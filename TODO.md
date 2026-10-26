@@ -25,6 +25,14 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       promotion places)
 - [x] Read the text of each language (`MyData/Languages`)
 
+## The engine of the screens
+
+- [ ] Read the layouts of the remake from `layouts/` first, then from the
+      import
+- [ ] Port the rest of the layout commands of the game: animations,
+      tweens, particle emitters, image sequences, templates, the crowd,
+      and the effects
+
 ## 0.3 Platforms
 
 - [ ] Build for iOS

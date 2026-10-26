@@ -38,6 +38,19 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   sold Bux in its store. The remake keeps the currency and removes only the
   store. Reason: the remake has no store, and the economy needs its cash.
 
+## New screens
+
+- **The remake has new screens, made from the assets of the game.** The
+  owner chose this on 2026-10-27. A new screen is a layout file in the
+  layout language of the game. It names the images of the atlases and the
+  macros of the game, for example `M_StandardButton`.
+- **The layouts of the remake are in `layouts/` of this repository.** The
+  app looks there first, then in the import. Reason: a new screen then has
+  the look of the game, and a pack can replace any screen.
+- **The repository holds no text of the layout files of the game.** A new
+  layout imports the macros of the game from the copy of the player when
+  it runs.
+
 ## The database and the packs
 
 - **The app reads the world from data packs.** The owner asked for a 2026
