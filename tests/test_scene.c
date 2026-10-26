@@ -282,7 +282,70 @@ static void test_panels_of_the_screen_and_of_origins(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The draws of a 3 x 2 crowd from the seed of the game. They come from a
+// copy of c_CrowdPacket.Draw in Python, with the same tweaks.
+static void test_draws_a_crowd(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Crowd", "Active", 1);
+    ssr_tweaks_set_number(tweaks, "Crowd", "TrouserColCount", 2);
+    ssr_tweaks_set(tweaks, "Crowd", "TrouserCol0", "808080FF");
+    ssr_tweaks_set(tweaks, "Crowd", "TrouserCol1", "806020FF");
+    ssr_tweaks_set_number(tweaks, "Crowd", "HatLikelihood", 0.3);
+    ssr_tweaks_set_number(tweaks, "Crowd", "HomeAwayBias", 0.7);
+    const char *sides[2] = {"HomeCrowd", "AwayCrowd"};
+    const char *home[2] = {"FF0000FF", "00FF00FF"};
+    const char *away[2] = {"0000FFFF", "FFFF00FF"};
+    for (int i = 0; i < 2; i++) {
+        ssr_tweaks_set_number(tweaks, sides[i], "Density", i ? 1.0 : 0.8);
+        ssr_tweaks_set_number(tweaks, sides[i], "StripChance", 0.7);
+        ssr_tweaks_set_number(tweaks, sides[i], "AwayStripChance", i ? 0.7 : 0.2);
+        ssr_tweaks_set(tweaks, sides[i], "ShirtColHome", home[i]);
+        ssr_tweaks_set(tweaks, sides[i], "ShirtColAway", away[i]);
+        for (int k = 0; k < 20; k++) {
+            char name[16], value[16];
+            snprintf(name, sizeof(name), "SkinCol%d", k);
+            snprintf(value, sizeof(value), "%02X%02X%02XFF", k * 10, k * 10, k * 10);
+            ssr_tweaks_set(tweaks, sides[i], name, value);
+        }
+    }
+    SSRUiTree *tree;
+    SSRScene *scene = build("Crowd:(0,0,20,40)\n"
+                            "\tHandle(10,40)\n"
+                            "\tSpacing(30,50)\n"
+                            "\tCopies(3,2)\n",
+                            tweaks, &tree);
+    static const struct {
+        const char *image;
+        float x, y, angle;
+        unsigned int rgb;
+    } expected[20] = {
+        {"CrowdTrousers1", 0, 0, 0, 0x808080}, {"CrowdShirt", 0, 0, 2, 0x6E94A6},
+        {"CrowdHead1", 0, 0, 2, 0x646464},     {"CrowdArms3", 0, 0, 2, 0x646464},
+        {"CrowdTrousers1", 59, 0, 0, 0x806020}, {"CrowdShirt", 59, 0, 1, 0xFFFF00},
+        {"CrowdHead1", 59, 1, 1, 0x5A5A5A},    {"CrowdArms2", 59, 0, 1, 0x5A5A5A},
+        {"CrowdTrousers1", 0, 50, 0, 0x808080}, {"CrowdShirt", 0, 50, 3, 0x0000FF},
+        {"CrowdHead2", 0, 50, 3, 0x141414},    {"CrowdArms4", 0, 50, 3, 0x141414},
+        {"CrowdTrousers1", 29, 50, 0, 0x806020}, {"CrowdShirt", 29, 50, 0, 0x227C22},
+        {"CrowdHead1", 29, 51, 0, 0x5A5A5A},   {"CrowdArms2", 29, 50, 0, 0x5A5A5A},
+        {"CrowdTrousers1", 60, 50, 0, 0x806020}, {"CrowdShirt", 60, 50, -3, 0xFF0000},
+        {"CrowdHead2", 60, 51, -3, 0x0A0A0A},  {"CrowdArms4", 60, 50, -3, 0x0A0A0A},
+    };
+    CHECK(ssr_scene_count(scene) == 20);
+    for (int i = 0; i < 20 && i < ssr_scene_count(scene); i++) {
+        const SSRSceneItem *item = ssr_scene_item(scene, i);
+        CHECK(strcmp(item->image, expected[i].image) == 0);
+        CHECK(near(item->pivotX, expected[i].x) && near(item->pivotY, expected[i].y));
+        CHECK(near(item->x, expected[i].x - 10) && near(item->y, expected[i].y - 40));
+        CHECK(near(item->angle, -expected[i].angle));
+        CHECK(item->colour == (expected[i].rgb << 8 | 0xFF));
+    }
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_draws_a_crowd();
     test_panels_of_the_screen_and_of_origins();
     test_sets_a_variable_many_times();
     test_tiles();

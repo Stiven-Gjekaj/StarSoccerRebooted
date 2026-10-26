@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "ssr_expr.h"
+#include "ssr_random.h"
 
 #define MAX_ORIGINS 64
 #define MAX_LAYERS 32
@@ -38,6 +39,9 @@ typedef struct {
     // "@x" is vars['x']. The game keeps the screen edges and the Set:
     // values in one table like this (c_MathUtils.m_SimpleVars).
     double vars[128];
+    // The random numbers of the crowds. Each build starts at the seed of
+    // the game, so a screen keeps the same crowd.
+    SSRRandom random;
     char layerNames[MAX_LAYERS][32];
     int layerCount;
 } Walker;
@@ -456,6 +460,113 @@ static void spine(Walker *w, const SSRUiNode *node, int layer, float ox, float o
     }
 }
 
+// One part of a fan of a crowd: the image, the place of its handle, the
+// angle, and the tint.
+static void crowd_part(Walker *w, int layer, const char *image, float x, float y, float width, float height,
+                       float handleX, float handleY, float angle, unsigned int rgb) {
+    SSRSceneItem *item = add_item(w, SSR_ITEM_IMAGE, layer, NULL);
+    if (!item) return;
+    item->image = keep(w->scene, image);
+    item->x = x - handleX;
+    item->y = y - handleY;
+    item->w = width;
+    item->h = height;
+    item->pivotX = x;
+    item->pivotY = y;
+    // The game turns the fan with the matrix (cos, -sin, sin, cos).
+    item->angle = -angle;
+    item->colour = (rgb << 8) | 0xFF;
+}
+
+static unsigned int tweak_rgb(Walker *w, const char *group, const char *name) {
+    return ssr_tweaks_colour(w->env->tweaks, group, name, 0xFFFFFFFF) >> 8;
+}
+
+// Crowd:(x,y,w,h,size) and BottomCrowd:(x,y,w,h): a grid of Copies(columns,
+// rows) fans, Spacing(x,y) apart. Each fan has trousers, a shirt, a head,
+// arms, and maybe a hat, with random tints from the tweaks of the crowd.
+// This is c_CrowdPacket.Draw of the game.
+static void crowd(Walker *w, const SSRUiNode *node, int layer, float ox, float oy, int bottom) {
+    const SSRTweaks *t = w->env->tweaks;
+    if (ssr_tweaks_number(t, "Crowd", "Active") <= 0) return;
+    if (!bottom && node->argCount >= 5 && number(w, node, 4, 1) == 0) return;
+    static const char *arms[] = {"CrowdArms1", "CrowdArms2", "CrowdArms3", "CrowdArms4"};
+    static const char *heads[] = {"CrowdHead1", "CrowdHead2"};
+    static const char *hats[] = {"CrowdHat1", "CrowdHat2"};
+    static const char *trousers[] = {"CrowdTrousers1", "CrowdTrousers2"};
+    static const char *bottomArms[] = {"CrowdBottomArms1", "CrowdBottomArms2"};
+    static const char *bottomHeads[] = {"CrowdBottomHead1"};
+    static const char *bottomTrousers[] = {"CrowdBottomTrousers1", "CrowdBottomTrousers2"};
+    const char *const *armList = bottom ? bottomArms : arms;
+    const char *const *headList = bottom ? bottomHeads : heads;
+    const char *const *trouserList = bottom ? bottomTrousers : trousers;
+    int armCount = bottom ? 2 : 4, headCount = bottom ? 1 : 2;
+    const char *shirt = bottom ? "CrowdBottomShirt1" : "CrowdShirt";
+
+    float x0 = ox + (float)number(w, node, 0, 0), y0 = oy + (float)number(w, node, 1, 0);
+    float width = (float)number(w, node, 2, 0), height = (float)number(w, node, 3, 0);
+    const SSRUiNode *m = modifier(node, "Handle");
+    float handleX = m ? (float)number(w, m, 0, 0) : 0, handleY = m ? (float)number(w, m, 1, 0) : 0;
+    // A handle of 1 or less is a part of the size.
+    if (fabsf(handleX) <= 1) handleX *= width;
+    if (fabsf(handleY) <= 1) handleY *= height;
+    m = modifier(node, "Spacing");
+    float stepX = m ? (float)number(w, m, 0, width) : width, stepY = m ? (float)number(w, m, 1, height) : height;
+    m = modifier(node, "Copies");
+    int columns = m ? (int)number(w, m, 0, 0) : 0, rows = m ? (int)number(w, m, 1, 0) : 0;
+
+    float homeDensity = (float)ssr_tweaks_number(t, "HomeCrowd", "Density");
+    float awayDensity = (float)ssr_tweaks_number(t, "AwayCrowd", "Density");
+    float hatLikelihood = (float)ssr_tweaks_number(t, "Crowd", "HatLikelihood");
+    float bias = (float)ssr_tweaks_number(t, "Crowd", "HomeAwayBias");
+    int trouserColours = (int)ssr_tweaks_number(t, "Crowd", "TrouserColCount");
+    if (trouserColours < 1) trouserColours = 1;
+    SSRRandom *r = &w->random;
+    float y = y0;
+    for (int row = 0; row < rows; row++) {
+        float x = x0;
+        float rowBias = row * 0.2f / (float)(rows + 1);
+        for (int column = 0; column < columns; column++) {
+            int home = ssr_rand_float(r, 0, 1) < bias;
+            const char *side = home ? "HomeCrowd" : "AwayCrowd";
+            float density = (home ? homeDensity : awayDensity) + rowBias;
+            if (ssr_rand_float(r, 0, 1) <= density) {
+                int px = (int)(ssr_rand_float(r, -1, 1) + x);
+                int yBody = (int)(y + ssr_rand_float(r, 0, 2));
+                float angle = (float)(int)ssr_rand_float(r, -4, 4);
+                int yHead = (int)(ssr_rand_float(r, 0, 2) + (float)yBody);
+                int head = ssr_rand2(r, 0, headCount - 1);
+                char name[32];
+                snprintf(name, sizeof(name), "TrouserCol%d", ssr_rand2(r, 0, trouserColours - 1));
+                unsigned int trouser = tweak_rgb(w, "Crowd", name);
+                crowd_part(w, layer, trouserList[ssr_rand2(r, 0, 1)], (float)px, y, width, height, handleX, handleY,
+                           0, trouser);
+                unsigned int sr = (unsigned int)ssr_rand2(r, 30, 200), sg = (unsigned int)ssr_rand2(r, 30, 200);
+                unsigned int sb = (unsigned int)ssr_rand2(r, 30, 200);
+                unsigned int shirtRgb = sr << 16 | sg << 8 | sb;
+                int skin = abs((ssr_rand2(r, 1, 39) + ssr_rand2(r, 1, 39)) / 2 - 20);
+                snprintf(name, sizeof(name), "SkinCol%d", skin);
+                unsigned int skinRgb = tweak_rgb(w, side, name);
+                if (ssr_rand_float(r, 0, 1) < (float)ssr_tweaks_number(t, side, "StripChance")) {
+                    int away = ssr_rand_float(r, 0, 1) < (float)ssr_tweaks_number(t, side, "AwayStripChance");
+                    shirtRgb = tweak_rgb(w, side, away ? "ShirtColAway" : "ShirtColHome");
+                }
+                crowd_part(w, layer, shirt, (float)px, (float)yBody, width, height, handleX, handleY, angle, shirtRgb);
+                crowd_part(w, layer, headList[head], (float)px, (float)yHead, width, height, handleX, handleY, angle,
+                           skinRgb);
+                crowd_part(w, layer, armList[ssr_rand2(r, 0, armCount - 1)], (float)px, (float)yBody, width, height,
+                           handleX, handleY, angle, skinRgb);
+                if (!bottom && ssr_rand_float(r, 0, 1) < hatLikelihood - skin * 0.01f) {
+                    crowd_part(w, layer, hats[head], (float)px, (float)yHead, width, height, handleX, handleY, angle,
+                               shirtRgb);
+                }
+            }
+            x += stepX;
+        }
+        y += stepY;
+    }
+}
+
 static void walk(Walker *w, const SSRUiNode *node, int layer) {
     const char *name = node->name;
     float ox = w->originX[w->originCount - 1], oy = w->originY[w->originCount - 1];
@@ -562,6 +673,12 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
         return;
     }
 
+    if (strcmp(name, "Crowd") == 0 || strcmp(name, "BottomCrowd") == 0) {
+        crowd(w, node, layer, ox, oy, name[0] == 'B');
+        walk_children(w, node, layer);
+        return;
+    }
+
     if (strcmp(name, "Spine") == 0) {
         spine(w, node, layer, ox, oy);
         walk_children(w, node, layer);
@@ -619,6 +736,7 @@ SSRScene *ssr_scene_build(const SSRUiTree *tree, const SSRSceneEnv *env) {
     w->scene = scene;
     w->env = env;
     w->originCount = 1;
+    w->random.seed = SSR_RANDOM_START;
     w->panel[0][0] = env->left;
     w->panel[0][1] = env->top;
     w->panel[0][2] = env->left + env->width;
