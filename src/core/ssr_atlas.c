@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ssr_fs.h"
+
 typedef struct {
     unsigned char *data;
     size_t size;
@@ -196,7 +198,7 @@ static void read_image(Reader *r, SSRAtlases *a, SSRAtlasImage *image) {
 }
 
 static unsigned char *read_file(const char *path, size_t *size) {
-    FILE *file = fopen(path, "rb");
+    FILE *file = ssr_fs_open(path, "rb");
     if (!file) return NULL;
     unsigned char *data = NULL;
     long length = -1;
@@ -289,7 +291,7 @@ SSRAtlases *ssr_atlas_load(const char *directory, const char *const *keys, int k
     for (int i = 0; i < a->pageCount; i++) {
         char path[4096];
         snprintf(path, sizeof(path), "%s/%s-quant.bin", directory, a->pages[i].name);
-        FILE *file = fopen(path, "rb");
+        FILE *file = ssr_fs_open(path, "rb");
         a->pages[i].rle = file != NULL;
         if (file) fclose(file);
     }

@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ssr_fs.h"
+
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
 #if defined(__clang__) || defined(__GNUC__)
@@ -85,7 +87,7 @@ uint32_t ssr_utf8_next(const char **text) {
 }
 
 SSRFont *ssr_font_load(const char *path, float pixelHeight) {
-    FILE *file = fopen(path, "rb");
+    FILE *file = ssr_fs_open(path, "rb");
     if (!file) return NULL;
     SSRFont *font = calloc(1, sizeof(SSRFont));
     long length = -1;

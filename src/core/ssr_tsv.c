@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ssr_fs.h"
+
 struct SSRTsv {
     char *text;
     // cells[row * columns + column]. Row 0 is the header row.
@@ -85,7 +87,7 @@ SSRTsv *ssr_tsv_parse(const char *text, size_t size) {
 }
 
 SSRTsv *ssr_tsv_load(const char *path) {
-    FILE *file = fopen(path, "rb");
+    FILE *file = ssr_fs_open(path, "rb");
     if (!file) return NULL;
     SSRTsv *table = NULL;
     if (fseek(file, 0, SEEK_END) == 0) {

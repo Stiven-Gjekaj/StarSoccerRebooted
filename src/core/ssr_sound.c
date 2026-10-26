@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ssr_fs.h"
+
 #if defined(__clang__) || defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -32,7 +34,7 @@ struct SSRSounds {
 };
 
 static int exists(const char *path) {
-    FILE *file = fopen(path, "rb");
+    FILE *file = ssr_fs_open(path, "rb");
     if (!file) return 0;
     fclose(file);
     return 1;
@@ -59,7 +61,7 @@ static void add(SSRSounds *sounds, const char *name, size_t nameLength, const ch
 SSRSounds *ssr_sounds_load(const char *gameDirectory) {
     char path[4096];
     snprintf(path, sizeof(path), "%s/Sounds/Sounds.txt", gameDirectory);
-    FILE *file = fopen(path, "rb");
+    FILE *file = ssr_fs_open(path, "rb");
     if (!file) return NULL;
     SSRSounds *sounds = calloc(1, sizeof(SSRSounds));
     char line[1024];
@@ -124,8 +126,10 @@ static int ends_with(const char *text, const char *end) {
     return 1;
 }
 
-int ssr_sound_decode(const char *path, SSRPcm *out) {
+int ssr_sound_decode(const char *asked, SSRPcm *out) {
     memset(out, 0, sizeof(*out));
+    char path[4096];
+    if (!ssr_fs_resolve(asked, path, sizeof(path))) return 0;
     if (ends_with(path, ".ogg")) {
         int channels = 0, rate = 0;
         short *samples = NULL;

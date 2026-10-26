@@ -1,7 +1,10 @@
 #include "ssr_image.h"
 
 #include <limits.h>
+#include <stdio.h>
 #include <string.h>
+
+#include "ssr_fs.h"
 
 // The game has only PNG and JPG images.
 #define STBI_ONLY_PNG
@@ -35,8 +38,11 @@ int ssr_image_decode(const void *data, size_t size, SSRImage *image) {
 
 int ssr_image_load(const char *path, SSRImage *image) {
     memset(image, 0, sizeof(*image));
+    FILE *file = ssr_fs_open(path, "rb");
+    if (!file) return 0;
     int width = 0, height = 0, channels = 0;
-    unsigned char *pixels = stbi_load(path, &width, &height, &channels, 4);
+    unsigned char *pixels = stbi_load_from_file(file, &width, &height, &channels, 4);
+    fclose(file);
     return keep(pixels, width, height, image);
 }
 
