@@ -29,7 +29,8 @@ typedef struct {
     // The box on the screen before the rotation. A negative width or
     // height flips the image.
     float x, y, w, h;
-    // The rotation in degrees, about the point (pivotX, pivotY).
+    // The rotation in degrees, about the point (pivotX, pivotY). A positive
+    // angle turns anticlockwise on the screen, as in the game.
     float angle;
     float pivotX, pivotY;
     // When quad is 1, the image goes on these four corners (top left, top

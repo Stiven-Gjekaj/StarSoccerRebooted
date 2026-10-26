@@ -229,8 +229,10 @@ static SDL_FPoint place(const Placement *p, float x, float y) {
     }
     float px = item->x + item->w * x - item->pivotX;
     float py = item->y + item->h * y - item->pivotY;
-    SDL_FPoint out = {item->pivotX + px * p->cosA - py * p->sinA + p->offsetX,
-                      item->pivotY + px * p->sinA + py * p->cosA + p->offsetY};
+    // The matrix of the game (c_GTransform): i = (cos, -sin), j = (sin, cos).
+    // A positive angle turns the image anticlockwise on the screen.
+    SDL_FPoint out = {item->pivotX + px * p->cosA + py * p->sinA + p->offsetX,
+                      item->pivotY - px * p->sinA + py * p->cosA + p->offsetY};
     return out;
 }
 
