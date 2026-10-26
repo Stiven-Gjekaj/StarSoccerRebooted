@@ -49,12 +49,12 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     if (!app) return SDL_APP_FAILURE;
     *state = app;
 
-    SDL_SetAppMetadata("NewStarSoccerRebooted", "0.1.0", "io.github.stivengjekaj.newstarsoccerrebooted");
+    SDL_SetAppMetadata("Star Soccer Rebooted", "0.1.0", "io.github.stivengjekaj.starsoccerrebooted");
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    if (!SDL_CreateWindowAndRenderer("NewStarSoccerRebooted", SSR_WIDTH, SSR_HEIGHT, SDL_WINDOW_RESIZABLE,
+    if (!SDL_CreateWindowAndRenderer("Star Soccer Rebooted", SSR_WIDTH, SSR_HEIGHT, SDL_WINDOW_RESIZABLE,
                                      &app->window, &app->renderer)) {
         SDL_Log("SDL_CreateWindowAndRenderer failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
@@ -62,7 +62,7 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     SDL_SetRenderLogicalPresentation(app->renderer, SSR_WIDTH, SSR_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
     SDL_SetRenderVSync(app->renderer, 1);
 
-    char *pref = SDL_GetPrefPath("StivenGjekaj", "NewStarSoccerRebooted");
+    char *pref = SDL_GetPrefPath("StivenGjekaj", "StarSoccerRebooted");
     if (!pref) return SDL_APP_FAILURE;
     SDL_snprintf(app->gameDirectory, sizeof(app->gameDirectory), "%sgame", pref);
     SDL_free(pref);
