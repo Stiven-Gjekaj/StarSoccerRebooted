@@ -8,10 +8,12 @@ typedef enum {
     NSR_SOURCE_UNKNOWN,
     NSR_SOURCE_APK,
     NSR_SOURCE_XAPK,
+    NSR_SOURCE_IPA,
 } NSRSource;
 
 // Copies each asset in the archive into the directory dest. The tree in
-// dest is the same as the tree under "assets/monkey/" in the APK. dest
+// dest is the same as the tree under "assets/monkey/" in an APK, or under
+// "Payload/<name>.app/data/" in an IPA. dest
 // gets the file "import.txt" last, when all the assets are there.
 // Returns the kind of the archive, or NSR_SOURCE_UNKNOWN when the archive
 // holds no assets or a copy fails. files gets the number of copied files.

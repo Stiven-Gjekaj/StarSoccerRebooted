@@ -91,6 +91,31 @@ static void test_imports_the_apk_in_an_xapk(void) {
     free(marker);
 }
 
+static void test_imports_the_assets_of_an_ipa(void) {
+    char archive[1100], dest[1100];
+    make_paths("ipa", archive, dest);
+    NSRZipFile files[] = {
+        {"Payload/soccer.app/Info.plist", "plist", 5, 0},
+        {"Payload/soccer.app/soccer", "binary", 6, 1},
+        {"Payload/soccer.app/data/MyData/Content.txt", "beach#\n", 7, 1},
+        {"Payload/soccer.app/data/Sounds/kick.mp3", "mp3", 3, 0},
+        {"Payload/soccer.app/Frameworks/Lib.framework/data/x.txt", "no", 2, 0},
+    };
+    CHECK(nsr_zipwriter_write(archive, files, 5));
+
+    int count = -1;
+    CHECK(nsr_import(archive, dest, &count) == NSR_SOURCE_IPA);
+    CHECK(count == 2);
+    char *text = read_text(dest, "MyData/Content.txt");
+    CHECK(text && strcmp(text, "beach#\n") == 0);
+    free(text);
+    CHECK(exists(dest, "Sounds/kick.mp3"));
+    CHECK(!exists(dest, "x.txt"));
+    char *marker = read_text(dest, "import.txt");
+    CHECK(marker && strcmp(marker, "source=ipa\nfiles=2\n") == 0);
+    free(marker);
+}
+
 static void test_refuses_an_archive_with_no_assets(void) {
     char archive[1100], dest[1100];
     make_paths("noassets", archive, dest);
@@ -133,6 +158,7 @@ static void test_a_failed_import_removes_the_old_marker(void) {
 int main(void) {
     test_imports_the_assets_of_an_apk();
     test_imports_the_apk_in_an_xapk();
+    test_imports_the_assets_of_an_ipa();
     test_refuses_an_archive_with_no_assets();
     test_refuses_a_name_that_leaves_the_directory();
     test_a_failed_import_removes_the_old_marker();

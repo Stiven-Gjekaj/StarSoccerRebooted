@@ -110,6 +110,25 @@ static int has_prefix(NSRZip *zip, const char *prefix) {
     return 0;
 }
 
+// Finds the prefix "Payload/<name>.app/data/" of an IPA. Returns 1 and
+// fills prefix when the archive has it.
+static int find_ipa_prefix(NSRZip *zip, char *prefix, size_t capacity) {
+    for (int i = 0; i < nsr_zip_count(zip); i++) {
+        const char *name = nsr_zip_name(zip, i);
+        if (!starts_with(name, "Payload/")) continue;
+        const char *app = name + strlen("Payload/");
+        const char *slash = strchr(app, '/');
+        if (!slash || slash - app < 5 || strncmp(slash - 4, ".app", 4) != 0) continue;
+        if (!starts_with(slash, "/data/")) continue;
+        size_t length = (size_t)(slash - name) + strlen("/data/");
+        if (length + 1 > capacity) return 0;
+        memcpy(prefix, name, length);
+        prefix[length] = 0;
+        return 1;
+    }
+    return 0;
+}
+
 NSRSource nsr_import(const char *archive, const char *dest, int *files) {
     if (files) *files = 0;
     NSRZip *zip = nsr_zip_open(archive);
@@ -117,9 +136,13 @@ NSRSource nsr_import(const char *archive, const char *dest, int *files) {
 
     NSRSource source = NSR_SOURCE_UNKNOWN;
     const char *prefix = NULL;
+    char ipaPrefix[1024];
     if (has_prefix(zip, NSR_APK_PREFIX)) {
         source = NSR_SOURCE_APK;
         prefix = NSR_APK_PREFIX;
+    } else if (find_ipa_prefix(zip, ipaPrefix, sizeof(ipaPrefix))) {
+        source = NSR_SOURCE_IPA;
+        prefix = ipaPrefix;
     }
 
     if (!prefix) {
@@ -168,6 +191,8 @@ const char *nsr_source_name(NSRSource source) {
         return "apk";
     case NSR_SOURCE_XAPK:
         return "xapk";
+    case NSR_SOURCE_IPA:
+        return "ipa";
     default:
         return "unknown";
     }
