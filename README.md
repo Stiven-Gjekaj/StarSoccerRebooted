@@ -1,4 +1,4 @@
-# NewStarSoccerRebooted
+# Star Soccer Rebooted
 
 A remake of New Star Soccer for iOS, Android, macOS, Windows, and Linux.
 It uses C99 and SDL3.
@@ -42,7 +42,7 @@ Give the app the path of your copy:
 
 You can also drop the file on the window. The app copies the assets into
 its data directory. On macOS this is
-`~/Library/Application Support/StivenGjekaj/NewStarSoccerRebooted/game`.
+`~/Library/Application Support/StivenGjekaj/StarSoccerRebooted/game`.
 After the first import, start the app with no path.
 
 To save the first frame as a PNG and quit:

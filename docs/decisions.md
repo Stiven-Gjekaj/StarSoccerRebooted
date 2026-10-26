@@ -5,7 +5,9 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 
 ## What the app is
 
-- **NewStarSoccerRebooted is a remake of New Star Soccer** for modern
+- **The name is Star Soccer Rebooted.** The owner chose it on 2026-10-26.
+  The repository folder keeps the name `NewStarSoccerRebooted`.
+- **Star Soccer Rebooted is a remake of New Star Soccer** for modern
   platforms: iOS, Android, macOS, Windows, and Linux. Reason: New Star Games
   seldom updates the game now.
 - **The game logic is a native rewrite.** The app does not run the code of
@@ -45,3 +47,8 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 - **The tests are plain C programs** that CTest runs. Reason: XCTest runs
   only on Apple platforms.
 - The prefix of the C names is `ssr`.
+
+## Identity
+
+- Display name `Star Soccer Rebooted`. Bundle ID
+  `io.github.stivengjekaj.starsoccerrebooted`.
