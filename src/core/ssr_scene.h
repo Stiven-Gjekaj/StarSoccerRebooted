@@ -58,8 +58,9 @@ typedef struct {
     const SSRTweaks *tweaks;
     // Gives the text of a language tag. NULL keeps the tag.
     const char *(*text)(void *context, const char *tag);
-    // Gives the size of an image when a Draw: has no size. NULL gives 0.
-    int (*image_size)(void *context, const char *name, float *w, float *h);
+    // Gives the size of an image when a Draw: has no size. file is the file
+    // of an Img: with the name, or NULL. NULL gives 0.
+    int (*image_size)(void *context, const char *name, const char *file, float *w, float *h);
     void *context;
 } SSRSceneEnv;
 

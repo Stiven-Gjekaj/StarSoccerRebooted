@@ -42,9 +42,10 @@ void ssr_gfx_text(SSRGfx *gfx, SSRFontSize size, const char *text, float x, floa
 float ssr_gfx_text_width(SSRGfx *gfx, SSRFontSize size, const char *text);
 float ssr_gfx_line_height(SSRGfx *gfx, SSRFontSize size);
 
-// The size of an image of the atlases, or of a file of the import. Returns
-// 0 when the image is not there.
-int ssr_gfx_image_size(SSRGfx *gfx, const char *name, float *w, float *h);
+// The size of an image: of the file of the import when file is not NULL,
+// else of the image of the atlases with the name. Returns 0 when the image
+// is not there.
+int ssr_gfx_image_size(SSRGfx *gfx, const char *name, const char *file, float *w, float *h);
 
 // Draws each item of the scene.
 void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene);

@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "ssr_audio.h"
+#include "ssr_fs.h"
 #include "ssr_gfx.h"
 #include "ssr_import.h"
 #include "ssr_scene.h"
@@ -41,8 +42,9 @@ typedef struct {
 
 static char *read_screen_file(void *context, const char *name, size_t *size) {
     const SSRApp *app = context;
-    char path[2400];
-    SDL_snprintf(path, sizeof(path), "%s/NewGUI/Screens/%s", app->gameDirectory, name);
+    char asked[2400], path[2400];
+    SDL_snprintf(asked, sizeof(asked), "%s/NewGUI/Screens/%s", app->gameDirectory, name);
+    if (!ssr_fs_resolve(asked, path, sizeof(path))) return NULL;
     char *data = SDL_LoadFile(path, size);
     if (!data) return NULL;
     // The parser frees the buffer with free(), so it gets a copy.
@@ -60,9 +62,9 @@ static const char *translate(void *context, const char *tag) {
     return app->text ? ssr_text_get(app->text, tag, 0) : tag;
 }
 
-static int image_size(void *context, const char *name, float *w, float *h) {
+static int image_size(void *context, const char *name, const char *file, float *w, float *h) {
     const SSRApp *app = context;
-    return ssr_gfx_image_size(app->gfx, name, w, h);
+    return ssr_gfx_image_size(app->gfx, name, file, w, h);
 }
 
 static void open_screen(SSRApp *app, const char *name) {
@@ -137,6 +139,7 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     } else if (ssr_import_is_done(app->gameDirectory)) {
         load_game(app);
     }
+
     return SDL_APP_CONTINUE;
 }
 

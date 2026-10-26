@@ -193,18 +193,18 @@ static SDL_Texture *atlas_texture_for(SSRGfx *gfx, const SSRAtlasImage *image) {
     return gfx->pageTextures[image->page];
 }
 
-int ssr_gfx_image_size(SSRGfx *gfx, const char *name, float *w, float *h) {
+// The atlases hold the images by the names of the Img: lines. The file of
+// an Img: line is only there when the atlases do not have the name.
+int ssr_gfx_image_size(SSRGfx *gfx, const char *name, const char *file, float *w, float *h) {
     if (!gfx) return 0;
-    const char *file = gfx->scene ? ssr_scene_image_file(gfx->scene, name) : NULL;
-    if (file) {
-        SDL_Texture *texture = ssr_gfx_texture(gfx, file);
-        return texture && SDL_GetTextureSize(texture, w, h);
-    }
     const SSRAtlasImage *image = ssr_atlas_find(gfx->atlases, name);
-    if (!image) return 0;
-    *w = (float)image->originalWidth;
-    *h = (float)image->originalHeight;
-    return 1;
+    if (image) {
+        *w = (float)image->originalWidth;
+        *h = (float)image->originalHeight;
+        return 1;
+    }
+    SDL_Texture *texture = file ? ssr_gfx_texture(gfx, file) : NULL;
+    return texture && SDL_GetTextureSize(texture, w, h);
 }
 
 typedef struct {
@@ -294,9 +294,9 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     p.cosA = cosf(radians);
     p.sinA = sinf(radians);
 
-    const char *file = gfx->scene ? ssr_scene_image_file(gfx->scene, item->image) : NULL;
+    const SSRAtlasImage *image = ssr_atlas_find(gfx->atlases, item->image);
+    const char *file = image || !gfx->scene ? NULL : ssr_scene_image_file(gfx->scene, item->image);
     SDL_Texture *texture = file ? ssr_gfx_texture(gfx, file) : NULL;
-    const SSRAtlasImage *image = texture ? NULL : ssr_atlas_find(gfx->atlases, item->image);
     if (!texture && !image) return;
     SDL_BlendMode mode = item->additive ? SDL_BLENDMODE_ADD : SDL_BLENDMODE_BLEND;
     if (texture) {
@@ -425,4 +425,5 @@ void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene) {
         }
     }
     SDL_SetRenderClipRect(gfx->renderer, NULL);
+    gfx->scene = NULL;
 }

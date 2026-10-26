@@ -25,8 +25,13 @@ static const char *translate(void *context, const char *tag) {
     return tag;
 }
 
-static int image_size(void *context, const char *name, float *w, float *h) {
+static int image_size(void *context, const char *name, const char *file, float *w, float *h) {
     (void)context;
+    if (file && strcmp(file, "NewGUI/Big.png") == 0) {
+        *w = 100;
+        *h = 50;
+        return 1;
+    }
     if (strcmp(name, "Glint") != 0) return 0;
     *w = 40;
     *h = 20;
@@ -118,6 +123,8 @@ static void test_text_areas_layers_and_clips(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
     SSRScene *scene = build("Img:(Pitch,NewGUI/Pitch.png)\n"
+                            "Img:(Big,NewGUI/Big.png)\n"
+                            "Draw:(Big,0,0)\n"
                             "Draw:(Front,0,0,10,10)\n"
                             "\tLayer(AfterGloss)\n"
                             "Rect:(20,30,200,80) ref:PlayButton\n"
@@ -131,16 +138,18 @@ static void test_text_areas_layers_and_clips(void) {
                             "\tDraw:(Inside,0,0,10,10)\n"
                             "}\n",
                             tweaks, &tree);
-    CHECK(ssr_scene_count(scene) == 7);
-    const SSRSceneItem *area = ssr_scene_item(scene, 0);
+    CHECK(ssr_scene_count(scene) == 8);
+    const SSRSceneItem *big = ssr_scene_item(scene, 0);
+    CHECK(big && big->w == 100 && big->h == 50);
+    const SSRSceneItem *area = ssr_scene_item(scene, 1);
     CHECK(area && area->kind == SSR_ITEM_AREA && strcmp(area->ref, "PlayButton") == 0);
-    const SSRSceneItem *label = ssr_scene_item(scene, 1);
+    const SSRSceneItem *label = ssr_scene_item(scene, 2);
     CHECK(label && label->kind == SSR_ITEM_TEXT && strcmp(label->text, "Play") == 0);
     CHECK(label && label->font == 2 && label->alignX == 'L' && label->alignY == 'T' && label->colour == 0x00FF00FF);
-    CHECK(strcmp(ssr_scene_item(scene, 2)->text, "0") == 0);
-    CHECK(ssr_scene_item(scene, 3)->kind == SSR_ITEM_CLIP && ssr_scene_item(scene, 5)->kind == SSR_ITEM_UNCLIP);
+    CHECK(strcmp(ssr_scene_item(scene, 3)->text, "0") == 0);
+    CHECK(ssr_scene_item(scene, 4)->kind == SSR_ITEM_CLIP && ssr_scene_item(scene, 6)->kind == SSR_ITEM_UNCLIP);
     // The item of a later layer draws last.
-    CHECK(strcmp(ssr_scene_item(scene, 6)->image, "Front") == 0);
+    CHECK(strcmp(ssr_scene_item(scene, 7)->image, "Front") == 0);
 
     CHECK(strcmp(ssr_scene_image_file(scene, "Pitch"), "NewGUI/Pitch.png") == 0);
     CHECK(ssr_scene_image_file(scene, "Other") == NULL);

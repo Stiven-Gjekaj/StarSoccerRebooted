@@ -375,7 +375,8 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
             }
             if (width == 0 || height == 0) {
                 float iw = 0, ih = 0;
-                if (w->env->image_size && w->env->image_size(w->env->context, item->image, &iw, &ih) && iw > 0 &&
+                const char *file = ssr_scene_image_file(w->scene, item->image);
+                if (w->env->image_size && w->env->image_size(w->env->context, item->image, file, &iw, &ih) && iw > 0 &&
                     ih > 0) {
                     if (width == 0 && height == 0) {
                         width = iw;
