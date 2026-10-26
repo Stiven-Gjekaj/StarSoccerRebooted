@@ -19,6 +19,13 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 
 ## What the remake changes
 
+- **The aim of the remake is a world that feels alive.** The owner chose
+  this on 2026-10-26. The world has rivalries, events, comebacks, and
+  histories. Other players exist and have careers of their own. Reason: in
+  the original, the player of the user is the only player with a career.
+  `c_TPlayer` has one instance (`g_player`), `c_StatHistory` records only
+  that player, and a club is mostly a strength number from `Clubs.txt`.
+
 - **The remake has no Bux.** The owner chose this on 2026-10-26. The
   original sells Bux, and it also gives some after a match. The things that
   Bux buy in the original come from play or from money in the remake.

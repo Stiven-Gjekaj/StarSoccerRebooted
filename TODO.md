@@ -90,6 +90,30 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - The cloud saves and the analytics of New Star Games (`CloudSetup`,
   `CloudCohort`, Firebase, Flurry)
 
+## A living world
+
+The aim of the remake. See [docs/decisions.md](docs/decisions.md).
+
+- [ ] Other players with careers: age, skill, form, transfers, injuries,
+      and retirement
+- [ ] Clubs with squads, managers, finances, and histories
+- [ ] Rivalries: derbies from the distance between stadiums, and rivalries
+      that grow from cup finals, title races, and transfers
+- [ ] Events: a news feed, a sacked manager, a scandal, a record transfer
+- [ ] Comebacks and form: a club in a bad run, a player who returns from
+      an injury
+- [ ] Histories: the champions of each season, records, the hall of fame
+      of each club
+
+## Ideas after 1.0
+
+- [ ] Choose the position of the player, and change it later
+- [ ] An editor for the leagues and the clubs
+- [ ] Data packs and art packs
+- [ ] More kinds of match moments: set pieces, defence, saves
+- [ ] A manager career after retirement
+- [ ] Seeds and replays
+
 ## Open questions
 
-- New features after 1.0: which features that the original does not have?
+- When does the living world come: in the season (0.6), or after 1.0?
