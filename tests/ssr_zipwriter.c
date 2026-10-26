@@ -1,4 +1,4 @@
-#include "nsr_zipwriter.h"
+#include "ssr_zipwriter.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -43,7 +43,7 @@ static unsigned char *deflate_raw(const void *data, size_t size, size_t *packedS
     return out;
 }
 
-int nsr_zipwriter_write(const char *path, const NSRZipFile *files, int count) {
+int ssr_zipwriter_write(const char *path, const SSRZipFile *files, int count) {
     FILE *file = fopen(path, "wb");
     if (!file) return 0;
     uint32_t *offsets = calloc((size_t)count + 1, sizeof(uint32_t));
@@ -52,7 +52,7 @@ int nsr_zipwriter_write(const char *path, const NSRZipFile *files, int count) {
     int ok = offsets && packedSizes && crcs;
 
     for (int i = 0; ok && i < count; i++) {
-        const NSRZipFile *entry = &files[i];
+        const SSRZipFile *entry = &files[i];
         size_t packedSize = entry->size;
         unsigned char *packed = NULL;
         if (entry->deflate) {
@@ -84,7 +84,7 @@ int nsr_zipwriter_write(const char *path, const NSRZipFile *files, int count) {
 
     uint32_t directoryOffset = (uint32_t)ftell(file);
     for (int i = 0; ok && i < count; i++) {
-        const NSRZipFile *entry = &files[i];
+        const SSRZipFile *entry = &files[i];
         uint16_t nameLength = (uint16_t)strlen(entry->name);
         put32(file, 0x02014b50);
         put16(file, 20);
@@ -122,11 +122,11 @@ int nsr_zipwriter_write(const char *path, const NSRZipFile *files, int count) {
     return ok;
 }
 
-const char *nsr_test_directory(const char *name) {
+const char *ssr_test_directory(const char *name) {
     static char path[1024];
     const char *base = getenv("TMPDIR");
     if (!base || !*base) base = "/tmp";
-    snprintf(path, sizeof(path), "%s/nsr-test-%s-%ld", base, name, (long)rand());
+    snprintf(path, sizeof(path), "%s/ssr-test-%s-%ld", base, name, (long)rand());
     char command[1200];
     snprintf(command, sizeof(command), "rm -rf '%s' && mkdir -p '%s'", path, path);
     if (system(command) != 0) return NULL;

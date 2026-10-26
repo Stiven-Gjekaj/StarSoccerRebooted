@@ -38,7 +38,7 @@ You need CMake and SDL3. On macOS:
 
 Give the app the path of your copy:
 
-    ./build/nsr path/to/NewStarSoccer.xapk
+    ./build/ssr path/to/NewStarSoccer.xapk
 
 You can also drop the file on the window. The app copies the assets into
 its data directory. On macOS this is
@@ -47,7 +47,7 @@ After the first import, start the app with no path.
 
 To save the first frame as a PNG and quit:
 
-    NSR_SHOT=frame.png ./build/nsr
+    SSR_SHOT=frame.png ./build/ssr
 
 ## Test
 

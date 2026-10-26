@@ -9,32 +9,32 @@ find_package(SDL3 REQUIRED CONFIG)
 find_package(ZLIB REQUIRED)
 
 # The code that has no window: the archives, the import, and later the rules.
-add_library(nsr_core STATIC
-    src/core/nsr_zip.c
-    src/core/nsr_import.c
+add_library(ssr_core STATIC
+    src/core/ssr_zip.c
+    src/core/ssr_import.c
 )
-target_include_directories(nsr_core PUBLIC src/core)
-target_link_libraries(nsr_core PUBLIC ZLIB::ZLIB)
-target_compile_options(nsr_core PRIVATE -Wall -Wextra)
+target_include_directories(ssr_core PUBLIC src/core)
+target_link_libraries(ssr_core PUBLIC ZLIB::ZLIB)
+target_compile_options(ssr_core PRIVATE -Wall -Wextra)
 
 # The app.
-add_executable(nsr src/app/main.c)
-target_link_libraries(nsr PRIVATE nsr_core SDL3::SDL3)
-target_compile_options(nsr PRIVATE -Wall -Wextra)
+add_executable(ssr src/app/main.c)
+target_link_libraries(ssr PRIVATE ssr_core SDL3::SDL3)
+target_compile_options(ssr PRIVATE -Wall -Wextra)
 
 enable_testing()
 
 # The helpers that each test uses: the checks and a writer for zip archives.
-add_library(nsr_testkit STATIC tests/nsr_zipwriter.c)
-target_include_directories(nsr_testkit PUBLIC tests)
-target_link_libraries(nsr_testkit PUBLIC nsr_core)
+add_library(ssr_testkit STATIC tests/ssr_zipwriter.c)
+target_include_directories(ssr_testkit PUBLIC tests)
+target_link_libraries(ssr_testkit PUBLIC ssr_core)
 
-function(nsr_add_test name)
+function(ssr_add_test name)
     add_executable(${name} tests/${name}.c)
-    target_link_libraries(${name} PRIVATE nsr_testkit)
+    target_link_libraries(${name} PRIVATE ssr_testkit)
     target_compile_options(${name} PRIVATE -Wall -Wextra)
     add_test(NAME ${name} COMMAND ${name})
 endfunction()
 
-nsr_add_test(test_zip)
-nsr_add_test(test_import)
+ssr_add_test(test_zip)
+ssr_add_test(test_import)

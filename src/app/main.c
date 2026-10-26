@@ -1,16 +1,16 @@
 // The app: imports the copy of the player, then shows the game.
 // Start it with the path of an APK, XAPK, or IPA, or drop the file on the
 // window.
-// Set NSR_SHOT to a path to save the first frame as a PNG and quit.
+// Set SSR_SHOT to a path to save the first frame as a PNG and quit.
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-#include "nsr_import.h"
+#include "ssr_import.h"
 
-#define NSR_WIDTH 960
-#define NSR_HEIGHT 640
+#define SSR_WIDTH 960
+#define SSR_HEIGHT 640
 
 typedef struct {
     SDL_Window *window;
@@ -18,9 +18,9 @@ typedef struct {
     SDL_Texture *logo;
     char gameDirectory[2048];
     char message[256];
-} NSRApp;
+} SSRApp;
 
-static void load_logo(NSRApp *app) {
+static void load_logo(SSRApp *app) {
     char path[2300];
     SDL_snprintf(path, sizeof(path), "%s/Images2x/NSS_Watermark.png", app->gameDirectory);
     SDL_Surface *surface = SDL_LoadPNG(path);
@@ -32,20 +32,20 @@ static void load_logo(NSRApp *app) {
     SDL_DestroySurface(surface);
 }
 
-static void import_copy(NSRApp *app, const char *archive) {
+static void import_copy(SSRApp *app, const char *archive) {
     int files = 0;
-    NSRSource source = nsr_import(archive, app->gameDirectory, &files);
-    if (source == NSR_SOURCE_UNKNOWN) {
+    SSRSource source = ssr_import(archive, app->gameDirectory, &files);
+    if (source == SSR_SOURCE_UNKNOWN) {
         SDL_snprintf(app->message, sizeof(app->message), "This file is not a copy of New Star Soccer.");
         return;
     }
-    SDL_Log("Imported %d files from the %s.", files, nsr_source_name(source));
+    SDL_Log("Imported %d files from the %s.", files, ssr_source_name(source));
     app->message[0] = 0;
     load_logo(app);
 }
 
 SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
-    NSRApp *app = SDL_calloc(1, sizeof(NSRApp));
+    SSRApp *app = SDL_calloc(1, sizeof(SSRApp));
     if (!app) return SDL_APP_FAILURE;
     *state = app;
 
@@ -54,12 +54,12 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    if (!SDL_CreateWindowAndRenderer("NewStarSoccerRebooted", NSR_WIDTH, NSR_HEIGHT, SDL_WINDOW_RESIZABLE,
+    if (!SDL_CreateWindowAndRenderer("NewStarSoccerRebooted", SSR_WIDTH, SSR_HEIGHT, SDL_WINDOW_RESIZABLE,
                                      &app->window, &app->renderer)) {
         SDL_Log("SDL_CreateWindowAndRenderer failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    SDL_SetRenderLogicalPresentation(app->renderer, NSR_WIDTH, NSR_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    SDL_SetRenderLogicalPresentation(app->renderer, SSR_WIDTH, SSR_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
     SDL_SetRenderVSync(app->renderer, 1);
 
     char *pref = SDL_GetPrefPath("StivenGjekaj", "NewStarSoccerRebooted");
@@ -69,14 +69,14 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
 
     if (argc > 1) {
         import_copy(app, argv[1]);
-    } else if (nsr_import_is_done(app->gameDirectory)) {
+    } else if (ssr_import_is_done(app->gameDirectory)) {
         load_logo(app);
     }
     return SDL_APP_CONTINUE;
 }
 
 SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
-    NSRApp *app = state;
+    SSRApp *app = state;
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
     if (event->type == SDL_EVENT_DROP_FILE && event->drop.data) import_copy(app, event->drop.data);
     return SDL_APP_CONTINUE;
@@ -84,11 +84,11 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
 
 static void draw_centered_text(SDL_Renderer *renderer, float y, const char *text) {
     float width = (float)SDL_strlen(text) * SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE;
-    SDL_RenderDebugText(renderer, (NSR_WIDTH - width) / 2, y, text);
+    SDL_RenderDebugText(renderer, (SSR_WIDTH - width) / 2, y, text);
 }
 
 SDL_AppResult SDL_AppIterate(void *state) {
-    NSRApp *app = state;
+    SSRApp *app = state;
     SDL_SetRenderDrawColor(app->renderer, 34, 120, 52, 255);
     SDL_RenderClear(app->renderer);
     SDL_SetRenderDrawColor(app->renderer, 255, 255, 255, 255);
@@ -96,15 +96,15 @@ SDL_AppResult SDL_AppIterate(void *state) {
     if (app->logo) {
         float width = 0, height = 0;
         SDL_GetTextureSize(app->logo, &width, &height);
-        SDL_FRect place = {(NSR_WIDTH - width) / 2, (NSR_HEIGHT - height) / 2, width, height};
+        SDL_FRect place = {(SSR_WIDTH - width) / 2, (SSR_HEIGHT - height) / 2, width, height};
         SDL_RenderTexture(app->renderer, app->logo, NULL, &place);
     } else {
-        draw_centered_text(app->renderer, NSR_HEIGHT / 2 - 12, "Drop your copy of New Star Soccer here.");
-        draw_centered_text(app->renderer, NSR_HEIGHT / 2 + 4, "The app reads an APK, an XAPK, or an IPA.");
+        draw_centered_text(app->renderer, SSR_HEIGHT / 2 - 12, "Drop your copy of New Star Soccer here.");
+        draw_centered_text(app->renderer, SSR_HEIGHT / 2 + 4, "The app reads an APK, an XAPK, or an IPA.");
     }
-    if (app->message[0]) draw_centered_text(app->renderer, NSR_HEIGHT - 40, app->message);
+    if (app->message[0]) draw_centered_text(app->renderer, SSR_HEIGHT - 40, app->message);
 
-    const char *shot = SDL_getenv("NSR_SHOT");
+    const char *shot = SDL_getenv("SSR_SHOT");
     if (shot && *shot) {
         SDL_Surface *frame = SDL_RenderReadPixels(app->renderer, NULL);
         bool saved = frame && SDL_SavePNG(frame, shot);
@@ -118,7 +118,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
 
 void SDL_AppQuit(void *state, SDL_AppResult result) {
     (void)result;
-    NSRApp *app = state;
+    SSRApp *app = state;
     if (!app) return;
     if (app->logo) SDL_DestroyTexture(app->logo);
     SDL_free(app);

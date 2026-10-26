@@ -44,4 +44,4 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   It uses zlib.
 - **The tests are plain C programs** that CTest runs. Reason: XCTest runs
   only on Apple platforms.
-- The prefix of the C names is `nsr`.
+- The prefix of the C names is `ssr`.

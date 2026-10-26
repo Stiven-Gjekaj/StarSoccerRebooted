@@ -1,4 +1,4 @@
-#include "nsr_zip.h"
+#include "ssr_zip.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -12,11 +12,11 @@ typedef struct {
     uint32_t compressed;
     uint32_t size;
     uint32_t offset;
-} NSRZipEntry;
+} SSRZipEntry;
 
-struct NSRZip {
+struct SSRZip {
     FILE *file;
-    NSRZipEntry *entries;
+    SSRZipEntry *entries;
     int count;
 };
 
@@ -51,7 +51,7 @@ static long find_end_record(FILE *file, unsigned char record[22]) {
     return found;
 }
 
-NSRZip *nsr_zip_open(const char *path) {
+SSRZip *ssr_zip_open(const char *path) {
     FILE *file = fopen(path, "rb");
     if (!file) return NULL;
     unsigned char end[22];
@@ -64,8 +64,8 @@ NSRZip *nsr_zip_open(const char *path) {
     uint32_t directoryOffset = read32(end + 16);
 
     unsigned char *directory = malloc(directorySize ? directorySize : 1);
-    NSRZip *zip = calloc(1, sizeof(NSRZip));
-    if (zip) zip->entries = calloc(count ? (size_t)count : 1, sizeof(NSRZipEntry));
+    SSRZip *zip = calloc(1, sizeof(SSRZip));
+    if (zip) zip->entries = calloc(count ? (size_t)count : 1, sizeof(SSRZipEntry));
     if (!directory || !zip || !zip->entries || fseek(file, directoryOffset, SEEK_SET) != 0 ||
         fread(directory, 1, directorySize, file) != directorySize) {
         free(directory);
@@ -83,7 +83,7 @@ NSRZip *nsr_zip_open(const char *path) {
         uint16_t nameLength = read16(p + 28);
         uint32_t next = at + 46 + nameLength + read16(p + 30) + read16(p + 32);
         if (next > directorySize) break;
-        NSRZipEntry *entry = &zip->entries[zip->count];
+        SSRZipEntry *entry = &zip->entries[zip->count];
         entry->name = malloc(nameLength + 1u);
         if (!entry->name) break;
         memcpy(entry->name, p + 46, nameLength);
@@ -99,7 +99,7 @@ NSRZip *nsr_zip_open(const char *path) {
     return zip;
 }
 
-void nsr_zip_close(NSRZip *zip) {
+void ssr_zip_close(SSRZip *zip) {
     if (!zip) return;
     for (int i = 0; i < zip->count; i++) free(zip->entries[i].name);
     free(zip->entries);
@@ -107,11 +107,11 @@ void nsr_zip_close(NSRZip *zip) {
     free(zip);
 }
 
-int nsr_zip_count(const NSRZip *zip) {
+int ssr_zip_count(const SSRZip *zip) {
     return zip ? zip->count : 0;
 }
 
-const char *nsr_zip_name(const NSRZip *zip, int index) {
+const char *ssr_zip_name(const SSRZip *zip, int index) {
     if (!zip || index < 0 || index >= zip->count) return NULL;
     return zip->entries[index].name;
 }
@@ -140,9 +140,9 @@ static unsigned char *inflate_all(const unsigned char *in, uint32_t inSize, uint
     return out;
 }
 
-unsigned char *nsr_zip_read(NSRZip *zip, const char *name, size_t *size) {
+unsigned char *ssr_zip_read(SSRZip *zip, const char *name, size_t *size) {
     if (!zip || !name) return NULL;
-    NSRZipEntry *entry = NULL;
+    SSRZipEntry *entry = NULL;
     for (int i = 0; i < zip->count; i++) {
         if (strcmp(zip->entries[i].name, name) == 0) {
             entry = &zip->entries[i];
