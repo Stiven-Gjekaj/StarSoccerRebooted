@@ -7,6 +7,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
+#include "ssr_image.h"
 #include "ssr_import.h"
 
 // The game is portrait. The 2x images fill 640 x 960 pixels.
@@ -16,21 +17,36 @@
 typedef struct {
     SDL_Window *window;
     SDL_Renderer *renderer;
+    SDL_Texture *background;
     SDL_Texture *logo;
+    SDL_Texture *photo;
     char gameDirectory[2048];
     char message[256];
 } SSRApp;
 
-static void load_logo(SSRApp *app) {
+// Loads an image of the import, for example "Images2x/NSS_Watermark.png".
+static SDL_Texture *load_texture(SSRApp *app, const char *name) {
     char path[2300];
-    SDL_snprintf(path, sizeof(path), "%s/Images2x/NSS_Watermark.png", app->gameDirectory);
-    SDL_Surface *surface = SDL_LoadPNG(path);
-    if (!surface) {
-        SDL_snprintf(app->message, sizeof(app->message), "The import has no logo: %s", SDL_GetError());
-        return;
+    SDL_snprintf(path, sizeof(path), "%s/%s", app->gameDirectory, name);
+    SSRImage image;
+    if (!ssr_image_load(path, &image)) {
+        SDL_snprintf(app->message, sizeof(app->message), "The import has no %s.", name);
+        return NULL;
     }
-    app->logo = SDL_CreateTextureFromSurface(app->renderer, surface);
+    SDL_Surface *surface = SDL_CreateSurfaceFrom(image.width, image.height, SDL_PIXELFORMAT_RGBA32, image.pixels,
+                                                 image.width * 4);
+    SDL_Texture *texture = surface ? SDL_CreateTextureFromSurface(app->renderer, surface) : NULL;
     SDL_DestroySurface(surface);
+    ssr_image_free(&image);
+    return texture;
+}
+
+static void load_title(SSRApp *app) {
+    // The background is white. The game tints it.
+    app->background = load_texture(app, "Images2x/Backgrounds/Default.jpg");
+    if (app->background) SDL_SetTextureColorMod(app->background, 34, 120, 52);
+    app->logo = load_texture(app, "Images2x/NSS_Watermark.png");
+    app->photo = load_texture(app, "Images2x/Relationships/training_ground.jpg");
 }
 
 static void import_copy(SSRApp *app, const char *archive) {
@@ -42,7 +58,7 @@ static void import_copy(SSRApp *app, const char *archive) {
     }
     SDL_Log("Imported %d files from the %s.", files, ssr_source_name(source));
     app->message[0] = 0;
-    load_logo(app);
+    load_title(app);
 }
 
 SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
@@ -72,7 +88,7 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     if (argc > 1) {
         import_copy(app, argv[1]);
     } else if (ssr_import_is_done(app->gameDirectory)) {
-        load_logo(app);
+        load_title(app);
     }
     return SDL_APP_CONTINUE;
 }
@@ -95,12 +111,18 @@ SDL_AppResult SDL_AppIterate(void *state) {
     SDL_RenderClear(app->renderer);
     SDL_SetRenderDrawColor(app->renderer, 255, 255, 255, 255);
 
+    if (app->background) SDL_RenderTexture(app->renderer, app->background, NULL, NULL);
     if (app->logo) {
         float width = 0, height = 0;
         SDL_GetTextureSize(app->logo, &width, &height);
-        SDL_FRect place = {(SSR_WIDTH - width) / 2, (SSR_HEIGHT - height) / 2, width, height};
+        SDL_FRect place = {(SSR_WIDTH - width) / 2, 160, width, height};
         SDL_RenderTexture(app->renderer, app->logo, NULL, &place);
-    } else {
+    }
+    if (app->photo) {
+        SDL_FRect place = {(SSR_WIDTH - 480) / 2.0f, 320, 480, 480};
+        SDL_RenderTexture(app->renderer, app->photo, NULL, &place);
+    }
+    if (!app->logo) {
         draw_centered_text(app->renderer, SSR_HEIGHT / 2 - 12, "Drop your copy of New Star Soccer here.");
         draw_centered_text(app->renderer, SSR_HEIGHT / 2 + 4, "The app reads an APK, an XAPK, or an IPA.");
     }
@@ -122,6 +144,8 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     (void)result;
     SSRApp *app = state;
     if (!app) return;
+    if (app->background) SDL_DestroyTexture(app->background);
     if (app->logo) SDL_DestroyTexture(app->logo);
+    if (app->photo) SDL_DestroyTexture(app->photo);
     SDL_free(app);
 }
