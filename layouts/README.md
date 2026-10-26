@@ -1,0 +1,11 @@
+# Layouts
+
+This folder holds the screen layouts of Star Soccer Rebooted. They use the
+layout language of New Star Soccer. docs/formats.md describes it.
+
+- The app looks for a layout here first, then in the import of the player.
+  A layout here with the name of a layout of the game takes its place.
+- A layout names the images of the atlases and imports the macros of the
+  game, for example `Import:(ButtonMacros.uis)`. The import of the player
+  gives them when the app runs.
+- Do not copy text from the layout files of the game into this folder.

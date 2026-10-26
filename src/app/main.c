@@ -54,11 +54,17 @@ typedef struct {
     char message[256];
 } SSRApp;
 
+// Reads a layout file: from the layouts of the remake first, then from the
+// import. A layout of the remake takes the place of the one of the game.
 static char *read_screen_file(void *context, const char *name, size_t *size) {
     const SSRApp *app = context;
     char asked[2400], path[2400];
-    SDL_snprintf(asked, sizeof(asked), "%s/NewGUI/Screens/%s", app->gameDirectory, name);
-    if (!ssr_fs_resolve(asked, path, sizeof(path))) return NULL;
+    const char *base = SDL_GetBasePath();
+    SDL_snprintf(asked, sizeof(asked), "%slayouts/%s", base ? base : "", name);
+    if (!ssr_fs_resolve(asked, path, sizeof(path))) {
+        SDL_snprintf(asked, sizeof(asked), "%s/NewGUI/Screens/%s", app->gameDirectory, name);
+        if (!ssr_fs_resolve(asked, path, sizeof(path))) return NULL;
+    }
     char *data = SDL_LoadFile(path, size);
     if (!data) return NULL;
     // The parser frees the buffer with free(), so it gets a copy.

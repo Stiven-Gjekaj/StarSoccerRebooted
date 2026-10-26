@@ -63,6 +63,12 @@ if(IOS)
         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
     )
 endif()
+# The layouts of the remake go into the app as resources.
+file(GLOB SSR_LAYOUTS ${CMAKE_SOURCE_DIR}/layouts/*.uis ${CMAKE_SOURCE_DIR}/layouts/*.uih)
+if(SSR_LAYOUTS)
+    target_sources(ssr PRIVATE ${SSR_LAYOUTS})
+    set_source_files_properties(${SSR_LAYOUTS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/layouts)
+endif()
 set_target_properties(ssr PROPERTIES
     OUTPUT_NAME "Star Soccer Rebooted"
     MACOSX_BUNDLE_BUNDLE_NAME "Star Soccer Rebooted"
