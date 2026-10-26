@@ -98,6 +98,11 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 - **The tests are plain C programs** that CTest runs. Reason: XCTest runs
   only on Apple platforms.
 - The prefix of the C names is `ssr`.
+- **stb_image decodes the PNG and JPG images.** Reason: SDL3 decodes only
+  PNG, and the game also has JPG images. stb_image is one file, and it is
+  public domain.
+- **The screen is portrait, 640 x 960 logical pixels.** Reason: the game is
+  portrait, and its 2x images fill 640 x 960. The 1x images are 320 x 480.
 
 ## Identity
 

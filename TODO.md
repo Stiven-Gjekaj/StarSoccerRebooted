@@ -12,7 +12,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 
 ## 0.2 Assets
 
-- [ ] Decode JPG images (the backgrounds)
+- [x] Decode JPG images (the backgrounds)
 - [ ] Load the atlases of the interface (`NewGUI/Atlases`)
 - [ ] Draw text with the fonts and the glyph tables of the game
       (`Fonts`, `FontRenderer`)
