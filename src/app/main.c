@@ -9,8 +9,9 @@
 
 #include "ssr_import.h"
 
-#define SSR_WIDTH 960
-#define SSR_HEIGHT 640
+// The game is portrait. The 2x images fill 640 x 960 pixels.
+#define SSR_WIDTH 640
+#define SSR_HEIGHT 960
 
 typedef struct {
     SDL_Window *window;
@@ -54,7 +55,8 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    if (!SDL_CreateWindowAndRenderer("Star Soccer Rebooted", SSR_WIDTH, SSR_HEIGHT, SDL_WINDOW_RESIZABLE,
+    if (!SDL_CreateWindowAndRenderer("Star Soccer Rebooted", SSR_WIDTH * 3 / 4, SSR_HEIGHT * 3 / 4,
+                                     SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY,
                                      &app->window, &app->renderer)) {
         SDL_Log("SDL_CreateWindowAndRenderer failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
