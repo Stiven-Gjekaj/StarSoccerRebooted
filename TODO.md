@@ -27,7 +27,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 
 ## The engine of the screens
 
-- [ ] Read the layouts of the remake from `layouts/` first, then from the
+- [x] Read the layouts of the remake from `layouts/` first, then from the
       import
 - [ ] Port the rest of the layout commands of the game: animations,
       tweens, particle emitters, image sequences, templates, the crowd,
