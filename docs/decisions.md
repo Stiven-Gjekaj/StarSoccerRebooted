@@ -31,6 +31,19 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   Bux buy in the original come from play or from money in the remake.
   Reason: the remake has no store, so a second currency has no purpose.
 
+## The database and the packs
+
+- **The app reads the world from data packs.** The owner asked for a 2026
+  update and for real logos and real player names, as the fans want. The
+  default world is the 2014 data of the original, from the import.
+- **This repository holds no real logos and no real player names.** A pack
+  holds them, and the player installs it from a file. Reason: club logos
+  are trademarks, and the names of players are licensed (FIFPro licenses
+  them for games). The model is the same as the option files of PES: the
+  app is clean, and the community makes the packs.
+- **The 2026 data pack is a separate project.** Reason: it changes each
+  season and has its own legal risk. The app stays public and MIT.
+
 ## The assets of New Star Soccer
 
 - **The repository holds no file of New Star Soccer.** The licence of the
