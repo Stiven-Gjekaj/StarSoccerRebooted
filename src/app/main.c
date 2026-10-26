@@ -6,9 +6,15 @@
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "ssr_gfx.h"
 #include "ssr_import.h"
+#include "ssr_scene.h"
+#include "ssr_text.h"
+#include "ssr_tweaks.h"
+#include "ssr_ui.h"
 #include "ssr_world.h"
 
 // The game is portrait. The 2x images fill 640 x 960 pixels.
@@ -20,11 +26,55 @@ typedef struct {
     SDL_Renderer *renderer;
     SSRGfx *gfx;
     SSRWorld *world;
+    SSRText *text;
+    SSRTweaks *tweaks;
+    // The screen that shows now, from NewGUI/Screens.
+    SSRUiTree *screen;
     char gameDirectory[2048];
     char message[256];
 } SSRApp;
 
+static char *read_screen_file(void *context, const char *name, size_t *size) {
+    const SSRApp *app = context;
+    char path[2400];
+    SDL_snprintf(path, sizeof(path), "%s/NewGUI/Screens/%s", app->gameDirectory, name);
+    char *data = SDL_LoadFile(path, size);
+    if (!data) return NULL;
+    // The parser frees the buffer with free(), so it gets a copy.
+    char *copy = malloc(*size + 1);
+    if (copy) {
+        memcpy(copy, data, *size);
+        copy[*size] = 0;
+    }
+    SDL_free(data);
+    return copy;
+}
+
+static const char *translate(void *context, const char *tag) {
+    const SSRApp *app = context;
+    return app->text ? ssr_text_get(app->text, tag, 0) : tag;
+}
+
+static int image_size(void *context, const char *name, float *w, float *h) {
+    const SSRApp *app = context;
+    return ssr_gfx_image_size(app->gfx, name, w, h);
+}
+
+static void open_screen(SSRApp *app, const char *name) {
+    ssr_ui_free(app->screen);
+    SSRUiFiles files = {read_screen_file, app};
+    app->screen = ssr_ui_parse(name, &files);
+    if (!app->screen) {
+        SDL_Log("The screen %s is not there.", name);
+        return;
+    }
+    for (int i = 0; i < ssr_ui_problem_count(app->screen); i++) SDL_Log("%s", ssr_ui_problem(app->screen, i));
+}
+
 static void load_game(SSRApp *app) {
+    ssr_ui_free(app->screen);
+    ssr_text_free(app->text);
+    ssr_tweaks_free(app->tweaks);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
     app->gfx = ssr_gfx_create(app->renderer, app->gameDirectory);
@@ -32,6 +82,11 @@ static void load_game(SSRApp *app) {
     SDL_snprintf(path, sizeof(path), "%s/MyData/%s", app->gameDirectory, SSR_WORLD_DEFAULT_SET);
     app->world = ssr_world_load(path);
     if (!app->world) SDL_snprintf(app->message, sizeof(app->message), "The import has no data set %s.", SSR_WORLD_DEFAULT_SET);
+    ssr_text_free(app->text);
+    SDL_snprintf(path, sizeof(path), "%s/MyData/Languages/en.txt", app->gameDirectory);
+    app->text = ssr_text_load(path);
+    const char *screen = SDL_getenv("SSR_SCREEN");
+    open_screen(app, screen && *screen ? screen : "MainMenu.uis");
 }
 
 static void import_copy(SSRApp *app, const char *archive) {
@@ -69,6 +124,7 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     if (!pref) return SDL_APP_FAILURE;
     SDL_snprintf(app->gameDirectory, sizeof(app->gameDirectory), "%sgame", pref);
     SDL_free(pref);
+    app->tweaks = ssr_tweaks_create();
 
     if (argc > 1) {
         import_copy(app, argv[1]);
@@ -96,26 +152,11 @@ SDL_AppResult SDL_AppIterate(void *state) {
     SDL_RenderClear(app->renderer);
     SDL_SetRenderDrawColor(app->renderer, 255, 255, 255, 255);
 
-    SDL_Texture *background = ssr_gfx_texture(app->gfx, "Images2x/Backgrounds/Default.jpg");
-    if (background) {
-        // The background is white. The game tints it.
-        SDL_SetTextureColorMod(background, 34, 120, 52);
-        SDL_RenderTexture(app->renderer, background, NULL, NULL);
-    }
-    SDL_Texture *logo = ssr_gfx_texture(app->gfx, "Images2x/NSS_Watermark.png");
-    if (logo) {
-        float width = 0, height = 0;
-        SDL_GetTextureSize(logo, &width, &height);
-        SDL_FRect place = {(SSR_WIDTH - width) / 2, 160, width, height};
-        SDL_RenderTexture(app->renderer, logo, NULL, &place);
-    }
-    ssr_gfx_text(app->gfx, SSR_FONT_LARGE, "STAR SOCCER REBOOTED", SSR_WIDTH / 2.0f, 300, 0xFFFFFF, SSR_ALIGN_CENTER);
-    if (app->world) {
-        char line[128];
-        SDL_snprintf(line, sizeof(line), "%d clubs in %d nations", app->world->clubCount, app->world->nationCount);
-        ssr_gfx_text(app->gfx, SSR_FONT_MEDIUM, line, SSR_WIDTH / 2.0f, 420, 0xFFE066, SSR_ALIGN_CENTER);
-        ssr_gfx_text(app->gfx, SSR_FONT_SMALL, "The 2025 data of your copy", SSR_WIDTH / 2.0f, 480, 0xDDEEDD,
-                     SSR_ALIGN_CENTER);
+    if (app->screen) {
+        SSRSceneEnv env = {SSR_WIDTH, SSR_HEIGHT, app->tweaks, translate, image_size, app};
+        SSRScene *scene = ssr_scene_build(app->screen, &env);
+        ssr_gfx_draw_scene(app->gfx, scene);
+        ssr_scene_free(scene);
     }
     if (!app->gfx) {
         draw_centered_text(app->renderer, SSR_HEIGHT / 2 - 12, "Drop your copy of New Star Soccer here.");
@@ -139,6 +180,9 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     (void)result;
     SSRApp *app = state;
     if (!app) return;
+    ssr_ui_free(app->screen);
+    ssr_text_free(app->text);
+    ssr_tweaks_free(app->tweaks);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
     SDL_free(app);

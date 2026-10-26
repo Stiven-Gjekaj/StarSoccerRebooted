@@ -6,6 +6,8 @@
 #include <SDL3/SDL.h>
 #include <stdint.h>
 
+#include "ssr_scene.h"
+
 // The four sizes of the "new" font set of the game (Fonts/Fonts.txt).
 typedef enum {
     SSR_FONT_SMALL,
@@ -23,8 +25,8 @@ typedef enum {
 
 typedef struct SSRGfx SSRGfx;
 
-// Opens the fonts of the import in gameDirectory. A font that is not there
-// draws nothing.
+// Opens the fonts and the image atlases of the import in gameDirectory. A
+// font or an atlas that is not there draws nothing.
 SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory);
 void ssr_gfx_free(SSRGfx *gfx);
 
@@ -39,5 +41,12 @@ void ssr_gfx_text(SSRGfx *gfx, SSRFontSize size, const char *text, float x, floa
                   SSRAlign align);
 float ssr_gfx_text_width(SSRGfx *gfx, SSRFontSize size, const char *text);
 float ssr_gfx_line_height(SSRGfx *gfx, SSRFontSize size);
+
+// The size of an image of the atlases, or of a file of the import. Returns
+// 0 when the image is not there.
+int ssr_gfx_image_size(SSRGfx *gfx, const char *name, float *w, float *h);
+
+// Draws each item of the scene.
+void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene);
 
 #endif
