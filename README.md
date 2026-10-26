@@ -9,8 +9,10 @@ It uses C99 and SDL3.
 
 ## Status
 
-The app imports the assets from your copy and shows the logo of the game.
-The game itself is not there yet.
+The app imports the assets from your copy. It reads the 2025 data of the
+game, its text, its sounds, its fonts, and its image atlases. It draws the
+main menu of the game from the layout files of your copy, and the buttons
+play their sounds. The career and the match are not there yet.
 
 ## You need a copy of New Star Soccer
 
@@ -38,7 +40,7 @@ You need CMake and SDL3. On macOS:
 
 Give the app the path of your copy:
 
-    ./build/ssr path/to/NewStarSoccer.xapk
+    "./build/Star Soccer Rebooted.app/Contents/MacOS/Star Soccer Rebooted" path/to/NewStarSoccer.xapk
 
 You can also drop the file on the window. The app copies the assets into
 its data directory. On macOS this is
@@ -47,7 +49,15 @@ After the first import, start the app with no path.
 
 To save the first frame as a PNG and quit:
 
-    SSR_SHOT=frame.png ./build/ssr
+    SSR_SHOT=frame.png "./build/Star Soccer Rebooted.app/Contents/MacOS/Star Soccer Rebooted"
+
+To show another screen of the game, give its layout file:
+
+    SSR_SCREEN=Options.uis "./build/Star Soccer Rebooted.app/Contents/MacOS/Star Soccer Rebooted"
+
+To press a point of the screen after the first frame:
+
+    SSR_PRESS=500,540 "./build/Star Soccer Rebooted.app/Contents/MacOS/Star Soccer Rebooted"
 
 ## Test
 
