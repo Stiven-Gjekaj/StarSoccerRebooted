@@ -9,13 +9,7 @@
 #include "ssr_expr.h"
 
 #define MAX_ORIGINS 64
-#define MAX_VARIABLES 64
 #define MAX_LAYERS 32
-
-typedef struct {
-    char name[32];
-    double value;
-} Variable;
 
 typedef struct {
     char *name;
@@ -36,10 +30,14 @@ struct SSRScene {
 typedef struct {
     SSRScene *scene;
     const SSRSceneEnv *env;
+    // The origin and the panel (left, top, right, bottom) of each level of
+    // PushOrigin. This is the origin stack of c_SceneFactory.
     float originX[MAX_ORIGINS], originY[MAX_ORIGINS];
+    float panel[MAX_ORIGINS][4];
     int originCount;
-    Variable variables[MAX_VARIABLES];
-    int variableCount;
+    // "@x" is vars['x']. The game keeps the screen edges and the Set:
+    // values in one table like this (c_MathUtils.m_SimpleVars).
+    double vars[128];
     char layerNames[MAX_LAYERS][32];
     int layerCount;
 } Walker;
@@ -62,17 +60,22 @@ static const char *keep(SSRScene *scene, const char *text) {
 
 static double variable(void *context, char kind, const char *name) {
     const Walker *w = context;
-    if (kind != '@') return 0;
-    for (int i = w->variableCount - 1; i >= 0; i--) {
-        if (strcmp(w->variables[i].name, name) == 0) return w->variables[i].value;
-    }
-    // The edges and the size of the screen.
-    if (strcmp(name, "L") == 0 || strcmp(name, "T") == 0) return 0;
-    if (strcmp(name, "W") == 0 || strcmp(name, "R") == 0) return w->env->width;
-    if (strcmp(name, "H") == 0 || strcmp(name, "B") == 0) return w->env->height;
-    if (strcmp(name, "C") == 0) return w->env->width / 2;
-    if (strcmp(name, "M") == 0) return w->env->height / 2;
-    return 0;
+    if (kind != '@' || !name[0]) return 0;
+    return w->vars[(unsigned char)name[0] & 127];
+}
+
+// Sets the letters of the panel of the top level: @L, @T, @R, @B, the size
+// @W and @H, and the centre @C and @M.
+static void set_panel_vars(Walker *w) {
+    const float *p = w->panel[w->originCount - 1];
+    w->vars['L'] = p[0];
+    w->vars['T'] = p[1];
+    w->vars['R'] = p[2];
+    w->vars['B'] = p[3];
+    w->vars['W'] = p[2] - p[0];
+    w->vars['H'] = p[3] - p[1];
+    w->vars['C'] = (p[0] + p[2]) * 0.5f;
+    w->vars['M'] = (p[1] + p[3]) * 0.5f;
 }
 
 static double tweak(void *context, const char *group, const char *name) {
@@ -339,28 +342,14 @@ static void walk_children(Walker *w, const SSRUiNode *node, int layer) {
     for (int i = 0; i < node->childCount; i++) walk(w, node->children[i], layer);
 }
 
-// "@name=expression". A new value of a name takes the place of the old one.
+// "@x=expression" sets vars['x']. Only the first letter of the name
+// counts, as in the game.
 static void set_variable(Walker *w, const char *assignment) {
-    if (assignment[0] != '@') return;
+    if (assignment[0] != '@' || !assignment[1]) return;
     const char *equals = strchr(assignment, '=');
     if (!equals) return;
-    char name[32];
-    size_t length = (size_t)(equals - assignment - 1);
-    if (length >= sizeof(name)) return;
-    memcpy(name, assignment + 1, length);
-    name[length] = 0;
     SSRExprScope scope = {variable, tweak, w};
-    double value = ssr_expr_eval(equals + 1, &scope, NULL);
-    for (int i = 0; i < w->variableCount; i++) {
-        if (strcmp(w->variables[i].name, name) == 0) {
-            w->variables[i].value = value;
-            return;
-        }
-    }
-    if (w->variableCount >= MAX_VARIABLES) return;
-    strcpy(w->variables[w->variableCount].name, name);
-    w->variables[w->variableCount].value = value;
-    w->variableCount++;
+    w->vars[(unsigned char)assignment[1] & 127] = ssr_expr_eval(equals + 1, &scope, NULL);
 }
 
 static void add_file(SSRScene *s, const char *name, const char *file) {
@@ -372,12 +361,59 @@ static void add_file(SSRScene *s, const char *name, const char *file) {
     s->fileCount++;
 }
 
+// PushOrigin:(x,y,w,h,angle). x can be Left, Right, or Centre, and y can be
+// Top, Bottom, or Centre: then the place is on the screen, not from the
+// origin. w and h are the size of the new panel, @W and @H by default. The
+// children see a panel from (0, 0). The angle is not used yet.
+static void push_origin(Walker *w, const SSRUiNode *node, int ltrb, float ox, float oy) {
+    const SSRSceneEnv *env = w->env;
+    int absolute = 0;
+    float x, y;
+    const char *ax = arg(node, 0), *ay = arg(node, 1);
+    if (strcmp(ax, "Left") == 0) {
+        x = env->left;
+        absolute = 1;
+    } else if (strcmp(ax, "Right") == 0) {
+        x = env->left + env->width;
+        absolute = 1;
+    } else if (strcmp(ax, "Centre") == 0) {
+        x = env->left + env->width * 0.5f;
+        absolute = 1;
+    } else {
+        x = (float)number(w, node, 0, 0);
+    }
+    if (strcmp(ay, "Top") == 0) {
+        y = env->top;
+        absolute = 1;
+    } else if (strcmp(ay, "Bottom") == 0) {
+        y = env->top + env->height;
+        absolute = 1;
+    } else if (strcmp(ay, "Centre") == 0) {
+        y = env->top + env->height * 0.5f;
+        absolute = 1;
+    } else {
+        y = (float)number(w, node, 1, 0);
+    }
+    float width = (float)w->vars['W'], height = (float)w->vars['H'];
+    float pw = ltrb ? (float)number(w, node, 2, width + x) - x : (float)number(w, node, 2, width);
+    float ph = ltrb ? (float)number(w, node, 3, height + y) - y : (float)number(w, node, 3, height);
+    int level = w->originCount++;
+    w->originX[level] = absolute ? x : ox + x;
+    w->originY[level] = absolute ? y : oy + y;
+    w->panel[level][0] = 0;
+    w->panel[level][1] = 0;
+    w->panel[level][2] = pw;
+    w->panel[level][3] = ph;
+    set_panel_vars(w);
+}
+
 static void walk(Walker *w, const SSRUiNode *node, int layer) {
     const char *name = node->name;
     float ox = w->originX[w->originCount - 1], oy = w->originY[w->originCount - 1];
 
     if (strcmp(name, "PopOrigin") == 0) {
         if (w->originCount > 1) w->originCount--;
+        set_panel_vars(w);
         return;
     }
     if (strcmp(name, "Set") == 0 && node->argCount > 0) {
@@ -394,11 +430,7 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
 
     int ltrb = strstr(name, "LTRB") != NULL;
     if (strcmp(name, "PushOrigin") == 0 || strcmp(name, "PushOriginLTRB") == 0) {
-        if (w->originCount < MAX_ORIGINS) {
-            w->originX[w->originCount] = ox + (float)number(w, node, 0, 0);
-            w->originY[w->originCount] = oy + (float)number(w, node, 1, 0);
-            w->originCount++;
-        }
+        if (w->originCount < MAX_ORIGINS) push_origin(w, node, ltrb, ox, oy);
         walk_children(w, node, layer);
         return;
     }
@@ -532,6 +564,11 @@ SSRScene *ssr_scene_build(const SSRUiTree *tree, const SSRSceneEnv *env) {
     w->scene = scene;
     w->env = env;
     w->originCount = 1;
+    w->panel[0][0] = env->left;
+    w->panel[0][1] = env->top;
+    w->panel[0][2] = env->left + env->width;
+    w->panel[0][3] = env->top + env->height;
+    set_panel_vars(w);
     const SSRUiNode *root = ssr_ui_root(tree);
     if (root) walk_children(w, root, 0);
     free(w);

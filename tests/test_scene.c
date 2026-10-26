@@ -42,7 +42,7 @@ static SSRScene *build(const char *text, SSRTweaks *tweaks, SSRUiTree **tree) {
     layout = text;
     SSRUiFiles files = {read_layout, NULL};
     *tree = ssr_ui_parse("Screen.uis", &files);
-    SSRSceneEnv env = {640, 1136, tweaks, translate, image_size, NULL};
+    SSRSceneEnv env = {0, 0, 640, 1136, tweaks, translate, image_size, NULL};
     return ssr_scene_build(*tree, &env);
 }
 
@@ -250,7 +250,38 @@ static void test_sets_a_variable_many_times(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static void test_panels_of_the_screen_and_of_origins(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "Draw:(Top,@L,@T,@W,@H)\n"
+             "PushOrigin:(306,431-[@T*0.8],200,100)\n"
+             "Draw:(Inside,@L,@T,@W,@H)\n"
+             "PushOrigin:(Left,Bottom)\n"
+             "Draw:(Corner,0,0,10,10)\n"
+             "PopOrigin\n"
+             "PopOrigin\n"
+             "Draw:(After,@C,@M,1,1)\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    // A 640 x 1422 screen: the 640 x 960 box is in the middle.
+    SSRSceneEnv env = {0, -231, 640, 1422, tweaks, translate, image_size, NULL};
+    SSRScene *scene = ssr_scene_build(tree, &env);
+    CHECK(ssr_scene_count(scene) == 4);
+    const SSRSceneItem *top = ssr_scene_item(scene, 0);
+    CHECK(top && near(top->y, -231) && near(top->h, 1422));
+    const SSRSceneItem *inside = ssr_scene_item(scene, 1);
+    CHECK(inside && near(inside->x, 306) && near(inside->y, 431 + 231 * 0.8f));
+    CHECK(inside && near(inside->w, 200) && near(inside->h, 100));
+    const SSRSceneItem *corner = ssr_scene_item(scene, 2);
+    CHECK(corner && near(corner->x, 0) && near(corner->y, -231 + 1422));
+    const SSRSceneItem *after = ssr_scene_item(scene, 3);
+    CHECK(after && near(after->x, 320) && near(after->y, -231 + 711));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_panels_of_the_screen_and_of_origins();
     test_sets_a_variable_many_times();
     test_tiles();
     test_clicks_and_their_sounds();

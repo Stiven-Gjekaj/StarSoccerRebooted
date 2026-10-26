@@ -51,8 +51,11 @@ typedef struct {
 } SSRSceneItem;
 
 typedef struct {
-    // The size of the screen in logical pixels, for example 640 x 960.
-    float width, height;
+    // The screen of the device in the units of the layouts. The layouts
+    // are for 640 x 960. The game fits that box in the screen and centres
+    // it, so a tall screen has a negative top, for example -231 for
+    // 640 x 1422. This is c_VirtualDisplay of the game.
+    float left, top, width, height;
     const SSRTweaks *tweaks;
     // Gives the text of a language tag. NULL keeps the tag.
     const char *(*text)(void *context, const char *tag);
