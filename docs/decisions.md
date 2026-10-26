@@ -104,6 +104,19 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 - **The screen is portrait, 640 x 960 logical pixels.** Reason: the game is
   portrait, and its 2x images fill 640 x 960. The 1x images are 320 x 480.
 
+## Releases
+
+- Each part of the roadmap is one minor release, as in Balatro4S. A release
+  gets a git tag `vX.Y.Z`, a changelog entry, and a GitHub release with the
+  macOS app.
+- **An agent may make a full release with no review.** The owner asked for
+  this on 2026-10-26. When a part of the roadmap is complete and its tests
+  pass, the agent runs `scripts/release.sh`.
+- **Version 1.0.0 needs all of `TODO.md`.** A release before that is a 0.x
+  release.
+- **SDL3 comes from its source, version 3.4.18.** Reason: the app then
+  holds SDL3, and the iOS and Android builds need SDL3 from source.
+
 ## Identity
 
 - Display name `Star Soccer Rebooted`. Bundle ID
