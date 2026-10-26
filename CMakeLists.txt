@@ -43,7 +43,7 @@ target_link_libraries(ssr_core PUBLIC ZLIB::ZLIB)
 target_compile_options(ssr_core PRIVATE -Wall -Wextra)
 
 # The app. On macOS it is an app bundle.
-add_executable(ssr MACOSX_BUNDLE src/app/main.c)
+add_executable(ssr MACOSX_BUNDLE src/app/main.c src/app/ssr_gfx.c)
 target_link_libraries(ssr PRIVATE ssr_core ${SSR_SDL})
 target_compile_options(ssr PRIVATE -Wall -Wextra)
 target_compile_definitions(ssr PRIVATE SSR_VERSION="${PROJECT_VERSION}")

@@ -7,8 +7,9 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-#include "ssr_image.h"
+#include "ssr_gfx.h"
 #include "ssr_import.h"
+#include "ssr_world.h"
 
 // The game is portrait. The 2x images fill 640 x 960 pixels.
 #define SSR_WIDTH 640
@@ -17,36 +18,20 @@
 typedef struct {
     SDL_Window *window;
     SDL_Renderer *renderer;
-    SDL_Texture *background;
-    SDL_Texture *logo;
-    SDL_Texture *photo;
+    SSRGfx *gfx;
+    SSRWorld *world;
     char gameDirectory[2048];
     char message[256];
 } SSRApp;
 
-// Loads an image of the import, for example "Images2x/NSS_Watermark.png".
-static SDL_Texture *load_texture(SSRApp *app, const char *name) {
+static void load_game(SSRApp *app) {
+    ssr_gfx_free(app->gfx);
+    ssr_world_free(app->world);
+    app->gfx = ssr_gfx_create(app->renderer, app->gameDirectory);
     char path[2300];
-    SDL_snprintf(path, sizeof(path), "%s/%s", app->gameDirectory, name);
-    SSRImage image;
-    if (!ssr_image_load(path, &image)) {
-        SDL_snprintf(app->message, sizeof(app->message), "The import has no %s.", name);
-        return NULL;
-    }
-    SDL_Surface *surface = SDL_CreateSurfaceFrom(image.width, image.height, SDL_PIXELFORMAT_RGBA32, image.pixels,
-                                                 image.width * 4);
-    SDL_Texture *texture = surface ? SDL_CreateTextureFromSurface(app->renderer, surface) : NULL;
-    SDL_DestroySurface(surface);
-    ssr_image_free(&image);
-    return texture;
-}
-
-static void load_title(SSRApp *app) {
-    // The background is white. The game tints it.
-    app->background = load_texture(app, "Images2x/Backgrounds/Default.jpg");
-    if (app->background) SDL_SetTextureColorMod(app->background, 34, 120, 52);
-    app->logo = load_texture(app, "Images2x/NSS_Watermark.png");
-    app->photo = load_texture(app, "Images2x/Relationships/training_ground.jpg");
+    SDL_snprintf(path, sizeof(path), "%s/MyData/%s", app->gameDirectory, SSR_WORLD_DEFAULT_SET);
+    app->world = ssr_world_load(path);
+    if (!app->world) SDL_snprintf(app->message, sizeof(app->message), "The import has no data set %s.", SSR_WORLD_DEFAULT_SET);
 }
 
 static void import_copy(SSRApp *app, const char *archive) {
@@ -58,7 +43,7 @@ static void import_copy(SSRApp *app, const char *archive) {
     }
     SDL_Log("Imported %d files from the %s.", files, ssr_source_name(source));
     app->message[0] = 0;
-    load_title(app);
+    load_game(app);
 }
 
 SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
@@ -88,7 +73,7 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     if (argc > 1) {
         import_copy(app, argv[1]);
     } else if (ssr_import_is_done(app->gameDirectory)) {
-        load_title(app);
+        load_game(app);
     }
     return SDL_APP_CONTINUE;
 }
@@ -111,18 +96,28 @@ SDL_AppResult SDL_AppIterate(void *state) {
     SDL_RenderClear(app->renderer);
     SDL_SetRenderDrawColor(app->renderer, 255, 255, 255, 255);
 
-    if (app->background) SDL_RenderTexture(app->renderer, app->background, NULL, NULL);
-    if (app->logo) {
+    SDL_Texture *background = ssr_gfx_texture(app->gfx, "Images2x/Backgrounds/Default.jpg");
+    if (background) {
+        // The background is white. The game tints it.
+        SDL_SetTextureColorMod(background, 34, 120, 52);
+        SDL_RenderTexture(app->renderer, background, NULL, NULL);
+    }
+    SDL_Texture *logo = ssr_gfx_texture(app->gfx, "Images2x/NSS_Watermark.png");
+    if (logo) {
         float width = 0, height = 0;
-        SDL_GetTextureSize(app->logo, &width, &height);
+        SDL_GetTextureSize(logo, &width, &height);
         SDL_FRect place = {(SSR_WIDTH - width) / 2, 160, width, height};
-        SDL_RenderTexture(app->renderer, app->logo, NULL, &place);
+        SDL_RenderTexture(app->renderer, logo, NULL, &place);
     }
-    if (app->photo) {
-        SDL_FRect place = {(SSR_WIDTH - 480) / 2.0f, 320, 480, 480};
-        SDL_RenderTexture(app->renderer, app->photo, NULL, &place);
+    ssr_gfx_text(app->gfx, SSR_FONT_LARGE, "STAR SOCCER REBOOTED", SSR_WIDTH / 2.0f, 300, 0xFFFFFF, SSR_ALIGN_CENTER);
+    if (app->world) {
+        char line[128];
+        SDL_snprintf(line, sizeof(line), "%d clubs in %d nations", app->world->clubCount, app->world->nationCount);
+        ssr_gfx_text(app->gfx, SSR_FONT_MEDIUM, line, SSR_WIDTH / 2.0f, 420, 0xFFE066, SSR_ALIGN_CENTER);
+        ssr_gfx_text(app->gfx, SSR_FONT_SMALL, "The 2025 data of your copy", SSR_WIDTH / 2.0f, 480, 0xDDEEDD,
+                     SSR_ALIGN_CENTER);
     }
-    if (!app->logo) {
+    if (!app->gfx) {
         draw_centered_text(app->renderer, SSR_HEIGHT / 2 - 12, "Drop your copy of New Star Soccer here.");
         draw_centered_text(app->renderer, SSR_HEIGHT / 2 + 4, "The app reads an APK, an XAPK, or an IPA.");
     }
@@ -144,8 +139,7 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     (void)result;
     SSRApp *app = state;
     if (!app) return;
-    if (app->background) SDL_DestroyTexture(app->background);
-    if (app->logo) SDL_DestroyTexture(app->logo);
-    if (app->photo) SDL_DestroyTexture(app->photo);
+    ssr_gfx_free(app->gfx);
+    ssr_world_free(app->world);
     SDL_free(app);
 }
