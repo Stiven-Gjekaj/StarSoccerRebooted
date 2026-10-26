@@ -214,7 +214,26 @@ static void test_clicks_and_their_sounds(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static void test_tiles(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    SSRScene *scene = build("Tile:(TitleGrass01,-5,700,139,254,,#404040FF)\n"
+                            "\tCopies(3,2)\n"
+                            "\tSpacing(104,10)\n"
+                            "Tile:(NoCopies,0,0,10,10)\n",
+                            tweaks, &tree);
+    CHECK(ssr_scene_count(scene) == 6);
+    const SSRSceneItem *last = ssr_scene_item(scene, 5);
+    CHECK(last && near(last->x, -5 + 2 * 104) && near(last->y, 710) && near(last->w, 139));
+    CHECK(last && last->colour == 0x404040FF && strcmp(last->image, "TitleGrass01") == 0);
+    CHECK(near(ssr_scene_item(scene, 1)->x, 99) && near(ssr_scene_item(scene, 1)->y, 700));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_tiles();
     test_clicks_and_their_sounds();
     test_text_expressions_and_set();
     test_places_images_with_origins_and_variables();

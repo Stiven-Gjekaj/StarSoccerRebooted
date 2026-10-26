@@ -289,6 +289,39 @@ static void apply_look(Walker *w, const SSRUiNode *node, SSRSceneItem *item) {
 
 static void walk(Walker *w, const SSRUiNode *node, int layer);
 
+// A Tile: draws Copies(columns,rows) of its image. A copy is Spacing(x,y)
+// from the one before it, and TileShear(x,y) moves each row and column. A
+// tile with no Copies() draws nothing, as in the game.
+static void tile(Walker *w, const SSRUiNode *node, SSRSceneItem *first) {
+    const SSRUiNode *copies = modifier(node, "Copies");
+    const SSRUiNode *spacing = modifier(node, "Spacing");
+    const SSRUiNode *shear = modifier(node, "TileShear");
+    int columns = copies ? (int)number(w, copies, 0, 0) : 0;
+    int rows = copies ? (int)number(w, copies, 1, 0) : 0;
+    float stepX = spacing ? (float)number(w, spacing, 0, first->w) : first->w;
+    float stepY = spacing ? (float)number(w, spacing, 1, first->h) : first->h;
+    float shearX = shear ? (float)number(w, shear, 0, 0) : 0;
+    float shearY = shear ? (float)number(w, shear, 1, 0) : 0;
+    if (columns <= 0 || rows <= 0) {
+        w->scene->count--;
+        return;
+    }
+    SSRSceneItem model = *first;
+    w->scene->count--;
+    for (int row = 0; row < rows; row++) {
+        for (int column = 0; column < columns; column++) {
+            SSRSceneItem *copy = add_item(w, SSR_ITEM_IMAGE, model.layer, NULL);
+            if (!copy) return;
+            *copy = model;
+            float dx = column * stepX + row * shearX, dy = row * stepY + column * shearY;
+            copy->x += dx;
+            copy->y += dy;
+            copy->pivotX += dx;
+            copy->pivotY += dy;
+        }
+    }
+}
+
 // Takes the click message and its sound from the Click() modifier.
 static void apply_click(Walker *w, const SSRUiNode *node, SSRSceneItem *item) {
     const SSRUiNode *click = modifier(node, "Click");
@@ -366,7 +399,6 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
         SSRSceneItem *item = add_item(w, SSR_ITEM_IMAGE, layer, node->ref);
         if (item) {
             item->image = keep(w->scene, arg(node, 0));
-            item->tile = name[0] == 'T';
             float x = (float)number(w, node, 1, 0), y = (float)number(w, node, 2, 0);
             float width = (float)number(w, node, 3, 0), height = (float)number(w, node, 4, 0);
             if (ltrb) {
@@ -396,6 +428,7 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
             item->colour = colour(arg(node, 6), 0xFFFFFFFF);
             apply_look(w, node, item);
             apply_click(w, node, item);
+            if (strcmp(name, "Tile") == 0) tile(w, node, item);
         }
         walk_children(w, node, layer);
         return;

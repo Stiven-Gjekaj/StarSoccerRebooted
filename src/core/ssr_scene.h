@@ -34,8 +34,6 @@ typedef struct {
     // 0xRRGGBBAA.
     uint32_t colour;
     int additive;
-    // The image repeats to fill the box.
-    int tile;
     // SSR_ITEM_TEXT: the font size (0 to 3) and the alignment: 'L', 'C', or
     // 'R', and 'T', 'M', or 'B'.
     int font;
