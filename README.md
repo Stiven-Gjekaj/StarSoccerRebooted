@@ -53,7 +53,7 @@ To save the first frame as a PNG and quit:
 
 To show another screen of the game, give its layout file:
 
-    SSR_SCREEN=Options.uis "./build/Star Soccer Rebooted.app/Contents/MacOS/Star Soccer Rebooted"
+    SSR_SCREEN=options.uis "./build/Star Soccer Rebooted.app/Contents/MacOS/Star Soccer Rebooted"
 
 To press a point of the screen after the first frame:
 
