@@ -5,7 +5,7 @@
 // folder, where Finder and the Files app can put it.
 // Set SSR_SHOT to a path to save the first frame as a PNG and quit.
 // Set SSR_PRESS to "x,y" to press that point of the screen after the first
-// frame.
+// frame. Set SSR_WINDOW to "WxH" for the size of the window in points.
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -157,7 +157,13 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    if (!SDL_CreateWindowAndRenderer("Star Soccer Rebooted", SSR_WIDTH * 3 / 4, SSR_MIN_HEIGHT * 3 / 4,
+    int windowW = SSR_WIDTH * 3 / 4, windowH = SSR_MIN_HEIGHT * 3 / 4;
+    const char *size = SDL_getenv("SSR_WINDOW");
+    if (size && SDL_sscanf(size, "%dx%d", &windowW, &windowH) != 2) {
+        windowW = SSR_WIDTH * 3 / 4;
+        windowH = SSR_MIN_HEIGHT * 3 / 4;
+    }
+    if (!SDL_CreateWindowAndRenderer("Star Soccer Rebooted", windowW, windowH,
                                      SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY,
                                      &app->window, &app->renderer)) {
         SDL_Log("SDL_CreateWindowAndRenderer failed: %s", SDL_GetError());
