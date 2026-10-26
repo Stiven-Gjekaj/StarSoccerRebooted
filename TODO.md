@@ -45,7 +45,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       (`c_TMatch`, `TScreen_Match`)
 - [ ] Before and after the match (`Prematch`, `MatchReview`, `MatchStats`,
       `Ratings`)
-- [ ] Energy and boosts (`ChooseBoost`)
+- [ ] Energy and boosts, with no Bux (`ChooseBoost`)
 - [ ] A test harness that compares the rules with the original code
 
 ## 0.6 The season
@@ -86,12 +86,10 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - Advertisements (`FakeInterstitial`, `NSS5Ad`, `RewardedAdStaffSelector`,
   `GamesWeLike`, the ad SDKs)
 - In-app purchases
+- Bux. The things that Bux buy come from play or from money.
 - The cloud saves and the analytics of New Star Games (`CloudSetup`,
   `CloudCohort`, Firebase, Flurry)
 
 ## Open questions
 
-- Bux: the original sells them, and it also gives some after a match
-  (`m_matchReviewBuxAwarded`). The remake has no store. Does the player get
-  more Bux from play, or does the remake remove Bux?
 - New features after 1.0: which features that the original does not have?

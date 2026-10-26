@@ -17,6 +17,13 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   turns these files into Java that a person can read.
 - **The reference version is the Android release 4.32** (version code 138).
 
+## What the remake changes
+
+- **The remake has no Bux.** The owner chose this on 2026-10-26. The
+  original sells Bux, and it also gives some after a match. The things that
+  Bux buy in the original come from play or from money in the remake.
+  Reason: the remake has no store, so a second currency has no purpose.
+
 ## The assets of New Star Soccer
 
 - **The repository holds no file of New Star Soccer.** The licence of the
