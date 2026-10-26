@@ -1,5 +1,7 @@
 #include "ssr_tweaks.h"
 
+#include "ssr_fs.h"
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +16,39 @@ struct SSRTweaks {
     Entry *entries;
     int count;
     int capacity;
+    // An open hash table of entry index + 1, or 0 for an empty place. It
+    // has a power of two places, and at least twice as many as entries.
+    int *table;
+    int tableSize;
 };
+
+// FNV-1a of the key, in lower case. The key is "group\x1fname".
+static unsigned int hash_key(const char *group, const char *name) {
+    unsigned int h = 2166136261u;
+    for (const char *p = group; *p; p++) h = (h ^ (unsigned char)tolower((unsigned char)*p)) * 16777619u;
+    h = (h ^ 0x1fu) * 16777619u;
+    for (const char *p = name; *p; p++) h = (h ^ (unsigned char)tolower((unsigned char)*p)) * 16777619u;
+    return h;
+}
+
+// 1 when the stored key is the key of group and name, in any case.
+static int same_key(const char *key, const char *group, const char *name) {
+    for (; *group; group++, key++) {
+        if (*key != tolower((unsigned char)*group)) return 0;
+    }
+    if (*key++ != '\x1f') return 0;
+    for (; *name; name++, key++) {
+        if (*key != tolower((unsigned char)*name)) return 0;
+    }
+    return *key == 0;
+}
+
+static void table_insert(SSRTweaks *tweaks, int index, unsigned int hash) {
+    unsigned int mask = (unsigned int)tweaks->tableSize - 1;
+    unsigned int at = hash & mask;
+    while (tweaks->table[at]) at = (at + 1) & mask;
+    tweaks->table[at] = index + 1;
+}
 
 // The key is "group\x1fname". The case of the letters does not matter.
 static char *make_key(const char *group, const char *name) {
@@ -29,18 +63,13 @@ static char *make_key(const char *group, const char *name) {
 }
 
 static Entry *find(const SSRTweaks *tweaks, const char *group, const char *name) {
-    if (!tweaks || !group || !name) return NULL;
-    char *key = make_key(group, name);
-    if (!key) return NULL;
-    Entry *found = NULL;
-    for (int i = 0; i < tweaks->count; i++) {
-        if (strcmp(tweaks->entries[i].key, key) == 0) {
-            found = &tweaks->entries[i];
-            break;
-        }
+    if (!tweaks || !group || !name || !tweaks->tableSize) return NULL;
+    unsigned int mask = (unsigned int)tweaks->tableSize - 1;
+    for (unsigned int at = hash_key(group, name) & mask; tweaks->table[at]; at = (at + 1) & mask) {
+        Entry *entry = &tweaks->entries[tweaks->table[at] - 1];
+        if (same_key(entry->key, group, name)) return entry;
     }
-    free(key);
-    return found;
+    return NULL;
 }
 
 SSRTweaks *ssr_tweaks_create(void) {
@@ -54,6 +83,7 @@ void ssr_tweaks_free(SSRTweaks *tweaks) {
         free(tweaks->entries[i].value);
     }
     free(tweaks->entries);
+    free(tweaks->table);
     free(tweaks);
 }
 
@@ -86,6 +116,22 @@ void ssr_tweaks_set(SSRTweaks *tweaks, const char *group, const char *name, cons
     tweaks->entries[tweaks->count].key = key;
     tweaks->entries[tweaks->count].value = copy;
     tweaks->count++;
+    if (tweaks->count * 2 > tweaks->tableSize) {
+        int size = tweaks->tableSize ? tweaks->tableSize * 2 : 256;
+        int *table = calloc((size_t)size, sizeof(int));
+        if (!table) return;
+        free(tweaks->table);
+        tweaks->table = table;
+        tweaks->tableSize = size;
+        for (int i = 0; i < tweaks->count; i++) {
+            const char *k = tweaks->entries[i].key;
+            unsigned int h = 2166136261u;
+            for (const char *q = k; *q; q++) h = (h ^ (unsigned char)*q) * 16777619u;
+            table_insert(tweaks, i, h);
+        }
+    } else {
+        table_insert(tweaks, tweaks->count - 1, hash_key(group, name));
+    }
 }
 
 void ssr_tweaks_set_number(SSRTweaks *tweaks, const char *group, const char *name, double value) {
@@ -116,4 +162,82 @@ int ssr_tweaks_equals(const SSRTweaks *tweaks, const char *group, const char *na
     double a, b;
     if (to_number(value, &a) && to_number(text, &b)) return a == b;
     return strcmp(value, text) == 0;
+}
+
+// Splits the text between the brackets at the commas. Returns the number
+// of parts.
+static int split_args(char *text, char **parts, int max) {
+    char *open = strchr(text, '(');
+    char *close = open ? strrchr(open, ')') : NULL;
+    if (!open || !close) return 0;
+    *close = 0;
+    int count = 0;
+    char *p = open + 1;
+    while (count < max) {
+        char *comma = strchr(p, ',');
+        if (comma) *comma = 0;
+        while (isspace((unsigned char)*p)) p++;
+        char *end = p + strlen(p);
+        while (end > p && isspace((unsigned char)end[-1])) *--end = 0;
+        parts[count++] = p;
+        if (!comma) break;
+        p = comma + 1;
+    }
+    return count;
+}
+
+int ssr_tweaks_load(SSRTweaks *tweaks, const char *path) {
+    FILE *file = ssr_fs_open(path, "rb");
+    if (!file) return -1;
+    char line[1024], group[128] = "";
+    int count = 0;
+    while (fgets(line, sizeof(line), file)) {
+        char *comment = strstr(line, "//");
+        if (comment) *comment = 0;
+        char *p = line;
+        while (isspace((unsigned char)*p)) p++;
+        char *parts[16];
+        if (strncmp(p, "Category:(", 10) == 0) {
+            int n = split_args(p, parts, 16);
+            snprintf(group, sizeof(group), "%s", n > 0 ? parts[0] : "");
+        } else if (strncmp(p, "EndCategory", 11) == 0) {
+            group[0] = 0;
+        } else if (!group[0]) {
+            continue;
+        } else if (strncmp(p, "Float:(", 7) == 0 || strncmp(p, "Var:(", 5) == 0) {
+            int n = split_args(p, parts, 16);
+            if (n < 3) continue;
+            double value = strtod(parts[2], NULL), scale = n >= 4 ? strtod(parts[3], NULL) : 1;
+            ssr_tweaks_set_number(tweaks, group, parts[0], value * scale);
+            count++;
+        } else if (strncmp(p, "Range:(", 7) == 0) {
+            int n = split_args(p, parts, 16);
+            if (n < 3) continue;
+            double scale = n >= 5 ? strtod(parts[4], NULL) : 1;
+            ssr_tweaks_set_number(tweaks, group, parts[0], strtod(parts[2], NULL) * scale);
+            count++;
+        } else if (strncmp(p, "Colour:(", 8) == 0 || strncmp(p, "String:(", 8) == 0) {
+            int n = split_args(p, parts, 16);
+            if (n < 1) continue;
+            ssr_tweaks_set(tweaks, group, parts[0], n >= 3 ? parts[2] : "");
+            count++;
+        }
+    }
+    fclose(file);
+    return count;
+}
+
+unsigned int ssr_tweaks_colour(const SSRTweaks *tweaks, const char *group, const char *name, unsigned int fallback) {
+    const char *text = ssr_tweaks_get(tweaks, group, name);
+    if (*text == '#') text++;
+    size_t length = strlen(text);
+    if (length != 6 && length != 8) return fallback;
+    unsigned int value = 0;
+    for (size_t i = 0; i < length; i++) {
+        char c = (char)tolower((unsigned char)text[i]);
+        int digit = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
+        if (digit < 0) return fallback;
+        value = (value << 4) | (unsigned int)digit;
+    }
+    return length == 6 ? (value << 8) | 0xFF : value;
 }
