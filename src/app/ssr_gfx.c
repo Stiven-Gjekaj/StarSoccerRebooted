@@ -35,6 +35,7 @@ struct SSRGfx {
     SDL_Texture **frameTextures;
     // The Img: files of the scene that draws now.
     const SSRScene *scene;
+    float offsetX, offsetY;
 };
 
 SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
@@ -211,6 +212,7 @@ typedef struct {
     const SSRSceneItem *item;
     SDL_FColor colour;
     float cosA, sinA;
+    float offsetX, offsetY;
 } Placement;
 
 // A point of the box (as parts of the box) on the screen, after the
@@ -219,7 +221,8 @@ static SDL_FPoint place(const Placement *p, float x, float y) {
     const SSRSceneItem *item = p->item;
     float px = item->x + item->w * x - item->pivotX;
     float py = item->y + item->h * y - item->pivotY;
-    SDL_FPoint out = {item->pivotX + px * p->cosA - py * p->sinA, item->pivotY + px * p->sinA + py * p->cosA};
+    SDL_FPoint out = {item->pivotX + px * p->cosA - py * p->sinA + p->offsetX,
+                      item->pivotY + px * p->sinA + py * p->cosA + p->offsetY};
     return out;
 }
 
@@ -293,6 +296,8 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     float radians = item->angle * (float)SDL_PI_F / 180.0f;
     p.cosA = cosf(radians);
     p.sinA = sinf(radians);
+    p.offsetX = gfx->offsetX;
+    p.offsetY = gfx->offsetY;
 
     const SSRAtlasImage *image = ssr_atlas_find(gfx->atlases, item->image);
     const char *file = image || !gfx->scene ? NULL : ssr_scene_image_file(gfx->scene, item->image);
@@ -391,8 +396,15 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
         float x = item->x;
         if (item->alignX == 'C') x += (item->w - width) / 2;
         if (item->alignX == 'R') x += item->w - width;
-        draw_line(gfx, slot, lines[i], x, y + lineHeight * i, scaleX, scaleY, item->colour);
+        draw_line(gfx, slot, lines[i], x + gfx->offsetX, y + lineHeight * i + gfx->offsetY, scaleX, scaleY,
+                  item->colour);
     }
+}
+
+void ssr_gfx_set_offset(SSRGfx *gfx, float x, float y) {
+    if (!gfx) return;
+    gfx->offsetX = x;
+    gfx->offsetY = y;
 }
 
 void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene) {
@@ -411,7 +423,7 @@ void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene) {
             break;
         case SSR_ITEM_CLIP:
             if (clipCount < 32) {
-                SDL_Rect rect = {(int)item->x, (int)item->y, (int)item->w, (int)item->h};
+                SDL_Rect rect = {(int)(item->x + gfx->offsetX), (int)(item->y + gfx->offsetY), (int)item->w, (int)item->h};
                 clips[clipCount++] = rect;
                 SDL_SetRenderClipRect(gfx->renderer, &rect);
             }

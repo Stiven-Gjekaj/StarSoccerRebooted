@@ -47,6 +47,10 @@ float ssr_gfx_line_height(SSRGfx *gfx, SSRFontSize size);
 // is not there.
 int ssr_gfx_image_size(SSRGfx *gfx, const char *name, const char *file, float *w, float *h);
 
+// Moves everything that the gfx draws by (x, y), from the units of the
+// layouts to the units of the window.
+void ssr_gfx_set_offset(SSRGfx *gfx, float x, float y);
+
 // Draws each item of the scene.
 void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene);
 

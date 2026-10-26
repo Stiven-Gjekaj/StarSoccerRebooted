@@ -23,11 +23,11 @@
 #include "ssr_ui.h"
 #include "ssr_world.h"
 
-// The game is portrait. The 2x images fill 640 x 960 pixels. On a taller
-// screen the width stays 640 and the height grows, as in the game. The
-// layouts place things from the bottom with @B.
+// The layouts are for a portrait box of 640 x 960. The game fits the box
+// in the screen and centres it (c_VirtualDisplay). The rest of the screen
+// is outside the box: a tall screen has a negative top.
 #define SSR_WIDTH 640
-#define SSR_MIN_HEIGHT 960
+#define SSR_HEIGHT 960
 
 typedef struct {
     SDL_Window *window;
@@ -40,8 +40,8 @@ typedef struct {
     SSRUiTree *screen;
     SSRScene *scene;
     SSRAudio *audio;
-    // The height of the screen in logical pixels.
-    int height;
+    // The screen in the units of the layouts.
+    float left, top, width, height;
     char gameDirectory[2048];
     char message[256];
 } SSRApp;
@@ -91,6 +91,7 @@ static void load_game(SSRApp *app) {
     ssr_audio_free(app->audio);
     app->audio = ssr_audio_create(app->gameDirectory);
     app->gfx = ssr_gfx_create(app->renderer, app->gameDirectory);
+    ssr_gfx_set_offset(app->gfx, -app->left, -app->top);
     char path[2300];
     SDL_snprintf(path, sizeof(path), "%s/MyData/%s", app->gameDirectory, SSR_WORLD_DEFAULT_SET);
     app->world = ssr_world_load(path);
@@ -138,13 +139,23 @@ static int import_from_documents(SSRApp *app) {
 }
 #endif
 
-// Sets the logical height from the shape of the window.
+// Fits the 640 x 960 box of the layouts in the window and centres it, as
+// c_VirtualDisplay.UpdateVirtualDisplay of the game does.
 static void fit_screen(SSRApp *app) {
     int w = 0, h = 0;
     SDL_GetRenderOutputSize(app->renderer, &w, &h);
-    app->height = SSR_MIN_HEIGHT;
-    if (w > 0 && h * SSR_WIDTH > w * SSR_MIN_HEIGHT) app->height = h * SSR_WIDTH / w;
-    SDL_SetRenderLogicalPresentation(app->renderer, SSR_WIDTH, app->height, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    if (w <= 0 || h <= 0) {
+        w = SSR_WIDTH;
+        h = SSR_HEIGHT;
+    }
+    float scale = (float)h / w > (float)SSR_HEIGHT / SSR_WIDTH ? (float)w / SSR_WIDTH : (float)h / SSR_HEIGHT;
+    app->width = w / scale;
+    app->height = h / scale;
+    app->left = -((w - SSR_WIDTH * scale) * 0.5f) / scale;
+    app->top = -((h - SSR_HEIGHT * scale) * 0.5f) / scale;
+    SDL_SetRenderLogicalPresentation(app->renderer, (int)(app->width + 0.5f), (int)(app->height + 0.5f),
+                                     SDL_LOGICAL_PRESENTATION_STRETCH);
+    ssr_gfx_set_offset(app->gfx, -app->left, -app->top);
 }
 
 SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
@@ -157,11 +168,11 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    int windowW = SSR_WIDTH * 3 / 4, windowH = SSR_MIN_HEIGHT * 3 / 4;
+    int windowW = SSR_WIDTH * 3 / 4, windowH = SSR_HEIGHT * 3 / 4;
     const char *size = SDL_getenv("SSR_WINDOW");
     if (size && SDL_sscanf(size, "%dx%d", &windowW, &windowH) != 2) {
         windowW = SSR_WIDTH * 3 / 4;
-        windowH = SSR_MIN_HEIGHT * 3 / 4;
+        windowH = SSR_HEIGHT * 3 / 4;
     }
     if (!SDL_CreateWindowAndRenderer("Star Soccer Rebooted", windowW, windowH,
                                      SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY,
@@ -200,7 +211,7 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
         SDL_ConvertEventToRenderCoordinates(app->renderer, event);
         float x = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? event->button.x : event->tfinger.x;
         float y = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? event->button.y : event->tfinger.y;
-        const SSRSceneItem *item = ssr_scene_hit_item(app->scene, x, y);
+        const SSRSceneItem *item = ssr_scene_hit_item(app->scene, x + app->left, y + app->top);
         if (item) {
             SDL_Log("Pressed %s (%s)", item->ref ? item->ref : "-", item->click ? item->click : "-");
             ssr_audio_play(app->audio, item->clickSound ? item->clickSound : "UISelect");
@@ -209,9 +220,9 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
     return SDL_APP_CONTINUE;
 }
 
-static void draw_centered_text(SDL_Renderer *renderer, float y, const char *text) {
+static void draw_centered_text(const SSRApp *app, float y, const char *text) {
     float width = (float)SDL_strlen(text) * SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE;
-    SDL_RenderDebugText(renderer, (SSR_WIDTH - width) / 2, y, text);
+    SDL_RenderDebugText(app->renderer, (app->width - width) / 2, y, text);
 }
 
 SDL_AppResult SDL_AppIterate(void *state) {
@@ -221,19 +232,19 @@ SDL_AppResult SDL_AppIterate(void *state) {
     SDL_SetRenderDrawColor(app->renderer, 255, 255, 255, 255);
 
     if (app->screen) {
-        SSRSceneEnv env = {SSR_WIDTH, (float)app->height, app->tweaks, translate, image_size, app};
+        SSRSceneEnv env = {app->left, app->top, app->width, app->height, app->tweaks, translate, image_size, app};
         ssr_scene_free(app->scene);
         app->scene = ssr_scene_build(app->screen, &env);
         ssr_gfx_draw_scene(app->gfx, app->scene);
     }
     if (!app->gfx) {
-        draw_centered_text(app->renderer, app->height / 2 - 12, "Drop your copy of New Star Soccer here.");
-        draw_centered_text(app->renderer, app->height / 2 + 4, "The app reads an APK, an XAPK, or an IPA.");
+        draw_centered_text(app, app->height / 2 - 12, "Drop your copy of New Star Soccer here.");
+        draw_centered_text(app, app->height / 2 + 4, "The app reads an APK, an XAPK, or an IPA.");
 #ifdef SDL_PLATFORM_IOS
-        draw_centered_text(app->renderer, app->height / 2 + 20, "Put the file in Documents with Finder, then restart.");
+        draw_centered_text(app, app->height / 2 + 20, "Put the file in Documents with Finder, then restart.");
 #endif
     }
-    if (app->message[0]) draw_centered_text(app->renderer, app->height - 40, app->message);
+    if (app->message[0]) draw_centered_text(app, app->height - 40, app->message);
 
     const char *press = SDL_getenv("SSR_PRESS");
     static int pressed = 0;
@@ -241,7 +252,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         pressed = 1;
         float x = 0, y = 0;
         if (SDL_sscanf(press, "%f,%f", &x, &y) == 2) {
-            const SSRSceneItem *item = ssr_scene_hit_item(app->scene, x, y);
+            const SSRSceneItem *item = ssr_scene_hit_item(app->scene, x + app->left, y + app->top);
             SDL_Log("Pressed %s (%s)", item && item->ref ? item->ref : "-", item && item->click ? item->click : "-");
             if (item) ssr_audio_play(app->audio, item->clickSound ? item->clickSound : "UISelect");
         }
