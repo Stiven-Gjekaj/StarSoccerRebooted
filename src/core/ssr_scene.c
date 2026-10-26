@@ -1,0 +1,449 @@
+#include "ssr_scene.h"
+
+#include <ctype.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "ssr_expr.h"
+
+#define MAX_ORIGINS 64
+#define MAX_VARIABLES 64
+#define MAX_LAYERS 32
+
+typedef struct {
+    char name[32];
+    double value;
+} Variable;
+
+typedef struct {
+    char *name;
+    char *file;
+} ImageFile;
+
+struct SSRScene {
+    SSRSceneItem *items;
+    int count;
+    int capacity;
+    ImageFile *files;
+    int fileCount;
+    char **strings;
+    int stringCount;
+    int stringCapacity;
+};
+
+typedef struct {
+    SSRScene *scene;
+    const SSRSceneEnv *env;
+    float originX[MAX_ORIGINS], originY[MAX_ORIGINS];
+    int originCount;
+    Variable variables[MAX_VARIABLES];
+    int variableCount;
+    char layerNames[MAX_LAYERS][32];
+    int layerCount;
+} Walker;
+
+static const char *keep(SSRScene *scene, const char *text) {
+    if (!text) return NULL;
+    if (scene->stringCount == scene->stringCapacity) {
+        int capacity = scene->stringCapacity ? scene->stringCapacity * 2 : 256;
+        char **grown = realloc(scene->strings, (size_t)capacity * sizeof(char *));
+        if (!grown) return "";
+        scene->strings = grown;
+        scene->stringCapacity = capacity;
+    }
+    char *copy = malloc(strlen(text) + 1);
+    if (!copy) return "";
+    strcpy(copy, text);
+    scene->strings[scene->stringCount++] = copy;
+    return copy;
+}
+
+static double variable(void *context, char kind, const char *name) {
+    const Walker *w = context;
+    if (kind != '@') return 0;
+    for (int i = w->variableCount - 1; i >= 0; i--) {
+        if (strcmp(w->variables[i].name, name) == 0) return w->variables[i].value;
+    }
+    // The edges and the size of the screen.
+    if (strcmp(name, "L") == 0 || strcmp(name, "T") == 0) return 0;
+    if (strcmp(name, "W") == 0 || strcmp(name, "R") == 0) return w->env->width;
+    if (strcmp(name, "H") == 0 || strcmp(name, "B") == 0) return w->env->height;
+    if (strcmp(name, "C") == 0) return w->env->width / 2;
+    if (strcmp(name, "M") == 0) return w->env->height / 2;
+    return 0;
+}
+
+static double tweak(void *context, const char *group, const char *name) {
+    const Walker *w = context;
+    return ssr_tweaks_number(w->env->tweaks, group, name);
+}
+
+static double number(Walker *w, const SSRUiNode *node, int index, double fallback) {
+    if (!node || index >= node->argCount || !node->args[index][0]) return fallback;
+    SSRExprScope scope = {variable, tweak, w};
+    int ok = 0;
+    double value = ssr_expr_eval(node->args[index], &scope, &ok);
+    return ok ? value : fallback;
+}
+
+static const char *arg(const SSRUiNode *node, int index) {
+    return node && index < node->argCount ? node->args[index] : "";
+}
+
+static int hex_value(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    c = (char)tolower((unsigned char)c);
+    return c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
+}
+
+// Reads "#RRGGBBAA", "#RRGGBB", or "#RRGGBBAARRGGBBAA". The second colour
+// of the long form is not used yet.
+static uint32_t colour(const char *text, uint32_t fallback) {
+    if (!text || text[0] != '#') return fallback;
+    size_t length = strlen(text + 1);
+    if (length != 6 && length != 8 && length != 16) return fallback;
+    uint32_t value = 0;
+    size_t digits = length == 6 ? 6 : 8;
+    for (size_t i = 0; i < digits; i++) {
+        int v = hex_value(text[1 + i]);
+        if (v < 0) return fallback;
+        value = (value << 4) | (uint32_t)v;
+    }
+    return length == 6 ? (value << 8) | 0xFF : value;
+}
+
+static SSRSceneItem *add_item(Walker *w, SSRItemKind kind, int layer, const char *ref) {
+    SSRScene *s = w->scene;
+    if (s->count == s->capacity) {
+        int capacity = s->capacity ? s->capacity * 2 : 256;
+        SSRSceneItem *grown = realloc(s->items, (size_t)capacity * sizeof(SSRSceneItem));
+        if (!grown) return NULL;
+        s->items = grown;
+        s->capacity = capacity;
+    }
+    SSRSceneItem *item = &s->items[s->count++];
+    memset(item, 0, sizeof(*item));
+    item->kind = kind;
+    item->colour = 0xFFFFFFFF;
+    item->layer = layer;
+    item->ref = ref ? keep(s, ref) : NULL;
+    item->alignX = 'C';
+    item->alignY = 'M';
+    item->font = 1;
+    return item;
+}
+
+static const SSRUiNode *modifier(const SSRUiNode *node, const char *name) {
+    for (int i = node->modifierCount - 1; i >= 0; i--) {
+        if (strcmp(node->modifiers[i]->name, name) == 0) return node->modifiers[i];
+    }
+    return NULL;
+}
+
+// ShowIf(Group,Name,Value), ShowIfNot(...), AndShowIf(...), and
+// OrShowIf(...). They go in order.
+static int visible(Walker *w, const SSRUiNode *node) {
+    if (node->flags & SSR_UI_HIDE) return 0;
+    int shown = 1, any = 0;
+    for (int i = 0; i < node->modifierCount; i++) {
+        const SSRUiNode *m = node->modifiers[i];
+        int show = strcmp(m->name, "ShowIf") == 0, not = strcmp(m->name, "ShowIfNot") == 0;
+        int and = strcmp(m->name, "AndShowIf") == 0, or = strcmp(m->name, "OrShowIf") == 0;
+        if (!show && !not && !and && !or) continue;
+        int value = m->argCount >= 3 ? ssr_tweaks_equals(w->env->tweaks, arg(m, 0), arg(m, 1), arg(m, 2))
+                                     : ssr_tweaks_number(w->env->tweaks, arg(m, 0), arg(m, 1)) != 0;
+        if (not) value = !value;
+        if (or && any) {
+            shown = shown || value;
+        } else if (and && any) {
+            shown = shown && value;
+        } else {
+            shown = value;
+        }
+        any = 1;
+    }
+    return shown;
+}
+
+static int layer_of(Walker *w, const SSRUiNode *node, int inherited) {
+    const SSRUiNode *m = modifier(node, "Layer");
+    if (!m || m->argCount < 1) return inherited;
+    for (int i = 0; i < w->layerCount; i++) {
+        if (strcmp(w->layerNames[i], arg(m, 0)) == 0) return i + 1;
+    }
+    if (w->layerCount < MAX_LAYERS) {
+        snprintf(w->layerNames[w->layerCount], sizeof(w->layerNames[0]), "%s", arg(m, 0));
+        w->layerCount++;
+        return w->layerCount;
+    }
+    return inherited;
+}
+
+// The modifiers that change how an image or a text draws.
+static void apply_look(Walker *w, const SSRUiNode *node, SSRSceneItem *item) {
+    const SSRUiNode *m;
+    if ((m = modifier(node, "Colour"))) item->colour = colour(arg(m, 0), item->colour);
+    if (modifier(node, "Additive")) item->additive = 1;
+    if ((m = modifier(node, "Angle"))) item->angle = (float)number(w, m, 0, 0);
+    float handleX = 0, handleY = 0;
+    if ((m = modifier(node, "Handle"))) {
+        handleX = (float)number(w, m, 0, 0);
+        handleY = (float)number(w, m, 1, 0);
+    }
+    float scaleX = 1, scaleY = 1;
+    if ((m = modifier(node, "Scale"))) {
+        scaleX = (float)number(w, m, 0, 1);
+        scaleY = (float)number(w, m, 1, scaleX);
+    }
+    // The handle is the point of the box that sits at (x, y). The box
+    // scales and turns about it.
+    float px = item->x, py = item->y;
+    item->x = px - handleX * scaleX;
+    item->y = py - handleY * scaleY;
+    item->w *= scaleX;
+    item->h *= scaleY;
+    item->pivotX = px;
+    item->pivotY = py;
+}
+
+static void walk(Walker *w, const SSRUiNode *node, int layer);
+
+static void walk_children(Walker *w, const SSRUiNode *node, int layer) {
+    for (int i = 0; i < node->childCount; i++) walk(w, node->children[i], layer);
+}
+
+static void set_variable(Walker *w, const char *assignment) {
+    // "@name=expression".
+    if (assignment[0] != '@') return;
+    const char *equals = strchr(assignment, '=');
+    if (!equals || w->variableCount >= MAX_VARIABLES) return;
+    Variable *v = &w->variables[w->variableCount];
+    size_t length = (size_t)(equals - assignment - 1);
+    if (length >= sizeof(v->name)) return;
+    memcpy(v->name, assignment + 1, length);
+    v->name[length] = 0;
+    SSRExprScope scope = {variable, tweak, w};
+    v->value = ssr_expr_eval(equals + 1, &scope, NULL);
+    w->variableCount++;
+}
+
+static void add_file(SSRScene *s, const char *name, const char *file) {
+    ImageFile *grown = realloc(s->files, (size_t)(s->fileCount + 1) * sizeof(ImageFile));
+    if (!grown) return;
+    s->files = grown;
+    s->files[s->fileCount].name = (char *)keep(s, name);
+    s->files[s->fileCount].file = (char *)keep(s, file);
+    s->fileCount++;
+}
+
+static void walk(Walker *w, const SSRUiNode *node, int layer) {
+    const char *name = node->name;
+    float ox = w->originX[w->originCount - 1], oy = w->originY[w->originCount - 1];
+
+    if (strcmp(name, "PopOrigin") == 0) {
+        if (w->originCount > 1) w->originCount--;
+        return;
+    }
+    if (strcmp(name, "Set") == 0 && node->argCount > 0) {
+        set_variable(w, arg(node, 0));
+        return;
+    }
+    if (strcmp(name, "Img") == 0 && node->argCount >= 2) {
+        add_file(w->scene, arg(node, 0), arg(node, 1));
+        return;
+    }
+    if (!(node->flags & SSR_UI_ELEMENT) && strcmp(name, "Group") != 0) return;
+    if (!visible(w, node)) return;
+    layer = layer_of(w, node, layer);
+
+    int ltrb = strstr(name, "LTRB") != NULL;
+    if (strcmp(name, "PushOrigin") == 0 || strcmp(name, "PushOriginLTRB") == 0) {
+        if (w->originCount < MAX_ORIGINS) {
+            w->originX[w->originCount] = ox + (float)number(w, node, 0, 0);
+            w->originY[w->originCount] = oy + (float)number(w, node, 1, 0);
+            w->originCount++;
+        }
+        walk_children(w, node, layer);
+        return;
+    }
+
+    if (strcmp(name, "Draw") == 0 || strcmp(name, "DrawLTRB") == 0 || strcmp(name, "Tile") == 0 ||
+        strcmp(name, "DrawFixedScale") == 0) {
+        SSRSceneItem *item = add_item(w, SSR_ITEM_IMAGE, layer, node->ref);
+        if (item) {
+            item->image = keep(w->scene, arg(node, 0));
+            item->tile = name[0] == 'T';
+            float x = (float)number(w, node, 1, 0), y = (float)number(w, node, 2, 0);
+            float width = (float)number(w, node, 3, 0), height = (float)number(w, node, 4, 0);
+            if (ltrb) {
+                width -= x;
+                height -= y;
+            }
+            if (width == 0 || height == 0) {
+                float iw = 0, ih = 0;
+                if (w->env->image_size && w->env->image_size(w->env->context, item->image, &iw, &ih) && iw > 0 &&
+                    ih > 0) {
+                    if (width == 0 && height == 0) {
+                        width = iw;
+                        height = ih;
+                    } else if (width == 0) {
+                        width = iw * height / ih;
+                    } else {
+                        height = ih * width / iw;
+                    }
+                }
+            }
+            item->x = ox + x;
+            item->y = oy + y;
+            item->w = width;
+            item->h = height;
+            item->angle = (float)number(w, node, 5, 0);
+            item->colour = colour(arg(node, 6), 0xFFFFFFFF);
+            apply_look(w, node, item);
+        }
+        walk_children(w, node, layer);
+        return;
+    }
+
+    if (strcmp(name, "Text") == 0 || strcmp(name, "TextLoc") == 0 || strcmp(name, "TextBox") == 0) {
+        SSRSceneItem *item = add_item(w, SSR_ITEM_TEXT, layer, node->ref);
+        if (item) {
+            const char *text = arg(node, 0);
+            size_t length = strlen(text);
+            char unquoted[512];
+            if (length >= 2 && text[0] == '"' && text[length - 1] == '"') {
+                snprintf(unquoted, sizeof(unquoted), "%.*s", (int)(length - 2), text + 1);
+                text = unquoted;
+            } else if (strcmp(name, "TextLoc") == 0 && w->env->text) {
+                text = w->env->text(w->env->context, text);
+            }
+            item->text = keep(w->scene, text);
+            item->x = ox + (float)number(w, node, 1, 0);
+            item->y = oy + (float)number(w, node, 2, 0);
+            item->w = (float)number(w, node, 3, 0);
+            item->h = (float)number(w, node, 4, 0);
+            if (arg(node, 5)[0]) item->alignX = (char)toupper((unsigned char)arg(node, 5)[0]);
+            if (arg(node, 6)[0]) item->alignY = (char)toupper((unsigned char)arg(node, 6)[0]);
+            item->colour = colour(arg(node, 7), 0xFFFFFFFF);
+            const SSRUiNode *size = modifier(node, "FontSize");
+            if (size) item->font = (int)number(w, size, 0, 1);
+            if (item->font < 0 || item->font > 3) item->font = 1;
+            apply_look(w, node, item);
+        }
+        walk_children(w, node, layer);
+        return;
+    }
+
+    if (strcmp(name, "Clip") == 0 || strcmp(name, "ClipLTRB") == 0) {
+        SSRSceneItem *item = add_item(w, SSR_ITEM_CLIP, layer, NULL);
+        if (item) {
+            item->x = ox + (float)number(w, node, 0, 0);
+            item->y = oy + (float)number(w, node, 1, 0);
+            item->w = (float)number(w, node, 2, 0);
+            item->h = (float)number(w, node, 3, 0);
+            if (ltrb) {
+                item->w -= item->x - ox;
+                item->h -= item->y - oy;
+            }
+        }
+        walk_children(w, node, layer);
+        add_item(w, SSR_ITEM_UNCLIP, layer, NULL);
+        return;
+    }
+
+    if (strcmp(name, "Rect") == 0 || strcmp(name, "RectLTRB") == 0) {
+        if (node->ref) {
+            SSRSceneItem *item = add_item(w, SSR_ITEM_AREA, layer, node->ref);
+            if (item) {
+                item->x = ox + (float)number(w, node, 0, 0);
+                item->y = oy + (float)number(w, node, 1, 0);
+                item->w = (float)number(w, node, 2, 0);
+                item->h = (float)number(w, node, 3, 0);
+                if (ltrb) {
+                    item->w -= item->x - ox;
+                    item->h -= item->y - oy;
+                }
+            }
+        }
+        walk_children(w, node, layer);
+        return;
+    }
+
+    // Other elements can hold children that draw.
+    walk_children(w, node, layer);
+}
+
+SSRScene *ssr_scene_build(const SSRUiTree *tree, const SSRSceneEnv *env) {
+    SSRScene *scene = calloc(1, sizeof(SSRScene));
+    Walker *w = calloc(1, sizeof(Walker));
+    if (!scene || !w || !env) {
+        free(scene);
+        free(w);
+        return NULL;
+    }
+    w->scene = scene;
+    w->env = env;
+    w->originCount = 1;
+    const SSRUiNode *root = ssr_ui_root(tree);
+    if (root) walk_children(w, root, 0);
+    free(w);
+    // A stable sort by layer: the items of each layer keep the order of the
+    // file.
+    if (scene->count > 1) {
+        int *order = malloc((size_t)scene->count * sizeof(int));
+        SSRSceneItem *sorted = malloc((size_t)scene->count * sizeof(SSRSceneItem));
+        if (order && sorted) {
+            int n = 0;
+            for (int layer = 0; layer <= MAX_LAYERS; layer++) {
+                for (int i = 0; i < scene->count; i++) {
+                    if (scene->items[i].layer == layer) order[n++] = i;
+                }
+            }
+            for (int i = 0; i < n; i++) sorted[i] = scene->items[order[i]];
+            memcpy(scene->items, sorted, (size_t)n * sizeof(SSRSceneItem));
+            scene->count = n;
+        }
+        free(order);
+        free(sorted);
+    }
+    return scene;
+}
+
+void ssr_scene_free(SSRScene *scene) {
+    if (!scene) return;
+    for (int i = 0; i < scene->stringCount; i++) free(scene->strings[i]);
+    free(scene->strings);
+    free(scene->items);
+    free(scene->files);
+    free(scene);
+}
+
+int ssr_scene_count(const SSRScene *scene) {
+    return scene ? scene->count : 0;
+}
+
+const SSRSceneItem *ssr_scene_item(const SSRScene *scene, int index) {
+    return scene && index >= 0 && index < scene->count ? &scene->items[index] : NULL;
+}
+
+const char *ssr_scene_image_file(const SSRScene *scene, const char *name) {
+    if (!scene || !name) return NULL;
+    for (int i = scene->fileCount - 1; i >= 0; i--) {
+        if (strcmp(scene->files[i].name, name) == 0) return scene->files[i].file;
+    }
+    return NULL;
+}
+
+const char *ssr_scene_hit(const SSRScene *scene, float x, float y) {
+    if (!scene) return NULL;
+    for (int i = scene->count - 1; i >= 0; i--) {
+        const SSRSceneItem *item = &scene->items[i];
+        if (!item->ref || item->kind == SSR_ITEM_CLIP || item->kind == SSR_ITEM_UNCLIP) continue;
+        float x0 = item->w < 0 ? item->x + item->w : item->x, x1 = item->w < 0 ? item->x : item->x + item->w;
+        float y0 = item->h < 0 ? item->y + item->h : item->y, y1 = item->h < 0 ? item->y : item->y + item->h;
+        if (x >= x0 && x < x1 && y >= y0 && y < y1) return item->ref;
+    }
+    return NULL;
+}
