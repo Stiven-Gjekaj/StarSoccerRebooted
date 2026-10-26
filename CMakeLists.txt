@@ -42,6 +42,7 @@ add_library(ssr_core STATIC
     src/core/ssr_tweaks.c
     src/core/ssr_scene.c
     src/core/ssr_sound.c
+    src/core/ssr_fs.c
 )
 target_include_directories(ssr_core PUBLIC src/core)
 target_include_directories(ssr_core PRIVATE src/third_party)
@@ -53,6 +54,15 @@ add_executable(ssr MACOSX_BUNDLE src/app/main.c src/app/ssr_gfx.c src/app/ssr_au
 target_link_libraries(ssr PRIVATE ssr_core ${SSR_SDL})
 target_compile_options(ssr PRIVATE -Wall -Wextra)
 target_compile_definitions(ssr PRIVATE SSR_VERSION="${PROJECT_VERSION}")
+if(IOS)
+    # The player copies the APK, XAPK, or IPA into the Documents folder of
+    # the app with Finder or the Files app.
+    set_target_properties(ssr PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/cmake/ios/Info.plist.in
+        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+        XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO
+    )
+endif()
 set_target_properties(ssr PROPERTIES
     OUTPUT_NAME "Star Soccer Rebooted"
     MACOSX_BUNDLE_BUNDLE_NAME "Star Soccer Rebooted"
@@ -60,6 +70,11 @@ set_target_properties(ssr PROPERTIES
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
 )
+
+# The tests run on the computer that builds the app.
+if(IOS OR ANDROID)
+    return()
+endif()
 
 enable_testing()
 
@@ -88,5 +103,6 @@ ssr_add_test(test_atlas)
 ssr_add_test(test_tweaks)
 ssr_add_test(test_scene)
 ssr_add_test(test_sound)
+ssr_add_test(test_fs)
 # The font test skips its layout checks when the system has no TTF font.
 set_tests_properties(test_font PROPERTIES SKIP_RETURN_CODE 77)

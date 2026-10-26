@@ -126,7 +126,10 @@ const char *ssr_test_directory(const char *name) {
     static char path[1024];
     const char *base = getenv("TMPDIR");
     if (!base || !*base) base = "/tmp";
-    snprintf(path, sizeof(path), "%s/ssr-test-%s-%ld", base, name, (long)rand());
+    // TMPDIR can end with a '/'. The path gets no "//".
+    size_t baseLength = strlen(base);
+    while (baseLength > 1 && base[baseLength - 1] == '/') baseLength--;
+    snprintf(path, sizeof(path), "%.*s/ssr-test-%s-%ld", (int)baseLength, base, name, (long)rand());
     char command[1200];
     snprintf(command, sizeof(command), "rm -rf '%s' && mkdir -p '%s'", path, path);
     if (system(command) != 0) return NULL;
