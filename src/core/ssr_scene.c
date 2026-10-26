@@ -449,8 +449,9 @@ static void spine(Walker *w, const SSRUiNode *node, int layer, float ox, float o
         for (int k = 0; k < 4; k++) {
             float px = d->m[0] * local[k * 2] + d->m[2] * local[k * 2 + 1] + d->m[4];
             float py = d->m[1] * local[k * 2] + d->m[3] * local[k * 2 + 1] + d->m[5];
-            item->corners[k * 2] = x + px * c - py * s;
-            item->corners[k * 2 + 1] = y + px * s + py * c;
+            // The angle of the element turns as c_GTransform does.
+            item->corners[k * 2] = x + px * c + py * s;
+            item->corners[k * 2 + 1] = y - px * s + py * c;
         }
         item->x = item->corners[0];
         item->y = item->corners[1];
@@ -473,8 +474,7 @@ static void crowd_part(Walker *w, int layer, const char *image, float x, float y
     item->h = height;
     item->pivotX = x;
     item->pivotY = y;
-    // The game turns the fan with the matrix (cos, -sin, sin, cos).
-    item->angle = -angle;
+    item->angle = angle;
     item->colour = (rgb << 8) | 0xFF;
 }
 
@@ -585,6 +585,9 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
         return;
     }
     if (!(node->flags & SSR_UI_ELEMENT) && strcmp(name, "Group") != 0) return;
+    // An Animation: or a Sequence: is a definition. It draws only where an
+    // instance plays it.
+    if (strcmp(name, "Animation") == 0 || strcmp(name, "Sequence") == 0) return;
     if (!visible(w, node)) return;
     layer = layer_of(w, node, layer);
 

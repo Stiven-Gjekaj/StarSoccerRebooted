@@ -336,7 +336,7 @@ static void test_draws_a_crowd(void) {
         CHECK(strcmp(item->image, expected[i].image) == 0);
         CHECK(near(item->pivotX, expected[i].x) && near(item->pivotY, expected[i].y));
         CHECK(near(item->x, expected[i].x - 10) && near(item->y, expected[i].y - 40));
-        CHECK(near(item->angle, -expected[i].angle));
+        CHECK(near(item->angle, expected[i].angle));
         CHECK(item->colour == (expected[i].rgb << 8 | 0xFF));
     }
     ssr_scene_free(scene);
@@ -344,7 +344,30 @@ static void test_draws_a_crowd(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static void test_definitions_do_not_draw(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    SSRScene *scene = build("Animation:(600,Loop,0) ref:Glow\n"
+                            "{\n"
+                            "\tDuring:(0,299)\n"
+                            "\t{\n"
+                            "\t\tDraw:(Glow,0,0,100,100)\n"
+                            "\t}\n"
+                            "}\n"
+                            "Sequence:(Spin)\n"
+                            "{\n"
+                            "\tDraw:(Coin,0,0,64,64)\n"
+                            "}\n"
+                            "Draw:(Shown,0,0,10,10)\n",
+                            tweaks, &tree);
+    CHECK(ssr_scene_count(scene) == 1 && strcmp(ssr_scene_item(scene, 0)->image, "Shown") == 0);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_definitions_do_not_draw();
     test_draws_a_crowd();
     test_panels_of_the_screen_and_of_origins();
     test_sets_a_variable_many_times();
