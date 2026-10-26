@@ -8,12 +8,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(SDL3 REQUIRED CONFIG)
 find_package(ZLIB REQUIRED)
 
-# The code that has no window: the archives, the import, and later the rules.
+# The code that has no window: the archives, the import, the images, and later the rules.
 add_library(ssr_core STATIC
     src/core/ssr_zip.c
     src/core/ssr_import.c
+    src/core/ssr_image.c
 )
 target_include_directories(ssr_core PUBLIC src/core)
+target_include_directories(ssr_core PRIVATE src/third_party)
 target_link_libraries(ssr_core PUBLIC ZLIB::ZLIB)
 target_compile_options(ssr_core PRIVATE -Wall -Wextra)
 
@@ -25,8 +27,8 @@ target_compile_options(ssr PRIVATE -Wall -Wextra)
 enable_testing()
 
 # The helpers that each test uses: the checks and a writer for zip archives.
-add_library(ssr_testkit STATIC tests/ssr_zipwriter.c)
-target_include_directories(ssr_testkit PUBLIC tests)
+add_library(ssr_testkit STATIC tests/ssr_zipwriter.c tests/ssr_imagewriter.c)
+target_include_directories(ssr_testkit PUBLIC tests src/third_party)
 target_link_libraries(ssr_testkit PUBLIC ssr_core)
 
 function(ssr_add_test name)
@@ -38,3 +40,4 @@ endfunction()
 
 ssr_add_test(test_zip)
 ssr_add_test(test_import)
+ssr_add_test(test_image)
