@@ -11,6 +11,7 @@ find_package(ZLIB REQUIRED)
 # The code that has no window: the archives, the import, and later the rules.
 add_library(nsr_core STATIC
     src/core/nsr_zip.c
+    src/core/nsr_import.c
 )
 target_include_directories(nsr_core PUBLIC src/core)
 target_link_libraries(nsr_core PUBLIC ZLIB::ZLIB)
@@ -31,3 +32,4 @@ function(nsr_add_test name)
 endfunction()
 
 nsr_add_test(test_zip)
+nsr_add_test(test_import)
