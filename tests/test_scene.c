@@ -42,7 +42,8 @@ static SSRScene *build(const char *text, SSRTweaks *tweaks, SSRUiTree **tree) {
     layout = text;
     SSRUiFiles files = {read_layout, NULL};
     *tree = ssr_ui_parse("Screen.uis", &files);
-    SSRSceneEnv env = {0, 0, 640, 1136, tweaks, translate, image_size, NULL};
+    SSRSceneEnv env = {.left = 0, .top = 0, .width = 640, .height = 1136, .tweaks = tweaks, .text = translate,
+                       .image_size = image_size};
     return ssr_scene_build(*tree, &env);
 }
 
@@ -263,7 +264,8 @@ static void test_panels_of_the_screen_and_of_origins(void) {
     SSRUiFiles files = {read_layout, NULL};
     SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
     // A 640 x 1422 screen: the 640 x 960 box is in the middle.
-    SSRSceneEnv env = {0, -231, 640, 1422, tweaks, translate, image_size, NULL};
+    SSRSceneEnv env = {.left = 0, .top = -231, .width = 640, .height = 1422, .tweaks = tweaks, .text = translate,
+                       .image_size = image_size};
     SSRScene *scene = ssr_scene_build(tree, &env);
     CHECK(ssr_scene_count(scene) == 4);
     const SSRSceneItem *top = ssr_scene_item(scene, 0);

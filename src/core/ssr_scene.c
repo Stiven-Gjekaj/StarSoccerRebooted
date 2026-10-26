@@ -407,6 +407,55 @@ static void push_origin(Walker *w, const SSRUiNode *node, int ltrb, float ox, fl
     set_panel_vars(w);
 }
 
+// Spine:(name,x,y,angle,animation,Loop,limit) draws a pose of a Spine
+// animation at the time of the screen. Each image is drawn at its own size
+// with its centre on its place.
+static void spine(Walker *w, const SSRUiNode *node, int layer, float ox, float oy) {
+    if (!w->env->spine) return;
+    const SSRSpine *file = w->env->spine(w->env->context, arg(node, 0));
+    if (!file) return;
+    int animation = ssr_spine_animation(file, arg(node, 4));
+    if (animation < 0) return;
+    // A limit of loops plays the animation that many times, then it stops.
+    int limit = (int)number(w, node, 6, 0);
+    int loop = strcmp(arg(node, 5), "Loop") == 0 && limit <= 0;
+    float time = w->env->time;
+    if (limit > 0) {
+        float duration = ssr_spine_duration(file, animation);
+        if (time > duration * limit) time = duration;
+        else if (duration > 0) time = fmodf(time, duration);
+    }
+    float x = ox + (float)number(w, node, 1, 0), y = oy + (float)number(w, node, 2, 0);
+    float radians = (float)number(w, node, 3, 0) * 3.14159265f / 180;
+    float c = cosf(radians), s = sinf(radians);
+    SSRSpineDraw draws[128];
+    int count = ssr_spine_pose(file, animation, time, loop, draws, 128);
+    if (count > 128) count = 128;
+    for (int i = 0; i < count; i++) {
+        const SSRSpineDraw *d = &draws[i];
+        float iw = 0, ih = 0;
+        if (!w->env->image_size || !w->env->image_size(w->env->context, d->image, d->file, &iw, &ih)) continue;
+        SSRSceneItem *item = add_item(w, SSR_ITEM_IMAGE, layer, NULL);
+        if (!item) return;
+        item->image = keep(w->scene, d->image);
+        item->quad = 1;
+        item->w = iw;
+        item->h = ih;
+        const float local[8] = {-iw / 2, -ih / 2, iw / 2, -ih / 2, iw / 2, ih / 2, -iw / 2, ih / 2};
+        for (int k = 0; k < 4; k++) {
+            float px = d->m[0] * local[k * 2] + d->m[2] * local[k * 2 + 1] + d->m[4];
+            float py = d->m[1] * local[k * 2] + d->m[3] * local[k * 2 + 1] + d->m[5];
+            item->corners[k * 2] = x + px * c - py * s;
+            item->corners[k * 2 + 1] = y + px * s + py * c;
+        }
+        item->x = item->corners[0];
+        item->y = item->corners[1];
+        uint32_t r = (uint32_t)(d->r * 255 + 0.5f), g = (uint32_t)(d->g * 255 + 0.5f);
+        uint32_t b = (uint32_t)(d->b * 255 + 0.5f), a = (uint32_t)(d->a * 255 + 0.5f);
+        item->colour = (r << 24) | (g << 16) | (b << 8) | a;
+    }
+}
+
 static void walk(Walker *w, const SSRUiNode *node, int layer) {
     const char *name = node->name;
     float ox = w->originX[w->originCount - 1], oy = w->originY[w->originCount - 1];
@@ -509,6 +558,12 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
             item->wrap = strcmp(name, "TextBox") == 0 || modifier(node, "WrapX") != NULL;
             apply_look(w, node, item);
         }
+        walk_children(w, node, layer);
+        return;
+    }
+
+    if (strcmp(name, "Spine") == 0) {
+        spine(w, node, layer, ox, oy);
         walk_children(w, node, layer);
         return;
     }

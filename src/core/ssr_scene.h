@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 
+#include "ssr_spine.h"
 #include "ssr_tweaks.h"
 #include "ssr_ui.h"
 
@@ -31,6 +32,10 @@ typedef struct {
     // The rotation in degrees, about the point (pivotX, pivotY).
     float angle;
     float pivotX, pivotY;
+    // When quad is 1, the image goes on these four corners (top left, top
+    // right, bottom right, bottom left, x and y each) in place of the box.
+    int quad;
+    float corners[8];
     // 0xRRGGBBAA.
     uint32_t colour;
     int additive;
@@ -62,6 +67,10 @@ typedef struct {
     // Gives the size of an image when a Draw: has no size. file is the file
     // of an Img: with the name, or NULL. NULL gives 0.
     int (*image_size)(void *context, const char *name, const char *file, float *w, float *h);
+    // Gives the Spine file with the name, for example "S2GrassAnim", or NULL.
+    const SSRSpine *(*spine)(void *context, const char *name);
+    // The time since the screen opened, in seconds. Animations use it.
+    float time;
     void *context;
 } SSRSceneEnv;
 
