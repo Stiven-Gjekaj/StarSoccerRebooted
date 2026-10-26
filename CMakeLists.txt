@@ -60,7 +60,6 @@ if(IOS)
     set_target_properties(ssr PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/cmake/ios/Info.plist.in
         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
-        XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO
     )
 endif()
 set_target_properties(ssr PROPERTIES
