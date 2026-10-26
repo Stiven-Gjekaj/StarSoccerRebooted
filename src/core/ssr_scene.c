@@ -92,6 +92,80 @@ static const char *arg(const SSRUiNode *node, int index) {
     return node && index < node->argCount ? node->args[index] : "";
 }
 
+// Finds the ')' that closes the '(' at text[0]. Returns NULL when there is
+// none.
+static const char *closing(const char *text) {
+    int depth = 0, quoted = 0;
+    for (const char *p = text; *p; p++) {
+        if (*p == '"') quoted = !quoted;
+        if (quoted) continue;
+        if (*p == '(') depth++;
+        if (*p == ')' && --depth == 0) return p;
+    }
+    return NULL;
+}
+
+static void append(char *out, size_t capacity, const char *text, size_t length) {
+    size_t used = strlen(out);
+    if (used + 1 >= capacity) return;
+    if (length > capacity - used - 1) length = capacity - used - 1;
+    memcpy(out + used, text, length);
+    out[used + length] = 0;
+}
+
+// Evaluates a text expression: "quoted" parts, twk(Group,Name), and
+// loc(expression), joined with "::". Other text stays as it is.
+static void text_value(Walker *w, const char *text, char *out, size_t capacity) {
+    out[0] = 0;
+    const char *p = text;
+    while (*p) {
+        while (*p == ' ') p++;
+        const char *next = NULL;
+        if (*p == '"') {
+            const char *end = strchr(p + 1, '"');
+            if (!end) {
+                append(out, capacity, p + 1, strlen(p + 1));
+                return;
+            }
+            append(out, capacity, p + 1, (size_t)(end - p - 1));
+            next = end + 1;
+        } else if (strncmp(p, "twk(", 4) == 0 && closing(p + 3)) {
+            const char *end = closing(p + 3);
+            char inside[128];
+            snprintf(inside, sizeof(inside), "%.*s", (int)(end - p - 4), p + 4);
+            char *comma = strchr(inside, ',');
+            if (comma) {
+                *comma = 0;
+                const char *value = ssr_tweaks_get(w->env->tweaks, inside, comma + 1);
+                append(out, capacity, value, strlen(value));
+            }
+            next = end + 1;
+        } else if (strncmp(p, "loc(", 4) == 0 && closing(p + 3)) {
+            const char *end = closing(p + 3);
+            char inside[512], tag[512];
+            snprintf(inside, sizeof(inside), "%.*s", (int)(end - p - 4), p + 4);
+            text_value(w, inside, tag, sizeof(tag));
+            const char *value = w->env->text ? w->env->text(w->env->context, tag) : tag;
+            append(out, capacity, value, strlen(value));
+            next = end + 1;
+        } else {
+            const char *join = strstr(p, "::");
+            size_t length = join ? (size_t)(join - p) : strlen(p);
+            append(out, capacity, p, length);
+            next = p + length;
+        }
+        p = next;
+        while (*p == ' ') p++;
+        if (strncmp(p, "::", 2) == 0) {
+            p += 2;
+        } else if (*p) {
+            // Text after a closed part that is not a join stays as it is.
+            append(out, capacity, p, strlen(p));
+            return;
+        }
+    }
+}
+
 static int hex_value(char c) {
     if (c >= '0' && c <= '9') return c - '0';
     c = (char)tolower((unsigned char)c);
@@ -132,6 +206,7 @@ static SSRSceneItem *add_item(Walker *w, SSRItemKind kind, int layer, const char
     item->alignX = 'C';
     item->alignY = 'M';
     item->font = 1;
+    item->fontScaleX = item->fontScaleY = 1;
     return item;
 }
 
@@ -149,6 +224,10 @@ static int visible(Walker *w, const SSRUiNode *node) {
     int shown = 1, any = 0;
     for (int i = 0; i < node->modifierCount; i++) {
         const SSRUiNode *m = node->modifiers[i];
+        if (strcmp(m->name, "set") == 0 && strcmp(arg(m, 0), "gel.vis") == 0) {
+            if (number(w, m, 1, 1) == 0) return 0;
+            continue;
+        }
         int show = strcmp(m->name, "ShowIf") == 0, not = strcmp(m->name, "ShowIfNot") == 0;
         int and = strcmp(m->name, "AndShowIf") == 0, or = strcmp(m->name, "OrShowIf") == 0;
         if (!show && !not && !and && !or) continue;
@@ -310,15 +389,18 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
     if (strcmp(name, "Text") == 0 || strcmp(name, "TextLoc") == 0 || strcmp(name, "TextBox") == 0) {
         SSRSceneItem *item = add_item(w, SSR_ITEM_TEXT, layer, node->ref);
         if (item) {
-            const char *text = arg(node, 0);
-            size_t length = strlen(text);
-            char unquoted[512];
-            if (length >= 2 && text[0] == '"' && text[length - 1] == '"') {
-                snprintf(unquoted, sizeof(unquoted), "%.*s", (int)(length - 2), text + 1);
-                text = unquoted;
-            } else if (strcmp(name, "TextLoc") == 0 && w->env->text) {
-                text = w->env->text(w->env->context, text);
+            char value[1024];
+            text_value(w, arg(node, 0), value, sizeof(value));
+            for (int i = 0; i < node->modifierCount; i++) {
+                const SSRUiNode *m = node->modifiers[i];
+                if (strcmp(m->name, "set") == 0 && strcmp(arg(m, 0), "gel.text") == 0) {
+                    text_value(w, arg(m, 1), value, sizeof(value));
+                }
             }
+            const char *text = value;
+            // TextLoc and TextBox take a language tag. A tag that the
+            // language does not have stays as it is.
+            if (strcmp(name, "Text") != 0 && w->env->text) text = w->env->text(w->env->context, value);
             item->text = keep(w->scene, text);
             item->x = ox + (float)number(w, node, 1, 0);
             item->y = oy + (float)number(w, node, 2, 0);
@@ -330,6 +412,12 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
             const SSRUiNode *size = modifier(node, "FontSize");
             if (size) item->font = (int)number(w, size, 0, 1);
             if (item->font < 0 || item->font > 3) item->font = 1;
+            const SSRUiNode *scale = modifier(node, "FontScale");
+            if (scale) {
+                item->fontScaleX = (float)number(w, scale, 0, 1);
+                item->fontScaleY = (float)number(w, scale, 1, item->fontScaleX);
+            }
+            item->wrap = strcmp(name, "TextBox") == 0 || modifier(node, "WrapX") != NULL;
             apply_look(w, node, item);
         }
         walk_children(w, node, layer);

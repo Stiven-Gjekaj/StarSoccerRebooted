@@ -40,6 +40,10 @@ typedef struct {
     // 'R', and 'T', 'M', or 'B'.
     int font;
     char alignX, alignY;
+    // SSR_ITEM_TEXT: the scale of the font, and 1 when the text wraps to
+    // the width of the box.
+    float fontScaleX, fontScaleY;
+    int wrap;
     int layer;
     const char *ref;
 } SSRSceneItem;

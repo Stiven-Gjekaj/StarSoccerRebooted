@@ -20,7 +20,9 @@ static char *read_layout(void *context, const char *name, size_t *size) {
 
 static const char *translate(void *context, const char *tag) {
     (void)context;
-    return strcmp(tag, "MENU_PLAY") == 0 ? "Play" : tag;
+    if (strcmp(tag, "MENU_PLAY") == 0) return "Play";
+    if (strcmp(tag, "Consent_TEXT_ATT_2") == 0) return "Second screen";
+    return tag;
 }
 
 static int image_size(void *context, const char *name, float *w, float *h) {
@@ -149,7 +151,35 @@ static void test_text_areas_layers_and_clips(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static void test_text_expressions_and_set(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Consent", "ATTFlowScreen", 2);
+    ssr_tweaks_set_number(tweaks, "Consent", "RequestLocalConsent", 0);
+    SSRUiTree *tree;
+    SSRScene *scene = build("Rect:(0,0,10,10) ref:Hidden\n"
+                            "\tset(gel.vis,twk(Consent,RequestLocalConsent))\n"
+                            "{\n"
+                            "\tText:(Inside,0,0,10,10)\n"
+                            "}\n"
+                            "TextBox:(\"Screen \"::twk(Consent,ATTFlowScreen),20,44,550,400)\n"
+                            "\tFontScale(0.55,0.5)\n"
+                            "TextBox:(MENU_PLAY,0,0,100,0)\n"
+                            "Text:(Old,0,0,10,10)\n"
+                            "\tset(gel.text,loc(\"Consent_TEXT_ATT_\"::twk(Consent,ATTFlowScreen)))\n",
+                            tweaks, &tree);
+    CHECK(ssr_scene_count(scene) == 3);
+    const SSRSceneItem *joined = ssr_scene_item(scene, 0);
+    CHECK(joined && strcmp(joined->text, "Screen 2") == 0 && joined->wrap);
+    CHECK(joined && joined->fontScaleX == 0.55f && joined->fontScaleY == 0.5f);
+    CHECK(strcmp(ssr_scene_item(scene, 1)->text, "Play") == 0);
+    CHECK(strcmp(ssr_scene_item(scene, 2)->text, "Second screen") == 0 && !ssr_scene_item(scene, 2)->wrap);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_text_expressions_and_set();
     test_places_images_with_origins_and_variables();
     test_shows_items_by_tweak();
     test_text_areas_layers_and_clips();
