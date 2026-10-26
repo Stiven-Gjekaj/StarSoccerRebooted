@@ -126,6 +126,9 @@ static void load_game(SSRApp *app) {
     SDL_snprintf(path, sizeof(path), "%s/MyData/%s", app->gameDirectory, SSR_WORLD_DEFAULT_SET);
     app->world = ssr_world_load(path);
     if (!app->world) SDL_snprintf(app->message, sizeof(app->message), "The import has no data set %s.", SSR_WORLD_DEFAULT_SET);
+    // The tweaks start with the values of the game.
+    SDL_snprintf(path, sizeof(path), "%s/Tweaks/TweakValues.txt", app->gameDirectory);
+    if (ssr_tweaks_load(app->tweaks, path) < 0) SDL_Log("The import has no Tweaks/TweakValues.txt.");
     ssr_text_free(app->text);
     app->text = NULL;
     SDL_snprintf(path, sizeof(path), "%s/MyData/Languages/en.txt", app->gameDirectory);
