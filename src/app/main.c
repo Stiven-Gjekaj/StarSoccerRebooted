@@ -2,6 +2,8 @@
 // Start it with the path of an APK, XAPK, or IPA, or drop the file on the
 // window.
 // Set SSR_SHOT to a path to save the first frame as a PNG and quit.
+// Set SSR_PRESS to "x,y" to press that point of the screen after the first
+// frame.
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -9,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ssr_audio.h"
 #include "ssr_gfx.h"
 #include "ssr_import.h"
 #include "ssr_scene.h"
@@ -28,8 +31,10 @@ typedef struct {
     SSRWorld *world;
     SSRText *text;
     SSRTweaks *tweaks;
-    // The screen that shows now, from NewGUI/Screens.
+    // The screen that shows now, from NewGUI/Screens, and its last frame.
     SSRUiTree *screen;
+    SSRScene *scene;
+    SSRAudio *audio;
     char gameDirectory[2048];
     char message[256];
 } SSRApp;
@@ -75,6 +80,8 @@ static void open_screen(SSRApp *app, const char *name) {
 static void load_game(SSRApp *app) {
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
+    ssr_audio_free(app->audio);
+    app->audio = ssr_audio_create(app->gameDirectory);
     app->gfx = ssr_gfx_create(app->renderer, app->gameDirectory);
     char path[2300];
     SDL_snprintf(path, sizeof(path), "%s/MyData/%s", app->gameDirectory, SSR_WORLD_DEFAULT_SET);
@@ -137,6 +144,16 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
     SSRApp *app = state;
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
     if (event->type == SDL_EVENT_DROP_FILE && event->drop.data) import_copy(app, event->drop.data);
+    if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_FINGER_DOWN) {
+        SDL_ConvertEventToRenderCoordinates(app->renderer, event);
+        float x = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? event->button.x : event->tfinger.x;
+        float y = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? event->button.y : event->tfinger.y;
+        const SSRSceneItem *item = ssr_scene_hit_item(app->scene, x, y);
+        if (item) {
+            SDL_Log("Pressed %s (%s)", item->ref ? item->ref : "-", item->click ? item->click : "-");
+            ssr_audio_play(app->audio, item->clickSound ? item->clickSound : "UISelect");
+        }
+    }
     return SDL_APP_CONTINUE;
 }
 
@@ -153,15 +170,27 @@ SDL_AppResult SDL_AppIterate(void *state) {
 
     if (app->screen) {
         SSRSceneEnv env = {SSR_WIDTH, SSR_HEIGHT, app->tweaks, translate, image_size, app};
-        SSRScene *scene = ssr_scene_build(app->screen, &env);
-        ssr_gfx_draw_scene(app->gfx, scene);
-        ssr_scene_free(scene);
+        ssr_scene_free(app->scene);
+        app->scene = ssr_scene_build(app->screen, &env);
+        ssr_gfx_draw_scene(app->gfx, app->scene);
     }
     if (!app->gfx) {
         draw_centered_text(app->renderer, SSR_HEIGHT / 2 - 12, "Drop your copy of New Star Soccer here.");
         draw_centered_text(app->renderer, SSR_HEIGHT / 2 + 4, "The app reads an APK, an XAPK, or an IPA.");
     }
     if (app->message[0]) draw_centered_text(app->renderer, SSR_HEIGHT - 40, app->message);
+
+    const char *press = SDL_getenv("SSR_PRESS");
+    static int pressed = 0;
+    if (press && *press && !pressed && app->scene) {
+        pressed = 1;
+        float x = 0, y = 0;
+        if (SDL_sscanf(press, "%f,%f", &x, &y) == 2) {
+            const SSRSceneItem *item = ssr_scene_hit_item(app->scene, x, y);
+            SDL_Log("Pressed %s (%s)", item && item->ref ? item->ref : "-", item && item->click ? item->click : "-");
+            if (item) ssr_audio_play(app->audio, item->clickSound ? item->clickSound : "UISelect");
+        }
+    }
 
     const char *shot = SDL_getenv("SSR_SHOT");
     if (shot && *shot) {
@@ -179,9 +208,11 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     (void)result;
     SSRApp *app = state;
     if (!app) return;
+    ssr_scene_free(app->scene);
     ssr_ui_free(app->screen);
     ssr_text_free(app->text);
     ssr_tweaks_free(app->tweaks);
+    ssr_audio_free(app->audio);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
     SDL_free(app);
