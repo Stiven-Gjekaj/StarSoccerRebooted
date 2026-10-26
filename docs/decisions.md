@@ -48,6 +48,25 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   app is clean, and the community makes the packs.
 - **The 2026 data pack is a separate project.** Reason: it changes each
   season and has its own legal risk. The app stays public and MIT.
+- **A separate index repository lists the packs.** The owner chose this on
+  2026-10-26. Each entry gives the name, the author, the version, the
+  download URL, the size, and the SHA-256 of a pack. A person adds or
+  changes an entry with a pull request.
+- **The index holds no pack files.** Each author hosts the pack, for
+  example as a release of their own repository. Reason: a takedown then
+  goes to that pack, not to the account of the owner. The owner removes
+  one entry from the index.
+- **A check in CI tests each pull request.** It downloads the pack and
+  checks the SHA-256, the size, and the format.
+- **The app reads the index and shows a pack browser.** It downloads a
+  pack, checks the SHA-256, and imports it with the same path checks as
+  the import of the game.
+- **A pack holds only data.** It holds no scripts and no code. Reason: a
+  pack from a stranger cannot harm the device.
+- **The builds for the App Store and Google Play have no pack browser.**
+  They import a pack only from a file. Reason: a store can refuse an app
+  that downloads trademarks and licensed names. The desktop builds and the
+  sideloaded builds have the browser.
 
 ## The assets of New Star Soccer
 

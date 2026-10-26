@@ -167,6 +167,10 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [ ] Data packs: the player installs a pack from a file. A pack can
       change the names, the squads, the kits, and the logos.
 - [ ] Art packs: a pack can replace any image of the game
+- [ ] The index repository of the packs, with a CI check for each pull
+      request
+- [ ] A pack browser in the app: read the index, download a pack, and
+      check its SHA-256. Not in the store builds.
 - [ ] A 2026 data pack: the leagues, the clubs, and the squads of the
       2025-26 season. It is a separate project, not in this repository.
       See [docs/decisions.md](docs/decisions.md).
