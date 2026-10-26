@@ -10,17 +10,20 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] Import the assets from an APK, an XAPK, or an IPA
 - [x] Show an image from the import
 
-## 0.2 Assets
+## 0.2 Assets (done)
 
 - [x] Decode JPG images (the backgrounds)
-- [ ] Load the atlases of the interface (`NewGUI/Atlases`)
-- [ ] Draw text with the fonts and the glyph tables of the game
-      (`Fonts`, `FontRenderer`)
-- [ ] Play the sounds and the music (OGG from an APK, MP3 from an IPA)
-- [ ] Read the screen layouts (`.uis`, `.uih`) and draw a screen from them
-- [ ] Read the season data (`MyData/v2014d`: clubs, nations, competitions,
-      stadiums, promotion places)
-- [ ] Read the text of each language (`MyData/Languages`)
+- [x] Load the atlases of the interface (`NewGUI/Atlases`)
+- [x] Draw text with the TTF fonts of the game (`Fonts`)
+- [ ] Draw the star of `Fonts.txt` (`Inject:`) and the glyph tables of
+      the other alphabets (`Fonts/Glyphs`). This moves to 1.0, with the
+      languages.
+- [x] Play the sounds (OGG from an APK, MP3 from an IPA). The game has no
+      music.
+- [x] Read the screen layouts (`.uis`, `.uih`) and draw a screen from them
+- [x] Read the season data (`MyData/v2025b`: clubs, nations, competitions,
+      promotion places)
+- [x] Read the text of each language (`MyData/Languages`)
 
 ## 0.3 Platforms
 
@@ -79,7 +82,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 ## 1.0 The full game
 
 - [ ] All the content of 4.32
-- [ ] All the languages of 4.32
+- [ ] All the languages of 4.32, with the star glyph and the glyph tables
 - [ ] All the features in this file
 
 ## Not in the remake
@@ -174,8 +177,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [ ] A 2026 data pack: the leagues, the clubs, and the squads of the
       2025-26 season. It is a separate project, not in this repository.
       See [docs/decisions.md](docs/decisions.md).
-- [ ] Import the 2014 data of the original (`MyData/v2014d`) as the
-      default world
+- [x] Read the 2025 data of the original (`MyData/v2025b`) as the default
+      world
 
 ## More features
 
