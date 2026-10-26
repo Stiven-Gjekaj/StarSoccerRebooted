@@ -32,6 +32,7 @@ add_library(ssr_core STATIC
     src/core/ssr_zip.c
     src/core/ssr_import.c
     src/core/ssr_image.c
+    src/core/ssr_tsv.c
 )
 target_include_directories(ssr_core PUBLIC src/core)
 target_include_directories(ssr_core PRIVATE src/third_party)
@@ -68,3 +69,4 @@ endfunction()
 ssr_add_test(test_zip)
 ssr_add_test(test_import)
 ssr_add_test(test_image)
+ssr_add_test(test_tsv)
