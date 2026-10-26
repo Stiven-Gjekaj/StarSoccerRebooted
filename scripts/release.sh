@@ -28,7 +28,7 @@ grep "tests passed" build/release-tests.log
 
 # The app for both kinds of Mac, in its own build directory.
 cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" >/dev/null
-cmake --build build/release -j8 >/dev/null
+cmake --build build/release -j8 >build/release-build.log 2>&1 || { tail -30 build/release-build.log >&2; exit 1; }
 lipo -archs "build/release/$APP/Contents/MacOS/Star Soccer Rebooted"
 rm -f "build/$ZIP"
 (cd build/release && ditto -c -k --keepParent "$APP" "../$ZIP")
