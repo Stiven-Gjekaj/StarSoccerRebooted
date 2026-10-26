@@ -18,6 +18,7 @@
 #include "ssr_gfx.h"
 #include "ssr_import.h"
 #include "ssr_scene.h"
+#include "ssr_spine.h"
 #include "ssr_text.h"
 #include "ssr_tweaks.h"
 #include "ssr_ui.h"
@@ -40,6 +41,13 @@ typedef struct {
     SSRUiTree *screen;
     SSRScene *scene;
     SSRAudio *audio;
+    // The Spine files that the screens use, and when the screen opened.
+    struct {
+        char name[64];
+        SSRSpine *spine;
+    } spines[16];
+    int spineCount;
+    Uint64 screenStart;
     // The screen in the units of the layouts.
     float left, top, width, height;
     char gameDirectory[2048];
@@ -73,7 +81,23 @@ static int image_size(void *context, const char *name, const char *file, float *
     return ssr_gfx_image_size(app->gfx, name, file, w, h);
 }
 
+static const SSRSpine *spine_file(void *context, const char *name) {
+    SSRApp *app = context;
+    for (int i = 0; i < app->spineCount; i++) {
+        if (SDL_strcmp(app->spines[i].name, name) == 0) return app->spines[i].spine;
+    }
+    if (app->spineCount >= (int)SDL_arraysize(app->spines)) return NULL;
+    char path[2400];
+    SDL_snprintf(path, sizeof(path), "%s/Spine/%s.spinary", app->gameDirectory, name);
+    SSRSpine *spine = ssr_spine_load(path);
+    // A missing file is kept too, so that the app does not look for it again.
+    SDL_strlcpy(app->spines[app->spineCount].name, name, sizeof(app->spines[0].name));
+    app->spines[app->spineCount++].spine = spine;
+    return spine;
+}
+
 static void open_screen(SSRApp *app, const char *name) {
+    app->screenStart = SDL_GetTicks();
     ssr_ui_free(app->screen);
     app->screen = NULL;
     SSRUiFiles files = {read_screen_file, app};
@@ -232,7 +256,18 @@ SDL_AppResult SDL_AppIterate(void *state) {
     SDL_SetRenderDrawColor(app->renderer, 255, 255, 255, 255);
 
     if (app->screen) {
-        SSRSceneEnv env = {app->left, app->top, app->width, app->height, app->tweaks, translate, image_size, app};
+        SSRSceneEnv env = {
+            .left = app->left,
+            .top = app->top,
+            .width = app->width,
+            .height = app->height,
+            .tweaks = app->tweaks,
+            .text = translate,
+            .image_size = image_size,
+            .spine = spine_file,
+            .time = (SDL_GetTicks() - app->screenStart) / 1000.0f,
+            .context = app,
+        };
         ssr_scene_free(app->scene);
         app->scene = ssr_scene_build(app->screen, &env);
         ssr_gfx_draw_scene(app->gfx, app->scene);
@@ -275,6 +310,7 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     SSRApp *app = state;
     if (!app) return;
     ssr_scene_free(app->scene);
+    for (int i = 0; i < app->spineCount; i++) ssr_spine_free(app->spines[i].spine);
     ssr_ui_free(app->screen);
     ssr_text_free(app->text);
     ssr_tweaks_free(app->tweaks);

@@ -219,6 +219,14 @@ typedef struct {
 // rotation about the pivot.
 static SDL_FPoint place(const Placement *p, float x, float y) {
     const SSRSceneItem *item = p->item;
+    if (item->quad) {
+        // A point of the four corners, by its parts along the top and the
+        // left side.
+        const float *c = item->corners;
+        SDL_FPoint out = {c[0] + (c[2] - c[0]) * x + (c[6] - c[0]) * y + p->offsetX,
+                          c[1] + (c[3] - c[1]) * x + (c[7] - c[1]) * y + p->offsetY};
+        return out;
+    }
     float px = item->x + item->w * x - item->pivotX;
     float py = item->y + item->h * y - item->pivotY;
     SDL_FPoint out = {item->pivotX + px * p->cosA - py * p->sinA + p->offsetX,
