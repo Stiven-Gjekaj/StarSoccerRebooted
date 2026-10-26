@@ -25,6 +25,11 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   the original, the player of the user is the only player with a career.
   `c_TPlayer` has one instance (`g_player`), `c_StatHistory` records only
   that player, and a club is mostly a strength number from `Clubs.txt`.
+- **The living world starts in 0.6, with the season.** The owner chose this
+  on 2026-10-26. Reason: the fixtures, the tables, and the transfers use
+  the squads and the histories. A later change to them is a rewrite.
+- **Version 1.0 has all the features in `TODO.md`.** The owner chose this
+  on 2026-10-26.
 
 - **The remake has no Bux.** The owner chose this on 2026-10-26. The
   original sells Bux, and it also gives some after a match. The things that

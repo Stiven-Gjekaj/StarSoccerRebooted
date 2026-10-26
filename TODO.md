@@ -80,6 +80,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 
 - [ ] All the content of 4.32
 - [ ] All the languages of 4.32
+- [ ] All the features in this file
 
 ## Not in the remake
 
@@ -92,7 +93,8 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 
 ## A living world
 
-The aim of the remake. See [docs/decisions.md](docs/decisions.md).
+The aim of the remake. See [docs/decisions.md](docs/decisions.md). The
+living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 ### The world around the player
 
@@ -171,15 +173,9 @@ The aim of the remake. See [docs/decisions.md](docs/decisions.md).
 - [ ] Import the 2014 data of the original (`MyData/v2014d`) as the
       default world
 
-## Ideas after 1.0
+## More features
 
 - [ ] Choose the position of the player, and change it later
 - [ ] More kinds of match moments: set pieces, defence, saves
 - [ ] A manager career after retirement
 - [ ] Replays of goals and matches
-
-## Open questions
-
-- When does the living world come: in the season (0.6), or after 1.0?
-- Which packs does the community make first, and where do people share
-  them?
