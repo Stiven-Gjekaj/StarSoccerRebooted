@@ -94,26 +94,92 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 
 The aim of the remake. See [docs/decisions.md](docs/decisions.md).
 
+### The world around the player
+
 - [ ] Other players with careers: age, skill, form, transfers, injuries,
       and retirement
 - [ ] Clubs with squads, managers, finances, and histories
+- [ ] Rival players: players of the same age who start with the player
+      and follow their own careers. The game compares their stats with
+      the stats of the player.
+- [ ] Teammates who matter: a strike partner, a captain, a young player
+      that the player mentors
+- [ ] Managers with styles: a new manager can drop the player, change the
+      role, or bring the player to a new club
+- [ ] New young players each season, so the world stays full after the
+      real players retire
+
+### Stories and events
+
+- [ ] A news feed: form, transfer rumours, crises at other clubs, records
+- [ ] Press and fans: the opinion of the fans is a stat. The answers in
+      interviews change the headlines and the rivals.
+- [ ] Season stories: a fight against relegation, a cup run of a small
+      club, a title on the last day
+- [ ] Career moments: the debut, the first goal, the 100th appearance,
+      the testimonial match
 - [ ] Rivalries: derbies from the distance between stadiums, and rivalries
       that grow from cup finals, title races, and transfers
-- [ ] Events: a news feed, a sacked manager, a scandal, a record transfer
 - [ ] Comebacks and form: a club in a bad run, a player who returns from
       an injury
-- [ ] Histories: the champions of each season, records, the hall of fame
-      of each club
+
+### History
+
+- [ ] The champions of each season, the records, and a hall of fame for
+      each club, league, and nation
+- [ ] A career timeline: the seasons, clubs, trophies, and big moments
+- [ ] A legacy after retirement: how the world remembers the player. The
+      world continues in a manager career or with a new player.
+
+### The match
+
+- [ ] Match context: a derby, a cup final, or a match that the club must
+      win changes the crowd, the pressure, and the stakes
+- [ ] Momentum: a goal changes the match, so a comeback from 2-0 is
+      possible
+- [ ] Weather and the pitch change how the ball moves
+- [ ] Fair ratings and real scores. Players of the original complained
+      about harsh ratings and very high scores.
+
+### Off the pitch
+
+- [ ] Rest and fitness: an injury has a recovery. The player can choose
+      to play with pain, at a risk.
+- [ ] Contract drama: release clauses, loans, a club that refuses to sell
+- [ ] Business and charity, with effects on fame and on the world
+
+### Replay value
+
+- [ ] World seeds, so that friends can share a world
+- [ ] Challenge starts: the lowest league at age 30, or one stat at its
+      maximum
+- [ ] Many careers in one world. The next player can play against the
+      last one.
+
+## The database
+
+- [ ] A data format for the world: leagues, clubs, players, stadiums,
+      kits, and logos. The format is open text, so that people can change
+      it.
+- [ ] An editor in the app for the leagues, the clubs, and the players
+- [ ] Data packs: the player installs a pack from a file. A pack can
+      change the names, the squads, the kits, and the logos.
+- [ ] Art packs: a pack can replace any image of the game
+- [ ] A 2026 data pack: the leagues, the clubs, and the squads of the
+      2025-26 season. It is a separate project, not in this repository.
+      See [docs/decisions.md](docs/decisions.md).
+- [ ] Import the 2014 data of the original (`MyData/v2014d`) as the
+      default world
 
 ## Ideas after 1.0
 
 - [ ] Choose the position of the player, and change it later
-- [ ] An editor for the leagues and the clubs
-- [ ] Data packs and art packs
 - [ ] More kinds of match moments: set pieces, defence, saves
 - [ ] A manager career after retirement
-- [ ] Seeds and replays
+- [ ] Replays of goals and matches
 
 ## Open questions
 
 - When does the living world come: in the season (0.6), or after 1.0?
+- Which packs does the community make first, and where do people share
+  them?
