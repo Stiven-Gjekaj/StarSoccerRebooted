@@ -1,6 +1,8 @@
 // The app: imports the copy of the player, then shows the game.
 // Start it with the path of an APK, XAPK, or IPA, or drop the file on the
 // window.
+// On iOS the app imports the first APK, XAPK, or IPA in its Documents
+// folder, where Finder and the Files app can put it.
 // Set SSR_SHOT to a path to save the first frame as a PNG and quit.
 // Set SSR_PRESS to "x,y" to press that point of the screen after the first
 // frame.
@@ -109,6 +111,29 @@ static void import_copy(SSRApp *app, const char *archive) {
     load_game(app);
 }
 
+#ifdef SDL_PLATFORM_IOS
+// Imports the first copy of the game in the Documents folder. Returns 1
+// when there was one.
+static int import_from_documents(SSRApp *app) {
+    const char *documents = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
+    if (!documents) return 0;
+    static const char *patterns[] = {"*.xapk", "*.apk", "*.ipa"};
+    for (size_t i = 0; i < SDL_arraysize(patterns); i++) {
+        int count = 0;
+        char **names = SDL_GlobDirectory(documents, patterns[i], SDL_GLOB_CASEINSENSITIVE, &count);
+        if (names && count > 0) {
+            char path[2400];
+            SDL_snprintf(path, sizeof(path), "%s%s", documents, names[0]);
+            SDL_free(names);
+            import_copy(app, path);
+            return 1;
+        }
+        SDL_free(names);
+    }
+    return 0;
+}
+#endif
+
 SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     SSRApp *app = SDL_calloc(1, sizeof(SSRApp));
     if (!app) return SDL_APP_FAILURE;
@@ -139,7 +164,11 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     } else if (ssr_import_is_done(app->gameDirectory)) {
         load_game(app);
     }
-
+#ifdef SDL_PLATFORM_IOS
+    else {
+        import_from_documents(app);
+    }
+#endif
     return SDL_APP_CONTINUE;
 }
 
@@ -180,6 +209,9 @@ SDL_AppResult SDL_AppIterate(void *state) {
     if (!app->gfx) {
         draw_centered_text(app->renderer, SSR_HEIGHT / 2 - 12, "Drop your copy of New Star Soccer here.");
         draw_centered_text(app->renderer, SSR_HEIGHT / 2 + 4, "The app reads an APK, an XAPK, or an IPA.");
+#ifdef SDL_PLATFORM_IOS
+        draw_centered_text(app->renderer, SSR_HEIGHT / 2 + 20, "Put the file in Documents with Finder, then restart.");
+#endif
     }
     if (app->message[0]) draw_centered_text(app->renderer, SSR_HEIGHT - 40, app->message);
 
