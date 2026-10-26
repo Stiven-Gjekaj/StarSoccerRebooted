@@ -31,10 +31,12 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 - **Version 1.0 has all the features in `TODO.md`.** The owner chose this
   on 2026-10-26.
 
-- **The remake has no Bux.** The owner chose this on 2026-10-26. The
-  original sells Bux, and it also gives some after a match. The things that
-  Bux buy in the original come from play or from money in the remake.
-  Reason: the remake has no store, so a second currency has no purpose.
+- **Bux stay. Nobody can buy them with real money.** The owner chose this
+  on 2026-10-26, and corrected it the same night. Star Bux are the cash of
+  the game: the wage goes into them (`m_bank` in `c_TPlayer`), and they buy
+  NRG drinks, boots, shop items, and bets in the casino. The original also
+  sold Bux in its store. The remake keeps the currency and removes only the
+  store. Reason: the remake has no store, and the economy needs its cash.
 
 ## The database and the packs
 

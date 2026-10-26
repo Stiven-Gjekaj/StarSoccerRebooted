@@ -48,7 +48,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       (`c_TMatch`, `TScreen_Match`)
 - [ ] Before and after the match (`Prematch`, `MatchReview`, `MatchStats`,
       `Ratings`)
-- [ ] Energy and boosts, with no Bux (`ChooseBoost`)
+- [ ] Energy and boosts (`ChooseBoost`)
 - [ ] A test harness that compares the rules with the original code
 
 ## 0.6 The season
@@ -90,7 +90,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - Advertisements (`FakeInterstitial`, `NSS5Ad`, `RewardedAdStaffSelector`,
   `GamesWeLike`, the ad SDKs)
 - In-app purchases
-- Bux. The things that Bux buy come from play or from money.
+- Buying Bux with real money. Bux, the cash of the game, stay.
 - The cloud saves and the analytics of New Star Games (`CloudSetup`,
   `CloudCohort`, Firebase, Flurry)
 
