@@ -17,6 +17,11 @@ target_include_directories(nsr_core PUBLIC src/core)
 target_link_libraries(nsr_core PUBLIC ZLIB::ZLIB)
 target_compile_options(nsr_core PRIVATE -Wall -Wextra)
 
+# The app.
+add_executable(nsr src/app/main.c)
+target_link_libraries(nsr PRIVATE nsr_core SDL3::SDL3)
+target_compile_options(nsr PRIVATE -Wall -Wextra)
+
 enable_testing()
 
 # The helpers that each test uses: the checks and a writer for zip archives.
