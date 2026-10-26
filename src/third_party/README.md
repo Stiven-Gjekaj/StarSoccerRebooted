@@ -11,3 +11,6 @@ change in the code that uses them.
 - `stb_image_write.h`: the image writer, version 1.16. Only the tests use
   it, to make the images that they need. The SHA-256 of the file is
   `cbd5f0ad7a9cf4468affb36354a1d2338034f2c12473cf1a8e32053cb6914a05`.
+- `stb_truetype.h`: the TrueType rasterizer, version 1.26. The app uses
+  it for the TTF fonts of the game. The SHA-256 of the file is
+  `ecd30b05e0dd4fea3a13c26810dd9e1992dc379049482c393d5a19e6b5090aab`.
