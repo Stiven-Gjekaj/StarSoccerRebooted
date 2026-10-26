@@ -309,21 +309,90 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     draw_atlas_image(gfx, image, &p);
 }
 
+// Draws one line of text with its top left at (x, y), scaled.
+static void draw_line(SSRGfx *gfx, FontSlot *slot, const char *text, float x, float y, float scaleX, float scaleY,
+                      uint32_t colour) {
+    static SSRGlyphQuad quads[MAX_QUADS];
+    int count = ssr_font_layout(slot->font, text, 0, 0, quads, MAX_QUADS);
+    if (count > MAX_QUADS) count = MAX_QUADS;
+    SDL_Texture *atlas = atlas_texture(gfx, slot);
+    if (!atlas) return;
+    SDL_SetTextureColorMod(atlas, (colour >> 24) & 0xFF, (colour >> 16) & 0xFF, (colour >> 8) & 0xFF);
+    SDL_SetTextureAlphaMod(atlas, colour & 0xFF);
+    for (int i = 0; i < count; i++) {
+        const SSRGlyphQuad *q = &quads[i];
+        SDL_FRect source = {q->u0 * SSR_FONT_ATLAS_SIZE, q->v0 * SSR_FONT_ATLAS_SIZE, q->x1 - q->x0, q->y1 - q->y0};
+        SDL_FRect place = {x + q->x0 * scaleX, y + q->y0 * scaleY, (q->x1 - q->x0) * scaleX, (q->y1 - q->y0) * scaleY};
+        SDL_RenderTexture(gfx->renderer, atlas, &source, &place);
+    }
+    SDL_SetTextureAlphaMod(atlas, 255);
+}
+
+#define MAX_LINES 32
+
+// Cuts the text into lines at '\n', and at spaces when a line is wider
+// than width. Each line goes into lines as a new buffer of the text.
+static int wrap_lines(FontSlot *slot, const char *text, float width, char lines[MAX_LINES][256]) {
+    int count = 0;
+    const char *p = text;
+    while (*p && count < MAX_LINES) {
+        char line[256] = "";
+        size_t used = 0;
+        const char *lastBreak = NULL;
+        size_t lastBreakUsed = 0;
+        while (*p && *p != '\n' && used + 1 < sizeof(line)) {
+            line[used++] = *p;
+            line[used] = 0;
+            if (*p == ' ') {
+                lastBreak = p;
+                lastBreakUsed = used - 1;
+            }
+            if (width > 0 && ssr_font_measure(slot->font, line) > width && lastBreak) {
+                line[lastBreakUsed] = 0;
+                p = lastBreak + 1;
+                break;
+            }
+            p++;
+        }
+        if (*p == '\n') p++;
+        SDL_strlcpy(lines[count++], line, 256);
+    }
+    return count;
+}
+
 static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
     if (!item->text || !item->text[0]) return;
-    SSRFontSize size = (SSRFontSize)item->font;
-    float width = ssr_gfx_text_width(gfx, size, item->text);
-    float height = ssr_gfx_line_height(gfx, size);
-    float x = item->x, y = item->y;
-    if (item->alignX == 'C') x += (item->w - width) / 2;
-    if (item->alignX == 'R') x += item->w - width;
-    if (item->alignY == 'M') y += (item->h - height) / 2;
-    if (item->alignY == 'B') y += item->h - height;
-    FontSlot *slot = &gfx->fonts[size];
-    SDL_Texture *atlas = slot->font ? atlas_texture(gfx, slot) : NULL;
-    if (atlas) SDL_SetTextureAlphaMod(atlas, (Uint8)(item->colour & 0xFF));
-    ssr_gfx_text(gfx, size, item->text, x, y, item->colour >> 8, SSR_ALIGN_LEFT);
-    if (atlas) SDL_SetTextureAlphaMod(atlas, 255);
+    FontSlot *slot = &gfx->fonts[item->font];
+    if (!slot->font) return;
+    float scaleX = item->fontScaleX > 0 ? item->fontScaleX : 1;
+    float scaleY = item->fontScaleY > 0 ? item->fontScaleY : 1;
+    char lines[MAX_LINES][256];
+    int count = wrap_lines(slot, item->text, item->wrap && item->w > 0 ? item->w / scaleX : 0, lines);
+    // A line that is wider than its box gets smaller to fit it.
+    if (item->w > 0) {
+        float widest = 0;
+        for (int i = 0; i < count; i++) {
+            float width = ssr_font_measure(slot->font, lines[i]) * scaleX;
+            if (width > widest) widest = width;
+        }
+        if (widest > item->w) {
+            float fit = item->w / widest;
+            scaleX *= fit;
+            scaleY *= fit;
+        }
+    }
+    float lineHeight = ssr_font_line_height(slot->font) * scaleY;
+    float total = lineHeight * count;
+    float y = item->y;
+    if (item->alignY == 'M') y += (item->h - total) / 2;
+    if (item->alignY == 'B') y += item->h - total;
+    for (int i = 0; i < count; i++) {
+        float width = ssr_font_measure(slot->font, lines[i]) * scaleX;
+        float x = item->x;
+        if (item->alignX == 'C') x += (item->w - width) / 2;
+        if (item->alignX == 'R') x += item->w - width;
+        draw_line(gfx, slot, lines[i], x, y + lineHeight * i, scaleX, scaleY, item->colour);
+    }
 }
 
 void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene) {
