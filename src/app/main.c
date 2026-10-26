@@ -23,9 +23,11 @@
 #include "ssr_ui.h"
 #include "ssr_world.h"
 
-// The game is portrait. The 2x images fill 640 x 960 pixels.
+// The game is portrait. The 2x images fill 640 x 960 pixels. On a taller
+// screen the width stays 640 and the height grows, as in the game. The
+// layouts place things from the bottom with @B.
 #define SSR_WIDTH 640
-#define SSR_HEIGHT 960
+#define SSR_MIN_HEIGHT 960
 
 typedef struct {
     SDL_Window *window;
@@ -38,6 +40,8 @@ typedef struct {
     SSRUiTree *screen;
     SSRScene *scene;
     SSRAudio *audio;
+    // The height of the screen in logical pixels.
+    int height;
     char gameDirectory[2048];
     char message[256];
 } SSRApp;
@@ -134,6 +138,15 @@ static int import_from_documents(SSRApp *app) {
 }
 #endif
 
+// Sets the logical height from the shape of the window.
+static void fit_screen(SSRApp *app) {
+    int w = 0, h = 0;
+    SDL_GetRenderOutputSize(app->renderer, &w, &h);
+    app->height = SSR_MIN_HEIGHT;
+    if (w > 0 && h * SSR_WIDTH > w * SSR_MIN_HEIGHT) app->height = h * SSR_WIDTH / w;
+    SDL_SetRenderLogicalPresentation(app->renderer, SSR_WIDTH, app->height, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+}
+
 SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     SSRApp *app = SDL_calloc(1, sizeof(SSRApp));
     if (!app) return SDL_APP_FAILURE;
@@ -144,13 +157,13 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    if (!SDL_CreateWindowAndRenderer("Star Soccer Rebooted", SSR_WIDTH * 3 / 4, SSR_HEIGHT * 3 / 4,
+    if (!SDL_CreateWindowAndRenderer("Star Soccer Rebooted", SSR_WIDTH * 3 / 4, SSR_MIN_HEIGHT * 3 / 4,
                                      SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY,
                                      &app->window, &app->renderer)) {
         SDL_Log("SDL_CreateWindowAndRenderer failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    SDL_SetRenderLogicalPresentation(app->renderer, SSR_WIDTH, SSR_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    fit_screen(app);
     SDL_SetRenderVSync(app->renderer, 1);
 
     char *pref = SDL_GetPrefPath("StivenGjekaj", "StarSoccerRebooted");
@@ -175,6 +188,7 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
 SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
     SSRApp *app = state;
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
+    if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) fit_screen(app);
     if (event->type == SDL_EVENT_DROP_FILE && event->drop.data) import_copy(app, event->drop.data);
     if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_FINGER_DOWN) {
         SDL_ConvertEventToRenderCoordinates(app->renderer, event);
@@ -201,19 +215,19 @@ SDL_AppResult SDL_AppIterate(void *state) {
     SDL_SetRenderDrawColor(app->renderer, 255, 255, 255, 255);
 
     if (app->screen) {
-        SSRSceneEnv env = {SSR_WIDTH, SSR_HEIGHT, app->tweaks, translate, image_size, app};
+        SSRSceneEnv env = {SSR_WIDTH, (float)app->height, app->tweaks, translate, image_size, app};
         ssr_scene_free(app->scene);
         app->scene = ssr_scene_build(app->screen, &env);
         ssr_gfx_draw_scene(app->gfx, app->scene);
     }
     if (!app->gfx) {
-        draw_centered_text(app->renderer, SSR_HEIGHT / 2 - 12, "Drop your copy of New Star Soccer here.");
-        draw_centered_text(app->renderer, SSR_HEIGHT / 2 + 4, "The app reads an APK, an XAPK, or an IPA.");
+        draw_centered_text(app->renderer, app->height / 2 - 12, "Drop your copy of New Star Soccer here.");
+        draw_centered_text(app->renderer, app->height / 2 + 4, "The app reads an APK, an XAPK, or an IPA.");
 #ifdef SDL_PLATFORM_IOS
-        draw_centered_text(app->renderer, SSR_HEIGHT / 2 + 20, "Put the file in Documents with Finder, then restart.");
+        draw_centered_text(app->renderer, app->height / 2 + 20, "Put the file in Documents with Finder, then restart.");
 #endif
     }
-    if (app->message[0]) draw_centered_text(app->renderer, SSR_HEIGHT - 40, app->message);
+    if (app->message[0]) draw_centered_text(app->renderer, app->height - 40, app->message);
 
     const char *press = SDL_getenv("SSR_PRESS");
     static int pressed = 0;
