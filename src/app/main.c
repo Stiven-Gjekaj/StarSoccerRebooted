@@ -1,6 +1,7 @@
 // The app: imports the copy of the player, then shows the game.
 // Start it with the path of an APK, XAPK, or IPA, or drop the file on the
 // window.
+// Set NSR_SHOT to a path to save the first frame as a PNG and quit.
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -103,6 +104,14 @@ SDL_AppResult SDL_AppIterate(void *state) {
     }
     if (app->message[0]) draw_centered_text(app->renderer, NSR_HEIGHT - 40, app->message);
 
+    const char *shot = SDL_getenv("NSR_SHOT");
+    if (shot && *shot) {
+        SDL_Surface *frame = SDL_RenderReadPixels(app->renderer, NULL);
+        bool saved = frame && SDL_SavePNG(frame, shot);
+        SDL_DestroySurface(frame);
+        if (!saved) SDL_Log("The frame was not saved: %s", SDL_GetError());
+        return saved ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
+    }
     SDL_RenderPresent(app->renderer);
     return SDL_APP_CONTINUE;
 }
