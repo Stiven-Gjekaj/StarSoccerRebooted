@@ -16,6 +16,7 @@ typedef struct {
 } Parser;
 
 static double expression(Parser *ps);
+static double sum(Parser *ps);
 
 static void skip_spaces(Parser *ps) {
     while (*ps->p == ' ' || *ps->p == '\t') ps->p++;
@@ -139,13 +140,43 @@ static double term(Parser *ps) {
     }
 }
 
-static double expression(Parser *ps) {
+static double sum(Parser *ps) {
     double value = term(ps);
     for (;;) {
         if (accept(ps, '+')) {
             value += term(ps);
         } else if (accept(ps, '-')) {
             value -= term(ps);
+        } else {
+            return value;
+        }
+    }
+}
+
+// A comparison gives 1 or 0. It binds less than + and -.
+static double expression(Parser *ps) {
+    double value = sum(ps);
+    for (;;) {
+        skip_spaces(ps);
+        const char *p = ps->p;
+        if (p[0] == '>' && p[1] == '=') {
+            ps->p += 2;
+            value = value >= sum(ps);
+        } else if (p[0] == '<' && p[1] == '=') {
+            ps->p += 2;
+            value = value <= sum(ps);
+        } else if ((p[0] == '!' || p[0] == '<') && (p[1] == '=' || p[1] == '>')) {
+            ps->p += 2;
+            value = value != sum(ps);
+        } else if (p[0] == '=') {
+            ps->p += p[1] == '=' ? 2 : 1;
+            value = value == sum(ps);
+        } else if (p[0] == '>') {
+            ps->p++;
+            value = value > sum(ps);
+        } else if (p[0] == '<') {
+            ps->p++;
+            value = value < sum(ps);
         } else {
             return value;
         }

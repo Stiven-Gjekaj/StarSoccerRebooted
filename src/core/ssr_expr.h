@@ -1,7 +1,8 @@
 // ssr_expr: the arithmetic of the screen layouts of the game, for example
 // "[@B-960]*0.7+744" or "Max[?W?:?H?]+100".
 //
-// Numbers, + - * /, unary minus, and [ ] for groups. Max[a:b] and Min[a:b]
+// Numbers, + - * /, unary minus, and [ ] for groups. The comparisons
+// =, ==, !=, <>, <, >, <=, and >= give 1 or 0. Max[a:b] and Min[a:b]
 // take two values. sin(x) and cos(x) take degrees. "@name" and "%name" are
 // variables, and "twk(Group,Name)" is a tweak value. The caller gives their
 // values. A part that the evaluator does not know counts as 0.

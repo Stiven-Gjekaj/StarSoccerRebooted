@@ -47,6 +47,20 @@ static void test_uses_the_scope(void) {
     CHECK(near(ssr_expr_eval("twk(Menu, Missing)", &scope, &ok), 0) && ok);
 }
 
+static void test_compares_values(void) {
+    SSRExprScope scope = {variable, tweak, NULL};
+    int ok = 0;
+    CHECK(near(ssr_expr_eval("twk(Player,Energy)>0", &scope, &ok), 1) && ok);
+    CHECK(near(ssr_expr_eval("twk(Consent,ATTFlowScreen)>0", &scope, &ok), 0) && ok);
+    CHECK(near(ssr_expr_eval("twk(Consent,AdmobActive)=0", &scope, &ok), 1) && ok);
+    CHECK(near(ssr_expr_eval("2+2==4", &scope, &ok), 1) && ok);
+    CHECK(near(ssr_expr_eval("3!=3", &scope, &ok), 0) && ok);
+    CHECK(near(ssr_expr_eval("3<>4", &scope, &ok), 1) && ok);
+    CHECK(near(ssr_expr_eval("1<=1", &scope, &ok), 1) && ok);
+    CHECK(near(ssr_expr_eval("1>=2", &scope, &ok), 0) && ok);
+    CHECK(near(ssr_expr_eval("1<2", &scope, &ok), 1) && ok);
+}
+
 static void test_reports_text_that_it_cannot_read(void) {
     int ok = 1;
     ssr_expr_eval("", NULL, &ok);
@@ -62,6 +76,7 @@ static void test_reports_text_that_it_cannot_read(void) {
 int main(void) {
     test_evaluates_arithmetic();
     test_uses_the_scope();
+    test_compares_values();
     test_reports_text_that_it_cannot_read();
     return TEST_RESULT();
 }
