@@ -289,6 +289,19 @@ static void apply_look(Walker *w, const SSRUiNode *node, SSRSceneItem *item) {
 
 static void walk(Walker *w, const SSRUiNode *node, int layer);
 
+// Takes the click message and its sound from the Click() modifier.
+static void apply_click(Walker *w, const SSRUiNode *node, SSRSceneItem *item) {
+    const SSRUiNode *click = modifier(node, "Click");
+    if (!click) return;
+    item->click = keep(w->scene, click->argCount ? arg(click, 0) : "");
+    for (int i = 0; i < click->childCount; i++) {
+        if (strcmp(click->children[i]->name, "PlaySnd") == 0) {
+            item->clickSound = keep(w->scene, arg(click->children[i], 0));
+            break;
+        }
+    }
+}
+
 static void walk_children(Walker *w, const SSRUiNode *node, int layer) {
     for (int i = 0; i < node->childCount; i++) walk(w, node->children[i], layer);
 }
@@ -381,6 +394,7 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
             item->angle = (float)number(w, node, 5, 0);
             item->colour = colour(arg(node, 6), 0xFFFFFFFF);
             apply_look(w, node, item);
+            apply_click(w, node, item);
         }
         walk_children(w, node, layer);
         return;
@@ -442,7 +456,7 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
     }
 
     if (strcmp(name, "Rect") == 0 || strcmp(name, "RectLTRB") == 0) {
-        if (node->ref) {
+        if (node->ref || modifier(node, "Click")) {
             SSRSceneItem *item = add_item(w, SSR_ITEM_AREA, layer, node->ref);
             if (item) {
                 item->x = ox + (float)number(w, node, 0, 0);
@@ -453,6 +467,7 @@ static void walk(Walker *w, const SSRUiNode *node, int layer) {
                     item->w -= item->x - ox;
                     item->h -= item->y - oy;
                 }
+                apply_click(w, node, item);
             }
         }
         walk_children(w, node, layer);
@@ -524,14 +539,19 @@ const char *ssr_scene_image_file(const SSRScene *scene, const char *name) {
     return NULL;
 }
 
-const char *ssr_scene_hit(const SSRScene *scene, float x, float y) {
+const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y) {
     if (!scene) return NULL;
     for (int i = scene->count - 1; i >= 0; i--) {
         const SSRSceneItem *item = &scene->items[i];
-        if (!item->ref || item->kind == SSR_ITEM_CLIP || item->kind == SSR_ITEM_UNCLIP) continue;
+        if ((!item->ref && !item->click) || item->kind == SSR_ITEM_CLIP || item->kind == SSR_ITEM_UNCLIP) continue;
         float x0 = item->w < 0 ? item->x + item->w : item->x, x1 = item->w < 0 ? item->x : item->x + item->w;
         float y0 = item->h < 0 ? item->y + item->h : item->y, y1 = item->h < 0 ? item->y : item->y + item->h;
-        if (x >= x0 && x < x1 && y >= y0 && y < y1) return item->ref;
+        if (x >= x0 && x < x1 && y >= y0 && y < y1) return item;
     }
     return NULL;
+}
+
+const char *ssr_scene_hit(const SSRScene *scene, float x, float y) {
+    const SSRSceneItem *item = ssr_scene_hit_item(scene, x, y);
+    return item ? item->ref : NULL;
 }

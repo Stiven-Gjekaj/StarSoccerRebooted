@@ -46,6 +46,10 @@ typedef struct {
     int wrap;
     int layer;
     const char *ref;
+    // The message of a Click(message) modifier, and the sound that its
+    // block plays with PlaySnd(name). NULL when there is none.
+    const char *click;
+    const char *clickSound;
 } SSRSceneItem;
 
 typedef struct {
@@ -72,5 +76,8 @@ const char *ssr_scene_image_file(const SSRScene *scene, const char *name);
 
 // The ref of the last item with a ref at the point, or NULL.
 const char *ssr_scene_hit(const SSRScene *scene, float x, float y);
+
+// The last item with a ref or a click at the point, or NULL.
+const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y);
 
 #endif

@@ -178,7 +178,32 @@ static void test_text_expressions_and_set(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static void test_clicks_and_their_sounds(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    SSRScene *scene = build("Rect:(0,0,200,100)\n"
+                            "\tClick(menu.play)\n"
+                            "\t<\n"
+                            "\t\tPlaySnd(UISelect)\n"
+                            "\t>\n"
+                            "Draw:(Glint,300,0,40,20) ref:Shine\n"
+                            "\tClick()\n",
+                            tweaks, &tree);
+    CHECK(ssr_scene_count(scene) == 2);
+    const SSRSceneItem *play = ssr_scene_hit_item(scene, 50, 50);
+    CHECK(play && strcmp(play->click, "menu.play") == 0 && strcmp(play->clickSound, "UISelect") == 0);
+    CHECK(play && play->ref == NULL);
+    const SSRSceneItem *shine = ssr_scene_hit_item(scene, 310, 10);
+    CHECK(shine && strcmp(shine->click, "") == 0 && shine->clickSound == NULL);
+    CHECK(strcmp(ssr_scene_hit(scene, 310, 10), "Shine") == 0);
+    CHECK(ssr_scene_hit_item(scene, 250, 50) == NULL);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_clicks_and_their_sounds();
     test_text_expressions_and_set();
     test_places_images_with_origins_and_variables();
     test_shows_items_by_tweak();
