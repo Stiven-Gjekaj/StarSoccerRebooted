@@ -38,6 +38,7 @@ add_library(ssr_core STATIC
     src/core/ssr_font.c
     src/core/ssr_expr.c
     src/core/ssr_ui.c
+    src/core/ssr_atlas.c
 )
 target_include_directories(ssr_core PUBLIC src/core)
 target_include_directories(ssr_core PRIVATE src/third_party)
@@ -80,5 +81,6 @@ ssr_add_test(test_text)
 ssr_add_test(test_font)
 ssr_add_test(test_expr)
 ssr_add_test(test_ui)
+ssr_add_test(test_atlas)
 # The font test skips its layout checks when the system has no TTF font.
 set_tests_properties(test_font PROPERTIES SKIP_RETURN_CODE 77)
