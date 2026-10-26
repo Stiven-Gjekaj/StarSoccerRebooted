@@ -17,6 +17,8 @@
 
 #define NSR_MARKER "import.txt"
 #define NSR_APK_PREFIX "assets/monkey/"
+#define NSR_XAPK_GAME "com.newstargames.newstarsoccer.apk"
+#define NSR_XAPK_TEMP ".import.apk"
 
 static int starts_with(const char *text, const char *prefix) {
     return strncmp(text, prefix, strlen(prefix)) == 0;
@@ -95,6 +97,12 @@ static int copy_tree(NSRZip *zip, const char *prefix, const char *dest) {
     return copied;
 }
 
+static int write_marker(const char *dest, NSRSource source, int copied) {
+    char marker[64];
+    int length = snprintf(marker, sizeof(marker), "source=%s\nfiles=%d\n", nsr_source_name(source), copied);
+    return write_file(dest, NSR_MARKER, marker, (size_t)length);
+}
+
 static int has_prefix(NSRZip *zip, const char *prefix) {
     for (int i = 0; i < nsr_zip_count(zip); i++) {
         if (starts_with(nsr_zip_name(zip, i), prefix)) return 1;
@@ -114,6 +122,26 @@ NSRSource nsr_import(const char *archive, const char *dest, int *files) {
         prefix = NSR_APK_PREFIX;
     }
 
+    if (!prefix) {
+        // An XAPK holds the APK of the game and the APKs of the languages.
+        size_t size = 0;
+        unsigned char *apk = nsr_zip_read(zip, NSR_XAPK_GAME, &size);
+        nsr_zip_close(zip);
+        if (!apk) return NSR_SOURCE_UNKNOWN;
+        int ok = write_file(dest, NSR_XAPK_TEMP, apk, size);
+        free(apk);
+        if (!ok) return NSR_SOURCE_UNKNOWN;
+        char inner[4096];
+        snprintf(inner, sizeof(inner), "%s/%s", dest, NSR_XAPK_TEMP);
+        int copied = 0;
+        NSRSource innerSource = nsr_import(inner, dest, &copied);
+        remove(inner);
+        if (innerSource != NSR_SOURCE_APK) return NSR_SOURCE_UNKNOWN;
+        if (!write_marker(dest, NSR_SOURCE_XAPK, copied)) return NSR_SOURCE_UNKNOWN;
+        if (files) *files = copied;
+        return NSR_SOURCE_XAPK;
+    }
+
     int copied = -1;
     if (prefix) {
         remove_marker(dest);
@@ -122,9 +150,7 @@ NSRSource nsr_import(const char *archive, const char *dest, int *files) {
     nsr_zip_close(zip);
     if (copied <= 0) return NSR_SOURCE_UNKNOWN;
 
-    char marker[64];
-    int length = snprintf(marker, sizeof(marker), "source=%s\nfiles=%d\n", nsr_source_name(source), copied);
-    if (!write_file(dest, NSR_MARKER, marker, (size_t)length)) return NSR_SOURCE_UNKNOWN;
+    if (!write_marker(dest, source, copied)) return NSR_SOURCE_UNKNOWN;
     if (files) *files = copied;
     return source;
 }
@@ -140,6 +166,8 @@ const char *nsr_source_name(NSRSource source) {
     switch (source) {
     case NSR_SOURCE_APK:
         return "apk";
+    case NSR_SOURCE_XAPK:
+        return "xapk";
     default:
         return "unknown";
     }

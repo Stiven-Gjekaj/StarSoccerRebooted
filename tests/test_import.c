@@ -60,6 +60,37 @@ static void test_imports_the_assets_of_an_apk(void) {
     free(marker);
 }
 
+static void test_imports_the_apk_in_an_xapk(void) {
+    char archive[1100], dest[1100];
+    make_paths("xapk", archive, dest);
+    char apk[1100];
+    snprintf(apk, sizeof(apk), "%s.inner", archive);
+    NSRZipFile inner[] = {{"assets/monkey/MyData/Content.txt", "beach#\n", 7, 1}};
+    CHECK(nsr_zipwriter_write(apk, inner, 1));
+    FILE *file = fopen(apk, "rb");
+    char apkData[4096];
+    size_t apkSize = fread(apkData, 1, sizeof(apkData), file);
+    fclose(file);
+
+    NSRZipFile outer[] = {
+        {"manifest.json", "{}", 2, 0},
+        {"config.en.apk", "language", 8, 0},
+        {"com.newstargames.newstarsoccer.apk", apkData, apkSize, 0},
+    };
+    CHECK(nsr_zipwriter_write(archive, outer, 3));
+
+    int count = -1;
+    CHECK(nsr_import(archive, dest, &count) == NSR_SOURCE_XAPK);
+    CHECK(count == 1);
+    char *text = read_text(dest, "MyData/Content.txt");
+    CHECK(text && strcmp(text, "beach#\n") == 0);
+    free(text);
+    CHECK(!exists(dest, ".import.apk"));
+    char *marker = read_text(dest, "import.txt");
+    CHECK(marker && strcmp(marker, "source=xapk\nfiles=1\n") == 0);
+    free(marker);
+}
+
 static void test_refuses_an_archive_with_no_assets(void) {
     char archive[1100], dest[1100];
     make_paths("noassets", archive, dest);
@@ -101,6 +132,7 @@ static void test_a_failed_import_removes_the_old_marker(void) {
 
 int main(void) {
     test_imports_the_assets_of_an_apk();
+    test_imports_the_apk_in_an_xapk();
     test_refuses_an_archive_with_no_assets();
     test_refuses_a_name_that_leaves_the_directory();
     test_a_failed_import_removes_the_old_marker();

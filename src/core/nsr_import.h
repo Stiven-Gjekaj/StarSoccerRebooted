@@ -7,6 +7,7 @@
 typedef enum {
     NSR_SOURCE_UNKNOWN,
     NSR_SOURCE_APK,
+    NSR_SOURCE_XAPK,
 } NSRSource;
 
 // Copies each asset in the archive into the directory dest. The tree in
