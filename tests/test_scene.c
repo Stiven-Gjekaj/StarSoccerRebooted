@@ -187,9 +187,12 @@ static void test_clicks_and_their_sounds(void) {
                             "\t\tPlaySnd(UISelect)\n"
                             "\t>\n"
                             "Draw:(Glint,300,0,40,20) ref:Shine\n"
-                            "\tClick()\n",
+                            "\tClick()\n"
+                            "Draw:(Glint,0,200,40,20) ref:Decoration\n",
                             tweaks, &tree);
-    CHECK(ssr_scene_count(scene) == 2);
+    CHECK(ssr_scene_count(scene) == 3);
+    CHECK(ssr_scene_hit_item(scene, 10, 210) == NULL);
+    CHECK(strcmp(ssr_scene_hit(scene, 10, 210), "Decoration") == 0);
     const SSRSceneItem *play = ssr_scene_hit_item(scene, 50, 50);
     CHECK(play && strcmp(play->click, "menu.play") == 0 && strcmp(play->clickSound, "UISelect") == 0);
     CHECK(play && play->ref == NULL);

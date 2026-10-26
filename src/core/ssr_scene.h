@@ -77,7 +77,7 @@ const char *ssr_scene_image_file(const SSRScene *scene, const char *name);
 // The ref of the last item with a ref at the point, or NULL.
 const char *ssr_scene_hit(const SSRScene *scene, float x, float y);
 
-// The last item with a ref or a click at the point, or NULL.
+// The last item with a click at the point, or NULL.
 const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y);
 
 #endif

@@ -539,11 +539,12 @@ const char *ssr_scene_image_file(const SSRScene *scene, const char *name) {
     return NULL;
 }
 
-const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y) {
+static const SSRSceneItem *hit(const SSRScene *scene, float x, float y, int clicksOnly) {
     if (!scene) return NULL;
     for (int i = scene->count - 1; i >= 0; i--) {
         const SSRSceneItem *item = &scene->items[i];
-        if ((!item->ref && !item->click) || item->kind == SSR_ITEM_CLIP || item->kind == SSR_ITEM_UNCLIP) continue;
+        if (clicksOnly ? !item->click : !item->ref) continue;
+        if (item->kind == SSR_ITEM_CLIP || item->kind == SSR_ITEM_UNCLIP) continue;
         float x0 = item->w < 0 ? item->x + item->w : item->x, x1 = item->w < 0 ? item->x : item->x + item->w;
         float y0 = item->h < 0 ? item->y + item->h : item->y, y1 = item->h < 0 ? item->y : item->y + item->h;
         if (x >= x0 && x < x1 && y >= y0 && y < y1) return item;
@@ -551,7 +552,11 @@ const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y) 
     return NULL;
 }
 
+const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y) {
+    return hit(scene, x, y, 1);
+}
+
 const char *ssr_scene_hit(const SSRScene *scene, float x, float y) {
-    const SSRSceneItem *item = ssr_scene_hit_item(scene, x, y);
+    const SSRSceneItem *item = hit(scene, x, y, 0);
     return item ? item->ref : NULL;
 }
