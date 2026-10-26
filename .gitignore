@@ -1,0 +1,8 @@
+# Build output
+build/
+.DS_Store
+
+# The files of New Star Soccer. The repository holds none of them.
+*.apk
+*.xapk
+*.ipa
