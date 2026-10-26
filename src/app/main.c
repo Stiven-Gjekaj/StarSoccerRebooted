@@ -66,7 +66,7 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     if (!app) return SDL_APP_FAILURE;
     *state = app;
 
-    SDL_SetAppMetadata("Star Soccer Rebooted", "0.1.0", "io.github.stivengjekaj.starsoccerrebooted");
+    SDL_SetAppMetadata("Star Soccer Rebooted", SSR_VERSION, "io.github.stivengjekaj.starsoccerrebooted");
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
