@@ -62,6 +62,7 @@ static int image_size(void *context, const char *name, float *w, float *h) {
 
 static void open_screen(SSRApp *app, const char *name) {
     ssr_ui_free(app->screen);
+    app->screen = NULL;
     SSRUiFiles files = {read_screen_file, app};
     app->screen = ssr_ui_parse(name, &files);
     if (!app->screen) {
@@ -72,9 +73,6 @@ static void open_screen(SSRApp *app, const char *name) {
 }
 
 static void load_game(SSRApp *app) {
-    ssr_ui_free(app->screen);
-    ssr_text_free(app->text);
-    ssr_tweaks_free(app->tweaks);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
     app->gfx = ssr_gfx_create(app->renderer, app->gameDirectory);
@@ -83,6 +81,7 @@ static void load_game(SSRApp *app) {
     app->world = ssr_world_load(path);
     if (!app->world) SDL_snprintf(app->message, sizeof(app->message), "The import has no data set %s.", SSR_WORLD_DEFAULT_SET);
     ssr_text_free(app->text);
+    app->text = NULL;
     SDL_snprintf(path, sizeof(path), "%s/MyData/Languages/en.txt", app->gameDirectory);
     app->text = ssr_text_load(path);
     const char *screen = SDL_getenv("SSR_SCREEN");
