@@ -339,18 +339,27 @@ static void walk_children(Walker *w, const SSRUiNode *node, int layer) {
     for (int i = 0; i < node->childCount; i++) walk(w, node->children[i], layer);
 }
 
+// "@name=expression". A new value of a name takes the place of the old one.
 static void set_variable(Walker *w, const char *assignment) {
-    // "@name=expression".
     if (assignment[0] != '@') return;
     const char *equals = strchr(assignment, '=');
-    if (!equals || w->variableCount >= MAX_VARIABLES) return;
-    Variable *v = &w->variables[w->variableCount];
+    if (!equals) return;
+    char name[32];
     size_t length = (size_t)(equals - assignment - 1);
-    if (length >= sizeof(v->name)) return;
-    memcpy(v->name, assignment + 1, length);
-    v->name[length] = 0;
+    if (length >= sizeof(name)) return;
+    memcpy(name, assignment + 1, length);
+    name[length] = 0;
     SSRExprScope scope = {variable, tweak, w};
-    v->value = ssr_expr_eval(equals + 1, &scope, NULL);
+    double value = ssr_expr_eval(equals + 1, &scope, NULL);
+    for (int i = 0; i < w->variableCount; i++) {
+        if (strcmp(w->variables[i].name, name) == 0) {
+            w->variables[i].value = value;
+            return;
+        }
+    }
+    if (w->variableCount >= MAX_VARIABLES) return;
+    strcpy(w->variables[w->variableCount].name, name);
+    w->variables[w->variableCount].value = value;
     w->variableCount++;
 }
 

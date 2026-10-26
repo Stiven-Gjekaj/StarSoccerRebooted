@@ -232,7 +232,26 @@ static void test_tiles(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static void test_sets_a_variable_many_times(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    char text[8192] = "";
+    // More sets than the store has places for, of one name.
+    for (int i = 0; i < 100; i++) {
+        char line[64];
+        snprintf(line, sizeof(line), "Set:(@n=%d)\n", i);
+        strcat(text, line);
+    }
+    strcat(text, "Draw:(Last,0,@n,10,10)\n");
+    SSRUiTree *tree;
+    SSRScene *scene = build(text, tweaks, &tree);
+    CHECK(ssr_scene_count(scene) == 1 && near(ssr_scene_item(scene, 0)->y, 99));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_sets_a_variable_many_times();
     test_tiles();
     test_clicks_and_their_sounds();
     test_text_expressions_and_set();
