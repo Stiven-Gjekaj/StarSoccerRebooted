@@ -3329,6 +3329,7 @@ static void honours_screen(SSRGame *game) {
     set_screen(game, "honours");
     SSRTweaks *t = game->tweaks;
     ssr_tweaks_set(t, "Honours", "Title", loc(game, "SSR_Honours"));
+    ssr_tweaks_set(t, "Honours", "Column", loc(game, "Season"));
     ssr_tweaks_set_number(t, "Honours", "Scroll", 0);
     add_op(game, SSR_OP_LIST_CLEAR, "HonourList", NULL, NULL, 0);
     add_op(game, SSR_OP_LIST_START, "HonourList", NULL, NULL, 82);

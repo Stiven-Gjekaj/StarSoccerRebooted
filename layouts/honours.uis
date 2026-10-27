@@ -110,11 +110,11 @@ PushOrigin:(22,220)
 			Layer(AfterGloss)
 		Draw:(GreyReadout,-2,0,568,52,,#EEFFEEFF)
 			Layer(AfterGloss)
-		Text:(Honours,20,5,520,44,L,,#FFFFFFFF)
+		Text:(Season,20,5,520,44,L,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
-			StringReadout(Honours,Title)
+			StringReadout(Honours,Column)
 	}
 		ConvergeFrom(-640,0)
 PopOrigin
