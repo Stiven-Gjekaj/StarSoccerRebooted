@@ -40,7 +40,9 @@ On macOS:
 
 For Android, open `android/` in Android Studio, or run
 `./gradlew assembleDebug` in it. For iOS, make an Xcode project with
-`cmake -S . -B build/ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS`.
+`cmake -S . -B build/ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS
+-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0`. Add `-DCMAKE_OSX_SYSROOT=iphonesimulator` for
+the simulator.
 
 ## Run
 
