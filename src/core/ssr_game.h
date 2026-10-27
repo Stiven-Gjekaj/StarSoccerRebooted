@@ -176,6 +176,12 @@ typedef enum {
     SSR_TICKER_WORLD_MENTEE,
     // A small club in the last eight of a cup of the nation of the player.
     SSR_TICKER_WORLD_CUPRUN,
+    // A big club of the league of the player low in the table.
+    SSR_TICKER_WORLD_CRISIS,
+    // A good young player of a small club, linked with the biggest club.
+    SSR_TICKER_WORLD_RUMOUR,
+    // The top scorer of the league near the record of a season.
+    SSR_TICKER_WORLD_RECORD,
     SSR_TICKER_KINDS,
 } SSRTickerKind;
 

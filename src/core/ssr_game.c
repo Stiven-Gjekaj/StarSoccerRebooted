@@ -10264,6 +10264,122 @@ static int form_run(SSRGame *game, int *run) {
     return best;
 }
 
+// The league of the player and its first pool, sorted as a table, or NULL.
+static SSRSeasonComp *my_table(SSRGame *game, SSRPool **pool) {
+    SSRSeason *s = game->season;
+    SSRSeasonComp *comp = s ? ssr_season_comp(s, ssr_season_actual_league(s, game->career.clubId)) : NULL;
+    if (!comp || comp->data->type != 0 || comp->poolCount == 0 || comp->pools[0].count < 4) return NULL;
+    *pool = &comp->pools[0];
+    ssr_season_sort_pool(s, *pool, 4);
+    return comp;
+}
+
+// The rounds before the table can show a crisis.
+#define CRISIS_ROUNDS 8
+
+// A crisis: one of the three strongest clubs of the league of the player in
+// the bottom four after some rounds. Returns the club, or 0. position gets
+// its place in the table.
+static int crisis(SSRGame *game, int *position) {
+    SSRPool *pool = NULL;
+    if (!my_table(game, &pool)) return 0;
+    const SSRTableRow *rows = game->season->rows;
+    int strongest[3] = {0, 0, 0};
+    for (int r = 0; r < pool->count; r++) {
+        const SSRTableRow *row = &rows[pool->rows[r]];
+        for (int k = 0; k < 3; k++) {
+            const SSRTableRow *other = strongest[k] ? &rows[strongest[k] - 1] : NULL;
+            if (!other || row->strength > other->strength) {
+                for (int m = 2; m > k; m--) strongest[m] = strongest[m - 1];
+                strongest[k] = pool->rows[r] + 1;
+                break;
+            }
+        }
+    }
+    for (int r = pool->count - 1; r >= pool->count - 4 && r >= 0; r--) {
+        int index = pool->rows[r];
+        if (rows[index].played < CRISIS_ROUNDS) continue;
+        for (int k = 0; k < 3; k++) {
+            if (strongest[k] == index + 1) {
+                *position = r + 1;
+                return rows[index].teamId;
+            }
+        }
+    }
+    return 0;
+}
+
+// The skill from which a young player of a small club makes a rumour.
+#define RUMOUR_SKILL 60
+
+// A rumour: the best player of 23 or younger at a club of the league of the
+// player that is not one of the three strongest, linked with the strongest
+// club that is not his own. Returns the player, or NULL. big gets the club.
+static SSRPerson *rumour(SSRGame *game, int *big) {
+    SSRPool *pool = NULL;
+    if (!game->people || !my_table(game, &pool)) return NULL;
+    const SSRTableRow *rows = game->season->rows;
+    int clubs[64], strengths[64], n = 0;
+    for (int r = 0; r < pool->count && n < 64; r++) {
+        clubs[n] = rows[pool->rows[r]].teamId;
+        strengths[n++] = rows[pool->rows[r]].strength;
+    }
+    int year = ssr_career_year(&game->career);
+    SSRPerson *best = NULL;
+    int bestClub = 0;
+    for (int i = 0; i < game->people->count; i++) {
+        SSRPerson *p = &game->people->list[i];
+        if (p->retired || year - p->born > 23 || p->skill < RUMOUR_SKILL || p->club == game->career.clubId) continue;
+        int at = -1, stronger = 0;
+        for (int k = 0; k < n; k++) {
+            if (clubs[k] == p->club) at = k;
+        }
+        if (at < 0) continue;
+        for (int k = 0; k < n; k++) stronger += strengths[k] > strengths[at];
+        if (stronger < 3) continue;
+        if (!best || p->skill > best->skill) {
+            best = p;
+            bestClub = at;
+        }
+    }
+    if (!best) return NULL;
+    int top = -1;
+    for (int k = 0; k < n; k++) {
+        if (k != bestClub && (top < 0 || strengths[k] > strengths[top])) top = k;
+    }
+    *big = top >= 0 ? clubs[top] : 0;
+    return *big ? best : NULL;
+}
+
+// The record of goals in a season of the league of the player, from the
+// honours, and the top scorer of the league now. Returns 1 when the top
+// scorer is near the record (3 goals or less) or past it.
+static int record_chase(SSRGame *game, char *name, size_t capacity, int *goals, int *record, const char **league) {
+    SSRPool *pool = NULL;
+    SSRSeasonComp *comp = my_table(game, &pool);
+    if (!comp || !game->people) return 0;
+    *record = 0;
+    for (int i = 0; i < game->honours.count; i++) {
+        const SSRHonour *h = &game->honours.list[i];
+        if (strcmp(h->league, comp->data->tla) == 0 && h->goals > *record) *record = h->goals;
+    }
+    if (*record < 5) return 0;
+    int clubs[64], n = 0;
+    for (int r = 0; r < pool->count && n < 64; r++) clubs[n++] = game->season->rows[pool->rows[r]].teamId;
+    SSRPerson *top = NULL;
+    *goals = 0;
+    if (ssr_people_top_scorers(game->people, clubs, n, &top, 1)) {
+        snprintf(name, capacity, "%s %s", top->first, top->last);
+        *goals = top->seasonGoals;
+    }
+    if (game->career.seasonGoals > *goals) {
+        snprintf(name, capacity, "%s", game->career.fullName);
+        *goals = game->career.seasonGoals;
+    }
+    *league = comp->data->tla;
+    return *goals > 0 && *goals >= *record - 3;
+}
+
 // The team mate with the most goals of the season, or NULL.
 static SSRPerson *strike_partner(SSRGame *game) {
     int club = game->career.clubId;
@@ -10454,6 +10570,23 @@ int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
         int run = 0;
         return club && form_run(game, &run) ? ticker_counter(count) : -1;
     }
+    case SSR_TICKER_WORLD_CRISIS: {
+        season_in(game);
+        int position = 0;
+        return club && crisis(game, &position) ? ticker_counter(count) : -1;
+    }
+    case SSR_TICKER_WORLD_RUMOUR: {
+        season_in(game);
+        int big = 0;
+        return club && rumour(game, &big) ? ticker_counter(count) : -1;
+    }
+    case SSR_TICKER_WORLD_RECORD: {
+        season_in(game);
+        char name[96];
+        int goals = 0, record = 0;
+        const char *league = "";
+        return club && record_chase(game, name, sizeof(name), &goals, &record, &league) ? ticker_counter(count) : -1;
+    }
     default:
         return -1;
     }
@@ -10629,6 +10762,44 @@ void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_
         replace_all(text, capacity, "$club", club_name(game, team));
         snprintf(number, sizeof(number), "%d", abs(run));
         replace_all(text, capacity, "$num", number);
+        break;
+    }
+    case SSR_TICKER_WORLD_CRISIS: {
+        season_in(game);
+        int position = 0, team = crisis(game, &position);
+        if (!team) return;
+        snprintf(text, capacity, "%s", loc(game, "SSR_TICKER_CRISIS"));
+        replace_all(text, capacity, "$club", club_name(game, team));
+        snprintf(number, sizeof(number), "%d", position);
+        replace_all(text, capacity, "$num", number);
+        break;
+    }
+    case SSR_TICKER_WORLD_RUMOUR: {
+        season_in(game);
+        int big = 0;
+        const SSRPerson *p = rumour(game, &big);
+        if (!p) return;
+        char name[64];
+        snprintf(name, sizeof(name), "%s %s", p->first, p->last);
+        snprintf(text, capacity, "%s", loc(game, "SSR_TICKER_RUMOUR"));
+        replace_all(text, capacity, "$name", name);
+        replace_all(text, capacity, "$club", club_name(game, p->club));
+        replace_all(text, capacity, "$big", club_name(game, big));
+        break;
+    }
+    case SSR_TICKER_WORLD_RECORD: {
+        season_in(game);
+        char name[96];
+        int goals = 0, record = 0;
+        const char *league = "";
+        if (!record_chase(game, name, sizeof(name), &goals, &record, &league)) return;
+        snprintf(text, capacity, "%s", loc(game, goals > record ? "SSR_TICKER_RECORDBROKEN" : "SSR_TICKER_RECORDCHASE"));
+        replace_all(text, capacity, "$name", name);
+        replace_all(text, capacity, "$league", league);
+        snprintf(number, sizeof(number), "%d", goals);
+        replace_all(text, capacity, "$num", number);
+        snprintf(number, sizeof(number), "%d", record);
+        replace_all(text, capacity, "$record", number);
         break;
     }
     case SSR_TICKER_WORLD_MANAGER: {

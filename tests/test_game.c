@@ -2555,6 +2555,16 @@ static void test_starts_a_new_career(void) {
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 24 && seasons < 2; i++) play_a_match(game, tweaks);
     CHECK(seasons >= 2 && transfers == 1);
+    // The stories of the news: a crisis, a rumour, and a record. A story
+    // that shows has all its names and numbers.
+    int stories[3] = {SSR_TICKER_WORLD_CRISIS, SSR_TICKER_WORLD_RUMOUR, SSR_TICKER_WORLD_RECORD};
+    for (int k = 0; k < 3; k++) {
+        int storyCount = 0;
+        char story[256] = "";
+        if (ssr_game_ticker_priority(game, stories[k], &storyCount) < 0) continue;
+        ssr_game_ticker_text(game, stories[k], &storyCount, story, sizeof(story));
+        CHECK(story[0] && strchr(story, '$') == NULL);
+    }
     // The world has players: the clubs of the matches have squads that
     // played and scored, and three rivals of the same age.
     SSRPeople *people = ssr_game_people(game);
