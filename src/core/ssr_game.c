@@ -661,7 +661,10 @@ static void people_played(void *context, SSRSeason *s, const SSRSeasonComp *comp
     SSRGame *game = context;
     if (!game->people || !game->names || !game->world || comp->data->level != 0) return;
     if (f->sdate > game->peopleDate) {
-        ssr_people_pass_days(game->people, f->sdate - game->peopleDate);
+        int days = f->sdate - game->peopleDate;
+        ssr_people_pass_days(game->people, days);
+        SSRCareer *c = &game->career;
+        c->injury = c->injury > days ? c->injury - days : 0;
         game->peopleDate = f->sdate;
     }
     int teams[2] = {ssr_fixture_home_team(s, f), ssr_fixture_away_team(s, f)};
@@ -2032,6 +2035,23 @@ static void signed_moment(SSRGame *game) {
     moment(game, text);
 }
 
+// A match can hurt the player: one match in 60, or one in 15 when the
+// player ends it with less than 30 energy. The numbers come from the
+// stream of the world, so the numbers of the career stay the same.
+static void player_injury(SSRGame *game, float energy) {
+    SSRCareer *c = &game->career;
+    if (!game->people || c->injury > 0) return;
+    SSRRandom *r = &game->people->random;
+    if (ssr_rand(r, energy < 30 ? 15 : 60) != 1) return;
+    c->injury = ssr_rand2(r, 7, 42);
+    char text[256], number[16];
+    snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentInjury"));
+    snprintf(number, sizeof(number), "%d", c->injury);
+    replace_all(text, sizeof(text), "$num", number);
+    alert(game, "bottommessagemoment", text, 4000);
+    ssr_career_add_moment(c, c->sdate, text);
+}
+
 // The moments of a career after a match of the club: the debut, the first
 // goal, and the matches and the goals of a milestone. Each opens an alert.
 static void career_moments(SSRGame *game, int goalsBefore) {
@@ -2139,6 +2159,7 @@ static void end_match(SSRGame *game) {
         c->totalRating += rating;
         ssr_career_add_form(c->form, (int)rating);
         career_moments(game, goalsBefore);
+        player_injury(game, m->energy);
     }
     memcpy(game->matchFurthest, m->furthest, sizeof(game->matchFurthest));
     game->matchPostHits = m->postHits;
@@ -2922,6 +2943,14 @@ static void play_matches(SSRGame *game) {
     game->career.newsDone = 0;
     int status = selection_status(game, f->level == 1);
     SSRCareer *c = &game->career;
+    if (c->injury > 0 && !c->retired) {
+        char injured[256], number[16];
+        snprintf(injured, sizeof(injured), "%s", loc(game, "SSR_Injured"));
+        snprintf(number, sizeof(number), "%d", c->injury);
+        replace_all(injured, sizeof(injured), "$num", number);
+        not_picked(game, injured);
+        return;
+    }
     int star = ssr_career_star_level(c);
     const SSRNation *nation = ssr_world_nation(game->world, c->nationId);
     char text[512];

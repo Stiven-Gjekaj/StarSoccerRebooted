@@ -2537,6 +2537,11 @@ static void test_starts_a_new_career(void) {
     // The race for the title made a rivalry of the first two clubs.
     const SSRHonours *honours = ssr_game_honours(game);
     CHECK(honours->count >= 2 && honours->rivalryCount >= 1 && honours->rivalries[0].points >= 2);
+    // An injured player is not picked, and the injury heals with the days.
+    ((SSRCareer *)ssr_game_career(game))->injury = 2;
+    int notPickedBefore = notPicked;
+    play_a_match(game, tweaks);
+    CHECK(notPicked == notPickedBefore + 1 && ssr_game_career(game)->injury == 0);
     // Each club of the league has a manager.
     CHECK(people && people->managerCount == 4 && ssr_people_manager(people, ssr_game_career(game)->clubId));
     char peoplePath[1200];
