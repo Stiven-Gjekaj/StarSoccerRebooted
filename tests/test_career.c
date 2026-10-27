@@ -81,7 +81,39 @@ static void test_updates_a_rating(void) {
     CHECK(ssr_career_update_rating(&c, 9, 1) == 0);
 }
 
+static void test_names_the_player_type(void) {
+    SSRCareer c;
+    ssr_career_create(&c, "The", "Kid", 0, 0, 62, 1, 1, 0);
+    c.sdate = 1;
+    // All under 7: the passes against the shots.
+    CHECK(strcmp(ssr_career_player_type(&c), "playerdesc_Forward") == 0);
+    c.ratings[0] = 6;
+    CHECK(strcmp(ssr_career_player_type(&c), "playerdesc_Midfielder") == 0);
+    // One top rating names its skill.
+    c.ratings[4] = 7.5f;
+    CHECK(strcmp(ssr_career_player_type(&c), "playerdesc_Heading") == 0);
+    // Finishing and long shots at the same level.
+    c.ratings[4] = 5;
+    c.ratings[2] = 8;
+    c.ratings[3] = 8;
+    CHECK(strcmp(ssr_career_player_type(&c), "playerdesc_FinishingLongShots") == 0);
+    c.ratings[4] = 8;
+    CHECK(strcmp(ssr_career_player_type(&c), "playerdesc_ShootingHeading") == 0);
+    // Crossing then dribbling.
+    for (int i = 0; i < 8; i++) c.ratings[i] = 5;
+    c.ratings[5] = 9;
+    c.ratings[7] = 9;
+    CHECK(strcmp(ssr_career_player_type(&c), "playerdesc_CrossingDribbling") == 0);
+    // Near the max, and young.
+    for (int i = 0; i < 8; i++) c.ratings[i] = 9;
+    CHECK(strcmp(ssr_career_player_type(&c), "playerdesc_NearMaxRatingYoung") == 0);
+    CHECK(ssr_career_player_type_index("playerdesc_NearMaxRatingYoung") == 20);
+    CHECK(ssr_career_player_type_index("playerdesc_Midfielder") == 0);
+    CHECK(ssr_career_player_type_index("playerdesc_NoRating") == -1);
+}
+
 int main(void) {
+    test_names_the_player_type();
     test_updates_a_rating();
     test_sums_a_skill();
     test_creates_a_career();

@@ -60,6 +60,97 @@ float ssr_career_update_rating(SSRCareer *c, int index, int success) {
     return change;
 }
 
+static const char *const TYPES[21] = {
+    "playerdesc_Midfielder",
+    "playerdesc_Forward",
+    "playerdesc_ShortPassing",
+    "playerdesc_LongPassing",
+    "playerdesc_LongPassingCrossing",
+    "playerdesc_Passing",
+    "playerdesc_PassingAssists",
+    "playerdesc_Finishing",
+    "playerdesc_LongShots",
+    "playerdesc_FinishingLongShots",
+    "playerdesc_ShootingHeading",
+    "playerdesc_PassingShootingAssists",
+    "playerdesc_Heading",
+    "playerdesc_Crossing",
+    "playerdesc_CrossingDribbling",
+    "playerdesc_SetPieces",
+    "playerdesc_Dribbling",
+    "playerdesc_DribblingPace",
+    "playerdesc_MaxRating",
+    "playerdesc_NearMaxRating",
+    "playerdesc_NearMaxRatingYoung",
+};
+
+int ssr_career_player_type_index(const char *tag) {
+    for (int i = 0; tag && i < 21; i++) {
+        if (strcmp(tag, TYPES[i]) == 0) return i;
+    }
+    return -1;
+}
+
+// m_GetBasicDescription: the type of one rating.
+static const char *basic_type(int index) {
+    static const char *const BASIC[8] = {"playerdesc_ShortPassing", "playerdesc_LongPassing", "playerdesc_Finishing",
+                                         "playerdesc_LongShots",    "playerdesc_Heading",     "playerdesc_Crossing",
+                                         "playerdesc_SetPieces",    "playerdesc_Dribbling"};
+    return index >= 0 && index < 8 ? BASIC[index] : "playerdesc_NoRating";
+}
+
+// The form of the bytecode (jadx -m fallback). The normal decompile mixes
+// up the branches of crossing and dribbling. [I: the career has no season
+// yet, so the assists of the season are the assists of the career.]
+const char *ssr_career_player_type(const SSRCareer *c) {
+    const float *r = c->ratings;
+    float sum = 0;
+    int top = 0, best = 0;
+    for (int i = 0; i <= 7; i++) {
+        sum += r[i];
+        if (r[i] > (float)top) {
+            top = (int)r[i];
+            best = i;
+        }
+    }
+    if (top < 7) return r[0] + r[1] > r[2] + r[3] ? "playerdesc_Midfielder" : "playerdesc_Forward";
+    // The second and the third rating with the same value as the top.
+    int second = -1, third = -1;
+    for (int i = 0; i <= 7; i++) {
+        if (i != best && r[i] == (float)top) {
+            second = i;
+            break;
+        }
+    }
+    for (int i = 0; i <= 7; i++) {
+        if (i != best && i != second && r[i] == (float)top) {
+            third = i;
+            break;
+        }
+    }
+    const char *type = basic_type(best);
+    if (best == 0 && second == 1) {
+        type = "playerdesc_Passing";
+        if ((float)c->assists > (float)c->apps * 0.6f) {
+            type = third == 2 || third == 3 ? "playerdesc_PassingShootingAssists" : "playerdesc_PassingAssists";
+        }
+    } else if (best == 2 && second == 3) {
+        type = third == 4 ? "playerdesc_ShootingHeading" : "playerdesc_FinishingLongShots";
+    } else if (best == 1 && second == 5 && r[1] == r[5]) {
+        type = "playerdesc_LongPassingCrossing";
+    } else if (best == 5 && second == 7) {
+        type = "playerdesc_CrossingDribbling";
+    } else if (best == 7 && ssr_career_skill(c->pace) > 50) {
+        type = "playerdesc_DribblingPace";
+    }
+    if ((best == 0 || best == 1) && (second == 2 || second == 3) && r[0] + r[1] < r[2] + r[3]) {
+        type = basic_type(second);
+    }
+    if (sum > 79) return "playerdesc_MaxRating";
+    if (sum > 69) return ssr_career_age(c) < 19 ? "playerdesc_NearMaxRatingYoung" : "playerdesc_NearMaxRating";
+    return type;
+}
+
 int ssr_career_star_level(const SSRCareer *c) {
     return c->starRating / 100 + 1;
 }

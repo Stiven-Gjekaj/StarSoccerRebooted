@@ -69,6 +69,15 @@ int ssr_career_skill(const int *levels);
 // A high rating moves less. Returns the change.
 float ssr_career_update_rating(SSRCareer *career, int index, int success);
 
+// c_TPlayer.GetRatingDescription: the language tag of the type of the
+// player from the first eight ratings, for example "playerdesc_Finishing".
+const char *ssr_career_player_type(const SSRCareer *career);
+
+// The number of a player type tag (c_TPlayer.CheckRatingNews), for the icon
+// of the type: 0 midfielder to 20 young and near the max. -1 for a tag that
+// is not a type.
+int ssr_career_player_type_index(const char *tag);
+
 // The star level of the career, from 1 (c_TPlayer.GetStarLevel).
 int ssr_career_star_level(const SSRCareer *career);
 
