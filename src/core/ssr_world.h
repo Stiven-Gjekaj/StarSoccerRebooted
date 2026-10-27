@@ -101,6 +101,10 @@ typedef struct {
     char **strings;
     int stringCount;
     int stringCapacity;
+    // The names of the data set, before a language changed them: the name,
+    // the tla, and the nationality of each nation, then the name and the
+    // tla of each continent.
+    const char **dataNames;
 } SSRWorld;
 
 // Reads the data set in the directory. Returns NULL when a file is missing
@@ -117,6 +121,18 @@ const SSRCompetition *ssr_world_competition(const SSRWorld *world, int id);
 // Puts the clubs of the league into clubs, up to max. Returns the number of
 // clubs in the league.
 int ssr_world_league_clubs(const SSRWorld *world, int league, const SSRClub **clubs, int max);
+
+// The names of the nations and the continents in a language, for example
+// "de" (TNation.LoadNames and TContinent.LoadNames). nations is the text of
+// "MyData/Languages/Nation_Trans.txt", with the columns <code>,
+// <code>_short, and <code>_nationality. continents is the text of
+// "Continent_Trans.txt", with the column <code>. The rows go to the records
+// in their order, as in the game. A tla of more than 6 characters keeps 6,
+// in capitals. The tla of a continent is the first 6 characters of its
+// name, in capitals. A file with
+// no column for the language gives the names of the data set. Returns the
+// number of records that changed.
+int ssr_world_set_language(SSRWorld *world, const char *nations, const char *continents, const char *code);
 
 // Reads "#FFF" or "#FF0000". Returns fallback for other text.
 SSRColor ssr_color_parse(const char *text, SSRColor fallback);

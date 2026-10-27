@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ssr_font.h"
 #include "ssr_tsv.h"
 
 static int hex_value(char c) {
@@ -206,8 +207,119 @@ SSRWorld *ssr_world_load(const char *directory) {
     return world;
 }
 
+// The capital of a Latin or a Cyrillic letter, as Java toUpperCase gives
+// it. Other characters stay.
+static uint32_t capital(uint32_t c) {
+    if (c >= 'a' && c <= 'z') return c - 32;
+    if (c >= 0xE0 && c <= 0xFE && c != 0xF7) return c - 32;
+    if (c == 0x131) return 'I';
+    if (c >= 0x100 && c <= 0x17F) {
+        int oddPairs = (c <= 0x137) || (c >= 0x14A && c <= 0x177);
+        int evenPairs = (c >= 0x139 && c <= 0x148) || (c >= 0x179 && c <= 0x17E);
+        if ((oddPairs && (c & 1)) || (evenPairs && !(c & 1))) return c - 1;
+        return c;
+    }
+    if (c >= 0x430 && c <= 0x44F) return c - 32;
+    if (c >= 0x450 && c <= 0x45F) return c - 80;
+    return c;
+}
+
+// The first count characters of UTF-8 text in capitals (slice and
+// toUpperCase of the game).
+static const char *first_capitals(SSRWorld *world, const char *text, int count) {
+    char part[128];
+    size_t n = 0;
+    const char *p = text;
+    uint32_t c;
+    while (count-- > 0 && (c = ssr_utf8_next(&p)) != 0 && n + 5 < sizeof(part)) {
+        c = capital(c);
+        if (c < 0x80) {
+            part[n++] = (char)c;
+        } else if (c < 0x800) {
+            part[n++] = (char)(0xC0 | c >> 6);
+            part[n++] = (char)(0x80 | (c & 0x3F));
+        } else if (c < 0x10000) {
+            part[n++] = (char)(0xE0 | c >> 12);
+            part[n++] = (char)(0x80 | (c >> 6 & 0x3F));
+            part[n++] = (char)(0x80 | (c & 0x3F));
+        } else {
+            part[n++] = (char)(0xF0 | c >> 18);
+            part[n++] = (char)(0x80 | (c >> 12 & 0x3F));
+            part[n++] = (char)(0x80 | (c >> 6 & 0x3F));
+            part[n++] = (char)(0x80 | (c & 0x3F));
+        }
+    }
+    part[n] = 0;
+    return keep(world, part);
+}
+
+static int count_characters(const char *text) {
+    int n = 0;
+    for (const unsigned char *p = (const unsigned char *)text; *p; p++) n += (*p & 0xC0) != 0x80;
+    return n;
+}
+
+int ssr_world_set_language(SSRWorld *world, const char *nations, const char *continents, const char *code) {
+    if (!world || !code) return 0;
+    if (!world->dataNames) {
+        int count = world->nationCount * 3 + world->continentCount * 2;
+        world->dataNames = malloc((size_t)(count ? count : 1) * sizeof(char *));
+        if (!world->dataNames) return 0;
+        for (int i = 0; i < world->nationCount; i++) {
+            world->dataNames[i * 3] = world->nations[i].name;
+            world->dataNames[i * 3 + 1] = world->nations[i].tla;
+            world->dataNames[i * 3 + 2] = world->nations[i].nationality;
+        }
+        const char **c = world->dataNames + world->nationCount * 3;
+        for (int i = 0; i < world->continentCount; i++) {
+            c[i * 2] = world->continents[i].name;
+            c[i * 2 + 1] = world->continents[i].tla;
+        }
+    }
+    for (int i = 0; i < world->nationCount; i++) {
+        world->nations[i].name = world->dataNames[i * 3];
+        world->nations[i].tla = world->dataNames[i * 3 + 1];
+        world->nations[i].nationality = world->dataNames[i * 3 + 2];
+    }
+    const char **c = world->dataNames + world->nationCount * 3;
+    for (int i = 0; i < world->continentCount; i++) {
+        world->continents[i].name = c[i * 2];
+        world->continents[i].tla = c[i * 2 + 1];
+    }
+    int changed = 0;
+    char column[48];
+    SSRTsv *table = nations ? ssr_tsv_parse(nations, strlen(nations)) : NULL;
+    int name = ssr_tsv_column(table, code);
+    snprintf(column, sizeof(column), "%s_short", code);
+    int tla = ssr_tsv_column(table, column);
+    snprintf(column, sizeof(column), "%s_nationality", code);
+    int nationality = ssr_tsv_column(table, column);
+    for (int i = 0; table && name >= 0 && i < world->nationCount && i < ssr_tsv_rows(table); i++) {
+        SSRNation *n = &world->nations[i];
+        n->name = keep(world, ssr_tsv_cell(table, i, name));
+        if (tla >= 0) {
+            const char *text = ssr_tsv_cell(table, i, tla);
+            n->tla = count_characters(text) > 6 ? first_capitals(world, text, 6) : keep(world, text);
+        }
+        if (nationality >= 0) n->nationality = keep(world, ssr_tsv_cell(table, i, nationality));
+        changed++;
+    }
+    ssr_tsv_free(table);
+    table = continents ? ssr_tsv_parse(continents, strlen(continents)) : NULL;
+    name = ssr_tsv_column(table, code);
+    for (int i = 0; table && name >= 0 && i < world->continentCount && i < ssr_tsv_rows(table); i++) {
+        SSRContinent *k = &world->continents[i];
+        k->name = keep(world, ssr_tsv_cell(table, i, name));
+        k->tla = first_capitals(world, k->name, 6);
+        changed++;
+    }
+    ssr_tsv_free(table);
+    return changed;
+}
+
 void ssr_world_free(SSRWorld *world) {
     if (!world) return;
+    free(world->dataNames);
     for (int i = 0; i < world->stringCount; i++) free(world->strings[i]);
     free(world->strings);
     free(world->continents);

@@ -88,7 +88,38 @@ static void test_parses_colours(void) {
     CHECK(ssr_color_parse("#FFFF", 1) == 1);
 }
 
+// The rows of the translations go to the nations and the continents in
+// their order. A language with no column gives the names of the data set.
+static void test_names_the_nations_in_a_language(void) {
+    SSRWorld *world = ssr_world_load(write_set("world_language"));
+    CHECK(world != NULL);
+    if (!world) return;
+    const char *nations = "\xEF\xBB\xBFid\tFull name (source)\tname\tshortname\tnationality\tde\tde_short\t"
+                          "de_nationality\tru\tru_short\tru_nationality\r\n"
+                          "62\tEngland\tEngland\tENGLAND\tEnglish\tEngland\tENGLAND\tEnglisch\t"
+                          "\xD0\x90\xD0\xBD\xD0\xB3\xD0\xBB\xD0\xB8\xD1\x8F\t"
+                          "\xD0\xB0\xD0\xBD\xD0\xB3\xD0\xBB\xD0\xB8\xD1\x8F\xD0\xB0\t\xD0\xB0\r\n";
+    const char *continents = "\xEF\xBB\xBFid\ten\tde\r\n6\tEurope\tEuropa-Kontinent\r\n";
+    CHECK(ssr_world_set_language(world, nations, continents, "de") == 2);
+    CHECK(strcmp(world->nations[0].nationality, "Englisch") == 0);
+    CHECK(strcmp(world->continents[0].name, "Europa-Kontinent") == 0);
+    CHECK(strcmp(world->continents[0].tla, "EUROPA") == 0);
+    // A tla of seven Cyrillic letters keeps six, in capitals.
+    CHECK(ssr_world_set_language(world, nations, continents, "ru") == 1);
+    CHECK(strcmp(world->nations[0].tla, "\xD0\x90\xD0\x9D\xD0\x93\xD0\x9B\xD0\x98\xD0\xAF") == 0);
+    CHECK(strcmp(world->continents[0].name, "Europe") == 0);
+    CHECK(strcmp(world->continents[0].tla, "EUR") == 0);
+    // The continents have an "en" column. The nations have none.
+    CHECK(ssr_world_set_language(world, nations, continents, "en") == 1);
+    CHECK(strcmp(world->nations[0].name, "England") == 0 && strcmp(world->nations[0].nationality, "English") == 0);
+    CHECK(strcmp(world->nations[0].tla, "ENGLAND") == 0 && strcmp(world->continents[0].tla, "EUROPE") == 0);
+    CHECK(ssr_world_set_language(world, NULL, NULL, "de") == 0);
+    CHECK(strcmp(world->nations[0].nationality, "English") == 0);
+    ssr_world_free(world);
+}
+
 int main(void) {
+    test_names_the_nations_in_a_language();
     test_loads_a_data_set();
     test_refuses_a_set_with_a_missing_file();
     test_parses_colours();
