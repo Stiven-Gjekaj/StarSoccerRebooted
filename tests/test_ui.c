@@ -234,20 +234,34 @@ static void test_nests_branch_blocks(void) {
 }
 
 static void test_puts_a_patch_on_a_layout(void) {
-    char text[] = "Rect:(0,0,10,10)\r\n"
-                  "\t//TM\r\n"
-                  "\tText:(TM,428,6)\r\n"
-                  "\tText:(TM,421,6)  \n"
-                  "\tText:(TMX,1,1)\n"
-                  "Draw:(Logo,0,0)";
+    const char *text = "Rect:(0,0,10,10)\r\n"
+                       "\t//TM\r\n"
+                       "\tText:(TM,428,6)\r\n"
+                       "\tText:(TM,421,6)  \n"
+                       "\tText:(TMX,1,1)\n"
+                       "Draw:(Logo,0,0)";
     const char *patch = "# The remake has no TM.\n"
                         "-\tText:(TM, \n"
                         "-\n"
                         "Text:(TMX,1,1)\n";
-    CHECK(ssr_ui_patch(text, patch) == 2);
-    CHECK(strcmp(text, "Rect:(0,0,10,10)\r\n\t//TM\r\n\tText:(TMX,1,1)\n" "Draw:(Logo,0,0)") == 0);
+    int removed = 0;
+    char *out = ssr_ui_patch(text, patch, &removed);
+    CHECK(removed == 2);
+    CHECK(out && strcmp(out, "Rect:(0,0,10,10)\r\n\t//TM\r\n\tText:(TMX,1,1)\n" "Draw:(Logo,0,0)") == 0);
+    free(out);
     // A patch with no "-" lines changes nothing.
-    CHECK(ssr_ui_patch(text, "Text:(TMX,1,1)\n") == 0);
+    out = ssr_ui_patch(text, "Text:(TMX,1,1)\n", &removed);
+    CHECK(removed == 0 && out && strcmp(out, text) == 0);
+    free(out);
+    // The "+" lines after a "-" line take the place of each line that it
+    // removes, with the spaces of that line.
+    out = ssr_ui_patch(text, "- Text:(TM,\n+ Draw:(Word,-32,168)\n+  Layer(Top) \n- Draw:(Logo\n", &removed);
+    CHECK(removed == 3);
+    CHECK(out && strcmp(out, "Rect:(0,0,10,10)\r\n\t//TM\r\n"
+                             "\tDraw:(Word,-32,168)\n\tLayer(Top)\n"
+                             "\tDraw:(Word,-32,168)\n\tLayer(Top)\n"
+                             "\tText:(TMX,1,1)\n") == 0);
+    free(out);
 }
 
 int main(void) {

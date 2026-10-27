@@ -741,7 +741,8 @@ static void trim_span(const char **start, const char **end) {
     while (*end > *start && ((*end)[-1] == ' ' || (*end)[-1] == '\t' || (*end)[-1] == '\r')) (*end)--;
 }
 
-static int patch_removes(const char *patch, const char *line, size_t length) {
+// The "-" line of the patch that removes the line, or NULL.
+static const char *patch_rule(const char *patch, const char *line, size_t length) {
     for (const char *p = patch; p && *p;) {
         const char *end = strchr(p, '\n');
         if (!end) end = p + strlen(p);
@@ -749,30 +750,63 @@ static int patch_removes(const char *patch, const char *line, size_t length) {
         if (*p == '-') {
             const char *a = p + 1, *b = end;
             trim_span(&a, &b);
-            if (b > a && (size_t)(b - a) <= length && strncmp(a, line, (size_t)(b - a)) == 0) return 1;
+            if (b > a && (size_t)(b - a) <= length && strncmp(a, line, (size_t)(b - a)) == 0) return p;
         }
         p = next;
     }
-    return 0;
+    return NULL;
 }
 
-int ssr_ui_patch(char *text, const char *patch) {
-    if (!text || !patch) return 0;
-    char *out = text;
-    int removed = 0;
-    for (char *p = text; *p;) {
-        char *end = strchr(p, '\n');
+// Adds text to the buffer, and makes the buffer bigger when it must.
+static int put_text(char **buffer, size_t *used, size_t *capacity, const char *text, size_t length) {
+    if (*used + length + 1 > *capacity) {
+        size_t bigger = (*used + length + 1) * 2;
+        char *grown = realloc(*buffer, bigger);
+        if (!grown) return 0;
+        *buffer = grown;
+        *capacity = bigger;
+    }
+    memcpy(*buffer + *used, text, length);
+    *used += length;
+    (*buffer)[*used] = 0;
+    return 1;
+}
+
+char *ssr_ui_patch(const char *text, const char *patch, int *removed) {
+    if (removed) *removed = 0;
+    if (!text) return NULL;
+    size_t used = 0, capacity = strlen(text) + 1;
+    char *out = malloc(capacity);
+    if (!out) return NULL;
+    out[0] = 0;
+    for (const char *p = text; *p;) {
+        const char *end = strchr(p, '\n');
         size_t full = end ? (size_t)(end - p) + 1 : strlen(p);
         const char *a = p, *b = p + (end ? (size_t)(end - p) : full);
         trim_span(&a, &b);
-        if (patch_removes(patch, a, (size_t)(b - a))) {
-            removed++;
+        const char *rule = patch ? patch_rule(patch, a, (size_t)(b - a)) : NULL;
+        int ok = 1;
+        if (!rule) {
+            ok = put_text(&out, &used, &capacity, p, full);
         } else {
-            memmove(out, p, full);
-            out += full;
+            if (removed) (*removed)++;
+            // The "+" lines after the rule take the place of the line, with
+            // the spaces at the start of the line.
+            const char *r = strchr(rule, '\n');
+            while (r && r[1] == '+' && ok) {
+                const char *line = r + 2, *stop = strchr(line, '\n');
+                const char *x = line, *y = stop ? stop : line + strlen(line);
+                trim_span(&x, &y);
+                ok = put_text(&out, &used, &capacity, p, (size_t)(a - p)) &&
+                     put_text(&out, &used, &capacity, x, (size_t)(y - x)) && put_text(&out, &used, &capacity, "\n", 1);
+                r = stop;
+            }
+        }
+        if (!ok) {
+            free(out);
+            return NULL;
         }
         p += full;
     }
-    *out = 0;
-    return removed;
+    return out;
 }

@@ -158,9 +158,13 @@ static char *read_screen_file(void *context, const char *name, size_t *size) {
     SDL_snprintf(asked, sizeof(asked), "%slayouts/%s.patch", base ? base : "", name);
     char *patch = !own && copy ? SDL_LoadFile(asked, NULL) : NULL;
     if (patch) {
-        ssr_ui_patch(copy, patch);
-        *size = strlen(copy);
+        char *patched = ssr_ui_patch(copy, patch, NULL);
         SDL_free(patch);
+        if (patched) {
+            free(copy);
+            copy = patched;
+            *size = strlen(copy);
+        }
     }
     return copy;
 }

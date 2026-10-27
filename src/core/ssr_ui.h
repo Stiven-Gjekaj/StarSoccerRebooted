@@ -61,12 +61,15 @@ typedef struct {
 
 typedef struct SSRUiTree SSRUiTree;
 
-// Puts a patch on the text of a layout file, in place. Each line of the
+// Gives the text of a layout file with a patch on it. Each line of the
 // patch that starts with "-" gives the start of the lines to remove: the
 // rest of the patch line, with no spaces at its start and end. A layout
-// line goes when it starts with that text after its own spaces. The other
-// lines of the patch are comments. Returns the number of lines that go.
-int ssr_ui_patch(char *text, const char *patch);
+// line goes when it starts with that text after its own spaces. The lines
+// that start with "+" just after a "-" line take the place of each line
+// that it removes, with the spaces at the start of that line. The other
+// lines of the patch are comments. removed gets the number of lines that
+// go. The caller frees the text. Returns NULL when there is no memory.
+char *ssr_ui_patch(const char *text, const char *patch, int *removed);
 
 // Reads the layout file and each file that it imports. Returns NULL when
 // the file is not there.
