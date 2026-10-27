@@ -94,6 +94,28 @@ static void test_sets_up_the_players(void) {
     CHECK(d.info.pitchSide == c.info.pitchSide);
 }
 
+// The match ball gives its factors to the ball and to the tap ball. No
+// factor is the ball NS-Pro.
+static void test_uses_the_match_ball(void) {
+    SSRRandom random = {SSR_RANDOM_START};
+    SSRChance c;
+    SSRChanceSetup s = setup_for(4);
+    ssr_chance_start(&c, &s, &random);
+    CHECK(c.ball.speedFactor == 1 && c.ball.curlFactor == 1 && c.tap.weight == 1);
+    s.ballSpeed = 1.04f;
+    s.ballBounce = 0.9f;
+    s.ballWeight = 0.9f;
+    s.ballCurl = 1.0f;
+    ssr_chance_start(&c, &s, &random);
+    CHECK(c.ball.speedFactor == 1.04f && c.ball.bounceFactor == 0.9f && c.ball.weightFactor == 0.9f);
+    CHECK(c.tap.weight == 0.9f && c.tap.bounce == 0.9f);
+    // A dribble too.
+    s = setup_for(11);
+    s.ballWeight = 1.04f;
+    ssr_chance_start(&c, &s, &random);
+    CHECK(c.ball.weightFactor == 1.04f && c.tap.weight == 1.04f && c.ball.speedFactor == 1);
+}
+
 static void test_shoots_a_penalty(void) {
     int saves = 0;
     for (int seed = 0; seed < 20; seed++) {
@@ -290,6 +312,7 @@ static void test_the_captain_draws_a_run(void) {
 }
 
 int main(void) {
+    test_uses_the_match_ball();
     test_dribbles_past_the_defenders();
     test_places_the_ball();
     test_sets_up_the_players();

@@ -59,6 +59,9 @@ typedef struct {
     float windSpeed, windDirection;
     // 0 normal, 1 rain, 2 snow.
     int weather;
+    // The factors of the match ball (c_TBall_Type): the speed, the bounce,
+    // the weight, and the curl. 0 is 1, the ball NS-Pro.
+    float ballSpeed, ballBounce, ballWeight, ballCurl;
 } SSRChanceSetup;
 
 // GetMakeRunMaxDist: (int)(Player.FakeStat * 150 / 10 + 150), with the

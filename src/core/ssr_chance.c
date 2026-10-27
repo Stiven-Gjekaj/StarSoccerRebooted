@@ -106,6 +106,18 @@ static void keeper(SSRChance *c, SSRRandom *random) {
 
 // m_SetUpDribbling: four defenders in a staggered line or in a ring, the
 // ball at (320, 850), and the finish line at y = 200.
+// The factors of the match ball go to the ball and to the tap ball, which
+// takes the weight and the bounce only.
+static void use_match_ball(SSRChance *c) {
+    const SSRChanceSetup *s = &c->setup;
+    c->ball.speedFactor = s->ballSpeed > 0 ? s->ballSpeed : 1;
+    c->ball.bounceFactor = s->ballBounce > 0 ? s->ballBounce : 1;
+    c->ball.weightFactor = s->ballWeight > 0 ? s->ballWeight : 1;
+    c->ball.curlFactor = s->ballCurl > 0 ? s->ballCurl : 1;
+    c->tap.weight = c->ball.weightFactor;
+    c->tap.bounce = c->ball.bounceFactor;
+}
+
 static void start_dribble(SSRChance *c, SSRRandom *random) {
     c->info.startX = 320;
     c->info.startY = 850;
@@ -141,6 +153,7 @@ static void start_dribble(SSRChance *c, SSRRandom *random) {
                        .careerGoals = c->setup.careerGoals, .careerPasses = c->setup.careerPasses};
     ssr_tapball_reset(&c->tap, &tap, random);
     ssr_ball_place(&c->ball, 320, 850);
+    use_match_ball(c);
     c->kicking = 3;
     c->actionType = 11;
     c->state = SSR_CHANCE_DRIBBLE;
@@ -203,6 +216,7 @@ void ssr_chance_start(SSRChance *c, const SSRChanceSetup *setup, SSRRandom *rand
                        .level = setup->level,
                        .opponentStrength = setup->opponentStrength};
     ssr_tapball_reset(&c->tap, &tap, random);
+    use_match_ball(c);
 
     ssr_players_clear(&c->players);
     if (setup->type == 11) {
