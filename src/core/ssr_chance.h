@@ -105,6 +105,13 @@ void ssr_chance_ball_start(int type, int pitchSide, int minute, SSRRandom *rando
 // the players, with the random numbers in the order of the game.
 void ssr_chance_start(SSRChance *chance, const SSRChanceSetup *setup, SSRRandom *random);
 
+// Sets up the ball of a training drill (c_TMatch.m_SetUpTraining and
+// c_TBall.m_Reset(5)): training 2, 3, 4, or 6 waits for the aim at (x, y),
+// and training 8 dribbles from there. The drill adds the keeper and its
+// objects.
+void ssr_chance_start_training(SSRChance *chance, const SSRChanceSetup *setup, int training, float x, float y,
+                               SSRRandom *random);
+
 // One tick at the time now in milliseconds, with the touch of the player.
 void ssr_chance_update(SSRChance *chance, int now, const SSRTapTouch *touch, SSRRandom *random);
 

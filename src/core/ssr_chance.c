@@ -146,6 +146,31 @@ static void start_dribble(SSRChance *c, SSRRandom *random) {
     c->state = SSR_CHANCE_DRIBBLE;
 }
 
+void ssr_chance_start_training(SSRChance *c, const SSRChanceSetup *setup, int training, float x, float y,
+                               SSRRandom *random) {
+    memset(c, 0, sizeof(*c));
+    c->setup = *setup;
+    c->info.training = training;
+    c->info.starLevel = setup->starLevel;
+    c->info.clubId = setup->clubId;
+    c->info.pitchSide = 1;
+    c->goal = ssr_goal(1);
+    ssr_ball_place(&c->ball, x, y);
+    c->ball.windSpeed = setup->windSpeed;
+    c->ball.windDirection = setup->windDirection;
+    c->info.startX = x;
+    c->info.startY = y;
+    c->actionType = 5;
+    // c_TBall.m_Reset(5) resets the tap ball, with its random numbers.
+    SSRTapSetup tap = {.training = training, .level = setup->level};
+    ssr_tapball_reset(&c->tap, &tap, random);
+    ssr_players_clear(&c->players);
+    if (training == 8) {
+        c->state = SSR_CHANCE_DRIBBLE;
+        c->kicking = 3;
+    }
+}
+
 void ssr_chance_start(SSRChance *c, const SSRChanceSetup *setup, SSRRandom *random) {
     memset(c, 0, sizeof(*c));
     c->setup = *setup;
@@ -547,6 +572,8 @@ static void dribble(SSRChance *c, const SSRTapTouch *touch, SSRRandom *random) {
     c->dribbleX *= 0.985f;
     c->dribbleY *= 0.985f;
     b->power = (float)sqrt((double)(vx * vx + vy * vy));
+    // The dribble drill has cones, not defenders. The drill decides its end.
+    if (c->info.training == 8) return;
     // A defender within 15 takes the ball.
     for (int i = 0; i < c->players.count; i++) {
         const SSRMatchPlayer *p = &c->players.list[i];
@@ -600,7 +627,8 @@ void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRando
         // The wind stops after the keeper touches the ball.
         b->windSpeed = toucher && toucher->type == SSR_PLAYER_KEEPER ? 0 : c->setup.windSpeed;
         b->holdStop = players_moving(c);
-        int noGoal = is_pass_chance(c->info.chanceType) || c->info.chanceType == 12;
+            int training = c->info.training;
+        int noGoal = is_pass_chance(c->info.chanceType) || c->info.chanceType == 12 || training == 2 || training == 6;
         int postHit = b->postHit;
         ssr_ball_update(b, noGoal ? NULL : &c->goal, random);
         if (!postHit && b->postHit && c->lastTouchedBy == 0) c->shotsOnTarget++;
@@ -612,8 +640,14 @@ void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRando
             c->result = SSR_RESULT_NONE;
             finish(c, last && last->type == SSR_PLAYER_ATTACKER ? SSR_RESULT_ASSIST : SSR_RESULT_GOAL);
         } else if (b->alive) {
-            check_players(c, random);
+            if (training == 0 || training == 3 || training == 4) check_players(c, random);
             if (b->alive && (b->x < 0 || b->x > 640 || b->y < 0 || b->y > 960)) finish(c, SSR_RESULT_MISSED);
+            // In training a ball that goes down the screen, or stops, dies.
+            if (b->alive && training != 0 && training != 5) {
+                float d = fmodf(b->direction, 360);
+                if (d < 0) d += 360;
+                if (d < 180 || b->power < 0.15f) finish(c, SSR_RESULT_MISSED);
+            }
         } else {
             finish(c, SSR_RESULT_MISSED);
         }
