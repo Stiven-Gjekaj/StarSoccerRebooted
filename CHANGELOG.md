@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.17.0 (2026-10-27)
+
+- Rivalries grow between clubs that race for a title and between clubs
+  that trade players. The ticker tells of the next rivalry match.
+- The ticker tells of the clubs in a run of wins or defeats.
+- A match can injure the player. An injured player misses the matches
+  until the injury heals, and the ticker counts the days.
+
 ## 0.16.0 (2026-10-27)
 
 - Each club has a manager with a style. A youth manager picks young
