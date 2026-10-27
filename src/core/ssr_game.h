@@ -163,6 +163,8 @@ typedef enum {
     SSR_TICKER_WORLD_MANAGER,
     // A club of the league of the player in a run of wins or defeats.
     SSR_TICKER_WORLD_FORM,
+    // The days of the injury of the player.
+    SSR_TICKER_INJURY,
     SSR_TICKER_KINDS,
 } SSRTickerKind;
 

@@ -9746,6 +9746,9 @@ int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
     }
     case SSR_TICKER_WORLD_MANAGER:
         return club && game->people && game->people->sackedCount > 0 ? ticker_counter(count) : -1;
+    case SSR_TICKER_INJURY:
+        // As the next match: first after one turn, then each time.
+        return club && c->injury > 0 ? (++*count < 2 ? 0 : 1000) : -1;
     case SSR_TICKER_WORLD_FORM: {
         season_in(game);
         int run = 0;
@@ -9887,6 +9890,11 @@ void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_
         replace_all(text, capacity, "$league", comp ? comp->data->tla : "");
         break;
     }
+    case SSR_TICKER_INJURY:
+        snprintf(text, capacity, "%s", loc(game, "SSR_Injured"));
+        snprintf(number, sizeof(number), "%d", c->injury);
+        replace_all(text, capacity, "$num", number);
+        break;
     case SSR_TICKER_WORLD_FORM: {
         season_in(game);
         int run = 0, team = form_run(game, &run);
