@@ -40,7 +40,24 @@ static void test_keeps_the_honours(void) {
     ssr_honours_clear(&back);
 }
 
+// A rivalry grows from the points of both orders of the clubs, and the
+// file keeps it.
+static void test_keeps_the_rivalries(void) {
+    SSRHonours h = {0};
+    CHECK(ssr_honours_add_rivalry(&h, 10, 11, 2) == 2 && ssr_honours_add_rivalry(&h, 11, 10, 3) == 5);
+    CHECK(ssr_honours_add_rivalry(&h, 10, 10, 3) == 0 && h.rivalryCount == 1);
+    CHECK(ssr_honours_rivalry(&h, 11, 10) == 5 && ssr_honours_rivalry(&h, 10, 12) == 0);
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/rivals.txt", ssr_test_directory("honours_rivals"));
+    CHECK(ssr_honours_save(&h, path));
+    SSRHonours back = {0};
+    CHECK(ssr_honours_load(&back, path) && back.rivalryCount == 1 && ssr_honours_rivalry(&back, 10, 11) == 5);
+    ssr_honours_clear(&h);
+    ssr_honours_clear(&back);
+}
+
 int main(void) {
+    test_keeps_the_rivalries();
     test_keeps_the_honours();
     return TEST_RESULT();
 }

@@ -19,10 +19,27 @@ typedef struct {
     int goals;
 } SSRHonour;
 
+// The rivalry of two clubs. It grows when the clubs race for a title or
+// when a player goes from one to the other.
+typedef struct {
+    int a, b;
+    int points;
+} SSRRivalry;
+
+// The points of a rivalry that make the match of the two clubs a rivalry.
+#define SSR_RIVALRY_POINTS 4
+
 typedef struct {
     SSRHonour *list;
     int count, capacity;
+    SSRRivalry *rivalries;
+    int rivalryCount, rivalryCapacity;
 } SSRHonours;
+
+// Adds points to the rivalry of the two clubs. Returns the new points.
+int ssr_honours_add_rivalry(SSRHonours *honours, int a, int b, int points);
+// The points of the rivalry of the two clubs.
+int ssr_honours_rivalry(const SSRHonours *honours, int a, int b);
 
 // Adds the honour. A second honour of the same year and league takes the
 // place of the first. Returns 1 on success.

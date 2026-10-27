@@ -25,8 +25,42 @@ int ssr_honours_add(SSRHonours *h, const SSRHonour *honour) {
 
 void ssr_honours_clear(SSRHonours *h) {
     if (!h) return;
+    free(h->rivalries);
     free(h->list);
     memset(h, 0, sizeof(*h));
+}
+
+static SSRRivalry *find_rivalry(const SSRHonours *h, int a, int b) {
+    for (int i = 0; h && i < h->rivalryCount; i++) {
+        SSRRivalry *r = &h->rivalries[i];
+        if ((r->a == a && r->b == b) || (r->a == b && r->b == a)) return r;
+    }
+    return NULL;
+}
+
+int ssr_honours_add_rivalry(SSRHonours *h, int a, int b, int points) {
+    if (!h || a == b || a <= 0 || b <= 0) return 0;
+    SSRRivalry *r = find_rivalry(h, a, b);
+    if (!r) {
+        if (h->rivalryCount == h->rivalryCapacity) {
+            int capacity = h->rivalryCapacity ? h->rivalryCapacity * 2 : 32;
+            SSRRivalry *grown = realloc(h->rivalries, sizeof(SSRRivalry) * (size_t)capacity);
+            if (!grown) return 0;
+            h->rivalries = grown;
+            h->rivalryCapacity = capacity;
+        }
+        r = &h->rivalries[h->rivalryCount++];
+        r->a = a < b ? a : b;
+        r->b = a < b ? b : a;
+        r->points = 0;
+    }
+    r->points += points;
+    return r->points;
+}
+
+int ssr_honours_rivalry(const SSRHonours *h, int a, int b) {
+    const SSRRivalry *r = find_rivalry(h, a, b);
+    return r ? r->points : 0;
 }
 
 int ssr_honours_titles(const SSRHonours *h, int club) {
@@ -58,6 +92,9 @@ int ssr_honours_save(const SSRHonours *h, const char *path) {
         ok = fprintf(file, "%d\t%s\t%d\t%s\t%s\t%s\t%d\n", e.year, e.league, e.club, e.clubName, e.scorer[0] ? e.scorer : "-",
                      e.scorerClub[0] ? e.scorerClub : "-", e.goals) > 0;
     }
+    for (int i = 0; ok && i < h->rivalryCount; i++) {
+        ok = fprintf(file, "R\t%d\t%d\t%d\n", h->rivalries[i].a, h->rivalries[i].b, h->rivalries[i].points) > 0;
+    }
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
         remove(temp);
@@ -77,6 +114,11 @@ int ssr_honours_load(SSRHonours *h, const char *path) {
         return 0;
     }
     while (fgets(line, sizeof(line), file)) {
+        int a, b, points;
+        if (line[0] == 'R' && sscanf(line, "R\t%d\t%d\t%d", &a, &b, &points) == 3) {
+            ssr_honours_add_rivalry(h, a, b, points);
+            continue;
+        }
         SSRHonour e;
         memset(&e, 0, sizeof(e));
         if (sscanf(line, "%d\t%15[^\t]\t%d\t%63[^\t]\t%63[^\t]\t%63[^\t]\t%d", &e.year, e.league, &e.club, e.clubName,
