@@ -75,27 +75,27 @@ EndM
 
 // The list.
 PushOrigin:(13,210)
-	Draw:(GreyRecess,0,0,614,410)
+	Draw:(GreyRecess,0,0,614,320)
 		SwipePanel(Packs,Scroll,Packs,ScrollVel)
 	{
 		PushOrigin:(7,8)
 			M_BGScrollWindow:(599,502)
 		PopOrigin()
 
-		Clip:(4,14,611,345)
+		Clip:(4,14,611,255)
 			Handle(0,-46)
 		{
 			M_PackRow:(PackEntry)
 
 			Rect:(0,0,0,0) ref:PackList
-				ScrollingList(Packs,Scroll,390,Packs,ScrollVel) ref:ScrollingList
+				ScrollingList(Packs,Scroll,300,Packs,ScrollVel) ref:ScrollingList
 			{
 			}
 		}
 		PushOrigin:(2,-1)
-			Draw:(GreyRecess,579,16,22,384)
+			Draw:(GreyRecess,579,16,22,294)
 			{
-				Draw:(SliderButton,581,16,20,384,,#656565FF)
+				Draw:(SliderButton,581,16,20,294,,#656565FF)
 					ScrollIndicator(PackList,ScrollingList)
 			}
 		PopOrigin
@@ -125,7 +125,7 @@ PopOrigin
 
 // The seed of the world of the next new career, and its challenge. A tap
 // on the seed types a new one.
-PushOrigin:(13,630)
+PushOrigin:(13,540)
 	Rect:(0,0,300,96)
 	{
 		Draw:(GreyRecess,0,0,300,96)
@@ -145,7 +145,7 @@ PushOrigin:(13,630)
 			PlaySnd(UISelect)
 		>
 PopOrigin
-PushOrigin:(327,630)
+PushOrigin:(327,540)
 	Rect:(0,0,300,96)
 	{
 		Draw:(ButtonShadow,8,8,300,96,,#FFFFFF80)
@@ -166,6 +166,35 @@ PushOrigin:(327,630)
 			GS_Challenge()
 	}
 		Click(packs.btn_Challenge)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+
+// The next new career starts a new world, or continues the world of the
+// last career.
+PushOrigin:(13,648)
+	Rect:(0,0,614,84)
+	{
+		Draw:(ButtonShadow,8,8,614,84,,#FFFFFF80)
+		Draw:(GreenButton,0,0,614,84)
+		Draw:(Glint,0,15.5,42,,,#606060FFFFFFFFFF)
+			Handle(42,16)
+			Shine(0,590)
+			Additive()
+		Text:(WORLD,10,0,594,36,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.4,0.4)
+			StringReadout(Packs,ContinueLabel)
+		Text:(NEW,10,34,594,46,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.5,0.5)
+			GS_ContinueWorld()
+	}
+		Click(packs.btn_Continue)
 		<
 			PlaySnd(UISelect)
 		>

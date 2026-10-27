@@ -571,6 +571,7 @@ static void packs_fill(SSRGame *game) {
     ssr_tweaks_set(t, "Packs", "Title", loc(game, "SSR_World"));
     ssr_tweaks_set(t, "Packs", "SeedLabel", loc(game, "SSR_SeedLabel"));
     ssr_tweaks_set(t, "Packs", "ChallengeLabel", loc(game, "SSR_ChallengeLabel"));
+    ssr_tweaks_set(t, "Packs", "ContinueLabel", loc(game, "SSR_ContinueLabel"));
     ssr_tweaks_set_number(t, "Packs", "CanInstall", game->canInstallPacks);
     ssr_tweaks_set_number(t, "Packs", "CanRemove", game->packRow > 0);
     ssr_tweaks_set_number(t, "Packs", "Scroll", 0);
@@ -625,6 +626,12 @@ static void seed_start(SSRGame *game) {
 static void seed_done(SSRGame *game) {
     game->typing = 0;
     game->settings.nextWorldSeed = atoi(game->seedText);
+    settings_changed(game);
+}
+
+static void continue_next(SSRGame *game) {
+    if (game->typing == 3) seed_done(game);
+    game->settings.continueWorld = !game->settings.continueWorld;
     settings_changed(game);
 }
 
@@ -742,6 +749,59 @@ static void people_start(SSRGame *game) {
     }
     ssr_people_make_rivals(game->people, game->world, game->names, league, c->nationId, year - ssr_career_age(c), 3,
                            year);
+}
+
+// A new career continues the world of the last career: the players, the
+// managers, the honours, and the rivalries of the career of another slot
+// with the most years. The old player stays in the world as a legend, and
+// the years of the world move back to the year of the new career. Returns
+// 0 when no other slot has a world.
+static int continue_world(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int best = -1, bestYear = 0;
+    static SSRCareer old;
+    char path[2200];
+    for (int slot = 0; slot < SSR_CAREER_SLOTS; slot++) {
+        if (slot == game->slot) continue;
+        slot_path(game, slot, path, sizeof(path));
+        if (!ssr_career_load(&old, path)) continue;
+        people_path(game, slot, path, sizeof(path));
+        FILE *file = fopen(path, "rb");
+        if (!file) continue;
+        fclose(file);
+        if (ssr_career_year(&old) > bestYear) {
+            bestYear = ssr_career_year(&old);
+            best = slot;
+        }
+    }
+    if (best < 0 || !game->world || !game->names) return 0;
+    slot_path(game, best, path, sizeof(path));
+    ssr_career_load(&old, path);
+    people_path(game, best, path, sizeof(path));
+    SSRPeople *people = ssr_people_load(path);
+    if (!people) return 0;
+    honours_path(game, best, path, sizeof(path));
+    ssr_honours_load(&game->honours, path);
+    int oldYear = ssr_career_year(&old);
+    ssr_people_add_legend(people, old.firstName, old.lastName, old.nationId, oldYear - ssr_career_age(&old), oldYear,
+                          old.apps, old.goals, old.assists);
+    int shift = people->year - ssr_career_year(c);
+    ssr_people_rebase(people, shift);
+    for (int i = 0; i < game->honours.count; i++) game->honours.list[i].year -= shift;
+    ssr_people_free(game->people);
+    game->people = people;
+    game->peopleDate = c->sdate;
+    c->worldSeed = people->seed;
+    // The club of the new player gets its squad, and new rivals start.
+    int year = ssr_career_year(c);
+    ssr_people_make_squad(people, game->world, game->names, c->clubId, year);
+    int league = game->season ? ssr_season_actual_league(game->season, c->clubId) : 0;
+    ssr_people_make_rivals(people, game->world, game->names, league, c->nationId, year - ssr_career_age(c), 3, year);
+    char text[256];
+    snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentLegend"));
+    replace_all(text, sizeof(text), "$name", old.fullName);
+    ssr_career_add_moment(c, c->sdate, text);
+    return 1;
 }
 
 static void people_load(SSRGame *game, int slot) {
@@ -1418,9 +1478,9 @@ static void call_start_career(SSRGame *game) {
         c->bank = 0;
         memset(c->nrg, 0, sizeof(c->nrg));
     }
-    people_start(game);
-    signed_moment(game);
     ssr_honours_clear(&game->honours);
+    if (!(game->settings.continueWorld && continue_world(game))) people_start(game);
+    signed_moment(game);
     const SSRClub *club = game->world ? ssr_world_club(game->world, c->clubId) : NULL;
     snprintf(c->headline, sizeof(c->headline), "%s", loc(game, "CNEWS_FIRSTCONTRACTMOBILE"));
     replace_all(c->headline, sizeof(c->headline), "$clubname", club ? club->name : "");
@@ -9476,6 +9536,7 @@ static const Route ROUTES[] = {
     {"packs.btn_Install", packs_install},
     {"packs.inp_Seed", seed_start},
     {"packs.btn_Challenge", challenge_next},
+    {"packs.btn_Continue", continue_next},
     {"about.btn_Ok", options},
     {"message.btn_Ok", message_ok},
     {"message.btn_Cancel", message_cancel},
@@ -9677,6 +9738,7 @@ int ssr_game_load_settings(SSRGame *game, const char *path) {
         if (strcmp(key, "language") == 0 && value >= -1 && value <= 12) game->settings.language = value;
         if (strcmp(key, "worldseed") == 0 && value >= 0) game->settings.nextWorldSeed = value;
         if (strcmp(key, "challenge") == 0 && value >= 0 && value <= 2) game->settings.challenge = value;
+        if (strcmp(key, "continueworld") == 0) game->settings.continueWorld = value != 0;
     }
     fclose(file);
     set_option_tweaks(game);
@@ -9694,7 +9756,8 @@ int ssr_game_save_settings(const SSRGame *game, const char *path) {
                      game->settings.volume, game->settings.distance, game->settings.replays,
                      game->settings.doneLoseSkills, game->settings.hardModeUnlocked, game->settings.language) > 0;
     ok = fprintf(file, "pack=%s\n", game->settings.pack) > 0 && ok;
-    ok = fprintf(file, "worldseed=%d\nchallenge=%d\n", game->settings.nextWorldSeed, game->settings.challenge) > 0 && ok;
+    ok = fprintf(file, "worldseed=%d\nchallenge=%d\ncontinueworld=%d\n", game->settings.nextWorldSeed,
+                 game->settings.challenge, game->settings.continueWorld) > 0 && ok;
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
         remove(temp);
@@ -10286,6 +10349,7 @@ const char *ssr_game_text(SSRGame *game, const char *name) {
         snprintf(game->shown, sizeof(game->shown), "%d", game->settings.nextWorldSeed);
         return game->shown;
     }
+    if (strcmp(name, "GS_ContinueWorld") == 0) return loc(game, game->settings.continueWorld ? "SSR_ContinueYes" : "SSR_ContinueNo");
     if (strcmp(name, "GS_Challenge") == 0) {
         static const char *const NAMES[3] = {"SSR_ChallengeNone", "SSR_ChallengePace", "SSR_ChallengeBroke"};
         return loc(game, NAMES[game->settings.challenge % 3]);

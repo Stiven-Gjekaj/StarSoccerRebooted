@@ -129,6 +129,8 @@ typedef struct {
     // pace at the maximum, 2 no Bux and no NRG.
     int nextWorldSeed;
     int challenge;
+    // 1 when the next new career continues the world of the last career.
+    int continueWorld;
 } SSRSettings;
 
 // The tickers of a career, in the order of the game
