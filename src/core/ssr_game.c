@@ -791,6 +791,31 @@ static void kit_tweaks(SSRGame *game, const char *team, const SSRKit *kit) {
     }
 }
 
+static float brightness(SSRColor c) {
+    return (float)(((c >> 16) & 0xFF) + ((c >> 8) & 0xFF) + (c & 0xFF)) / 3.0f;
+}
+
+// c_AScreen_Match.m_SetUpTeamPlates: the plates and the commentary rows take
+// the colours of the teams, with dark text on a bright plate. The kit
+// colours stand for the badge colours [I].
+static void team_plates(SSRGame *game, const char *side, const SSRKit *kit) {
+    SSRColor first = kit->shirt1, second = kit->shirt2;
+    if (brightness(first) > 200 && brightness(second) < brightness(first)) {
+        first = kit->shirt2;
+        second = kit->shirt1;
+    }
+    int bright = brightness(first) > (float)ssr_tweaks_number(game->tweaks, "MatchColours", "BrightKit");
+    char name[48], value[16];
+    snprintf(name, sizeof(name), "Nameplate%sCol1", side);
+    snprintf(value, sizeof(value), "%06XFF", (unsigned)(first & 0xFFFFFF));
+    ssr_tweaks_set_kind(game->tweaks, "MatchColours", name, value, SSR_TWEAK_COLOUR);
+    snprintf(name, sizeof(name), "Nameplate%sCol2", side);
+    snprintf(value, sizeof(value), "%06XFF", (unsigned)(second & 0xFFFFFF));
+    ssr_tweaks_set_kind(game->tweaks, "MatchColours", name, value, SSR_TWEAK_COLOUR);
+    snprintf(name, sizeof(name), "Nameplate%sColText", side);
+    ssr_tweaks_set_kind(game->tweaks, "MatchColours", name, bright ? "333333FF" : "FFFFFFFF", SSR_TWEAK_COLOUR);
+}
+
 static void start_match(SSRGame *game) {
     const SSRClub *mine = player_club(game);
     if (!mine) return;
@@ -823,6 +848,8 @@ static void start_match(SSRGame *game) {
     // Each team plays in its kit for the ground [I: the clash of kits].
     kit_tweaks(game, "MyTeam", home ? &mine->home : &mine->away);
     kit_tweaks(game, "OppTeam", home ? &other->away : &other->home);
+    team_plates(game, "Home", home ? &mine->home : &other->home);
+    team_plates(game, "Away", home ? &other->away : &mine->away);
     ssr_tweaks_set(t, "Match", "HomeName", s.homeName);
     ssr_tweaks_set(t, "Match", "AwayName", s.awayName);
     ssr_tweaks_set_number(t, "Match", "AggHomeScore", -1);
@@ -878,11 +905,24 @@ static void match_focus(SSRGame *game) {
     match_tweaks(game);
 }
 
+// c_AScreen_Match.m_AddCommentary: a row of the colours of the team, with
+// the minute on its stopwatch.
 static void show_line(SSRGame *game, const SSRMatchLine *line) {
     static const char *TEMPLATES[] = {"Comment", "HomeComment", "AwayComment"};
     static const char *GOALS[] = {"Comment", "HomeGoalComment", "AwayGoalComment"};
+    static const char *SIDES[] = {"", "Home", "Away"};
     int team = line->team >= 0 && line->team <= 2 ? line->team : 0;
     add_op(game, SSR_OP_LIST_ADD, "CommentaryTable", line->goal ? GOALS[team] : TEMPLATES[team], line->text, 0);
+    if (team != 0) {
+        char name[48];
+        snprintf(name, sizeof(name), "Nameplate%sColText", SIDES[team]);
+        add_op(game, SSR_OP_LIST_COLOUR, "CommentaryTable", NULL, ssr_tweaks_get(game->tweaks, "MatchColours", name), 1);
+        snprintf(name, sizeof(name), "Nameplate%sCol1", SIDES[team]);
+        add_op(game, SSR_OP_LIST_COLOUR, "CommentaryTable", NULL, ssr_tweaks_get(game->tweaks, "MatchColours", name), 2);
+    }
+    char minute[16] = "";
+    if (line->minute[0]) snprintf(minute, sizeof(minute), "%s'", line->minute);
+    add_op(game, SSR_OP_LIST_SUB, "CommentaryTable", "TimeStamp", minute, minute[0] != 0);
 }
 
 // The commentary rows go into the table of the screen.

@@ -28,6 +28,12 @@ typedef enum {
     // Add to the list with ref a copy of the template ref2, with the text
     // and the id.
     SSR_OP_LIST_ADD,
+    // The element number id of the last entry of the list ref takes the
+    // colour in text.
+    SSR_OP_LIST_COLOUR,
+    // The elements ref2 of the last entry of the list ref show when id is 1,
+    // and take the text when it is not "".
+    SSR_OP_LIST_SUB,
 } SSRUiOpKind;
 
 typedef struct {

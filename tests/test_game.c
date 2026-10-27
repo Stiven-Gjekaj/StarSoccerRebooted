@@ -92,6 +92,7 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 1);
     CHECK(ssr_tweaks_kind(tweaks, "MatchColours", "MyTeamShirt1") == SSR_TWEAK_COLOUR);
     CHECK(strlen(ssr_tweaks_get(tweaks, "MatchColours", "OppTeamPants")) == 8);
+    CHECK(strlen(ssr_tweaks_get(tweaks, "MatchColours", "NameplateHomeCol1")) == 8);
     const char *home = ssr_tweaks_get(tweaks, "Match", "HomeName");
     CHECK(strlen(home) == 3 && strcmp(home, ssr_tweaks_get(tweaks, "Match", "AwayName")) != 0);
     ssr_game_message(game, "match.btn_Time");
@@ -102,6 +103,8 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     ssr_game_update(game, 1);
     int count = take_ops(game, ops, 64);
     CHECK(count >= 1 && has_op(ops, count, SSR_OP_LIST_ADD, "CommentaryTable", "Kick Off"));
+    // The kick-off has no minute: its stopwatch hides.
+    CHECK(has_op(ops, count, SSR_OP_LIST_SUB, "CommentaryTable", ""));
     int chances = 0, frames = 0;
     while (strcmp(ssr_game_screen(game), "gamemenu") != 0 && frames < 200000) {
         frames++;
