@@ -1120,6 +1120,9 @@ static void get_old_boots_and_a_sponsor(SSRGame *game, SSRTweaks *tweaks, const 
     for (int i = 0; i < 10; i++) c.sponsors[i] = 0;
     c.captain = 0;
     c.relationFans = 50;
+    // A transfer offer in the window comes first, so the test has one just
+    // now.
+    c.lastTransferDate = c.sdate;
     // News that comes before it in the chain, as the transfer window, can
     // take the week. The test tries again.
     for (int i = 0; i < 4; i++) {
