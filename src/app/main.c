@@ -4,7 +4,8 @@
 // On iOS the app imports the first APK, XAPK, or IPA in its Documents
 // folder, where Finder and the Files app can put it. On Android it imports
 // the APK of the installed New Star Soccer.
-// Set SSR_SHOT to a path to save the first frame as a PNG and quit.
+// Set SSR_SHOT to a path to save the first frame as a PNG and quit. Set
+// SSR_SHOT_MS to save a later frame, that many milliseconds after the first.
 // Set SSR_PRESS to "x,y" to press that point of the screen after the first
 // frame. Set SSR_WINDOW to "WxH" for the size of the window in points.
 
@@ -48,7 +49,7 @@ typedef struct {
         SSRSpine *spine;
     } spines[16];
     int spineCount;
-    Uint64 screenStart;
+    Uint64 lastFrame;
     // The screen in the units of the layouts.
     float left, top, width, height;
     char gameDirectory[2048];
@@ -104,7 +105,8 @@ static const SSRSpine *spine_file(void *context, const char *name) {
 }
 
 static void open_screen(SSRApp *app, const char *name) {
-    app->screenStart = SDL_GetTicks();
+    ssr_scene_free(app->scene);
+    app->scene = NULL;
     ssr_ui_free(app->screen);
     app->screen = NULL;
     SSRUiFiles files = {read_screen_file, app};
@@ -218,6 +220,9 @@ static void fit_screen(SSRApp *app) {
     SDL_SetRenderLogicalPresentation(app->renderer, (int)(app->width + 0.5f), (int)(app->height + 0.5f),
                                      SDL_LOGICAL_PRESENTATION_STRETCH);
     ssr_gfx_set_offset(app->gfx, -app->left, -app->top);
+    // The layout of a screen depends on the size, so the screen opens again.
+    ssr_scene_free(app->scene);
+    app->scene = NULL;
 }
 
 SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
@@ -274,11 +279,34 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
     if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) fit_screen(app);
     if (event->type == SDL_EVENT_DROP_FILE && event->drop.data) import_copy(app, event->drop.data);
-    if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_FINGER_DOWN) {
+    int mouse = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP ||
+                event->type == SDL_EVENT_MOUSE_MOTION;
+    int finger = event->type == SDL_EVENT_FINGER_DOWN || event->type == SDL_EVENT_FINGER_UP ||
+                 event->type == SDL_EVENT_FINGER_MOTION;
+    // A touch makes mouse events too. The app takes the touch only.
+    if (mouse && event->type != SDL_EVENT_MOUSE_MOTION && event->button.which == SDL_TOUCH_MOUSEID) mouse = 0;
+    if (mouse && event->type == SDL_EVENT_MOUSE_MOTION && event->motion.which == SDL_TOUCH_MOUSEID) mouse = 0;
+    if (mouse || finger) {
         SDL_ConvertEventToRenderCoordinates(app->renderer, event);
-        float x = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? event->button.x : event->tfinger.x;
-        float y = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? event->button.y : event->tfinger.y;
-        const SSRSceneItem *item = ssr_scene_hit_item(app->scene, x + app->left, y + app->top);
+        float x, y;
+        int down;
+        if (event->type == SDL_EVENT_MOUSE_MOTION) {
+            x = event->motion.x;
+            y = event->motion.y;
+            down = (event->motion.state & SDL_BUTTON_LMASK) != 0;
+        } else if (mouse) {
+            x = event->button.x;
+            y = event->button.y;
+            down = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+        } else {
+            x = event->tfinger.x;
+            y = event->tfinger.y;
+            down = event->type != SDL_EVENT_FINGER_UP;
+        }
+        ssr_scene_touch(app->scene, down, x + app->left, y + app->top);
+        // A click is when the touch goes up on the element, as in the game.
+        int up = event->type == SDL_EVENT_MOUSE_BUTTON_UP || event->type == SDL_EVENT_FINGER_UP;
+        const SSRSceneItem *item = up ? ssr_scene_hit_item(app->scene, x + app->left, y + app->top) : NULL;
         if (item) {
             SDL_Log("Pressed %s (%s)", item->ref ? item->ref : "-", item->click ? item->click : "-");
             ssr_audio_play(app->audio, item->clickSound ? item->clickSound : "UISelect");
@@ -308,11 +336,17 @@ SDL_AppResult SDL_AppIterate(void *state) {
             .text = translate,
             .image_size = image_size,
             .spine = spine_file,
-            .time = (SDL_GetTicks() - app->screenStart) / 1000.0f,
             .context = app,
         };
-        ssr_scene_free(app->scene);
-        app->scene = ssr_scene_build(app->screen, &env);
+        Uint64 now = SDL_GetTicks();
+        int ms = 0;
+        if (!app->scene) {
+            app->scene = ssr_scene_open(app->screen, &env);
+        } else {
+            ms = (int)(now - app->lastFrame);
+        }
+        app->lastFrame = now;
+        ssr_scene_update(app->scene, &env, ms);
         ssr_gfx_draw_scene(app->gfx, app->scene);
     }
     if (!app->gfx) {
@@ -337,7 +371,11 @@ SDL_AppResult SDL_AppIterate(void *state) {
     }
 
     const char *shot = SDL_getenv("SSR_SHOT");
-    if (shot && *shot) {
+    const char *shotMs = SDL_getenv("SSR_SHOT_MS");
+    static Uint64 firstFrame = 0;
+    if (!firstFrame) firstFrame = SDL_GetTicks();
+    int wait = shotMs ? SDL_atoi(shotMs) : 0;
+    if (shot && *shot && SDL_GetTicks() - firstFrame >= (Uint64)wait) {
         SDL_Surface *frame = SDL_RenderReadPixels(app->renderer, NULL);
         bool saved = frame && SDL_SavePNG(frame, shot);
         SDL_DestroySurface(frame);

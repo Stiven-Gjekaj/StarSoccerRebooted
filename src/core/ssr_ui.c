@@ -227,6 +227,10 @@ static void open_block(Parser *p, int modifierBlock) {
         target->line = p->line;
         push_child(&top(p)->target->children, &top(p)->target->childCount, target);
     }
+    if (!modifierBlock && !(target->flags & SSR_UI_BLOCK)) {
+        target->flags |= SSR_UI_BLOCK;
+        target->blockAt = target->modifierCount;
+    }
     Frame *frame = &p->frames[p->frameCount++];
     frame->owner = owner;
     frame->modifierBlock = modifierBlock;

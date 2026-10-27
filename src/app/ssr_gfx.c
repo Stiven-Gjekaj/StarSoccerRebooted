@@ -313,7 +313,13 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     const char *file = image || !gfx->scene ? NULL : ssr_scene_image_file(gfx->scene, item->image);
     SDL_Texture *texture = file ? ssr_gfx_texture(gfx, file) : NULL;
     if (!texture && !image) return;
-    SDL_BlendMode mode = item->additive ? SDL_BLENDMODE_ADD : SDL_BLENDMODE_BLEND;
+    SDL_BlendMode mode = SDL_BLENDMODE_BLEND;
+    if (item->blend == SSR_BLEND_ADD) mode = SDL_BLENDMODE_ADD;
+    // Gloss() adds the image times the colour under it.
+    if (item->blend == SSR_BLEND_GLOSS) {
+        mode = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_DST_COLOR, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD,
+                                          SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD);
+    }
     if (texture) {
         SDL_SetTextureBlendMode(texture, mode);
         draw_quad(gfx, texture, &p, 0, 0, 1, 1, 0, 0, 1, 1);

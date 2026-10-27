@@ -25,6 +25,8 @@
 #define SSR_UI_BOXED 16u
 // The line began with ':': a later Press() or NoPress() can run it again.
 #define SSR_UI_REARM 32u
+// The element has a "{ }" block. blockAt tells which modifiers came before.
+#define SSR_UI_BLOCK 64u
 
 typedef struct SSRUiNode SSRUiNode;
 
@@ -38,6 +40,9 @@ struct SSRUiNode {
     int childCount;
     SSRUiNode **modifiers;
     int modifierCount;
+    // The number of modifiers before the first "{ }" block. The game makes
+    // the children at the block, so the modifiers after it come later.
+    int blockAt;
     // Where the line is, for messages.
     const char *file;
     int line;

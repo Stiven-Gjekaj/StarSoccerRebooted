@@ -179,6 +179,8 @@ static void test_pushes_and_pops_the_parent(void) {
     CHECK(inner && inner->ref && strcmp(inner->ref, "Inner") == 0);
     CHECK(inner && inner->childCount == 2 && is(inner->children[1], "Text"));
     CHECK(inner && inner->modifierCount == 2 && is(inner->modifiers[0], "Delay"));
+    CHECK(inner && (inner->flags & SSR_UI_BLOCK) && inner->blockAt == 0);
+    CHECK(outer && (outer->flags & SSR_UI_BLOCK) && outer->blockAt == 1);
     CHECK(inner && (inner->modifiers[1]->flags & SSR_UI_REARM));
     const SSRUiNode *next = NULL;
     for (int i = 0; i < root->childCount; i++) {

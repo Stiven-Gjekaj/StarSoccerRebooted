@@ -1,6 +1,8 @@
-// ssr_scene: turns the tree of a screen layout into a list of things to
-// draw, in order. The app draws the list. The scene does no drawing, so a
-// test can check it.
+// ssr_scene: makes the elements of a screen layout from its tree, as the
+// game does (c_Gel), and runs them each frame: the animations, the
+// converges, the movers, the emitters, and the touch. Each frame gives a
+// list of things to draw, in order. The app draws the list. The scene does
+// no drawing, so a test can check it.
 
 #ifndef SSR_SCENE_H
 #define SSR_SCENE_H
@@ -19,6 +21,15 @@ typedef enum {
     SSR_ITEM_CLIP,
     SSR_ITEM_UNCLIP,
 } SSRItemKind;
+
+typedef enum {
+    // src ONE, dst ONE_MINUS_SRC_ALPHA: the default of the game.
+    SSR_BLEND_ALPHA,
+    // Additive(): dst ONE.
+    SSR_BLEND_ADD,
+    // Gloss(): src DST_COLOR, dst ONE.
+    SSR_BLEND_GLOSS,
+} SSRBlend;
 
 typedef struct {
     SSRItemKind kind;
@@ -39,7 +50,7 @@ typedef struct {
     float corners[8];
     // 0xRRGGBBAA.
     uint32_t colour;
-    int additive;
+    SSRBlend blend;
     // SSR_ITEM_TEXT: the font size (0 to 3) and the alignment: 'L', 'C', or
     // 'R', and 'T', 'M', or 'B'.
     int font;
@@ -48,6 +59,10 @@ typedef struct {
     // the width of the box.
     float fontScaleX, fontScaleY;
     int wrap;
+    // SSR_ITEM_TEXT: the slant of the glyphs, x += (y - baseline) * italic.
+    // The game slants all text by -0.25 if Italicise() does not change it.
+    float italic;
+    // The index of the layer of the screen. The list is in draw order.
     int layer;
     const char *ref;
     // The message of a Click(message) modifier, and the sound that its
@@ -62,7 +77,8 @@ typedef struct {
     // it, so a tall screen has a negative top, for example -231 for
     // 640 x 1422. This is c_VirtualDisplay of the game.
     float left, top, width, height;
-    const SSRTweaks *tweaks;
+    // SetTweak() of a layout changes the tweaks.
+    SSRTweaks *tweaks;
     // Gives the text of a language tag. NULL keeps the tag.
     const char *(*text)(void *context, const char *tag);
     // Gives the size of an image when a Draw: has no size. file is the file
@@ -70,15 +86,29 @@ typedef struct {
     int (*image_size)(void *context, const char *name, const char *file, float *w, float *h);
     // Gives the Spine file with the name, for example "S2GrassAnim", or NULL.
     const SSRSpine *(*spine)(void *context, const char *name);
-    // The time since the screen opened, in seconds. Animations use it.
-    float time;
     void *context;
 } SSRSceneEnv;
 
 typedef struct SSRScene SSRScene;
 
+// Makes the elements of the screen. The tree must stay until the scene is
+// freed. The scene has no items before the first update.
+SSRScene *ssr_scene_open(const SSRUiTree *tree, const SSRSceneEnv *env);
+
+// Runs one frame, ms milliseconds after the frame before it, and makes the
+// list of items. The first update gives 0.
+void ssr_scene_update(SSRScene *scene, const SSRSceneEnv *env, int ms);
+
+// The touch of the player, in the units of the layouts. Press() sees it in
+// the next update.
+void ssr_scene_touch(SSRScene *scene, int down, float x, float y);
+
+// Opens the screen and runs its first frame.
 SSRScene *ssr_scene_build(const SSRUiTree *tree, const SSRSceneEnv *env);
 void ssr_scene_free(SSRScene *scene);
+
+// The time of the scene in milliseconds, as the game counts it.
+int ssr_scene_time(const SSRScene *scene);
 
 int ssr_scene_count(const SSRScene *scene);
 const SSRSceneItem *ssr_scene_item(const SSRScene *scene, int index);

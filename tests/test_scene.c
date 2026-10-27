@@ -6,6 +6,7 @@
 
 #include "ssr_scene.h"
 #include "ssr_test.h"
+#include "ssr_zipwriter.h"
 
 static const char *layout;
 
@@ -61,7 +62,7 @@ static void test_places_images_with_origins_and_variables(void) {
                             "\tAdditive()\n"
                             "Draw:(Glint,0,0,40,20)\n"
                             "\tHandle(20,10)\n"
-                            "\tScale(2)\n"
+                            "\tScale(2,2)\n"
                             "\tAngle(45)\n"
                             "PopOrigin\n"
                             "DrawLTRB:(Glint,10,10,30,50)\n",
@@ -73,7 +74,7 @@ static void test_places_images_with_origins_and_variables(void) {
     const SSRSceneItem *glint = ssr_scene_item(scene, 1);
     CHECK(glint && near(glint->x, 110) && near(glint->y, 88 + 20));
     CHECK(glint && near(glint->w, 20) && near(glint->h, 10));
-    CHECK(glint && glint->colour == 0xFF000080 && glint->additive);
+    CHECK(glint && glint->colour == 0xFF000080 && glint->blend == SSR_BLEND_ADD);
 
     const SSRSceneItem *turned = ssr_scene_item(scene, 2);
     CHECK(turned && near(turned->x, 100 - 40) && near(turned->y, 88 - 20));
@@ -123,7 +124,8 @@ static void test_shows_items_by_tweak(void) {
 static void test_text_areas_layers_and_clips(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
-    SSRScene *scene = build("Img:(Pitch,NewGUI/Pitch.png)\n"
+    SSRScene *scene = build("UnsortedLayer:(AfterGloss,1)\n"
+                            "Img:(Pitch,NewGUI/Pitch.png)\n"
                             "Img:(Big,NewGUI/Big.png)\n"
                             "Draw:(Big,0,0)\n"
                             "Draw:(Front,0,0,10,10)\n"
@@ -352,12 +354,13 @@ static void test_definitions_do_not_draw(void) {
                             "\tDuring:(0,299)\n"
                             "\t{\n"
                             "\t\tDraw:(Glow,0,0,100,100)\n"
+                            "\t\tSequence:(Coin#,1,2)\n"
                             "\t}\n"
                             "}\n"
-                            "Sequence:(Spin)\n"
+                            "Draw:(Template,0,0,10,10) ref:Particle\n"
                             "{\n"
-                            "\tDraw:(Coin,0,0,64,64)\n"
-                            "}\n"
+                            "\tDraw:(Inside,0,0,10,10)\n"
+                            "} Template\n"
                             "Draw:(Shown,0,0,10,10)\n",
                             tweaks, &tree);
     CHECK(ssr_scene_count(scene) == 1 && strcmp(ssr_scene_item(scene, 0)->image, "Shown") == 0);
@@ -366,7 +369,220 @@ static void test_definitions_do_not_draw(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static SSRSceneEnv test_env(SSRTweaks *tweaks) {
+    SSRSceneEnv env = {.left = 0, .top = 0, .width = 640, .height = 960, .tweaks = tweaks, .text = translate,
+                       .image_size = image_size};
+    return env;
+}
+
+static const SSRSceneItem *find_image(const SSRScene *scene, const char *image) {
+    for (int i = 0; i < ssr_scene_count(scene); i++) {
+        const SSRSceneItem *item = ssr_scene_item(scene, i);
+        if (item->image && strcmp(item->image, image) == 0) return item;
+    }
+    return NULL;
+}
+
+// The buttons of the menu wait for their Delay, then slide in from the left
+// at a rate of 0.2 a frame. Press() pulls the button down by 8.
+static void test_converges_after_a_delay_and_on_press(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    layout = "PushOrigin:(100,200)\n"
+             "Rect:(0,0,200,80)\n"
+             "\tPress()\n"
+             "\t<\n"
+             "\t\tConvergeTo(0,8)\n"
+             "\t>\n"
+             "\tNoPress()\n"
+             "\t<\n"
+             "\t\tConvergeTo(0,0)\n"
+             "\t>\n"
+             "{\n"
+             "\tRect:(0,0,200,80)\n"
+             "\t{\n"
+             "\t\tDraw:(Button,0,0,200,80)\n"
+             "\t}\n"
+             "\t\tDelay(0.1)\n"
+             "\t\tConvergeFrom(-640,0)\n"
+             "}\n"
+             "PopOrigin\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    const SSRSceneItem *button = find_image(scene, "Button");
+    CHECK(button && near(button->x, 100 - 640) && near(button->y, 200));
+    // 0, 17, 17, 17, 17, 17, 17: the counter is 102 ms at the seventh frame,
+    // so the first step is there.
+    for (int i = 0; i < 5; i++) ssr_scene_update(scene, &env, 17);
+    button = find_image(scene, "Button");
+    CHECK(button && near(button->x, -540));
+    ssr_scene_update(scene, &env, 17);
+    button = find_image(scene, "Button");
+    CHECK(button && near(button->x, -540 + 640 * 0.2f));
+    for (int i = 0; i < 200; i++) ssr_scene_update(scene, &env, 17);
+    button = find_image(scene, "Button");
+    CHECK(button && fabsf(button->x - 100) < 0.01f && fabsf(button->y - 200) < 0.01f);
+
+    // A touch on the button. Press() sees it in the next frame.
+    ssr_scene_touch(scene, 1, 150, 230);
+    ssr_scene_update(scene, &env, 17);
+    ssr_scene_update(scene, &env, 17);
+    button = find_image(scene, "Button");
+    CHECK(button && near(button->y, 200 + 8 * 0.2f));
+    for (int i = 0; i < 100; i++) ssr_scene_update(scene, &env, 17);
+    CHECK(fabsf(find_image(scene, "Button")->y - 208) < 0.01f);
+    ssr_scene_touch(scene, 0, 150, 230);
+    for (int i = 0; i < 100; i++) ssr_scene_update(scene, &env, 17);
+    CHECK(fabsf(find_image(scene, "Button")->y - 200) < 0.01f);
+    CHECK(ssr_scene_time(scene) == 408 * 17);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
+// The Glow of the main menu: 0 to 299 turns to 240 degrees, gets half the
+// size about its centre, and goes from grey to white.
+static void test_plays_an_animation(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    layout = "Animation:(600,Loop,0) ref:Glow\n"
+             "{\n"
+             "\tDuring:(0,299)\n"
+             "\t{\n"
+             "\t\tDraw:(Glow,0,0,100,100,,#80808000)\n"
+             "\t\t\tAdditive()\n"
+             "\t\t\tTweenAngle(240,0,0)\n"
+             "\t\t\tTweenSize(50,50,50,50,-1,-1)\n"
+             "\t\t\tTweenCol(#FFFFFFFF)\n"
+             "\t}\n"
+             "\tDuring:(300,599)\n"
+             "\t{\n"
+             "\t\tDraw:(Glow2,0,0,50,50,241,#FFFFFFFF)\n"
+             "\t}\n"
+             "}\n"
+             "AnimInstance:(40,160,Glow)\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    const SSRSceneItem *glow = find_image(scene, "Glow");
+    CHECK(ssr_scene_count(scene) == 1 && glow);
+    CHECK(glow && near(glow->w, 100) && near(glow->pivotX, 40) && near(glow->x, -10) && near(glow->angle, 0));
+    CHECK(glow && glow->colour == 0x80808000 && glow->blend == SSR_BLEND_ADD);
+    // Frames of 16 ms are one frame of the game each. Frame 299: t is 1.
+    for (int i = 0; i < 299; i++) ssr_scene_update(scene, &env, 16);
+    glow = find_image(scene, "Glow");
+    CHECK(glow && near(glow->w, 50) && near(glow->x, 15) && near(glow->angle, -120));
+    CHECK(glow && glow->colour == 0xFFFFFFFF);
+    // Frame 150: the size eases with smoothstep, the angle does not.
+    ssr_scene_free(scene);
+    scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    for (int i = 0; i < 150; i++) ssr_scene_update(scene, &env, 16);
+    glow = find_image(scene, "Glow");
+    float t = 150.0f / 299;
+    CHECK(glow && fabsf(glow->w - (100 - 50 * (3 * t * t - 2 * t * t * t))) < 0.01f);
+    CHECK(glow && fabsf(glow->angle - 240 * t) < 0.01f);
+    for (int i = 0; i < 150; i++) ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "Glow2") && !find_image(scene, "Glow"));
+    // The loop starts again at 600.
+    for (int i = 0; i < 300; i++) ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "Glow") && !find_image(scene, "Glow2"));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
+// A colour of 16 digits mixes with the colour of the parent. A gel with no
+// colour takes the colour of the parent.
+static void test_mixes_colours_and_orders_layers(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    SSRScene *scene = build("UnsortedLayer:(Top,2)\n"
+                            "SortedLayer:(Sorted,1)\n"
+                            "Rect:(0,0,10,10,,#80402080)\n"
+                            "{\n"
+                            "\tDraw:(Plain,0,0,10,10)\n"
+                            "\tDraw:(Multiply,0,0,10,10,,#FFFFFFFFFFFFFFFF)\n"
+                            "\tDraw:(OwnRgb,0,0,10,10,,#FF0000FF000000FF)\n"
+                            "\tDraw:(Replace,0,0,10,10,,#00FF00FF)\n"
+                            "\t\tLayer(Top)\n"
+                            "}\n"
+                            "Draw:(Deep,0,0,10,10)\n"
+                            "\tLayer(Sorted)\n"
+                            "\tDepth(5)\n"
+                            "Draw:(Shallow,0,0,10,10)\n"
+                            "\tLayer(Sorted)\n"
+                            "\tDepth(2)\n",
+                            tweaks, &tree);
+    CHECK(ssr_scene_count(scene) == 6);
+    CHECK(find_image(scene, "Plain")->colour == 0x80402080);
+    CHECK(find_image(scene, "Multiply")->colour == 0x80402080);
+    CHECK(find_image(scene, "OwnRgb")->colour == 0xFF000080);
+    CHECK(find_image(scene, "Replace")->colour == 0x00FF00FF);
+    CHECK(strcmp(ssr_scene_item(scene, 3)->image, "Shallow") == 0);
+    CHECK(strcmp(ssr_scene_item(scene, 4)->image, "Deep") == 0);
+    CHECK(strcmp(ssr_scene_item(scene, 5)->image, "Replace") == 0);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
+// An emitter makes copies of its template with values from Range tweaks,
+// and each copy goes away at the end of its Lifetime.
+static void test_emits_particles(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/TweakValues.txt", ssr_test_directory("scene_emitter"));
+    FILE *file = fopen(path, "wb");
+    fputs("Category:(Stars)\n"
+          "\tRange:(Rate,Rate,0.1,0.1,1)\n"
+          "\tRange:(Lifetime,Life,0.25,0.25,1)\n"
+          "\tRange:(XVel,X Vel,2,2,1)\n"
+          "\tRange:(YVel,Y Vel,0,0,1)\n"
+          "EndCategory\n",
+          file);
+    fclose(file);
+    CHECK(ssr_tweaks_load(tweaks, path) == 4);
+    SSRUiTree *tree;
+    layout = "Draw:(Star,0,0,10,10) ref:StarTemplate\n"
+             "\tEmitPlacer()\n"
+             "\tEmitMover()\n"
+             "\tEmitLifetime()\n"
+             "{\n"
+             "} Template\n"
+             "Emitter:(Stars,StarTemplate) ref:Burst\n"
+             "Instance:(Burst,300,400)\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(ssr_scene_count(scene) == 0);
+    // 100 ms a star: after 6 frames of 17 ms the first one is there.
+    for (int i = 0; i < 6; i++) ssr_scene_update(scene, &env, 17);
+    CHECK(ssr_scene_count(scene) == 1);
+    const SSRSceneItem *star = find_image(scene, "Star");
+    CHECK(star && near(star->x, 302) && near(star->y, 400));
+    ssr_scene_update(scene, &env, 17);
+    CHECK(near(find_image(scene, "Star")->x, 304));
+    // A star lives 250 ms, so at most three are there.
+    for (int i = 0; i < 60; i++) ssr_scene_update(scene, &env, 17);
+    CHECK(ssr_scene_count(scene) >= 2 && ssr_scene_count(scene) <= 3);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_converges_after_a_delay_and_on_press();
+    test_plays_an_animation();
+    test_mixes_colours_and_orders_layers();
+    test_emits_particles();
     test_definitions_do_not_draw();
     test_draws_a_crowd();
     test_panels_of_the_screen_and_of_origins();
