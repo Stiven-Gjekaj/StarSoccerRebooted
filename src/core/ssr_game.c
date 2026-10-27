@@ -400,7 +400,10 @@ static void message(SSRGame *game, const char *layout, const char *text, int can
         run_call(game, game->messageCall);
         return;
     }
-    snprintf(game->messageReturn, sizeof(game->messageReturn), "%s", game->screen);
+    // A message over a message goes back to the screen under them both.
+    if (strncmp(game->screen, "message", 7) != 0) {
+        snprintf(game->messageReturn, sizeof(game->messageReturn), "%s", game->screen);
+    }
     ssr_tweaks_set(game->tweaks, "Menu", "MessageTitle", "");
     ssr_tweaks_set(game->tweaks, "Menu", "MessageBody", text);
     ssr_tweaks_set_number(game->tweaks, "Message", "ShowAcc", ok);
