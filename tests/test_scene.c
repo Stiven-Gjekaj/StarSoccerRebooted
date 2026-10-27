@@ -1658,6 +1658,30 @@ static void test_spawns_an_emitter_at_a_point(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// set(gel.gx) and set(gel.gy) give a gel a place on the screen. The gel
+// takes the place in its parent that gives it (c_EX_Gel_WorldX).
+static void test_sets_the_place_on_the_screen(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    layout = "Rect:(100,50,0,0)\n"
+             "{\n"
+             "\tDraw:(Dot,20,0,10,10)\n"
+             "\t\t.set(gel.gx,300)\n"
+             "\t\t.set(gel.gy,@T+10)\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 16);
+    ssr_scene_update(scene, &env, 16);
+    const SSRSceneItem *dot = find_image(scene, "Dot");
+    CHECK(dot && near(dot->x, 300) && near(dot->y, 10));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -2043,6 +2067,7 @@ int main(void) {
     test_knows_set_message();
     test_puts_a_random_number_in_a_tweak();
     test_spawns_an_emitter_at_a_point();
+    test_sets_the_place_on_the_screen();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();

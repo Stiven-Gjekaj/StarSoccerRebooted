@@ -1099,6 +1099,20 @@ static void ex_set(void *context, void *gel, SSRGelProperty property, float valu
     case SSR_GEL_HY:
         g->hy = value;
         break;
+    case SSR_GEL_GX:
+    case SSR_GEL_GY: {
+        // The place on the screen changes, and the gel takes the place in
+        // its parent that gives it (c_EX_Gel_WorldX.Set, Unbake).
+        Mat parent = g->parent ? g->parent->baked : mat_make(0, 0, 0, 1, 1);
+        Mat world = mat_concat(parent, local_matrix(g));
+        if (property == SSR_GEL_GX) world.tx = value;
+        else world.ty = value;
+        Mat inverse = mat_inverse(parent);
+        g->x = inverse.a * world.tx + inverse.c * world.ty + inverse.tx;
+        g->y = inverse.b * world.tx + inverse.d * world.ty + inverse.ty;
+        g->baked = world;
+        break;
+    }
     case SSR_GEL_ANGLE:
         g->angle = value;
         break;
