@@ -359,8 +359,10 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] World seeds, so that friends can share a world. Options, World
       types the seed of the next career. The Honours screen shows the seed
       of the career.
-- [ ] A custom career: the player chooses the age, the skill ratings, and
-      more at the start. It takes the place of the challenge starts.
+- [x] A custom career: after the nation, the screen "Your start" chooses
+      the age (16 to 32) and the least value of each skill (up to 70)
+- [ ] More choices for the custom career: the position, the first club,
+      and the Bux
 - [x] Many careers in one world: Options, World can make the next new
       career continue the world of the last career
 - [ ] The next player can play against the last one
@@ -370,7 +372,13 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] A data format for the world: the files of the data set, the
       names of the players, images, and screens, in a zip file with
       `pack.txt` ([docs/packs.md](docs/packs.md))
-- [ ] Stadiums and logos in a pack
+- [x] Crests in a pack (`crests/<club id>.png`): the crest goes on the
+      face of the badge of the match and of the fixtures
+- [x] The real players and the managers of the clubs in a pack
+      (`world/Players.txt`)
+- [x] A pack changes only the rows and the columns that it gives
+- [ ] Stadiums in a pack
+- [ ] The first community pack: the season 2025/26
 - [x] An editor in the app, first step: a tap on the name of a club on the
       squad screen renames it. The edit goes into the pack "custom".
 - [ ] An editor for the leagues, the kits, and the players
@@ -399,5 +407,5 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 ## After 1.0
 
-- [ ] Challenge starts. The remake has two now (Options, World): the pace
-      at its maximum, or no Bux and no NRG. More come in a 1.x release.
+- [ ] Challenge starts: for example the pace at its maximum, or no Bux and
+      no NRG. The custom career takes their place for 1.0.
