@@ -19,6 +19,7 @@
 #include "ssr_audio.h"
 #include "ssr_fs.h"
 #include "ssr_game.h"
+#include "ssr_ticker.h"
 #include "ssr_gfx.h"
 #include "ssr_import.h"
 #include "ssr_scene.h"
@@ -50,6 +51,11 @@ typedef struct {
     // The screen that shows now, from NewGUI/Screens, and its last frame.
     SSRUiTree *screen;
     SSRScene *scene;
+    // The ticker shell over the screen (ticker.uis).
+    SSRUiTree *tickerScreen;
+    SSRScene *tickerScene;
+    SSRTicker *ticker;
+    Uint64 tickerFrame;
     SSRAudio *audio;
     // The Spine files that the screens use, and when the screen opened.
     struct {
@@ -187,6 +193,29 @@ static void click(SSRApp *app, const SSRSceneItem *item) {
     follow_game(app);
 }
 
+static float ticker_measure(void *context, const char *text) {
+    SSRApp *app = context;
+    return ssr_gfx_text_width(app->gfx, SSR_FONT_MEDIUM, text);
+}
+
+// The ticker of the game (bb_soccer_tickers.InitialiseTickers): the welcome
+// texts. The texts of the career come with the parts that they tell of.
+static void load_ticker(SSRApp *app) {
+    ssr_scene_free(app->tickerScene);
+    app->tickerScene = NULL;
+    ssr_ui_free(app->tickerScreen);
+    ssr_ticker_free(app->ticker);
+    SSRUiFiles files = {read_screen_file, app};
+    app->tickerScreen = ssr_ui_parse("ticker.uis", &files);
+    app->ticker = ssr_ticker_create(ticker_measure, app);
+    for (int i = 1; i <= 6; i++) {
+        char tag[32];
+        SDL_snprintf(tag, sizeof(tag), "TICKER_NEWPLAYER_%d", i);
+        ssr_ticker_add(app->ticker, translate(app, tag), 0);
+    }
+    ssr_tweaks_set_number(app->tweaks, "Shell", "Ticker", 1);
+}
+
 static void load_game(SSRApp *app) {
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
@@ -212,6 +241,7 @@ static void load_game(SSRApp *app) {
     ssr_game_load_settings(app->game, app->settingsPath);
     apply_settings(app);
     app->gameScreen = ssr_game_screen_version(app->game);
+    load_ticker(app);
     const char *screen = SDL_getenv("SSR_SCREEN");
     open_screen(app, screen && *screen ? screen : "MainMenu.uis");
 }
@@ -299,6 +329,8 @@ static void fit_screen(SSRApp *app) {
     // The layout of a screen depends on the size, so the screen opens again.
     ssr_scene_free(app->scene);
     app->scene = NULL;
+    ssr_scene_free(app->tickerScene);
+    app->tickerScene = NULL;
 }
 
 SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
@@ -403,6 +435,23 @@ static void draw_centered_text(const SSRApp *app, float y, const char *text) {
     SDL_RenderDebugText(app->renderer, (app->width - width) / 2, y, text);
 }
 
+// The ticker shell shows while the tweak Shell,Ticker is 1 (ShowShell).
+static void draw_ticker(SSRApp *app, const SSRSceneEnv *env) {
+    if (!app->tickerScreen || ssr_tweaks_number(app->tweaks, "Shell", "Ticker") == 0) return;
+    Uint64 now = SDL_GetTicks();
+    int ms = 0;
+    if (!app->tickerScene) {
+        app->tickerScene = ssr_scene_open(app->tickerScreen, env);
+        ssr_ticker_start(app->ticker, app->tickerScene);
+    } else {
+        ms = (int)(now - app->tickerFrame);
+    }
+    app->tickerFrame = now;
+    ssr_scene_update(app->tickerScene, env, ms);
+    ssr_ticker_update(app->ticker, app->tickerScene);
+    ssr_gfx_draw_scene(app->gfx, app->tickerScene);
+}
+
 static const char *provide(void *context, const char *name) {
     SSRApp *app = context;
     return ssr_game_text(app->game, name);
@@ -456,6 +505,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         }
         ssr_gfx_set_tweaks(app->gfx, app->tweaks);
         ssr_gfx_draw_scene(app->gfx, app->scene);
+        draw_ticker(app, &env);
     }
     if (!app->gfx) {
         draw_centered_text(app, app->height / 2 - 12, "Drop your copy of New Star Soccer here.");
@@ -513,6 +563,9 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     ssr_ui_free(app->screen);
     ssr_text_free(app->text);
     ssr_game_free(app->game);
+    ssr_scene_free(app->tickerScene);
+    ssr_ui_free(app->tickerScreen);
+    ssr_ticker_free(app->ticker);
     ssr_tweaks_free(app->tweaks);
     ssr_audio_free(app->audio);
     ssr_gfx_free(app->gfx);
