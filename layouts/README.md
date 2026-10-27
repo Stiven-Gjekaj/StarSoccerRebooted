@@ -8,7 +8,8 @@ layout language of New Star Soccer. docs/formats.md describes it.
 - A layout names the images of the atlases and imports the macros of the
   game, for example `Import:(ButtonMacros.uis)`. The import of the player
   gives them when the app runs.
-- A file `<layout>.patch` removes lines of a layout of the game. Each line
+- A file `<layout>.patch` changes lines of a layout of the game. Each line
   that starts with `-` gives the start of the lines to remove, for example
-  `- Text:(TM,`. The other lines are comments.
+  `- Text:(TM,`. The lines that start with `+` just after a `-` line take
+  the place of each line that it removes. The other lines are comments.
 - Do not copy text from the layout files of the game into this folder.
