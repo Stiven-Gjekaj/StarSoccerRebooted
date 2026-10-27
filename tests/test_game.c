@@ -557,6 +557,8 @@ static void results_play(SSRGame *game, SSRTweaks *tweaks) {
 static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     SSRUiOp ops[256];
     int apps = ssr_game_career(game)->apps, bank = ssr_game_career(game)->bank;
+    int goals = ssr_game_career(game)->goals, assists = ssr_game_career(game)->assists;
+    int passes = ssr_game_career(game)->passes;
     float ratings[10];
     memcpy(ratings, ssr_game_career(game)->ratings, sizeof(ratings));
     // Play shows the fixtures of the round of the player first.
@@ -777,6 +779,13 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     int date = c->sdate;
     ssr_game_message(game, "matchstats.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "leaguefixtures") == 0 && c->sdate == date + 1);
+    // The awards of the match (CheckAchievements): a goal, a hat trick,
+    // five passes, an assist, and the goals of the career.
+    if (c->goals > goals) CHECK(c->awards[2] > 0);
+    if (c->goals >= goals + 3) CHECK(c->awards[3] > 0);
+    if (c->passes >= passes + 5) CHECK(c->awards[4] > 0);
+    if (c->assists > assists) CHECK(c->awards[6] > 0);
+    CHECK((c->awards[23] > 0) == (c->goals >= 50));
     CHECK(ssr_tweaks_number(tweaks, "Menu", "LeagueFixturesResults") == 1);
     rows = take_ops(game, ops, 256);
     CHECK(has_op(ops, rows, SSR_OP_LIST_ADD, "FixtureList", "") && !has_op(ops, rows, SSR_OP_LIST_TEXT, "FixtureList", "vs."));

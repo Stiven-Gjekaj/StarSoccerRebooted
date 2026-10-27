@@ -2172,6 +2172,88 @@ static void cup_trophy(SSRGame *game, const SSRFixture *f) {
     if (medal >= 4) c->wonMajorAward = 1;
 }
 
+static float form_of(const int *form, int apps);
+
+// TScreen_MatchStats.CheckAchievements: the awards of a match. [I: the
+// remake keeps no count of the hits of the post and of the goals from a
+// corner, so the awards 115, 117, and 118 do not come yet.]
+static void match_awards(SSRGame *game, SSRFixture *f) {
+    SSRCareer *c = &game->career;
+    const SSRAfterMatchFacts *m = &game->facts;
+    // A hat trick counts at the third, the sixth, and the ninth goal.
+    int hatTricks = m->goals / 3;
+    if (m->passes >= 5) award(game, 4);
+    if (m->passes >= 10) award(game, 5);
+    if (m->assists > 0) award(game, 6);
+    if (m->assists >= 3) award(game, 7);
+    if (m->dribbles >= 3) award(game, 116);
+    // A rating at 10, from the short pass to the dribble.
+    for (int i = 0; i < 8; i++) {
+        if (c->ratings[i] >= 10) award(game, 101 + i);
+    }
+    SSRSeasonComp *comp = game->season && f ? ssr_season_comp(game->season, game->fixtureComp) : NULL;
+    int won = m->myScore > m->opponentScore;
+    int margin = m->home ? m->score1 - m->score2 : m->score2 - m->score1;
+    if (comp && comp->data->level == 0) {
+        if (m->goals > 0) award(game, 2);
+        if (hatTricks > 0) award(game, 3);
+        if (form_of(c->form, c->apps) >= 10) award(game, 12);
+        if (c->goals >= 50) award(game, 23);
+        if (c->goals >= 100) award(game, 24);
+        if (comp->data->locale == 1) {
+            award(game, 58);
+            if (m->goals > 0) award(game, 59);
+            if (hatTricks > 0) award(game, 60);
+        }
+        if (won) {
+            int final = ssr_season_won_final(game->season, comp, f, c->clubId);
+            if (comp->data->type == 0) {
+                if (comp->data->locale == 0) award(game, 13);
+                else if (comp->data->locale == 1) award(game, 61);
+            } else if (comp->data->type == 1 && comp->data->locale == 0) {
+                award(game, 14);
+                if (final) award(game, 15);
+            } else if (comp->data->type == 1 && comp->data->locale == 1) {
+                award(game, 61);
+                if (final) {
+                    award(game, 62);
+                    if (ssr_career_history_apps(c, my_club_tla(game)) + c->seasonApps == c->apps) award(game, 124);
+                }
+            }
+            if (margin > 4) award(game, 18);
+        }
+        // CheckTotalAppsForCurrentClub.
+        int clubApps = ssr_career_history_apps(c, my_club_tla(game)) + c->seasonApps;
+        if (clubApps > 100) award(game, 76);
+        if (clubApps > 250) award(game, 77);
+        if (clubApps > 500) award(game, 78);
+    } else if (comp && comp->data->level == 1) {
+        award(game, 51);
+        if (m->goals > 0) award(game, 52);
+        if (hatTricks > 0) award(game, 53);
+        if (c->intGoals >= 50) award(game, 56);
+        if (c->intGoals >= 100) award(game, 57);
+        if (won) {
+            award(game, 54);
+            if (comp->data->type == 1 && ssr_season_won_final(game->season, comp, f, c->nationId)) {
+                award(game, 55);
+                if (comp->data->id == 60) {
+                    award(game, 75);
+                    if (c->captain == 2 || c->captain == 3) award(game, 83);
+                }
+            }
+            // [I: 4.32 compares the winner of 5 goals with the club here, so
+            // the award 18 never comes from a match of the nation.]
+        }
+    }
+    // CheckTotalAppsClubAndCountry.
+    int apps = c->apps + c->intApps;
+    if (apps > 250) award(game, 109);
+    if (apps > 500) award(game, 110);
+    if (apps > 1000) award(game, 111);
+    if (hatTricks > 1) award(game, 112);
+}
+
 static void stats_continue(SSRGame *game) {
     if (game->statStage < 6) after_relations(game);
     if (game->statStage < 9) after_star_rating(game);
@@ -2192,6 +2274,7 @@ static void stats_continue(SSRGame *game) {
         ssr_season_my_result(game->season, f, game->facts.score1, game->facts.score2);
     }
     cup_trophy(game, f);
+    if (game->statStage < 11) match_awards(game, f);
     // MatchRecovery comes first in PlayToDate, with the rest days to the
     // next match.
     match_recovery(game);
