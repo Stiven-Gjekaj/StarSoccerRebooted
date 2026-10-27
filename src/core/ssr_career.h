@@ -34,6 +34,13 @@ typedef enum {
 // The awards of the achievements screen have the ids 1 to 125.
 #define SSR_CAREER_AWARDS 200
 
+// A moment of the career timeline of the remake.
+#define SSR_CAREER_MOMENTS 64
+typedef struct {
+    int sdate;
+    char text[128];
+} SSRMoment;
+
 // A trophy or an award of the trophy log. medal is 0 for a league place
 // that is not first, 1 for a league title, 2 for a title with promotion,
 // 3 for the cup, 4 for the continental cup, 5 for an international cup,
@@ -186,6 +193,9 @@ typedef struct {
     // The day of the unlock of each award, by its id. 0 is locked
     // (c_TPlayer.achievements).
     int awards[SSR_CAREER_AWARDS];
+    // The moments of the career, the oldest first: the day and the text.
+    SSRMoment moments[SSR_CAREER_MOMENTS];
+    int momentCount;
 } SSRCareer;
 
 // The start of a new career (c_TPlayer.m_Create). The values come from
@@ -286,6 +296,10 @@ void ssr_career_add_history(SSRCareer *career, int year, const char *club);
 // GetTotalStarMan. And GetTotalAppsForClub.
 void ssr_career_history_totals(const SSRCareer *career, int *apps, int *goals, int *assists, int *starMan);
 int ssr_career_history_apps(const SSRCareer *career, const char *club);
+
+// Adds a moment to the timeline. When the timeline is full, the oldest
+// moment goes.
+void ssr_career_add_moment(SSRCareer *career, int sdate, const char *text);
 
 // Reads the career from the file. Returns 0 when the file is not there or
 // has no club.

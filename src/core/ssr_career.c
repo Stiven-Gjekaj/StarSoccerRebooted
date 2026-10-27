@@ -393,6 +393,11 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     for (int id = 0; id < SSR_CAREER_AWARDS; id++) {
         if (c->awards[id] > 0) fprintf(file, "award=%d:%d\n", id, c->awards[id]);
     }
+    for (int i = 0; i < c->momentCount; i++) {
+        char value[160];
+        snprintf(value, sizeof(value), "%d:%s", c->moments[i].sdate, c->moments[i].text);
+        write_text(file, "moment", value);
+    }
     int ok = !ferror(file);
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
@@ -564,7 +569,14 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "horses") == 0) read_text(value, c->horses, sizeof(c->horses));
         else if (strcmp(key, "trophy") == 0) read_trophy(c, value);
         else if (strcmp(key, "history") == 0) read_history(c, value);
-        else if (strcmp(key, "award") == 0) {
+        else if (strcmp(key, "moment") == 0) {
+            const char *text = strchr(value, ':');
+            if (text && c->momentCount < SSR_CAREER_MOMENTS) {
+                SSRMoment *m = &c->moments[c->momentCount++];
+                m->sdate = atoi(value);
+                read_text(text + 1, m->text, sizeof(m->text));
+            }
+        } else if (strcmp(key, "award") == 0) {
             int id = atoi(value);
             const char *day = strchr(value, ':');
             if (id >= 0 && id < SSR_CAREER_AWARDS && day) c->awards[id] = atoi(day + 1);
@@ -734,4 +746,15 @@ void ssr_career_set_selected_ball(SSRCareer *c, int ball, int type) {
     int *fields[4] = {&c->ballLeague, &c->ballCup, &c->ballContinent, &c->ballInternational};
     if (type < 1 || type > 4) return;
     *fields[type - 1] = ball == 0 ? 1 : ball;
+}
+
+void ssr_career_add_moment(SSRCareer *c, int sdate, const char *text) {
+    if (!c || !text) return;
+    if (c->momentCount == SSR_CAREER_MOMENTS) {
+        memmove(c->moments, c->moments + 1, sizeof(SSRMoment) * (SSR_CAREER_MOMENTS - 1));
+        c->momentCount--;
+    }
+    SSRMoment *m = &c->moments[c->momentCount++];
+    m->sdate = sdate;
+    snprintf(m->text, sizeof(m->text), "%s", text);
 }

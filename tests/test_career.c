@@ -343,6 +343,25 @@ static void test_keeps_the_records(void) {
     CHECK(back.seasonFurthest[0] == 0 && back.furthest[1] == 640 && back.intFurthest[3] == 250);
 }
 
+// The timeline keeps the newest moments, with the day of each.
+static void test_keeps_the_moments(void) {
+    static SSRCareer c, back;
+    ssr_career_create(&c, "The", "Kid", 0, 0, 62, 1, 1, 0);
+    c.clubId = 10;
+    for (int i = 1; i <= SSR_CAREER_MOMENTS + 2; i++) {
+        char text[32];
+        snprintf(text, sizeof(text), "Moment %d", i);
+        ssr_career_add_moment(&c, i * 10, text);
+    }
+    CHECK(c.momentCount == SSR_CAREER_MOMENTS && strcmp(c.moments[0].text, "Moment 3") == 0);
+    ssr_career_add_moment(&c, 999, "Two lines\nand a \\ sign");
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/moments.txt", ssr_test_directory("career_moments"));
+    CHECK(ssr_career_save(&c, path) && ssr_career_load(&back, path));
+    CHECK(back.momentCount == SSR_CAREER_MOMENTS && back.moments[0].sdate == 40);
+    CHECK(strcmp(back.moments[SSR_CAREER_MOMENTS - 1].text, "Two lines\nand a \\ sign") == 0);
+}
+
 // StoreOldStats: a career of the second year with no history gets a row
 // of year 0 with the counts before the season.
 static void test_stores_the_old_stats(void) {
@@ -385,6 +404,7 @@ int main(void) {
     test_chooses_the_match_balls();
     test_keeps_the_awards();
     test_keeps_the_records();
+    test_keeps_the_moments();
     test_keeps_the_trophies_and_the_history();
     test_stores_the_old_stats();
     test_keeps_the_days_of_training();
