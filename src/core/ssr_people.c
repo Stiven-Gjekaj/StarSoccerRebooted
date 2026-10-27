@@ -304,7 +304,11 @@ int ssr_people_make_squad(SSRPeople *people, const SSRWorld *world, const SSRNam
     const SSRClub *c = ssr_world_club(world, club);
     if (!people || !c || !names) return 0;
     if (year > people->year) people->year = year;
-    if (ssr_people_squad(people, club, NULL, 0) > 0) return 0;
+    // A squad of a save from before the managers gets its manager now.
+    if (ssr_people_squad(people, club, NULL, 0) > 0) {
+        if (!ssr_people_manager(people, club)) new_manager(people, world, names, c, year);
+        return 0;
+    }
     int made = 0;
     for (int pos = 0; pos < SSR_POS_COUNT; pos++) {
         for (int k = 0; k < SHAPE[pos]; k++) made += new_player(people, world, names, c, pos, ssr_rand2(&people->random, 17, 34), year) != NULL;

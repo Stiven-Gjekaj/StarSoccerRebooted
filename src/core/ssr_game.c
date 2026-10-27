@@ -3659,8 +3659,41 @@ static void keep_honours(SSRGame *game) {
     }
 }
 
+// The managers of the clubs in the relegation places, or in the bottom
+// three of a league with no relegation, can go. A new manager of the club
+// of the player starts with a boss relation of 50.
+static void judge_managers(SSRGame *game) {
+    SSRSeason *s = game->season;
+    if (!s || !game->people || !game->names) return;
+    int bottom[256], n = 0;
+    for (int i = 0; i < s->compCount; i++) {
+        SSRSeasonComp *comp = &s->comps[i];
+        if (comp->data->level != 0 || comp->data->type != 0 || comp->poolCount == 0) continue;
+        SSRPool *pool = &comp->pools[0];
+        ssr_season_sort_pool(s, pool, 4);
+        for (int k = 0; k < pool->count && n < 256; k++) {
+            int place = k + 1;
+            int low = ssr_season_is_relegation_place(s, comp, place) || place > pool->count - 3;
+            if (low) bottom[n++] = s->rows[pool->rows[k]].teamId;
+        }
+    }
+    int year = ssr_career_year(&game->career);
+    ssr_people_judge_managers(game->people, game->world, game->names, bottom, n, year);
+    for (int k = 0; k < game->people->sackedCount; k++) {
+        if (game->people->sacked[k] != game->career.clubId) continue;
+        const SSRManager *m = ssr_people_manager(game->people, game->career.clubId);
+        game->career.relationBoss = 50;
+        char text[256], name[64];
+        snprintf(name, sizeof(name), "%s %s", m->first, m->last);
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentManager"));
+        replace_all(text, sizeof(text), "$name", name);
+        moment(game, text);
+    }
+}
+
 static void season_end(SSRGame *game) {
     keep_honours(game);
+    judge_managers(game);
     ssr_tweaks_set_number(game->tweaks, "Menu", "CanSavePlayer", 0);
     season_review(game);
 }
@@ -9632,6 +9665,8 @@ int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
         const SSRTableRow *rows[3];
         return club && table_story(game, rows) ? ticker_counter(count) : -1;
     }
+    case SSR_TICKER_WORLD_MANAGER:
+        return club && game->people && game->people->sackedCount > 0 ? ticker_counter(count) : -1;
     default:
         return -1;
     }
@@ -9766,6 +9801,21 @@ void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_
         replace_all(text, capacity, "$apps", value);
         SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, ssr_season_actual_league(game->season, c->clubId)) : NULL;
         replace_all(text, capacity, "$league", comp ? comp->data->tla : "");
+        break;
+    }
+    case SSR_TICKER_WORLD_MANAGER: {
+        SSRPeople *people = game->people;
+        if (!people || people->sackedCount == 0) return;
+        int club = people->sacked[game->worldTurn++ % people->sackedCount];
+        const SSRManager *m = ssr_people_manager(people, club);
+        if (!m) return;
+        static const char *const STYLES[SSR_STYLE_COUNT] = {"SSR_StyleBalanced", "SSR_StyleYouth", "SSR_StyleAttacking"};
+        char name[64];
+        snprintf(name, sizeof(name), "%s %s", m->first, m->last);
+        snprintf(text, capacity, "%s", loc(game, "SSR_TICKER_MANAGER"));
+        replace_all(text, capacity, "$club", club_name(game, club));
+        replace_all(text, capacity, "$name", name);
+        replace_all(text, capacity, "$style", loc(game, STYLES[m->style % SSR_STYLE_COUNT]));
         break;
     }
     case SSR_TICKER_WORLD_TABLE: {

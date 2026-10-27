@@ -2357,6 +2357,10 @@ static void test_starts_a_new_career(void) {
     ssr_tweaks_set_number(tweaks, "SplashMessage", "DelayWatchReplay", 25);
     const char *directory = ssr_test_directory("game_career");
     char path[1200];
+    snprintf(path, sizeof(path), "%s/people1.txt", directory);
+    remove(path);
+    snprintf(path, sizeof(path), "%s/honours1.txt", directory);
+    remove(path);
     snprintf(path, sizeof(path), "%s/career1.txt", directory);
     remove(path);
     careerPath = path;
@@ -2530,6 +2534,8 @@ static void test_starts_a_new_career(void) {
         CHECK(p->first[0] && p->last[0]);
     }
     CHECK(rivals == 3 && squads >= SSR_SQUAD_SIZE && apps > 0 && goals > 0);
+    // Each club of the league has a manager.
+    CHECK(people && people->managerCount == 4 && ssr_people_manager(people, ssr_game_career(game)->clubId));
     char peoplePath[1200];
     snprintf(peoplePath, sizeof(peoplePath), "%s/people1.txt", directory);
     SSRPeople *saved = ssr_people_load(peoplePath);

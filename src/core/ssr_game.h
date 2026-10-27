@@ -158,6 +158,8 @@ typedef enum {
     // The race for the title and the fight against relegation in the
     // league of the player.
     SSR_TICKER_WORLD_TABLE,
+    // The new managers of the new season.
+    SSR_TICKER_WORLD_MANAGER,
     SSR_TICKER_KINDS,
 } SSRTickerKind;
 

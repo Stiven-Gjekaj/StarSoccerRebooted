@@ -25,3 +25,8 @@ SSR_TICKER_TITLELEVEL	$leader and $second are level at the top of the $league af
 SSR_MomentSigned	Signed for $club.	Unterschrift bei $club.	Signe à $club.	Ficha por $club.	Firma con il $club.	Assina com o $club.	Assina pelo $club.		
 SSR_MomentTitle	Champions of the $league with $club!	Meister der $league mit $club!	Champion de $league avec $club !	¡Campeón de la $league con $club!	Campione della $league con il $club!	Campeão da $league com o $club!	Campeão da $league com o $club!		
 SSR_MomentAward	Won the award: $award.	Auszeichnung gewonnen: $award.	Prix gagné : $award.	Premio ganado: $award.	Premio vinto: $award.	Prêmio ganho: $award.	Prémio ganho: $award.		
+SSR_TICKER_MANAGER	New manager at $club: $name, with a $style style.	Neuer Trainer bei $club: $name, mit einem $style Stil.	Nouvel entraîneur à $club : $name, au style $style.	Nuevo entrenador en $club: $name, de estilo $style.	Nuovo allenatore al $club: $name, con uno stile $style.	Novo técnico no $club: $name, com estilo $style.	Novo treinador no $club: $name, com estilo $style.		
+SSR_StyleBalanced	balanced	ausgewogenen	équilibré	equilibrado	equilibrato	equilibrado	equilibrado		
+SSR_StyleYouth	youth	jugendlichen	jeunesse	juvenil	giovanile	jovem	jovem		
+SSR_StyleAttacking	attacking	offensiven	offensif	ofensivo	offensivo	ofensivo	ofensivo		
+SSR_MomentManager	A new manager arrives: $name.	Ein neuer Trainer kommt: $name.	Un nouvel entraîneur arrive : $name.	Llega un nuevo entrenador: $name.	Arriva un nuovo allenatore: $name.	Chega um novo técnico: $name.	Chega um novo treinador: $name.		
