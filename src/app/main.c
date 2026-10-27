@@ -899,6 +899,16 @@ static void load_game(SSRApp *app) {
     ssr_game_free(app->game);
     app->game = ssr_game_create(app->tweaks);
     ssr_game_set_data(app->game, app->world, translate, app, app->saveDirectory);
+    // The names of the race horses.
+    char resolved[2300];
+    SDL_snprintf(path, sizeof(path), "%s/MyData/Horse.txt", app->gameDirectory);
+    char *horses = ssr_fs_resolve(path, resolved, sizeof(resolved)) ? SDL_LoadFile(resolved, NULL) : NULL;
+    if (horses) {
+        ssr_game_set_horse_names(app->game, horses);
+        SDL_free(horses);
+    } else {
+        SDL_Log("The import has no MyData/Horse.txt.");
+    }
     // SSR_SEED fixes the random numbers, so that a test run is the same each time.
     const char *seed = SDL_getenv("SSR_SEED");
     ssr_game_set_seed(app->game, seed && *seed ? SDL_atoi(seed) : (int)SDL_GetTicks());
