@@ -316,6 +316,12 @@ static void apply_ops(SSRApp *app) {
         case SSR_OP_LIST_CLEAR:
             ssr_scene_list_clear(app->scene, op.ref);
             break;
+        case SSR_OP_LIST_COLOUR:
+            ssr_scene_list_colour(app->scene, op.ref, op.id, op.text);
+            break;
+        case SSR_OP_LIST_SUB:
+            ssr_scene_list_sub(app->scene, op.ref, op.ref2, op.text[0] ? op.text : NULL, op.id);
+            break;
         case SSR_OP_LIST_ADD:
             ssr_scene_list_add(app->scene, op.ref, op.ref2, op.text, op.id);
             break;
