@@ -1739,6 +1739,23 @@ static void test_styles_the_shadow_of_a_text(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// ReadoutConcat() joins the values of tweaks, each with its separator. A
+// number shows as a whole number, and "@Tag" is the text of the tag with
+// spaces (c_ReadoutConcat).
+static void test_joins_tweaks_in_a_text(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "SelProduct", "MatchesRemaining", 12.7);
+    ssr_tweaks_set(tweaks, "SelProduct", "Name", "Boots");
+    SSRUiTree *tree;
+    SSRScene *scene = build("Text:(,0,0,148,52)\n"
+                            "\tReadoutConcat(SelProduct,MatchesRemaining,@nrg_Cans,SelProduct,Name,!)\n",
+                            tweaks, &tree);
+    CHECK(find_text(scene, "12 Cans Boots!"));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -2127,6 +2144,7 @@ int main(void) {
     test_sets_the_place_on_the_screen();
     test_follows_a_spine_slot();
     test_styles_the_shadow_of_a_text();
+    test_joins_tweaks_in_a_text();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();

@@ -95,6 +95,7 @@ typedef enum {
     D_RANDOM_TWEAK,
     D_SPAWN,
     D_SLOT,
+    D_READOUT_CONCAT,
     D_SHOW_SHELL,
     D_SWIPE_PANEL,
     D_EMIT_PLACER,
@@ -1547,6 +1548,27 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         d->v[1] = (float)number(s, m, 8, 0);
         d->v[2] = (float)(int)number(s, m, 10, lo);
         d->v[3] = (float)(int)number(s, m, 11, hi);
+    } else if (is(n, "ReadoutConcat")) {
+        // ReadoutConcat(Cat,Name,separator,...): the values of the tweaks,
+        // each with the separator after it. A separator "@Tag" is the text
+        // of the tag with a space at each side (c_ReadoutConcat). The parts
+        // go into one text, split by 0x1f.
+        d = new_doodad(D_READOUT_CONCAT, m);
+        if (!d) return NULL;
+        char parts[512] = "";
+        for (int i = 0; i < m->argCount; i++) {
+            const char *part = arg(m, i);
+            char separator[160];
+            if (i % 3 == 2 && part[0] == '@') {
+                const char *t = s->env->text ? s->env->text(s->env->context, part + 1) : part + 1;
+                snprintf(separator, sizeof(separator), " %s ", t ? t : part + 1);
+                part = separator;
+            }
+            size_t used = strlen(parts);
+            snprintf(parts + used, sizeof(parts) - used, "%s%s", i ? "\x1f" : "", part);
+        }
+        d->text[0] = keep(s, parts);
+        d->v[0] = (float)m->argCount;
     } else if (is(n, "StringReadout")) {
         d = new_doodad(D_STRING_READOUT, m);
         if (!d) return NULL;
@@ -2677,6 +2699,30 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         }
         snprintf(text, sizeof(text), "%.*s%s%.*s", prefixLength, d->text[2], sign ? number : number + 1, suffixLength,
                  suffix);
+        set_shown(g, text);
+        break;
+    }
+    case D_READOUT_CONCAT: {
+        char text[512] = "", parts[3][160];
+        const char *at = d->text[0];
+        int count = (int)d->v[0];
+        for (int i = 0; i < count; i += 3) {
+            for (int k = 0; k < 3; k++) {
+                size_t length = strcspn(at, "\x1f");
+                snprintf(parts[k], sizeof(parts[k]), "%.*s", (int)length, at);
+                at += length;
+                if (*at) at++;
+            }
+            size_t used = strlen(text);
+            SSRTweakKind kind = ssr_tweaks_kind(s->env->tweaks, parts[0], parts[1]);
+            if (kind == SSR_TWEAK_STRING) {
+                snprintf(text + used, sizeof(text) - used, "%s", ssr_tweaks_get(s->env->tweaks, parts[0], parts[1]));
+            } else if (kind == SSR_TWEAK_FLOAT) {
+                snprintf(text + used, sizeof(text) - used, "%d", (int)ssr_tweaks_number(s->env->tweaks, parts[0], parts[1]));
+            }
+            used = strlen(text);
+            if (i + 2 < count) snprintf(text + used, sizeof(text) - used, "%s", parts[2]);
+        }
         set_shown(g, text);
         break;
     }
