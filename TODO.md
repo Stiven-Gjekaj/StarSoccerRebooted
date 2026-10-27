@@ -189,6 +189,9 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 
 ## 1.0 The full game
 
+The content of 4.32 in 1.0 is the content of the new look. The classic
+look is not in the remake.
+
 - [ ] All the content of 4.32
 - [x] All the languages of 4.32, with the star glyph and the glyph tables
 - [ ] All the features in this file
@@ -267,6 +270,9 @@ place of the atlas image with the same name (`art/NewStarLogo.png`).
   `GamesWeLike`, the ad SDKs)
 - In-app purchases
 - Buying Bux with real money. Bux, the cash of the game, stay.
+- The classic look of 4.32 (the `CL` layouts and images). The owner chose
+  this on 2026-10-27.
+- A manager career. The owner chose this on 2026-10-27.
 - The cloud saves and the analytics of New Star Games (`CloudSetup`,
   `CloudCohort`, Firebase, Flurry)
 
@@ -325,7 +331,6 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       moments (Honours, Career)
 - [x] A legacy after retirement: the old player stays in the hall of fame
       of the world that a new player continues
-- [ ] The world continues in a manager career
 
 ### The match
 
@@ -354,8 +359,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] World seeds, so that friends can share a world. Options, World
       types the seed of the next career. The Honours screen shows the seed
       of the career.
-- [x] Challenge starts: the pace at its maximum, or no Bux and no NRG
-- [ ] A challenge start at age 30 in the lowest league
+- [ ] A custom career: the player chooses the age, the skill ratings, and
+      more at the start. It takes the place of the challenge starts.
 - [x] Many careers in one world: Options, World can make the next new
       career continue the world of the last career
 - [ ] The next player can play against the last one
@@ -390,5 +395,9 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 - [ ] Choose the position of the player, and change it later
 - [ ] More kinds of match moments: set pieces, defence, saves
-- [ ] A manager career after retirement
 - [ ] Replays of goals and matches
+
+## After 1.0
+
+- [ ] Challenge starts. The remake has two now (Options, World): the pace
+      at its maximum, or no Bux and no NRG. More come in a 1.x release.

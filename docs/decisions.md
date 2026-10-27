@@ -224,6 +224,15 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   after the clip, so a clip that starts and ends as items can lose its
   items.
 
+## Scope
+
+- **The remake has no classic look and no manager career.** The owner
+  chose this on 2026-10-27. Version 1.0 has the content of the new look
+  of 4.32 only.
+- **Challenge starts move to a 1.x release.** The owner chose this on
+  2026-10-27. For 1.0, a custom career takes their place: the player
+  chooses the age, the skill ratings, and more at the start.
+
 ## Releases
 
 - Each part of the roadmap is one minor release, as in Balatro4S. A release
