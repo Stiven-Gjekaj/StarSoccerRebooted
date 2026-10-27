@@ -144,6 +144,38 @@ static void test_runs_the_seasons(void) {
     ssr_world_free(world);
 }
 
+// Each club with a squad has a manager. A manager of a club at the bottom
+// goes more often, and the style of a manager picks the team.
+static void test_runs_the_managers(void) {
+    SSRWorld *world = small_world();
+    SSRNames *names = ssr_names_parse(NAMES);
+    SSRPeople *people = ssr_people_create(21);
+    ssr_people_make_squad(people, world, names, 10, 1);
+    ssr_people_make_squad(people, world, names, 11, 1);
+    CHECK(people->managerCount == 2 && ssr_people_manager(people, 11)->since == 1);
+    CHECK(1 - ssr_people_manager(people, 11)->born >= 38);
+    int bottom[1] = {11}, sackedSmall = 0, sackedBig = 0;
+    for (int year = 2; year < 42; year++) {
+        ssr_people_judge_managers(people, world, names, bottom, 1, year);
+        for (int k = 0; k < people->sackedCount; k++) {
+            sackedSmall += people->sacked[k] == 11;
+            sackedBig += people->sacked[k] == 10;
+        }
+    }
+    CHECK(sackedSmall > 15 && sackedBig < 10 && people->managerCount == 2);
+    CHECK(ssr_people_manager(people, 11)->since > 1);
+    // An attacking manager plays three attackers.
+    ssr_people_manager(people, 10)->style = SSR_STYLE_ATTACKING;
+    ssr_people_play(people, 10, 0);
+    SSRPerson *squad[40];
+    int n = ssr_people_squad(people, 10, squad, 40), attackers = 0;
+    for (int i = 0; i < n; i++) attackers += squad[i]->position == SSR_POS_ATTACKER && squad[i]->seasonApps == 1;
+    CHECK(attackers == 3);
+    ssr_people_free(people);
+    ssr_names_free(names);
+    ssr_world_free(world);
+}
+
 static void test_makes_rivals(void) {
     SSRWorld *world = small_world();
     SSRNames *names = ssr_names_parse(NAMES);
@@ -180,6 +212,8 @@ static void test_keeps_the_people(void) {
     CHECK(back && back->count == people->count && back->nextId == people->nextId);
     CHECK(back && back->seed == 12 && back->random.seed == people->random.seed);
     CHECK(back && memcmp(&back->list[3], &people->list[3], sizeof(SSRPerson)) == 0);
+    CHECK(back && back->managerCount == 1 && back->year == people->year);
+    CHECK(back && memcmp(back->managers, people->managers, sizeof(SSRManager)) == 0);
     // The same numbers come next.
     ssr_people_play(people, 10, 3);
     if (back) ssr_people_play(back, 10, 3);
@@ -196,6 +230,7 @@ int main(void) {
     test_makes_a_squad();
     test_plays_a_match();
     test_runs_the_seasons();
+    test_runs_the_managers();
     test_makes_rivals();
     test_keeps_the_people();
     return TEST_RESULT();

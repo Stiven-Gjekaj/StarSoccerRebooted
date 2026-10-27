@@ -162,6 +162,7 @@ SSRPeople *ssr_people_create(int seed) {
 
 void ssr_people_free(SSRPeople *people) {
     if (!people) return;
+    free(people->managers);
     free(people->list);
     free(people);
 }
@@ -246,13 +247,69 @@ int ssr_people_squad(SSRPeople *people, int club, SSRPerson **out, int max) {
     return n;
 }
 
+SSRManager *ssr_people_manager(SSRPeople *people, int club) {
+    for (int i = 0; people && i < people->managerCount; i++) {
+        if (people->managers[i].club == club) return &people->managers[i];
+    }
+    return NULL;
+}
+
+// A new manager for the club takes the place of the old one.
+static SSRManager *new_manager(SSRPeople *people, const SSRWorld *world, const SSRNames *names, const SSRClub *club,
+                               int year) {
+    SSRManager *m = ssr_people_manager(people, club->id);
+    if (!m) {
+        if (people->managerCount == people->managerCapacity) {
+            int capacity = people->managerCapacity ? people->managerCapacity * 2 : 64;
+            SSRManager *grown = realloc(people->managers, sizeof(SSRManager) * (size_t)capacity);
+            if (!grown) return NULL;
+            people->managers = grown;
+            people->managerCapacity = capacity;
+        }
+        m = &people->managers[people->managerCount++];
+    }
+    SSRRandom *r = &people->random;
+    memset(m, 0, sizeof(*m));
+    m->club = club->id;
+    m->nation = pick_nation(r, world, club->nation);
+    const SSRNation *nation = ssr_world_nation(world, m->nation);
+    ssr_names_pick(names, m->nation, nation ? nation->continent : 0, r, m->first, sizeof(m->first), m->last,
+                   sizeof(m->last));
+    m->born = year - ssr_rand2(r, 38, 62);
+    m->style = ssr_rand(r, SSR_STYLE_COUNT) - 1;
+    m->since = year;
+    return m;
+}
+
+int ssr_people_judge_managers(SSRPeople *people, const SSRWorld *world, const SSRNames *names, const int *bottom,
+                              int bottomCount, int year) {
+    if (!people || !world || !names) return 0;
+    people->sackedCount = 0;
+    int made = 0;
+    for (int i = 0; i < people->managerCount; i++) {
+        int club = people->managers[i].club, low = 0;
+        for (int k = 0; k < bottomCount && !low; k++) low = bottom[k] == club;
+        // Six in ten managers in the bottom places go, and one in twenty
+        // of the others.
+        int goes = low ? ssr_rand(&people->random, 10) <= 6 : ssr_rand(&people->random, 20) == 1;
+        const SSRClub *c = ssr_world_club(world, club);
+        if (!goes || !c || !new_manager(people, world, names, c, year)) continue;
+        if (people->sackedCount < 16) people->sacked[people->sackedCount++] = club;
+        made++;
+    }
+    return made;
+}
+
 int ssr_people_make_squad(SSRPeople *people, const SSRWorld *world, const SSRNames *names, int club, int year) {
     const SSRClub *c = ssr_world_club(world, club);
-    if (!people || !c || !names || ssr_people_squad(people, club, NULL, 0) > 0) return 0;
+    if (!people || !c || !names) return 0;
+    if (year > people->year) people->year = year;
+    if (ssr_people_squad(people, club, NULL, 0) > 0) return 0;
     int made = 0;
     for (int pos = 0; pos < SSR_POS_COUNT; pos++) {
         for (int k = 0; k < SHAPE[pos]; k++) made += new_player(people, world, names, c, pos, ssr_rand2(&people->random, 17, 34), year) != NULL;
     }
+    if (!ssr_people_manager(people, club)) new_manager(people, world, names, c, year);
     return made;
 }
 
@@ -299,11 +356,21 @@ void ssr_people_play(SSRPeople *people, int club, int goals) {
     if (n > 64) n = 64;
     if (n == 0) return;
     int used[64] = {0}, count = 0;
-    // A 4-4-2.
+    const SSRManager *manager = ssr_people_manager(people, club);
+    int style = manager ? manager->style : SSR_STYLE_BALANCED;
+    // A youth manager counts a player under 23 as 5 skill points better.
+    int bonus[64] = {0};
+    for (int i = 0; style == SSR_STYLE_YOUTH && i < n; i++) {
+        if (people->year - squad[i]->born < 23) bonus[i] = 5;
+        squad[i]->skill += bonus[i];
+    }
+    // A 4-4-2, or a 4-3-3 of an attacking manager.
+    int attack = style == SSR_STYLE_ATTACKING;
     count = pick_best(squad, n, used, SSR_POS_KEEPER, team, count, 1);
     count = pick_best(squad, n, used, SSR_POS_DEFENDER, team, count, 4);
-    count = pick_best(squad, n, used, SSR_POS_MIDFIELDER, team, count, 4);
-    count = pick_best(squad, n, used, SSR_POS_ATTACKER, team, count, 2);
+    count = pick_best(squad, n, used, SSR_POS_MIDFIELDER, team, count, attack ? 3 : 4);
+    count = pick_best(squad, n, used, SSR_POS_ATTACKER, team, count, attack ? 3 : 2);
+    for (int i = 0; i < n; i++) squad[i]->skill -= bonus[i];
     SSRRandom *r = &people->random;
     for (int i = 0; i < count; i++) {
         team[i]->apps++;
@@ -433,6 +500,7 @@ static int transfers(SSRPeople *people, const SSRWorld *world, const int *clubs,
 
 int ssr_people_new_season(SSRPeople *people, const SSRWorld *world, const SSRNames *names, int year) {
     if (!people || !world) return 0;
+    people->year = year;
     SSRRandom *r = &people->random;
     for (int i = 0; i < people->count; i++) {
         SSRPerson *p = &people->list[i];
@@ -500,7 +568,13 @@ int ssr_people_save(const SSRPeople *people, const char *path) {
     snprintf(temp, sizeof(temp), "%s.new", path);
     FILE *file = fopen(temp, "wb");
     if (!file) return 0;
-    int ok = fprintf(file, "%s\t1\t%d\t%d\t%d\n", FILE_TAG, people->seed, (int)people->random.seed, people->nextId) > 0;
+    int ok = fprintf(file, "%s\t1\t%d\t%d\t%d\t%d\n", FILE_TAG, people->seed, (int)people->random.seed, people->nextId,
+                     people->year) > 0;
+    for (int i = 0; ok && i < people->managerCount; i++) {
+        const SSRManager *m = &people->managers[i];
+        ok = fprintf(file, "M\t%d\t%s\t%s\t%d\t%d\t%d\t%d\n", m->club, m->first, m->last, m->nation, m->born, m->style,
+                     m->since) > 0;
+    }
     for (int i = 0; ok && i < people->count; i++) {
         const SSRPerson *p = &people->list[i];
         ok = fprintf(file, "%d\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", p->id, p->first,
@@ -519,9 +593,9 @@ SSRPeople *ssr_people_load(const char *path) {
     FILE *file = path ? fopen(path, "rb") : NULL;
     if (!file) return NULL;
     char line[512];
-    int version = 0, seed = 0, stream = 0, next = 0;
+    int version = 0, seed = 0, stream = 0, next = 0, year = 0;
     if (!fgets(line, sizeof(line), file) ||
-        sscanf(line, FILE_TAG "\t%d\t%d\t%d\t%d", &version, &seed, &stream, &next) != 4 || version != 1) {
+        sscanf(line, FILE_TAG "\t%d\t%d\t%d\t%d\t%d", &version, &seed, &stream, &next, &year) < 4 || version != 1) {
         fclose(file);
         return NULL;
     }
@@ -531,7 +605,25 @@ SSRPeople *ssr_people_load(const char *path) {
         return NULL;
     }
     people->random.seed = stream;
+    people->year = year;
     while (fgets(line, sizeof(line), file)) {
+        if (line[0] == 'M' && line[1] == '\t') {
+            SSRManager m;
+            memset(&m, 0, sizeof(m));
+            if (sscanf(line + 2, "%d\t%23[^\t]\t%31[^\t]\t%d\t%d\t%d\t%d", &m.club, m.first, m.last, &m.nation, &m.born,
+                       &m.style, &m.since) != 7) {
+                continue;
+            }
+            if (people->managerCount == people->managerCapacity) {
+                int capacity = people->managerCapacity ? people->managerCapacity * 2 : 64;
+                SSRManager *grown = realloc(people->managers, sizeof(SSRManager) * (size_t)capacity);
+                if (!grown) break;
+                people->managers = grown;
+                people->managerCapacity = capacity;
+            }
+            people->managers[people->managerCount++] = m;
+            continue;
+        }
         SSRPerson p;
         memset(&p, 0, sizeof(p));
         if (sscanf(line, "%d\t%23[^\t]\t%31[^\t]\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d", &p.id,

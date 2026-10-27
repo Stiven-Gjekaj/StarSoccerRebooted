@@ -52,6 +52,29 @@ typedef struct {
     int seasonApps, seasonGoals, seasonAssists;
 } SSRPerson;
 
+// The styles of a manager.
+enum {
+    SSR_STYLE_BALANCED,
+    // A youth manager picks a young player before an older player of
+    // nearly the same skill.
+    SSR_STYLE_YOUTH,
+    // An attacking manager plays with three attackers.
+    SSR_STYLE_ATTACKING,
+    SSR_STYLE_COUNT,
+};
+
+// The manager of a club.
+typedef struct {
+    int club;
+    char first[24];
+    char last[32];
+    int nation;
+    int born;
+    int style;
+    // The year of the start at the club.
+    int since;
+} SSRManager;
+
 typedef struct SSRNames SSRNames;
 
 // Reads the name lists (data/names.txt of the remake, or
@@ -72,10 +95,19 @@ typedef struct {
     // The seed of the world, and the stream of the people.
     int seed;
     SSRRandom random;
+    // The year of the world: the last new season or new squad.
+    int year;
     // The transfers of the last new season: the player, the old club, and
     // the new club. They are not in the file.
     int moves[16][3];
     int moveCount;
+    // The managers of the clubs with a squad.
+    SSRManager *managers;
+    int managerCount, managerCapacity;
+    // The clubs of the last new season with a new manager. They are not
+    // in the file.
+    int sacked[16];
+    int sackedCount;
 } SSRPeople;
 
 SSRPeople *ssr_people_create(int seed);
@@ -87,6 +119,16 @@ SSRPerson *ssr_people_find(SSRPeople *people, int id);
 // Makes a squad for the club when it has none. The skills follow the
 // strength of the club. Returns the number of new players.
 int ssr_people_make_squad(SSRPeople *people, const SSRWorld *world, const SSRNames *names, int club, int year);
+
+// The manager of the club, or NULL.
+SSRManager *ssr_people_manager(SSRPeople *people, int club);
+
+// The end of a season for the managers: a manager of a club in the
+// bottom places of its league can go, and a new manager takes the place.
+// bottom lists the clubs in the bottom places. Returns the number of new
+// managers.
+int ssr_people_judge_managers(SSRPeople *people, const SSRWorld *world, const SSRNames *names, const int *bottom,
+                              int bottomCount, int year);
 
 // Puts the players of the club into out, up to max. Returns the number of
 // players of the club.
