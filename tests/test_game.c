@@ -104,8 +104,12 @@ static void test_chooses_a_language(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The Tag_NationId of the language, or NULL for none.
+static const char *nationTag;
+
 static const char *localise(void *context, const char *tag) {
     (void)context;
+    if (strcmp(tag, "Tag_NationId") == 0) return nationTag;
     if (strcmp(tag, "CMESSAGE_TRIALSUCCESSMOBILE") == 0) return "Signed by $clubname ($labelname) in $leaguename.";
     if (strcmp(tag, "CMESSAGE_TRIALMOBILE1") == 0) return "Trial one.";
     if (strcmp(tag, "CMESSAGE_TRIALMOBILEFAIL4_DRIBBLING") == 0) return "Failed. Now dribble.";
@@ -1847,6 +1851,17 @@ static void test_starts_a_new_career(void) {
     ssr_game_message(game, "choosenation.cmb_Nation");
     count = take_ops(game, ops, 64);
     CHECK(has_op(ops, count, SSR_OP_TEXT, "NationText", "Wales"));
+    // A language with the tag Tag_NationId starts on its nation.
+    nationTag = "63";
+    ssr_game_message(game, "chooseclub.btn_Ok");
+    CHECK(ssr_tweaks_number(tweaks, "Combo", "ChosenDesiredNation") == 63);
+    nationTag = "0";
+    ssr_game_message(game, "chooseclub.btn_Ok");
+    CHECK(ssr_tweaks_number(tweaks, "Combo", "ChosenDesiredNation") == 62);
+    nationTag = NULL;
+    ssr_tweaks_set_number(tweaks, "Combo", "ChosenDesiredNation", 63);
+    ssr_game_message(game, "choosenation.cmb_Nation");
+    take_ops(game, ops, 64);
 
     ssr_game_message(game, "choosenation.btn_Ok");
     CHECK(strcmp(ssr_game_screen(game), "messagedefault") == 0);

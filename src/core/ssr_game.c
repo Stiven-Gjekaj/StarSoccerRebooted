@@ -795,12 +795,15 @@ static void choose_nation(SSRGame *game) {
         upper(name);
         add_op(game, SSR_OP_LIST_ADD, "LeagueCombo", "LeagueTemplate", name, n->id);
     }
-    // The default nation of the language: England for English.
-    const SSRNation *nation = ssr_world_nation(world, DEFAULT_NATION);
+    // The default nation of the language (GetDefaultNation): the tag
+    // Tag_NationId, or England.
+    int chosen = atoi(loc(game, "Tag_NationId"));
+    if (chosen < 1 || chosen > 209) chosen = DEFAULT_NATION;
+    const SSRNation *nation = ssr_world_nation(world, chosen);
     int continent = nation ? nation->continent : 6;
     ssr_tweaks_set_number(game->tweaks, "Combo", "ChosenDesiredContinent", continent);
-    ssr_tweaks_set_number(game->tweaks, "Combo", "ChosenDesiredNation", DEFAULT_NATION);
-    ssr_tweaks_set_number(game->tweaks, "Combo", "ChosenDesiredLeague", DEFAULT_NATION);
+    ssr_tweaks_set_number(game->tweaks, "Combo", "ChosenDesiredNation", chosen);
+    ssr_tweaks_set_number(game->tweaks, "Combo", "ChosenDesiredLeague", chosen);
     combo_continent(game);
     combo_nation(game);
     combo_league(game);
