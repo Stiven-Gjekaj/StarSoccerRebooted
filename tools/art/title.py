@@ -17,10 +17,14 @@ b += glossy_text(text_path('STAR', tx, y0, w, S, track=0.02), y0, y0 + S, clip_i
 render(b, 555, 134, OUT + '/NewStarLogo.svg', OUT + '/NewStarLogo.png')
 os.remove(OUT + '/NewStarLogo.svg')
 
-# REBOOTED in the red type of the logo, at two times the drawn size.
-W, H = 640, 104
-h = 84
-w = natural_width('REBOOTED', h, track=0.12)
-b = glossy_text(text_path('REBOOTED', (W - w) / 2, 8, w, h, track=0.12), 8, 8 + h, sw=5, clip_id='r')
+# REBOOTED in the red type of the logo, with the letter height of STAR on
+# the screen (the layout draws the logo at 434 of 555), at two times the
+# drawn size.
+h = round(2 * S * 434 / 555)
+w = natural_width('REBOOTED', h, track=0.02)
+pad = 8
+W, H = round(w + 2 * pad), h + 2 * pad
+b = glossy_text(text_path('REBOOTED', pad, pad, w, h, track=0.02), pad, pad + h, sw=5, clip_id='r')
 render(b, W, H, OUT + '/SSRRebooted.svg', OUT + '/SSRRebooted.png')
 os.remove(OUT + '/SSRRebooted.svg')
+print('SSRRebooted', W, H)
