@@ -997,6 +997,42 @@ static void choose_a_dilemma(SSRGame *game, const char *path) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
+// An accident after a dilemma takes the top level of a skill. The message
+// shows the bar of the skill out of 60, with the loss (SetUpSkillBar).
+static void an_accident_costs_a_skill(SSRGame *game, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    int *rows[5] = {c.pace, c.power, c.technique, c.vision, c.setPieces};
+    for (int i = 0; i < 5; i++) rows[i][1] += 10;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    int found = 0;
+    for (int seed = 1; seed <= 400 && !found; seed++) {
+        rest(game, path);
+        ssr_game_set_seed(game, seed);
+        ssr_game_message(game, "debug.dilemma");
+        ssr_game_update(game, 130);
+        ssr_game_message(game, "dilemma.btn_relationship1");
+        SSRUiOp drop;
+        while (ssr_game_take_op(game, &drop)) {
+        }
+        ssr_game_update(game, 160);
+        if (strcmp(ssr_game_screen(game), "messagedefault") != 0) continue;
+        found = 1;
+        static SSRUiOp ops[1024];
+        int count = take_ops(game, ops, 1024), bars = 0, text = 0;
+        for (int i = 0; i < count; i++) {
+            if (ops[i].kind == SSR_OP_BAR_SOURCE) bars += strncmp(ops[i].text, "Player,", 7) == 0 && ops[i].id == 60;
+            if (ops[i].kind == SSR_OP_TEXT && strcmp(ops[i].ref, "BarText") == 0) text = strstr(ops[i].text, " -") != NULL;
+        }
+        CHECK(has_op(ops, count, SSR_OP_SHOW, "OneBar", NULL) && bars == 3 && text);
+        ssr_game_message(game, "message.btn_Ok");
+    }
+    CHECK(found);
+}
+
 // The lifestyle shop: a purchase, too little cash, the question of the
 // first property, a repair, and the end of a trip with the team-mates.
 // The casino: the stake, and eleven spins of the slots. Each tenth bet
@@ -1955,6 +1991,7 @@ static void test_starts_a_new_career(void) {
     CHECK(winnerPages == 1);
     spend_time(game, tweaks, path);
     choose_a_dilemma(game, path);
+    an_accident_costs_a_skill(game, path);
     go_to_the_casino(game, tweaks, path);
     play_roulette(game, tweaks, path);
     play_blackjack(game, tweaks, path);

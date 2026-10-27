@@ -3980,6 +3980,27 @@ static void dilemma_bottom(SSRGame *game) {
     choose_dilemma(game, 1);
 }
 
+// The names of the skills, as the tweaks of the group Player and the text
+// tags have them.
+static const char *const SKILL_NAMES[5] = {"Pace", "Power", "Technique", "Vision", "SetPieces"};
+
+// AScreen_Message.SetUpSkillBar: the bar of the message shows the skill,
+// out of 60, and its name with the change.
+static void skill_bar(SSRGame *game, const char *skill, int change) {
+    add_op(game, SSR_OP_SHOW, "OneBar", NULL, NULL, 0);
+    char source[64], text[96];
+    snprintf(source, sizeof(source), "Player,%s", skill);
+    add_op(game, SSR_OP_BAR_SOURCE, "BarAPDoodad", NULL, source, 60);
+    add_op(game, SSR_OP_BAR_SOURCE, "BarPBDoodad", NULL, source, 60);
+    add_op(game, SSR_OP_BAR_SOURCE, "ClippedBarPBDoodad", NULL, source, 60);
+    if (change != 0) {
+        snprintf(text, sizeof(text), "%s %d", loc(game, skill), change);
+    } else {
+        snprintf(text, sizeof(text), "%s", loc(game, skill));
+    }
+    add_op(game, SSR_OP_TEXT, "BarText", NULL, text, 0);
+}
+
 // c_TPlayer.DepleteSkillByLevels: the top levels of the skill go.
 static int deplete_skill(int *levels, int count) {
     int lost = 0;
@@ -4019,10 +4040,8 @@ static void dilemma_accident(SSRGame *game) {
     int age = ssr_career_age(c);
     int lost = deplete_skill(levels, age <= 23 ? 1 : age <= 32 ? 2 : 3);
     skill_tweaks(game);
-    // [I: the bar of the skill in the message needs a bar source that the
-    // code can change.]
     message(game, "messagedefault", text, 0, 1, NULL);
-    (void)lost;
+    skill_bar(game, SKILL_NAMES[skill - 1], -lost);
 }
 
 static void dilemma_tick(SSRGame *game) {
