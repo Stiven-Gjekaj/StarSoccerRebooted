@@ -187,6 +187,13 @@ struct SSRGame {
     int iconOrder[16];
     int pairsMade;
     int clicked, timeClicked, turn;
+
+    // The dilemma (c_TScreen_Dilemma): the two relations, their images,
+    // the national flags, the choice, the time of the end, and the day of
+    // the last accident (a static of the game, not in the save).
+    int dilemmaRelation[2], dilemmaImage[2], dilemmaInt[2];
+    int dilemmaChoice, dilemmaChosen, dilemmaEnd;
+    int lastAccident;
 };
 
 enum { REPLAY_NONE, REPLAY_OFFER, REPLAY_PLAY };
@@ -3294,6 +3301,175 @@ static void call_dump_partner(SSRGame *game) {
     relationships_screen(game, 0, 0);
 }
 
+
+/* ------------------------------------------------------------ the dilemma */
+
+// The names of the dilemma images, from 1 (c_AScreen_Dilemma).
+static const char *const DILEMMA_IMAGES[17] = {"",          "Beach",      "Boss",   "Bowling",  "Cinema", "Fans",
+                                               "GoKart",    "Golf",       "Gym",    "Hospital", "Nightclub",
+                                               "Physio",    "Pub",        "Restaurant", "Swimming", "Shopping",
+                                               "Training"};
+
+// The image of a dilemma of the relation: one random number a relation.
+static int dilemma_image(SSRGame *game, int relation) {
+    static const int BOSS[3] = {2, 11, 16};
+    static const int TEAM[9] = {3, 4, 6, 7, 8, 10, 12, 14, 16};
+    static const int FANS[2] = {5, 9};
+    static const int PARTNER[6] = {1, 4, 10, 12, 13, 15};
+    static const int SPONSORS[2] = {2, 7};
+    switch (relation) {
+    case 0: return BOSS[ssr_rand(&game->random, 3) - 1];
+    case 1: return TEAM[ssr_rand(&game->random, 9) - 1];
+    case 2: return FANS[ssr_rand(&game->random, 2) - 1];
+    case 3: return PARTNER[ssr_rand(&game->random, 6) - 1];
+    default: return SPONSORS[ssr_rand(&game->random, 2) - 1];
+    }
+}
+
+// c_AScreen_Dilemma.SetItem: the template of the relation and the image in
+// the hook.
+static void dilemma_item(SSRGame *game, const char *hook, int relation, int image, int international) {
+    static const char *ENTITY[5] = {"Boss", "Team", "Fans", "Girlfriend", "Sponsor"};
+    int base = relation >= 6 ? relation - 6 : relation;
+    char name[64];
+    snprintf(name, sizeof(name), "%sDilemma%s%s", DILEMMA_IMAGES[image], international ? "Int" : "", ENTITY[base]);
+    add_op(game, SSR_OP_HOOK, hook, name, NULL, 0);
+    if (!international) return;
+    static const char *TAGS[3] = {"BOSS_CAPS", "TEAM_CAPS", "FANS_CAPS"};
+    const SSRNation *nation = ssr_world_nation(game->world, game->career.nationId);
+    char text[64];
+    snprintf(text, sizeof(text), "%s (%.3s)", loc(game, TAGS[base]), nation && nation->tla ? nation->tla : "");
+    add_op(game, SSR_OP_SUB, hook, "BarName", text, 1);
+}
+
+// c_TScreen_Dilemma.SetUpScreen.
+static void dilemma_screen(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    set_screen(game, "dilemma");
+    int *r = game->dilemmaRelation;
+    r[0] = ssr_rand2(&game->random, 0, 3);
+    while (c->relationPartner == 0 && r[0] == 3) r[0] = ssr_rand2(&game->random, 0, 3);
+    do {
+        r[1] = ssr_rand2(&game->random, 0, 3);
+    } while (r[1] == r[0] || (r[1] == 3 && c->relationPartner <= 0));
+    for (int i = 0; i < 2; i++) {
+        if (r[i] == 2 && ssr_career_count_sponsors(c) > 0) r[i] = ssr_rand(&game->random, 2) == 1 ? 2 : 4;
+    }
+    game->dilemmaImage[0] = dilemma_image(game, r[0]);
+    do {
+        game->dilemmaImage[1] = dilemma_image(game, r[1]);
+    } while (game->dilemmaImage[1] == game->dilemmaImage[0]);
+    // A player that the nation picks for its next match chooses for the
+    // national relations.
+    game->dilemmaInt[0] = game->dilemmaInt[1] = 0;
+    season_in(game);
+    const SSRFixture *next = game->season ? ssr_season_next_fixture(game->season) : NULL;
+    if (next && c->intApps > 0 &&
+        (ssr_fixture_home_team(game->season, next) == c->nationId ||
+         ssr_fixture_away_team(game->season, next) == c->nationId)) {
+        int status = selection_status(game, 1);
+        if (status == 1 || (status >= 7 && status <= 9)) {
+            for (int i = 0; i < 2; i++) {
+                if (r[i] <= 2) {
+                    r[i] += 6;
+                    game->dilemmaInt[i] = 1;
+                }
+            }
+        }
+    }
+    relation_tweaks(game, 1);
+    dilemma_item(game, "TopHook", r[0], game->dilemmaImage[0], game->dilemmaInt[0]);
+    dilemma_item(game, "BottomHook", r[1], game->dilemmaImage[1], game->dilemmaInt[1]);
+    game->dilemmaChosen = 0;
+    game->dilemmaChoice = 0;
+    game->dilemmaEnd = 0;
+    char text[64];
+    snprintf(text, sizeof(text), "%s", loc(game, "Dilemma!"));
+    upper(text);
+    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+    game->splashEnd = game->now + 2000;
+}
+
+// The fuse parameter dilemma_not_chosen_decay of 4.32.
+#define DILEMMA_DECAY -10.0f
+
+static void choose_dilemma(SSRGame *game, int item) {
+    if (game->now < game->splashEnd || game->dilemmaChosen) return;
+    SSRCareer *c = &game->career;
+    int chosen = game->dilemmaRelation[item], other = game->dilemmaRelation[1 - item];
+    if (chosen == 3) c->lastSpendTimePartner = (float)c->sdate;
+    ssr_career_update_relation(c, (SSRRelation)chosen, 5.0f);
+    ssr_career_update_relation(c, (SSRRelation)other, DILEMMA_DECAY);
+    game->dilemmaChoice = game->dilemmaImage[item];
+    relation_tweaks(game, 0);
+    add_op(game, SSR_OP_SUB, item == 0 ? "TopHook" : "BottomHook", "Selected", NULL, 1);
+    add_op(game, SSR_OP_SUB, item == 0 ? "BottomHook" : "TopHook", "NotSelected", NULL, 1);
+    // c_ActionAfterDilemma runs 2500 ms later.
+    game->dilemmaEnd = game->now + 2500;
+    game->dilemmaChosen = 1;
+}
+
+static void dilemma_top(SSRGame *game) {
+    choose_dilemma(game, 0);
+}
+
+static void dilemma_bottom(SSRGame *game) {
+    choose_dilemma(game, 1);
+}
+
+// c_TPlayer.DepleteSkillByLevels: the top levels of the skill go.
+static int deplete_skill(int *levels, int count) {
+    int lost = 0;
+    for (int n = 0; n < count; n++) {
+        int k = SSR_CAREER_SKILL_LEVELS - 1;
+        while (k > 0 && levels[k] <= 0) k--;
+        if (k > 0) {
+            lost += levels[k];
+            levels[k] = 0;
+        }
+    }
+    return lost;
+}
+
+// c_TScreen_Dilemma.CheckAccident and DepleteSkill: the place of the
+// choice can cost the player a skill.
+static void dilemma_accident(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->sdate < game->lastAccident + 28) return;
+    int a = ssr_rand(&game->random, 10);
+    if (ssr_rand(&game->random, a) != 1) return;
+    int skill = ssr_rand(&game->random, 5);
+    // The rows of skill_levels are pace, power, technique, vision, and set
+    // pieces, as the numbers 1 to 5 of the game.
+    int *levels = skill_levels(c, skill - 1);
+    if (ssr_career_skill(levels) < 4) return;
+    static const char *PLACES[17] = {"",          "BEACH", "",          "BOWLING", "CINEMA",   "", "GOKART",
+                                     "GOLF",      "GYM",   "HOSPITAL",  "NIGHTCLUB", "",     "PUB", "RESTAURANT",
+                                     "SWIMMING",  "SHOPPING", ""};
+    int choice = game->dilemmaChoice;
+    if (choice < 1 || choice > 16 || !PLACES[choice][0]) return;
+    char tag[48], text[512];
+    snprintf(tag, sizeof(tag), "CMESSAGE_DILEMMA%s%d", PLACES[choice], skill);
+    snprintf(text, sizeof(text), "%s", loc(game, tag));
+    if (!text[0] || strchr(text, '@')) return;
+    game->lastAccident = c->sdate;
+    int age = ssr_career_age(c);
+    int lost = deplete_skill(levels, age <= 23 ? 1 : age <= 32 ? 2 : 3);
+    skill_tweaks(game);
+    // [I: the bar of the skill in the message needs a bar source that the
+    // code can change.]
+    message(game, "messagedefault", text, 0, 1, NULL);
+    (void)lost;
+}
+
+static void dilemma_tick(SSRGame *game) {
+    if (!game->dilemmaEnd || game->now < game->dilemmaEnd) return;
+    game->dilemmaEnd = 0;
+    save_career(game);
+    game_menu(game);
+    dilemma_accident(game);
+}
+
 /* ------------------------------------------------------------ the pairs */
 
 // The face of each card by relation and image id (c_<X>CardAnimations).
@@ -3536,6 +3712,9 @@ static const Route ROUTES[] = {
     {"relationships.btn_Girlfriend", activity_partner},
     {"relationships.btn_Sponsors", activity_sponsors},
     {"relationships.btn_DumpGirl", dump_partner},
+    {"debug.dilemma", dilemma_screen},
+    {"dilemma.btn_relationship1", dilemma_top},
+    {"dilemma.btn_relationship2", dilemma_bottom},
     {"pairs.btn_0", card0},
     {"pairs.btn_1", card1},
     {"pairs.btn_2", card2},
@@ -3797,6 +3976,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->ticks -= 1;
             game->now += 16;
             if (strcmp(game->screen, "playeroftheyear") == 0) poty_tick(game);
+        }
+    } else if (strcmp(game->screen, "dilemma") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1 && strcmp(game->screen, "dilemma") == 0) {
+            game->ticks -= 1;
+            game->now += 16;
+            dilemma_tick(game);
         }
     } else if (strcmp(game->screen, "pairs") == 0) {
         game->ticks += frames;

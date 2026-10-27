@@ -635,6 +635,59 @@ static void spend_time(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
+// The relation of a dilemma template, from the end of its name.
+static float dilemma_relation(const SSRCareer *c, const char *name) {
+    const char *at = strstr(name, "Dilemma");
+    if (!at) return -1;
+    at += 7;
+    if (strcmp(at, "Boss") == 0) return c->relationBoss;
+    if (strcmp(at, "Team") == 0) return c->relationTeam;
+    if (strcmp(at, "Fans") == 0) return c->relationFans;
+    if (strcmp(at, "Sponsor") == 0) return c->relationSponsors;
+    if (strcmp(at, "Girlfriend") == 0) return c->relationPartner;
+    return -1;
+}
+
+// A dilemma: two cards of two relations. The choice gives one 5 and takes
+// 10 from the other, then the game menu comes back.
+static void choose_a_dilemma(SSRGame *game, const char *path) {
+    rest(game, path);
+    const SSRCareer *c = ssr_game_career(game);
+    SSRUiOp drop;
+    while (ssr_game_take_op(game, &drop)) {
+    }
+    ssr_game_message(game, "debug.dilemma");
+    CHECK(strcmp(ssr_game_screen(game), "dilemma") == 0 && ssr_game_splash(game));
+    SSRUiOp ops[64];
+    int count = take_ops(game, ops, 64);
+    char top[48] = "", bottom[48] = "";
+    for (int i = 0; i < count; i++) {
+        if (ops[i].kind != SSR_OP_HOOK) continue;
+        if (strcmp(ops[i].ref, "TopHook") == 0) snprintf(top, sizeof(top), "%s", ops[i].ref2);
+        if (strcmp(ops[i].ref, "BottomHook") == 0) snprintf(bottom, sizeof(bottom), "%s", ops[i].ref2);
+    }
+    float a = dilemma_relation(c, top), b = dilemma_relation(c, bottom);
+    CHECK(a >= 0 && b >= 0 && strcmp(top, bottom) != 0);
+    // The player has no partner, so no card is of the partner.
+    CHECK(!strstr(top, "Girlfriend") && !strstr(bottom, "Girlfriend"));
+    // The cards do not take a click while the splash shows.
+    ssr_game_message(game, "dilemma.btn_relationship1");
+    CHECK(dilemma_relation(c, top) == a);
+    ssr_game_update(game, 130);
+    ssr_game_message(game, "dilemma.btn_relationship1");
+    CHECK(dilemma_relation(c, top) == (a + 5 > 100 ? 100 : a + 5));
+    CHECK(dilemma_relation(c, bottom) == (b - 10 < 1 ? 1 : b - 10));
+    count = take_ops(game, ops, 64);
+    CHECK(has_op(ops, count, SSR_OP_SUB, "TopHook", NULL) && has_op(ops, count, SSR_OP_SUB, "BottomHook", NULL));
+    // A second click does nothing.
+    ssr_game_message(game, "dilemma.btn_relationship2");
+    CHECK(dilemma_relation(c, top) == (a + 5 > 100 ? 100 : a + 5));
+    ssr_game_update(game, 160);
+    // An accident can cost a skill. Its message comes over the game menu.
+    if (strcmp(ssr_game_screen(game), "messagedefault") == 0) ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+}
+
 // Drinks the next can after a match: a question when the energy is above
 // 75, then the boost screen of a skill can, and full energy at the end.
 static void drink_a_can(SSRGame *game, SSRTweaks *tweaks) {
@@ -848,6 +901,7 @@ static void test_starts_a_new_career(void) {
     CHECK(ssr_game_career(game)->spentTime == 0 && fabsf(ssr_game_career(game)->relationSponsors - 48.7f) < 1e-4f);
     CHECK(winnerPages == 1);
     spend_time(game, tweaks, path);
+    choose_a_dilemma(game, path);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 12 && seasons == 0; i++) play_a_match(game, tweaks);
     CHECK(seasons >= 1);
