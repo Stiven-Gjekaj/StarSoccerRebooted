@@ -6,8 +6,14 @@
 #include "ssr_font.h"
 #include "ssr_image.h"
 
-// The pixel heights of the Android "new" font set, for the 2x screen.
-static const float FONT_PIXELS[SSR_FONT_COUNT] = {31, 44, 60, 18};
+// The Android "new" font set of Fonts.txt, for an import that has no
+// Fonts.txt.
+static const SSRFontSlot DEFAULT_FONTS[SSR_FONT_COUNT] = {
+    {"Veriox-Rg.ttf", 31, -1, 6, 5, 32, 28, -26},
+    {"Veriox-Rg.ttf", 44, -1, 6, 5, 45, 40, -40},
+    {"Veriox-Rg.ttf", 60, -1, 6, 5, 59, 50, -48},
+    {"Veriox-Rg.ttf", 18, -1, 6, 5, 18, 16, -14},
+};
 
 #define MAX_TEXTURES 512
 #define MAX_QUADS 1024
@@ -19,6 +25,7 @@ typedef struct {
 
 typedef struct {
     SSRFont *font;
+    SSRFontSlot config;
     SDL_Texture *atlas;
     int atlasVersion;
 } FontSlot;
@@ -47,9 +54,20 @@ SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
     gfx->renderer = renderer;
     SDL_strlcpy(gfx->gameDirectory, gameDirectory, sizeof(gfx->gameDirectory));
     char path[2300];
-    SDL_snprintf(path, sizeof(path), "%s/Fonts/Veriox-Rg.ttf", gameDirectory);
+    SSRFontSlot slots[SSR_FONT_COUNT];
+    SDL_memcpy(slots, DEFAULT_FONTS, sizeof(slots));
+    SDL_snprintf(path, sizeof(path), "%s/Fonts/Fonts.txt", gameDirectory);
+    char *fonts = SDL_LoadFile(path, NULL);
+    if (fonts && ssr_font_read_set(fonts, "new", slots, SSR_FONT_COUNT) < SSR_FONT_COUNT) {
+        SDL_Log("Fonts.txt has less than %d fonts in the set \"new\".", SSR_FONT_COUNT);
+        SDL_memcpy(slots, DEFAULT_FONTS, sizeof(slots));
+    }
+    SDL_free(fonts);
     for (int i = 0; i < SSR_FONT_COUNT; i++) {
-        gfx->fonts[i].font = ssr_font_load(path, FONT_PIXELS[i]);
+        SDL_snprintf(path, sizeof(path), "%s/Fonts/%s", gameDirectory, slots[i].file);
+        gfx->fonts[i].font = ssr_font_load(path, slots[i].size);
+        ssr_font_set_spacing(gfx->fonts[i].font, slots[i].spacing);
+        gfx->fonts[i].config = slots[i];
         gfx->fonts[i].atlasVersion = -1;
     }
     // The 2x screen uses the high resolution keys.
@@ -497,11 +515,8 @@ static int wrap_lines(FontSlot *slot, const char *text, float width, char lines[
     return count;
 }
 
-// The space inside a text box (c_GelText.m_padding), and the space that
-// the "new" fonts of Fonts.txt add at the left and the right.
+// The space inside a text box (c_GelText.m_padding).
 #define TEXT_PADDING 5.0f
-#define FONT_PAD_LEFT 6.0f
-#define FONT_PAD_RIGHT 5.0f
 
 // A line that is wider than its box moves from side to side in it, at the
 // time of the game (c_GelText.DoBounceScroll): 300 units each 6 seconds.
@@ -516,37 +531,41 @@ static float bounce_scroll(int gameMS, float overflow) {
     return at;
 }
 
+// Draws a text as c_GelTextFR and c_GelTextBoxFR do. The font gives the
+// line height and the distances from the box to the baseline. A TextBox
+// cuts its text into lines that fit the width of the box.
 static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
     if (!item->text || !item->text[0]) return;
     FontSlot *slot = &gfx->fonts[item->font];
     if (!slot->font) return;
+    const SSRFontSlot *config = &slot->config;
     float scaleX = item->fontScaleX > 0 ? item->fontScaleX : 1;
     float scaleY = item->fontScaleY > 0 ? item->fontScaleY : 1;
     char lines[MAX_LINES][256];
     int count = wrap_lines(slot, item->text, item->wrap && item->w > 0 ? item->w / scaleX : 0, lines);
-    // A wrapped line that is still wider than its box gets smaller.
-    if (item->wrap && item->w > 0) {
-        float widest = 0;
-        for (int i = 0; i < count; i++) {
-            float width = ssr_font_measure(slot->font, lines[i]) * scaleX;
-            if (width > widest) widest = width;
-        }
-        if (widest > item->w) {
-            float fit = item->w / widest;
-            scaleX *= fit;
-            scaleY *= fit;
-        }
-    }
-    float lineHeight = ssr_font_line_height(slot->font) * scaleY;
-    float total = lineHeight * count;
-    float y = item->y;
-    if (item->alignY == 'M') y += (item->h - total) / 2;
-    if (item->alignY == 'B') y += item->h - total;
-    // The slant moves the text (c_GelTextFR): f7 to the left, and f11 at
-    // the right side.
-    float lean = -item->italic * lineHeight * 0.2f;
+    // The height of a line of the font, in units of the font.
+    float fontHeight = ssr_font_line_height(slot->font);
+    float lineHeight = fontHeight * scaleY;
+    float ascent = ssr_font_ascent(slot->font) * scaleY;
     float rightLean = lineHeight * 0.5f * item->italic;
+    float lean = item->italic * lineHeight * 0.2f;
     for (int i = 0; i < count; i++) {
+        // The baseline of the line, from the top of the box.
+        float below = (float)i * fontHeight;
+        float baseline;
+        if (item->alignY == 'T') {
+            baseline = scaleY * (below + config->padTop);
+        } else if (item->alignY == 'B') {
+            baseline = item->h + scaleY * (below - (float)count * fontHeight - config->padBottom);
+        } else if (item->wrap) {
+            // The game puts the baseline of one line of a TextBox at the
+            // middle padding below the middle of the box. The screens of
+            // the game show this, not the -lines * height / 2 that the
+            // decompiled c_GelTextBoxFR reads as.
+            baseline = item->h * 0.5f + scaleY * (below - (float)(count - 1) * fontHeight * 0.5f + config->padMiddle);
+        } else {
+            baseline = (item->h - lineHeight) * 0.5f + scaleY * config->padMiddle;
+        }
         float width = ssr_font_measure(slot->font, lines[i]) * scaleX;
         float x;
         int scroll = !item->wrap && item->w > 0 && width > item->w - TEXT_PADDING * 2;
@@ -555,13 +574,13 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
             float low = item->w - TEXT_PADDING + rightLean - width, high = TEXT_PADDING;
             x = centre < low ? low : centre > high ? high : centre;
         } else if (item->alignX == 'L') {
-            x = TEXT_PADDING + FONT_PAD_LEFT;
+            x = TEXT_PADDING + config->padLeft;
         } else if (item->alignX == 'R') {
-            x = item->w - (TEXT_PADDING + FONT_PAD_RIGHT) + rightLean - width;
+            x = item->w - (TEXT_PADDING + config->padRight) + rightLean - width;
         } else {
             x = (item->w - width) / 2;
         }
-        x += item->x - lean;
+        x += item->x + lean;
         SDL_Rect outer;
         int clipped = SDL_RenderClipEnabled(gfx->renderer);
         if (clipped) SDL_GetRenderClipRect(gfx->renderer, &outer);
@@ -573,7 +592,8 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
             if (clipped) SDL_GetRectIntersection(&rect, &outer, &rect);
             SDL_SetRenderClipRect(gfx->renderer, &rect);
         }
-        draw_line(gfx, slot, lines[i], x + gfx->offsetX, y + lineHeight * i + gfx->offsetY, scaleX, scaleY,
+        // draw_line takes the top of the line.
+        draw_line(gfx, slot, lines[i], x + gfx->offsetX, item->y + baseline - ascent + gfx->offsetY, scaleX, scaleY,
                   item->colour, item->italic);
         if (scroll) SDL_SetRenderClipRect(gfx->renderer, clipped ? &outer : NULL);
     }
