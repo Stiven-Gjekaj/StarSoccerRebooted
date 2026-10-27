@@ -19,13 +19,25 @@ typedef struct {
     float u0, v0, u1, v1;
 } SSRGlyphQuad;
 
-// Reads the TTF font at path, for text with lines of pixelHeight pixels.
-// Returns NULL when the file is not a font.
-SSRFont *ssr_font_load(const char *path, float pixelHeight);
+// Reads the TTF font at path with an em of emSize pixels, as the text size
+// of an Android Paint. The kerning of the game comes from the file with the
+// same name and the extension ".metrics", when it is there. Returns NULL
+// when the file is not a font.
+SSRFont *ssr_font_load(const char *path, float emSize);
 void ssr_font_free(SSRFont *font);
 
-// The distance from one line to the next, and from the top of a line to
-// its baseline.
+// Reads the kerning of the game from a ".metrics" file (FontNative): an
+// int count, three floats, then pairs of int characters with a float
+// factor of the width of the first character. Returns 0 when it cannot.
+int ssr_font_load_kerning(SSRFont *font, const char *path);
+
+// The pixels that each character adds after its advance (the kernX of
+// Fonts.txt).
+void ssr_font_set_spacing(SSRFont *font, int spacing);
+
+// The distance from one line to the next: the height of the box of the
+// font, in whole pixels (FontMetrics bottom - top). And the distance from
+// the top of a line to its baseline.
 float ssr_font_line_height(const SSRFont *font);
 float ssr_font_ascent(const SSRFont *font);
 

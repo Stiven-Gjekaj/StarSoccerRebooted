@@ -2,6 +2,8 @@
 // font of the system, because the repository holds no font. When there is
 // no such font, the test reports that it skipped them.
 
+#include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -79,8 +81,11 @@ static void test_lays_out_text(const char *path) {
     SSRFont *font = ssr_font_load(path, 32);
     CHECK(font != NULL);
     if (!font) return;
-    CHECK(ssr_font_line_height(font) >= 32);
-    CHECK(ssr_font_ascent(font) > 16 && ssr_font_ascent(font) < 32);
+    // The em is 32 pixels, so the box of the font is taller, and a whole
+    // number of pixels.
+    float line = ssr_font_line_height(font);
+    CHECK(line > 32 && line < 64 && line == floorf(line));
+    CHECK(ssr_font_ascent(font) > 20 && ssr_font_ascent(font) < line);
 
     int before;
     ssr_font_atlas(font, &before);
@@ -112,6 +117,36 @@ static void test_lays_out_text(const char *path) {
     CHECK(one > 10);
     CHECK(ssr_font_measure(font, "HH") > one * 1.9f);
     CHECK(ssr_font_measure(font, "HH\nH") == ssr_font_measure(font, "HH"));
+
+    // The advances are whole pixels.
+    CHECK(one == floorf(one));
+    // The spacing comes after each character.
+    ssr_font_set_spacing(font, -1);
+    CHECK(ssr_font_measure(font, "HH") == 2 * one - 2);
+    ssr_font_set_spacing(font, 0);
+
+    // The kerning of the game: the pair "HH" moves by -0.5 of the width of
+    // the ink of the first H. A later pair takes the place of an earlier.
+    const char *metrics = "test_font.metrics";
+    FILE *file = fopen(metrics, "wb");
+    CHECK(file != NULL);
+    if (file) {
+        int32_t ints[] = {2, 0, 0, 0};
+        fwrite(ints, 4, 4, file);
+        int32_t pair[] = {'H', 'H'};
+        float factors[] = {0.25f, -0.5f};
+        for (int i = 0; i < 2; i++) {
+            fwrite(pair, 4, 2, file);
+            fwrite(&factors[i], 4, 1, file);
+        }
+        fclose(file);
+    }
+    CHECK(ssr_font_load_kerning(font, metrics));
+    int inkH = (int)(quads[0].x1 - quads[0].x0);
+    CHECK(ssr_font_measure(font, "HH") == 2 * one + (float)(int)(inkH * -0.5f));
+    CHECK(ssr_font_measure(font, "Hi") == ssr_font_measure(font, "H") + ssr_font_measure(font, "i"));
+    remove(metrics);
+    CHECK(!ssr_font_load_kerning(font, "/nonexistent/font.metrics"));
 
     // Only the quads that fit go into the array.
     CHECK(ssr_font_layout(font, "HHHH", 0, 0, quads, 2) == 4);

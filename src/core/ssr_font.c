@@ -31,7 +31,18 @@ typedef struct {
     int ax, ay, w, h;
     int xoff, yoff;
     float advance;
+    // The width of the ink (Paint.getTextBounds), for the kerning.
+    int inkWidth;
 } Glyph;
+
+typedef struct {
+    // The first character in the high 16 bits, as MakeKerningKey.
+    uint32_t key;
+    // The place in the file. A later pair takes the place of an earlier
+    // pair with the same key, as in a map.
+    int order;
+    float factor;
+} KernPair;
 
 struct SSRFont {
     unsigned char *file;
@@ -47,6 +58,9 @@ struct SSRFont {
     Glyph *glyphs;
     int glyphCount;
     int glyphCapacity;
+    int spacing;
+    KernPair *kerns;
+    int kernCount;
 };
 
 uint32_t ssr_utf8_next(const char **text) {
@@ -158,7 +172,7 @@ int ssr_font_read_set(const char *text, const char *set, SSRFontSlot *slots, int
     return count;
 }
 
-SSRFont *ssr_font_load(const char *path, float pixelHeight) {
+SSRFont *ssr_font_load(const char *path, float emSize) {
     FILE *file = ssr_fs_open(path, "rb");
     if (!file) return NULL;
     SSRFont *font = calloc(1, sizeof(SSRFont));
@@ -174,17 +188,80 @@ SSRFont *ssr_font_load(const char *path, float pixelHeight) {
         ssr_font_free(font);
         return NULL;
     }
-    int ascent, descent, gap;
-    stbtt_GetFontVMetrics(&font->info, &ascent, &descent, &gap);
-    font->scale = stbtt_ScaleForPixelHeight(&font->info, pixelHeight);
-    font->ascent = ascent * font->scale;
-    font->lineHeight = (ascent - descent + gap) * font->scale;
+    // Android takes the top and the bottom of the font from its box.
+    int x0, y0, x1, y1;
+    stbtt_GetFontBoundingBox(&font->info, &x0, &y0, &x1, &y1);
+    font->scale = stbtt_ScaleForMappingEmToPixels(&font->info, emSize);
+    font->ascent = y1 * font->scale;
+    font->lineHeight = floorf((y1 - y0) * font->scale);
+    char metrics[1024];
+    const char *dot = strrchr(path, '.');
+    size_t stem = dot ? (size_t)(dot - path) : strlen(path);
+    if (stem + 9 < sizeof(metrics)) {
+        memcpy(metrics, path, stem);
+        memcpy(metrics + stem, ".metrics", 9);
+        ssr_font_load_kerning(font, metrics);
+    }
     return font;
+}
+
+static int read_int(FILE *file, int32_t *value) {
+    unsigned char b[4];
+    if (fread(b, 1, 4, file) != 4) return 0;
+    *value = (int32_t)((uint32_t)b[0] | (uint32_t)b[1] << 8 | (uint32_t)b[2] << 16 | (uint32_t)b[3] << 24);
+    return 1;
+}
+
+static int read_float(FILE *file, float *value) {
+    int32_t bits;
+    if (!read_int(file, &bits)) return 0;
+    memcpy(value, &bits, sizeof(*value));
+    return 1;
+}
+
+static int compare_kerns(const void *a, const void *b) {
+    const KernPair *x = a, *y = b;
+    if (x->key != y->key) return x->key < y->key ? -1 : 1;
+    return x->order < y->order ? -1 : x->order > y->order;
+}
+
+int ssr_font_load_kerning(SSRFont *font, const char *path) {
+    if (!font || !path) return 0;
+    FILE *file = ssr_fs_open(path, "rb");
+    if (!file) return 0;
+    int32_t count;
+    float unused;
+    int ok = read_int(file, &count) && read_float(file, &unused) && read_float(file, &unused) &&
+             read_float(file, &unused);
+    int capacity = font->kernCount;
+    int32_t first, second;
+    float factor;
+    while (ok && read_int(file, &first) && read_int(file, &second) && read_float(file, &factor)) {
+        if (font->kernCount == capacity) {
+            capacity = capacity ? capacity * 2 : 256;
+            KernPair *kerns = realloc(font->kerns, (size_t)capacity * sizeof(KernPair));
+            if (!kerns) break;
+            font->kerns = kerns;
+        }
+        // The game keeps the characters as shorts.
+        font->kerns[font->kernCount].key = (uint32_t)(uint16_t)first << 16 | (uint16_t)second;
+        font->kerns[font->kernCount].order = font->kernCount;
+        font->kerns[font->kernCount].factor = factor;
+        font->kernCount++;
+    }
+    fclose(file);
+    qsort(font->kerns, (size_t)font->kernCount, sizeof(KernPair), compare_kerns);
+    return ok;
+}
+
+void ssr_font_set_spacing(SSRFont *font, int spacing) {
+    if (font) font->spacing = spacing;
 }
 
 void ssr_font_free(SSRFont *font) {
     if (!font) return;
     free(font->glyphs);
+    free(font->kerns);
     free(font->atlas);
     free(font->file);
     free(font);
@@ -252,9 +329,30 @@ static const Glyph *glyph_for(SSRFont *font, uint32_t codepoint) {
     g->present = g->glyph != 0;
     int advance, bearing;
     stbtt_GetGlyphHMetrics(&font->info, g->glyph, &advance, &bearing);
-    g->advance = advance * font->scale;
+    // The game keeps the advance as a short.
+    g->advance = floorf(advance * font->scale);
+    int x0, y0, x1, y1;
+    stbtt_GetGlyphBitmapBox(&font->info, g->glyph, font->scale, font->scale, &x0, &y0, &x1, &y1);
+    g->inkWidth = x1 - x0;
     if (g->present) bake(font, g);
     return g;
+}
+
+// The kerning of the game after the character first: the width of its ink
+// times the factor of the pair, in whole pixels (FontNative.GetKerning).
+static float kerning(const SSRFont *font, uint32_t first, int inkWidth, uint32_t second) {
+    if (first > 0xFFFF || second > 0xFFFF) return 0;
+    uint32_t key = first << 16 | second;
+    // The last pair with the key: the first place with a greater key, less
+    // one.
+    int low = 0, high = font->kernCount;
+    while (low < high) {
+        int middle = (low + high) / 2;
+        if (font->kerns[middle].key <= key) low = middle + 1;
+        else high = middle;
+    }
+    if (low == 0 || font->kerns[low - 1].key != key) return 0;
+    return (float)(int)(inkWidth * font->kerns[low - 1].factor);
 }
 
 int ssr_font_layout(SSRFont *font, const char *text, float x, float y, SSRGlyphQuad *quads, int max) {
@@ -262,7 +360,8 @@ int ssr_font_layout(SSRFont *font, const char *text, float x, float y, SSRGlyphQ
     int count = 0;
     float penX = x;
     float baseline = y + font->ascent;
-    int previous = 0;
+    uint32_t previous = 0;
+    int previousInk = 0;
     uint32_t c;
     while ((c = ssr_utf8_next(&text)) != 0) {
         if (c == '\n') {
@@ -273,7 +372,7 @@ int ssr_font_layout(SSRFont *font, const char *text, float x, float y, SSRGlyphQ
         }
         const Glyph *g = glyph_for(font, c);
         if (!g) continue;
-        if (previous && g->glyph) penX += stbtt_GetGlyphKernAdvance(&font->info, previous, g->glyph) * font->scale;
+        if (previous) penX += kerning(font, previous, previousInk, c);
         if (g->present && g->w > 0) {
             if (quads && count < max) {
                 SSRGlyphQuad *q = &quads[count];
@@ -288,8 +387,9 @@ int ssr_font_layout(SSRFont *font, const char *text, float x, float y, SSRGlyphQ
             }
             count++;
         }
-        penX += g->advance;
-        previous = g->glyph;
+        penX += g->advance + (float)font->spacing;
+        previous = c;
+        previousInk = g->inkWidth;
     }
     return count;
 }
@@ -297,7 +397,8 @@ int ssr_font_layout(SSRFont *font, const char *text, float x, float y, SSRGlyphQ
 float ssr_font_measure(SSRFont *font, const char *text) {
     if (!font || !text) return 0;
     float widest = 0, penX = 0;
-    int previous = 0;
+    uint32_t previous = 0;
+    int previousInk = 0;
     uint32_t c;
     while ((c = ssr_utf8_next(&text)) != 0) {
         if (c == '\n') {
@@ -308,9 +409,10 @@ float ssr_font_measure(SSRFont *font, const char *text) {
         }
         const Glyph *g = glyph_for(font, c);
         if (!g) continue;
-        if (previous && g->glyph) penX += stbtt_GetGlyphKernAdvance(&font->info, previous, g->glyph) * font->scale;
-        penX += g->advance;
-        previous = g->glyph;
+        if (previous) penX += kerning(font, previous, previousInk, c);
+        penX += g->advance + (float)font->spacing;
+        previous = c;
+        previousInk = g->inkWidth;
     }
     return penX > widest ? penX : widest;
 }
