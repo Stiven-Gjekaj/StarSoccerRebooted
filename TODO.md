@@ -83,13 +83,29 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 
 ## 0.5 The match
 
-- [ ] The ball physics (`c_TBall`, `c_TBall2`)
-- [ ] The players on the pitch (`c_TMatchPlayer`)
-- [ ] The match moments: pass, shoot, dribble, and the controls
-      (`c_TMatch`, `TScreen_Match`)
+- [x] The ball physics (`c_TBall`, `c_TBall2`): the flight, the posts and
+      the nets, and the tap ball with its time and its control boots
+- [x] The players on the pitch (`c_TMatchPlayer`): the places of the keeper,
+      the defenders, and the team-mates, their runs, the dives of the
+      keeper, and offside
+- [x] One chance of the player: aim, tap, flight, saves, passes, team-mate
+      shots, and goals
+- [x] The flow of a match (`c_TMatch`): the clock, the chances of the teams,
+      the commentary, the half time, the full time, the energy, and the
+      substitutions
+- [x] The match screen (`match.uis`): the names, the scores, the time, the
+      speed, the work rate, the focus, and the commentary
+- [ ] The view of a chance: the pitch is a 3D `Sheet:` that the game draws
+      into a texture (`Surf:`). The players, their kits, and the ball show
+      now, but the pitch has no lines.
+- [ ] The intercept game (type 6) and the dribble game (type 11). Until then
+      the player wins the ball or gets past at once.
+- [ ] The result banner of a chance (`scoreanim.uis`) and the replays
+- [ ] Extra time and the penalty shoot-out of a cup match
 - [ ] Before and after the match (`Prematch`, `MatchReview`, `MatchStats`,
       `Ratings`)
 - [ ] Energy and boosts (`ChooseBoost`)
+- [ ] The five trials of a new career (they need the chance view)
 - [ ] A test harness that compares the rules with the original code
 
 ## 0.6 The season
