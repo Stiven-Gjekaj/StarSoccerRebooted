@@ -69,6 +69,7 @@ typedef struct {
     // The installed data packs, and the directory of the chosen one, or "".
     char packsDirectory[2048];
     char packDirectory[2112];
+    char packId[48];
     int typing;
     // The screen that shows now, from NewGUI/Screens, and its last frame.
     SSRUiTree *screen;
@@ -281,6 +282,49 @@ static void follow_overlay(SSRApp *app) {
 static void load_language(SSRApp *app);
 static void load_ticker(SSRApp *app);
 
+static void load_game(SSRApp *app);
+
+// The event of a file that the dialog chose. data1 holds a copy of the
+// path.
+static Uint32 packEvent;
+
+static void SDLCALL pack_chosen(void *userdata, const char *const *files, int filter) {
+    (void)userdata;
+    (void)filter;
+    if (!files || !files[0]) return;
+    SDL_Event event;
+    SDL_zero(event);
+    event.type = packEvent;
+    event.user.data1 = SDL_strdup(files[0]);
+    if (!SDL_PushEvent(&event)) SDL_free(event.user.data1);
+}
+
+static void ask_for_pack(SSRApp *app) {
+    static const SDL_DialogFileFilter filters[] = {{"Data pack", "zip"}};
+    if (!packEvent) packEvent = SDL_RegisterEvents(1);
+    SDL_ShowOpenFileDialog(pack_chosen, app, app->window, filters, 1, NULL, false);
+}
+
+static int install_pack(SSRApp *app, const char *archive);
+
+// A copy of the chosen file goes to the data folder first: on Android the
+// dialog gives a content URI that only SDL can read.
+static void install_chosen_pack(SSRApp *app, const char *chosen) {
+    char copy[2200];
+    SDL_snprintf(copy, sizeof(copy), "%s/.incoming.zip", app->packsDirectory);
+    SDL_CreateDirectory(app->packsDirectory);
+    size_t size = 0;
+    void *data = SDL_LoadFile(chosen, &size);
+    int ok = data && SDL_SaveFile(copy, data, size);
+    SDL_free(data);
+    if (!ok || !install_pack(app, copy)) SDL_Log("The file %s is not a data pack.", chosen);
+    else if (app->game) {
+        ssr_game_show_packs(app->game);
+        app->gameScreen = -1;
+    }
+    SDL_RemovePath(copy);
+}
+
 static void follow_game(SSRApp *app) {
     if (!app->game) return;
     const char *sound;
@@ -288,6 +332,14 @@ static void follow_game(SSRApp *app) {
     if (ssr_game_take_settings_change(app->game)) {
         if (!ssr_game_save_settings(app->game, app->settingsPath)) SDL_Log("The settings were not saved.");
         apply_settings(app);
+        if (SDL_strcmp(ssr_game_settings(app->game)->pack, app->packId) != 0) {
+            // The world reads the chosen pack: the app loads the game again,
+            // and the packs screen shows the choice.
+            load_game(app);
+            ssr_game_show_packs(app->game);
+            app->gameScreen = -1;
+            return;
+        }
         if (ssr_game_settings(app->game)->language != app->textLanguage) {
             // c_TScreen_Language.SetLanguage: the screens open again with the
             // new text.
@@ -295,6 +347,7 @@ static void follow_game(SSRApp *app) {
             load_ticker(app);
         }
     }
+    if (ssr_game_take_pack_install(app->game)) ask_for_pack(app);
     follow_overlay(app);
     int version = ssr_game_screen_version(app->game);
     if (version == app->gameScreen) return;
@@ -999,6 +1052,7 @@ static int language_from_device(SSRApp *app) {
 // directory when the pack is installed and good, else "".
 static void find_pack(SSRApp *app) {
     app->packDirectory[0] = 0;
+    app->packId[0] = 0;
     char *text = SDL_LoadFile(app->settingsPath, NULL);
     const char *line = text ? SDL_strstr(text, "pack=") : NULL;
     while (line && line != text && line[-1] != '\n') line = SDL_strstr(line + 1, "pack=");
@@ -1011,6 +1065,7 @@ static void find_pack(SSRApp *app) {
         SSRPackInfo info;
         if (id[0] && ssr_pack_info(directory, &info) && SDL_strcmp(info.id, id) == 0) {
             SDL_strlcpy(app->packDirectory, directory, sizeof(app->packDirectory));
+            SDL_strlcpy(app->packId, id, sizeof(app->packId));
             SDL_Log("The world reads the data pack %s (%s).", info.name, info.version);
         } else if (id[0]) {
             SDL_Log("The data pack %s is not installed.", id);
@@ -1043,6 +1098,13 @@ static void load_game(SSRApp *app) {
     ssr_game_free(app->game);
     app->game = ssr_game_create(app->tweaks);
     ssr_game_set_data(app->game, app->world, translate, app, app->saveDirectory);
+    // The packs screen opens a file to install a pack. iOS has no file
+    // dialog: the app installs each zip file of its Documents folder.
+#ifdef SDL_PLATFORM_IOS
+    ssr_game_set_packs_directory(app->game, app->packsDirectory, 0);
+#else
+    ssr_game_set_packs_directory(app->game, app->packsDirectory, 1);
+#endif
     // The names of the race horses.
     char resolved[2300];
     SDL_snprintf(path, sizeof(path), "%s/MyData/Horse.txt", app->gameDirectory);
@@ -1158,6 +1220,20 @@ static int import_installed_game(SSRApp *app) {
 #ifdef SDL_PLATFORM_IOS
 // Imports the first copy of the game in the Documents folder. Returns 1
 // when there was one.
+// Each zip file of the Documents folder is a data pack to install. The
+// file goes after the install.
+static void packs_from_documents(SSRApp *app) {
+    const char *documents = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
+    int count = 0;
+    char **names = documents ? SDL_GlobDirectory(documents, "*.zip", SDL_GLOB_CASEINSENSITIVE, &count) : NULL;
+    for (int i = 0; i < count; i++) {
+        char path[2400];
+        SDL_snprintf(path, sizeof(path), "%s%s", documents, names[i]);
+        if (install_pack(app, path)) SDL_RemovePath(path);
+    }
+    SDL_free(names);
+}
+
 static int import_from_documents(SSRApp *app) {
     const char *documents = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
     if (!documents) return 0;
@@ -1246,6 +1322,7 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     else {
         import_from_documents(app);
     }
+    if (ssr_import_is_done(app->gameDirectory)) packs_from_documents(app);
 #endif
 #ifdef SDL_PLATFORM_ANDROID
     else if (!import_installed_game(app)) {
@@ -1265,6 +1342,10 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
     if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) fit_screen(app);
     if (event->type == SDL_EVENT_DROP_FILE && event->drop.data) import_copy(app, event->drop.data);
+    if (packEvent && event->type == packEvent) {
+        install_chosen_pack(app, event->user.data1);
+        SDL_free(event->user.data1);
+    }
     int mouse = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP ||
                 event->type == SDL_EVENT_MOUSE_MOTION;
     int finger = event->type == SDL_EVENT_FINGER_DOWN || event->type == SDL_EVENT_FINGER_UP ||
