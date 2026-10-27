@@ -3715,21 +3715,129 @@ static void hall_of_fame(SSRGame *game) {
     free(all);
 }
 
+static void record_row(SSRGame *game, const char *title, const char *detail, int highlight) {
+    add_op(game, SSR_OP_LIST_ADD, "HonourList", "HonourEntry", "", 0);
+    add_op(game, SSR_OP_LIST_TEXT, "HonourList", NULL, title, 1);
+    add_op(game, SSR_OP_LIST_TEXT, "HonourList", NULL, detail, 2);
+    if (highlight) add_op(game, SSR_OP_LIST_SUB, "HonourList", "Highlight", NULL, 1);
+}
+
+// The text of a tag with the names and the numbers in it.
+static void record_text(SSRGame *game, char *out, size_t capacity, const char *tag, const char *name,
+                        const char *club, int number, int year) {
+    char value[16];
+    snprintf(out, capacity, "%s", loc(game, tag));
+    replace_all(out, capacity, "$name", name ? name : "");
+    replace_all(out, capacity, "$club", club ? club : "");
+    replace_all(out, capacity, "$league", name ? name : "");
+    replace_all(out, capacity, "$nation", name ? name : "");
+    snprintf(value, sizeof(value), "%d", number);
+    replace_all(out, capacity, "$n", value);
+    snprintf(value, sizeof(value), "%d", year);
+    replace_all(out, capacity, "$year", value);
+}
+
+// The records of the world: for each league, the club with the most titles
+// and the most goals of a scorer in a season; the titles of the club and of
+// the nation of the player; and the scorer with the most goals.
+static void records(SSRGame *game) {
+    const SSRHonours *h = &game->honours;
+    const SSRClub *mine = game->world ? ssr_world_club(game->world, game->career.clubId) : NULL;
+    const SSRCompetition *myLeague = mine ? ssr_world_competition(game->world, mine->league) : NULL;
+    char title[256], detail[256];
+    // The leagues of the honours, the league of the player first.
+    const char *leagues[64];
+    int leagueCount = 0;
+    if (myLeague) leagues[leagueCount++] = myLeague->tla;
+    for (int i = 0; i < h->count && leagueCount < 64; i++) {
+        int seen = 0;
+        for (int k = 0; k < leagueCount && !seen; k++) seen = strcmp(leagues[k], h->list[i].league) == 0;
+        if (!seen) leagues[leagueCount++] = h->list[i].league;
+    }
+    for (int l = 0; l < leagueCount; l++) {
+        int bestClub = 0, bestTitles = 0, bestGoals = -1;
+        const SSRHonour *top = NULL;
+        for (int i = 0; i < h->count; i++) {
+            const SSRHonour *a = &h->list[i];
+            if (strcmp(a->league, leagues[l]) != 0) continue;
+            int titles = 0;
+            for (int k = 0; k < h->count; k++) titles += strcmp(h->list[k].league, leagues[l]) == 0 && h->list[k].club == a->club;
+            if (titles > bestTitles) {
+                bestTitles = titles;
+                bestClub = a->club;
+            }
+            if (a->scorer[0] && a->goals > bestGoals) {
+                bestGoals = a->goals;
+                top = a;
+            }
+        }
+        record_text(game, title, sizeof(title), "SSR_RecordLeagueTitles", leagues[l], NULL, 0, 0);
+        if (bestClub) record_text(game, detail, sizeof(detail), "SSR_RecordTitlesOf", NULL, club_name(game, bestClub),
+                                  bestTitles, 0);
+        else snprintf(detail, sizeof(detail), "%s", loc(game, "SSR_RecordNone"));
+        record_row(game, title, detail, bestClub && bestClub == game->career.clubId);
+        if (top) {
+            record_text(game, title, sizeof(title), "SSR_RecordSeasonGoals", leagues[l], NULL, 0, 0);
+            record_text(game, detail, sizeof(detail), "SSR_RecordScorer", top->scorer, top->scorerClub, top->goals,
+                        top->year);
+            record_row(game, title, detail, strcmp(top->scorer, game->career.fullName) == 0);
+        }
+    }
+    // The titles of the club and of the nation of the player.
+    if (mine) {
+        record_text(game, title, sizeof(title), "SSR_RecordClubTitles", NULL, mine->name, 0, 0);
+        record_text(game, detail, sizeof(detail), "SSR_RecordTitles", NULL, NULL, ssr_honours_titles(h, mine->id), 0);
+        record_row(game, title, detail, 1);
+        const SSRNation *nation = ssr_world_nation(game->world, mine->nation);
+        int titles = 0;
+        for (int i = 0; i < h->count; i++) {
+            const SSRClub *c = ssr_world_club(game->world, h->list[i].club);
+            titles += c && c->nation == mine->nation;
+        }
+        record_text(game, title, sizeof(title), "SSR_RecordNationTitles", nation ? nation->name : "", NULL, 0, 0);
+        record_text(game, detail, sizeof(detail), "SSR_RecordTitles", NULL, NULL, titles, 0);
+        record_row(game, title, detail, 0);
+    }
+    // The scorer of the world with the most goals in a career.
+    const SSRPerson *best = NULL;
+    for (int i = 0; game->people && i < game->people->count; i++) {
+        const SSRPerson *p = &game->people->list[i];
+        if (!best || p->goals > best->goals) best = p;
+    }
+    int myGoals = game->career.goals + game->career.intGoals;
+    snprintf(title, sizeof(title), "%s", loc(game, "SSR_RecordWorldGoals"));
+    if (best && best->goals > myGoals) {
+        char name[96];
+        snprintf(name, sizeof(name), "%s %s", best->first, best->last);
+        record_text(game, detail, sizeof(detail), "SSR_RecordGoals", name, NULL, best->goals, 0);
+        record_row(game, title, detail, best->rival);
+    } else {
+        record_text(game, detail, sizeof(detail), "SSR_RecordGoals", game->career.fullName, NULL, myGoals, 0);
+        record_row(game, title, detail, 1);
+    }
+}
+
 static void honours_fill(SSRGame *game) {
     SSRTweaks *t = game->tweaks;
     int career = game->honoursMode == 1;
-    ssr_tweaks_set(t, "Honours", "Title", loc(game, career ? "Career" : "SSR_Honours"));
+    // The title of each mode, and the name of the next mode on the button.
+    static const char *const TITLES[4] = {"SSR_Honours", "Career", "SSR_HallOfFame", "SSR_Records"};
+    ssr_tweaks_set(t, "Honours", "Title", loc(game, TITLES[game->honoursMode % 4]));
     char column[128], seed[16];
     snprintf(column, sizeof(column), "%s", loc(game, career ? "Year" : "SSR_WorldSeedOf"));
     snprintf(seed, sizeof(seed), "%d", game->career.worldSeed);
     replace_all(column, sizeof(column), "$seed", seed);
     ssr_tweaks_set(t, "Honours", "Column", column);
-    ssr_tweaks_set(t, "Honours", "ModeText", loc(game, career ? "SSR_HallOfFame" : "Career"));
+    ssr_tweaks_set(t, "Honours", "ModeText", loc(game, TITLES[(game->honoursMode + 1) % 4]));
     ssr_tweaks_set_number(t, "Honours", "Scroll", 0);
     add_op(game, SSR_OP_LIST_CLEAR, "HonourList", NULL, NULL, 0);
     add_op(game, SSR_OP_LIST_START, "HonourList", NULL, NULL, 82);
     if (game->honoursMode == 2) {
         hall_of_fame(game);
+        return;
+    }
+    if (game->honoursMode == 3) {
+        records(game);
         return;
     }
     if (career) {
@@ -3782,7 +3890,7 @@ static void honours_screen(SSRGame *game) {
 }
 
 static void honours_mode(SSRGame *game) {
-    game->honoursMode = (game->honoursMode + 1) % 3;
+    game->honoursMode = (game->honoursMode + 1) % 4;
     honours_fill(game);
 }
 

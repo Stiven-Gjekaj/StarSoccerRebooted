@@ -2625,7 +2625,18 @@ static void test_starts_a_new_career(void) {
         fameRows += honourOps[i].kind == SSR_OP_LIST_ADD && strcmp(honourOps[i].ref, "HonourList") == 0;
     }
     CHECK(fameRows >= 2 && fameRows <= 30);
+    // The records: the titles of each league with a champion, the club and
+    // the nation of the player, and the most goals of a career.
     ssr_game_message(game, "honours.btn_Mode");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Honours", "Title"), "SSR_Records") == 0);
+    honourCount = take_ops(game, honourOps, 256);
+    CHECK(has_op(honourOps, honourCount, SSR_OP_LIST_TEXT, "HonourList", "SSR_RecordLeagueTitles"));
+    CHECK(has_op(honourOps, honourCount, SSR_OP_LIST_TEXT, "HonourList", "SSR_RecordSeasonGoals"));
+    CHECK(has_op(honourOps, honourCount, SSR_OP_LIST_TEXT, "HonourList", "SSR_RecordClubTitles"));
+    CHECK(has_op(honourOps, honourCount, SSR_OP_LIST_TEXT, "HonourList", "SSR_RecordNationTitles"));
+    CHECK(has_op(honourOps, honourCount, SSR_OP_LIST_TEXT, "HonourList", "SSR_RecordWorldGoals"));
+    ssr_game_message(game, "honours.btn_Mode");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Honours", "Title"), "SSR_Honours") == 0);
     ssr_game_message(game, "honours.btn_Back");
     CHECK(strcmp(ssr_game_screen(game), "squad") == 0);
     ssr_game_message(game, "squad.btn_Back");
