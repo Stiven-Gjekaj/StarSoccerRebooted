@@ -70,6 +70,16 @@ struct SSRGfx {
     char packDirectory[2048];
     char **packArt;
     int packArtCount;
+    // The hole in the ring of a shield (MapShieldFrameAll), measured once:
+    // 0 not yet, 1 measured, -1 no hole. hole has a byte for each pixel of
+    // the image of a crest: 1 where the crest shows. The ellipse of the
+    // hole: the middle, and the map from a point of the image to the unit
+    // circle: u = (dx - lean * dy) / width, v = dy / height. The map keeps
+    // the rows of the crest level, and the sides of the crest lean with the
+    // perspective of the ring.
+    int holeState;
+    unsigned char *hole;
+    float holeX, holeY, holeWidth, holeHeight, holeLean;
 };
 
 SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
@@ -175,6 +185,7 @@ void ssr_gfx_free(SSRGfx *gfx) {
     ssr_atlas_free(gfx->atlases);
     SDL_free(gfx->art);
     SDL_free(gfx->packArt);
+    SDL_free(gfx->hole);
     SDL_free(gfx);
 }
 
@@ -247,23 +258,138 @@ static SDL_Texture *own_art(SSRGfx *gfx, const char *name) {
     return cached_texture(gfx, key, path, 1);
 }
 
-// The image of a crest has the shape of the box of a shield, so that the
-// crest goes on the face of the shield. FACE_X and FACE_Y are the middle of
-// the hole in the ring of the shield (MapShieldFrameAll) as a part of the
-// box, and FACE_RX and FACE_RY its radii. The values come from a frame of
-// the match screen. The hole is a little to the side of the box.
-#define CREST_W 210
-#define CREST_H 285
-#define FACE_X 0.478f
-#define FACE_Y 0.5f
-#define FACE_RX 0.376f
-#define FACE_RY 0.29f
+// The image of a crest has the shape of the box of a shield, at two times
+// its size, so that the crest goes on the face of the shield.
+#define CREST_W 420
+#define CREST_H 570
+
+static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item);
+
+// Measures the hole in the ring of a shield: the app draws the ring
+// (MapShieldFrameAll) into the box of a crest, and fills the clear pixels
+// from the middle. The ellipse of the hole comes from the moments of the
+// fill, so that it follows the perspective of the ring. The hole grows by
+// a few pixels under the ring, so that no gap shows at its edge.
+static void measure_hole(SSRGfx *gfx) {
+    gfx->holeState = -1;
+    SDL_Texture *target = SDL_CreateTexture(gfx->renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, CREST_W,
+                                            CREST_H);
+    if (!target) return;
+    SDL_Texture *old = SDL_GetRenderTarget(gfx->renderer);
+    float offsetX = gfx->offsetX, offsetY = gfx->offsetY;
+    SDL_SetRenderTarget(gfx->renderer, target);
+    SDL_SetRenderDrawColor(gfx->renderer, 0, 0, 0, 0);
+    SDL_RenderClear(gfx->renderer);
+    gfx->offsetX = gfx->offsetY = 0;
+    SSRSceneItem ring;
+    SDL_zero(ring);
+    ring.kind = SSR_ITEM_IMAGE;
+    ring.image = "MapShieldFrameAll";
+    ring.w = CREST_W;
+    ring.h = CREST_H;
+    ring.colour = 0xFFFFFFFF;
+    draw_image_item(gfx, &ring);
+    SDL_Surface *read = SDL_RenderReadPixels(gfx->renderer, NULL);
+    SDL_SetRenderTarget(gfx->renderer, old);
+    gfx->offsetX = offsetX;
+    gfx->offsetY = offsetY;
+    SDL_DestroyTexture(target);
+    SDL_Surface *frame = read ? SDL_ConvertSurface(read, SDL_PIXELFORMAT_RGBA32) : NULL;
+    SDL_DestroySurface(read);
+    if (!frame || frame->w != CREST_W || frame->h != CREST_H) {
+        SDL_DestroySurface(frame);
+        return;
+    }
+    unsigned char *fill = SDL_calloc(CREST_W * CREST_H, 1);
+    int *stack = SDL_malloc(sizeof(int) * CREST_W * CREST_H);
+    int closed = fill && stack;
+    const unsigned char *pixels = frame->pixels;
+#define CLEAR(x, y) (pixels[(size_t)(y) * frame->pitch + (size_t)(x) * 4 + 3] < 128)
+    // The fill starts at the clear pixel nearest the middle on its row.
+    int start = -1;
+    for (int d = 0; closed && d < CREST_W / 2 && start < 0; d++) {
+        if (CLEAR(CREST_W / 2 + d, CREST_H / 2)) start = CREST_H / 2 * CREST_W + CREST_W / 2 + d;
+        else if (CLEAR(CREST_W / 2 - d, CREST_H / 2)) start = CREST_H / 2 * CREST_W + CREST_W / 2 - d;
+    }
+    int top = 0;
+    if (start >= 0 && closed) {
+        stack[top++] = start;
+        fill[start] = 1;
+    }
+    double n = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+    while (top > 0 && closed) {
+        int k = stack[--top], x = k % CREST_W, y = k / CREST_W;
+        // A fill that comes to the edge of the box is not in a ring.
+        if (x == 0 || y == 0 || x == CREST_W - 1 || y == CREST_H - 1) closed = 0;
+        n++;
+        sx += x;
+        sy += y;
+        sxx += (double)x * x;
+        syy += (double)y * y;
+        sxy += (double)x * y;
+        const int next[4] = {k - 1, k + 1, k - CREST_W, k + CREST_W};
+        for (int i = 0; i < 4 && closed; i++) {
+            int nx = next[i] % CREST_W, ny = next[i] / CREST_W;
+            if (!fill[next[i]] && CLEAR(nx, ny)) {
+                fill[next[i]] = 1;
+                stack[top++] = next[i];
+            }
+        }
+    }
+#undef CLEAR
+    SDL_free(stack);
+    SDL_DestroySurface(frame);
+    if (!closed || n < 1000) {
+        SDL_free(fill);
+        return;
+    }
+    // The ellipse with the same moments as the hole. A full ellipse with
+    // the covariance C is d * inverse(4 C) * d = 1. Its map to the unit
+    // circle that keeps the rows level comes from that matrix M:
+    // width = 1 / sqrt(M11), lean = -M12 / M11, and
+    // height = 1 / sqrt(M22 - M12 * M12 / M11).
+    double mx = sx / n, my = sy / n;
+    double cxx = 4 * (sxx / n - mx * mx), cyy = 4 * (syy / n - my * my), cxy = 4 * (sxy / n - mx * my);
+    double det = cxx * cyy - cxy * cxy;
+    if (det <= 0) {
+        SDL_free(fill);
+        return;
+    }
+    double m11 = cyy / det, m22 = cxx / det, m12 = -cxy / det;
+    gfx->holeX = (float)mx;
+    gfx->holeY = (float)my;
+    gfx->holeWidth = (float)(1 / SDL_sqrt(m11));
+    gfx->holeLean = (float)(-m12 / m11);
+    gfx->holeHeight = (float)(1 / SDL_sqrt(m22 - m12 * m12 / m11));
+    // The hole grows by 4 pixels under the ring.
+    gfx->hole = SDL_calloc(CREST_W * CREST_H, 1);
+    if (!gfx->hole) {
+        SDL_free(fill);
+        return;
+    }
+    for (int y = 0; y < CREST_H; y++) {
+        for (int x = 0; x < CREST_W; x++) {
+            int in = 0;
+            for (int dy = -4; dy <= 4 && !in; dy++) {
+                for (int dx = -4; dx <= 4 && !in; dx++) {
+                    int px = x + dx, py = y + dy;
+                    in = px >= 0 && py >= 0 && px < CREST_W && py < CREST_H && dx * dx + dy * dy <= 16 &&
+                         fill[py * CREST_W + px];
+                }
+            }
+            gfx->hole[y * CREST_W + x] = (unsigned char)in;
+        }
+    }
+    SDL_free(fill);
+    gfx->holeState = 1;
+}
 
 // The crest of a club in the pack: "Crest_<id>", or "CrestM_<id>" for the
-// flipped crest of a flipped shield. The image of crests/<id>.png goes on
-// the round face of the shield as on a dome: the middle of the crest comes
-// near, its edge bends away, and the light falls from the top. Returns NULL
-// when the image is not a crest or is not there.
+// flipped crest of a flipped shield. The image of crests/<id>.png fills the
+// hole in the ring of the shield. It lies on the ellipse of the hole as on
+// a dome: the middle of the crest comes near, its edge bends away, and the
+// light falls from the top. Returns NULL when the image is not a crest, is
+// not there, or the ring has no hole.
 static SDL_Texture *crest_texture(SSRGfx *gfx, const char *name) {
     int flip = SDL_strncmp(name, "CrestM_", 7) == 0;
     if (!flip && SDL_strncmp(name, "Crest_", 6) != 0) return NULL;
@@ -271,25 +397,26 @@ static SDL_Texture *crest_texture(SSRGfx *gfx, const char *name) {
     for (int i = 0; i < gfx->textureCount; i++) {
         if (SDL_strcmp(gfx->textures[i].name, name) == 0) return gfx->textures[i].texture;
     }
+    if (gfx->holeState == 0) measure_hole(gfx);
     char path[2400];
     SDL_snprintf(path, sizeof(path), "%s/crests/%d.png", gfx->packDirectory, SDL_atoi(name + (flip ? 7 : 6)));
     SSRImage source;
     SDL_Texture *texture = NULL;
-    unsigned char *pixels = load_own_image(path, &source) ? SDL_calloc(CREST_W * CREST_H, 4) : NULL;
+    unsigned char *pixels = gfx->holeState == 1 && load_own_image(path, &source) ? SDL_calloc(CREST_W * CREST_H, 4)
+                                                                                  : NULL;
     if (pixels) {
-        const float cx = FACE_X * CREST_W, cy = FACE_Y * CREST_H, rx = FACE_RX * CREST_W, ry = FACE_RY * CREST_H;
         const float side = (float)(source.width < source.height ? source.width : source.height);
         for (int y = 0; y < CREST_H; y++) {
             for (int x = 0; x < CREST_W; x++) {
+                if (!gfx->hole[y * CREST_W + x]) continue;
                 unsigned char *to = pixels + ((size_t)y * CREST_W + x) * 4;
-                // u and v go from -1 to 1 across the face.
-                float u = (x + 0.5f - cx) / rx, v = (y + 0.5f - cy) / ry, r = SDL_sqrtf(u * u + v * v);
-                // The edge of the face is soft over about one pixel.
-                float edge = SDL_clamp((1 - r) * rx + 0.5f, 0.0f, 1.0f);
-                if (edge <= 0) continue;
+                // u and v go from -1 to 1 across the ellipse of the hole.
+                float dx = x + 0.5f - gfx->holeX, dy = y + 0.5f - gfx->holeY;
+                float u = (dx - gfx->holeLean * dy) / gfx->holeWidth, v = dy / gfx->holeHeight;
+                float r = SDL_sqrtf(u * u + v * v), rc = SDL_min(r, 1.0f);
                 // On a dome, the point at r on the screen is at the angle
                 // asin(r) from the front, so the crest bends at the edge.
-                float bend = r > 0 ? SDL_asinf(SDL_min(r, 1.0f)) / (SDL_PI_F / 2) / r : 1;
+                float bend = r > 0 ? SDL_asinf(rc) / (SDL_PI_F / 2) / r : 1;
                 float su = u * bend, sv = v * bend;
                 int sx = (int)(source.width / 2.0f + (flip ? -su : su) * side / 2);
                 int sy = (int)(source.height / 2.0f + sv * side / 2);
@@ -298,11 +425,11 @@ static SDL_Texture *crest_texture(SSRGfx *gfx, const char *name) {
                 const unsigned char *from = source.pixels + ((size_t)sy * source.width + sx) * 4;
                 // The crest lies on white. The light falls from the top left
                 // onto the dome.
-                float nz = SDL_sqrtf(SDL_max(0.0f, 1 - r * r));
+                float nz = SDL_sqrtf(SDL_max(0.0f, 1 - rc * rc));
                 float light = SDL_clamp(0.72f + 0.28f * (0.8f * nz - 0.35f * v - 0.2f * u), 0.0f, 1.0f);
-                float a = from[3] / 255.0f;
-                for (int c = 0; c < 3; c++) to[c] = (unsigned char)((from[c] * a + 255 * (1 - a)) * light + 0.5f);
-                to[3] = (unsigned char)(edge * 255 + 0.5f);
+                float alpha = from[3] / 255.0f;
+                for (int c = 0; c < 3; c++) to[c] = (unsigned char)((from[c] * alpha + 255 * (1 - alpha)) * light + 0.5f);
+                to[3] = 255;
             }
         }
         texture = texture_from_pixels(gfx->renderer, CREST_W, CREST_H, pixels);
