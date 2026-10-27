@@ -62,7 +62,27 @@ static void test_sums_a_skill(void) {
     CHECK(ssr_career_skill(levels) == 100);
 }
 
+static void test_updates_a_rating(void) {
+    SSRCareer c;
+    ssr_career_create(&c, "The", "Kid", 0, 0, 62, 1, 1, 0);
+    // A rating of 5 moves by half of the step.
+    CHECK(c.ratings[2] == 5 && ssr_career_update_rating(&c, 2, 1) == 0.75f && c.ratings[2] == 5.75f);
+    // 5.75 is level 5 too. A fault of short passing is -2 * 0.5.
+    CHECK(ssr_career_update_rating(&c, 0, 0) == -1 && c.ratings[0] == 4);
+    // Level 4 moves by 0.6 of the step.
+    CHECK(fabsf(ssr_career_update_rating(&c, 0, 1) - 0.3f) < 1e-6f);
+    // A rating stays from 1 to 10.
+    c.ratings[7] = 1.2f;
+    ssr_career_update_rating(&c, 7, 0);
+    CHECK(c.ratings[7] == 1);
+    c.ratings[8] = 9.95f;
+    ssr_career_update_rating(&c, 8, 1);
+    CHECK(c.ratings[8] == 10);
+    CHECK(ssr_career_update_rating(&c, 9, 1) == 0);
+}
+
 int main(void) {
+    test_updates_a_rating();
     test_sums_a_skill();
     test_creates_a_career();
     test_saves_and_loads_a_career();

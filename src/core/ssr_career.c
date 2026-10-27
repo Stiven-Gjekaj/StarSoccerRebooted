@@ -45,6 +45,21 @@ void ssr_career_create(SSRCareer *c, const char *first, const char *last, int ge
     copy_name(c->gameVersion, sizeof(c->gameVersion), "v2.32");
 }
 
+float ssr_career_update_rating(SSRCareer *c, int index, int success) {
+    // The fuse parameters of 4.32 for a success and for a fault.
+    static const float SUCCESS[9] = {0.5f, 1, 1.5f, 1.5f, 1, 1, 1, 1, 1};
+    static const float FAULT[9] = {-2, -2, -1.5f, -1.5f, -1, -1, -1, -1.5f, -1};
+    if (index < 0 || index > 8) return 0;
+    float r = c->ratings[index];
+    int level = (int)r;
+    static const float SCALE[9] = {0.1f, 0.9f, 0.8f, 0.7f, 0.6f, 0.5f, 0.4f, 0.3f, 0.2f};
+    float scale = level >= 1 && level <= 8 ? SCALE[level] : 0.1f;
+    float change = (success ? SUCCESS[index] : FAULT[index]) * scale;
+    float v = r + change;
+    c->ratings[index] = v < 1 ? 1 : v > 10 ? 10 : v;
+    return change;
+}
+
 int ssr_career_star_level(const SSRCareer *c) {
     return c->starRating / 100 + 1;
 }

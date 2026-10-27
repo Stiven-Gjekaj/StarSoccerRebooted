@@ -63,6 +63,12 @@ void ssr_career_create(SSRCareer *career, const char *first, const char *last, i
 // (GSPlayerUtility.GetSkill).
 int ssr_career_skill(const int *levels);
 
+// c_TPlayer.UpdateRating: the rating of a skill (0 short passing, 1 long
+// passing, 2 finishing, 3 long shots, 4 heading, 5 crossing, 6 set pieces,
+// 7 dribbling, 8 defence) goes up after a success and down after a fault.
+// A high rating moves less. Returns the change.
+float ssr_career_update_rating(SSRCareer *career, int index, int success);
+
 // The star level of the career, from 1 (c_TPlayer.GetStarLevel).
 int ssr_career_star_level(const SSRCareer *career);
 
