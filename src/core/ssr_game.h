@@ -109,6 +109,10 @@ typedef struct {
     // 1 after the first career that retires. A new career can then play
     // the hard mode (global data 12 of the game).
     int hardModeUnlocked;
+    // The language (c_TPlayer.m_opLanguage): 0 English to 12 Chinese, in
+    // the order of c_TLocale.GetNationCode. -1 until the player or the
+    // device chooses one.
+    int language;
 } SSRSettings;
 
 // Starts at the main menu. The game keeps the tweaks, and sets the tweaks
@@ -135,6 +139,14 @@ const SSRCareer *ssr_game_career(const SSRGame *game);
 int ssr_game_load_settings(SSRGame *game, const char *path);
 int ssr_game_save_settings(const SSRGame *game, const char *path);
 const SSRSettings *ssr_game_settings(const SSRGame *game);
+
+// Sets the language, for example from the language of the device. The
+// distance goes to metres or yards with it, as the device table says.
+void ssr_game_set_language(SSRGame *game, int language, int metres);
+
+// Opens the screen "language", where the player chooses a language. The
+// game does this at the start when the device gives no language.
+void ssr_game_choose_language(SSRGame *game);
 
 // Handles the message of a Click. Returns 1 when the game knows it.
 int ssr_game_message(SSRGame *game, const char *message);

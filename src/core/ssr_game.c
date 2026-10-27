@@ -361,6 +361,7 @@ static void set_option_tweaks(SSRGame *game) {
     ssr_tweaks_set_number(game->tweaks, "Menu", "SettingsVolume", game->settings.volume);
     ssr_tweaks_set_number(game->tweaks, "Menu", "SettingsDistance", game->settings.distance);
     ssr_tweaks_set_number(game->tweaks, "Menu", "SettingsReplays", game->settings.replays);
+    if (game->settings.language >= 0) ssr_tweaks_set_number(game->tweaks, "Menu", "Language", game->settings.language);
 }
 
 static void settings_changed(SSRGame *game) {
@@ -447,6 +448,27 @@ static void replays(SSRGame *game) {
 
 static void about(SSRGame *game) {
     set_screen(game, "about");
+}
+
+// c_TScreen_Options.ButtonLanguage. The screen shows the language of the
+// tweak Menu.Language.
+static void language_screen(SSRGame *game) {
+    set_option_tweaks(game);
+    set_screen(game, "language");
+}
+
+// c_TScreen_Language.ButtonOk and SetLanguage: the same language goes back
+// to the options. A new language loads, and the main menu opens.
+static void language_ok(SSRGame *game) {
+    int language = (int)ssr_tweaks_number(game->tweaks, "Menu", "Language");
+    if (language < 0 || language > 12) language = 0;
+    if (language == game->settings.language) {
+        options(game);
+        return;
+    }
+    game->settings.language = language;
+    settings_changed(game);
+    main_menu(game);
 }
 
 /* ------------------------------------------------------------ save slots */
@@ -7920,6 +7942,8 @@ static const Route ROUTES[] = {
     {"options.btn_Distance", distance},
     {"options.btn_OfferReplay", replays},
     {"options.btn_About", about},
+    {"options.btn_Language", language_screen},
+    {"language.btn_Ok", language_ok},
     {"options.btn_Back", main_menu},
     {"about.btn_Ok", options},
     {"message.btn_Ok", message_ok},
@@ -8026,6 +8050,7 @@ SSRGame *ssr_game_create(SSRTweaks *tweaks) {
     game->tweaks = tweaks;
     game->settings.volume = 1;
     game->settings.replays = 1;
+    game->settings.language = -1;
     game->random.seed = SSR_RANDOM_START;
     casino_new_player(game);
     set_option_tweaks(game);
@@ -8082,6 +8107,7 @@ int ssr_game_load_settings(SSRGame *game, const char *path) {
         if (strcmp(key, "replays") == 0) game->settings.replays = value != 0;
         if (strcmp(key, "doneloseskills") == 0) game->settings.doneLoseSkills = value != 0;
         if (strcmp(key, "hardmodeunlocked") == 0) game->settings.hardModeUnlocked = value != 0;
+        if (strcmp(key, "language") == 0 && value >= -1 && value <= 12) game->settings.language = value;
     }
     fclose(file);
     set_option_tweaks(game);
@@ -8095,9 +8121,9 @@ int ssr_game_save_settings(const SSRGame *game, const char *path) {
     snprintf(temp, sizeof(temp), "%s.new", path);
     FILE *file = fopen(temp, "wb");
     if (!file) return 0;
-    int ok = fprintf(file, "volume=%d\ndistance=%d\nreplays=%d\ndoneloseskills=%d\nhardmodeunlocked=%d\n",
+    int ok = fprintf(file, "volume=%d\ndistance=%d\nreplays=%d\ndoneloseskills=%d\nhardmodeunlocked=%d\nlanguage=%d\n",
                      game->settings.volume, game->settings.distance, game->settings.replays,
-                     game->settings.doneLoseSkills, game->settings.hardModeUnlocked) > 0;
+                     game->settings.doneLoseSkills, game->settings.hardModeUnlocked, game->settings.language) > 0;
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
         remove(temp);
@@ -8108,6 +8134,20 @@ int ssr_game_save_settings(const SSRGame *game, const char *path) {
 
 const SSRSettings *ssr_game_settings(const SSRGame *game) {
     return game ? &game->settings : NULL;
+}
+
+void ssr_game_set_language(SSRGame *game, int language, int metres) {
+    if (!game || language < 0 || language > 12) return;
+    game->settings.language = language;
+    game->settings.distance = metres != 0;
+    settings_changed(game);
+}
+
+void ssr_game_choose_language(SSRGame *game) {
+    if (!game) return;
+    // c_GameEngine.SetUpScreens: the text is English until the choice.
+    ssr_tweaks_set_number(game->tweaks, "Menu", "Language", 0);
+    set_screen(game, "language");
 }
 
 const SSRCareer *ssr_game_career(const SSRGame *game) {

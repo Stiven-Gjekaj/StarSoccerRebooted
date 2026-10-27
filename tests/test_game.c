@@ -63,6 +63,47 @@ static void test_changes_and_saves_the_options(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The options open the language screen. Ok with a new language saves it
+// and goes to the main menu. Ok with the same language goes back.
+static void test_chooses_a_language(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRGame *game = ssr_game_create(tweaks);
+    CHECK(ssr_game_settings(game)->language == -1);
+    ssr_game_set_language(game, 6, 1);
+    CHECK(ssr_game_settings(game)->language == 6 && ssr_game_settings(game)->distance == 1);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "Language") == 6);
+    CHECK(ssr_game_take_settings_change(game));
+    CHECK(ssr_game_message(game, "mainmenu.btn_Options"));
+    CHECK(ssr_game_message(game, "options.btn_Language"));
+    CHECK(strcmp(ssr_game_screen(game), "language") == 0);
+    CHECK(ssr_game_message(game, "language.btn_Ok"));
+    CHECK(strcmp(ssr_game_screen(game), "options") == 0);
+    CHECK(!ssr_game_take_settings_change(game));
+    ssr_game_message(game, "options.btn_Language");
+    // The rows of language.uis set the tweak.
+    ssr_tweaks_set_number(tweaks, "Menu", "Language", 10);
+    ssr_game_message(game, "language.btn_Ok");
+    CHECK(ssr_game_settings(game)->language == 10);
+    CHECK(strcmp(ssr_game_screen(game), "mainmenu") == 0);
+    CHECK(ssr_game_take_settings_change(game));
+
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/settings.txt", ssr_test_directory("game_language"));
+    CHECK(ssr_game_save_settings(game, path));
+    ssr_game_free(game);
+    game = ssr_game_create(tweaks);
+    CHECK(ssr_game_load_settings(game, path));
+    CHECK(ssr_game_settings(game)->language == 10);
+    // With no language, the game asks for one in English.
+    ssr_game_free(game);
+    game = ssr_game_create(tweaks);
+    ssr_game_choose_language(game);
+    CHECK(strcmp(ssr_game_screen(game), "language") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "Language") == 0);
+    ssr_game_free(game);
+    ssr_tweaks_free(tweaks);
+}
+
 static const char *localise(void *context, const char *tag) {
     (void)context;
     if (strcmp(tag, "CMESSAGE_TRIALSUCCESSMOBILE") == 0) return "Signed by $clubname ($labelname) in $leaguename.";
@@ -1928,5 +1969,6 @@ int main(void) {
     test_starts_a_new_career();
     test_goes_between_screens();
     test_changes_and_saves_the_options();
+    test_chooses_a_language();
     return TEST_RESULT();
 }
