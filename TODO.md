@@ -40,8 +40,11 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       swipe, and lists that the code fills from a template
 - [ ] The expression language of the layouts: `set(...)`, `fmt()`,
       `oneof()`, `lerp()`, `rgba()`, `slotcol()`, and `%` variables
-- [ ] The shells: the news ticker (`ShowShell(Ticker)`, `ticker.uis`),
-      the borders, and the overlays
+- [x] The news ticker shell (`ShowShell(Ticker)`, `ticker.uis`) with the
+      welcome texts
+- [ ] The texts of the ticker that tell of the career (low energy, the
+      next match, relations, promotion), the speed-up when you touch the
+      tape, and the other shells: the borders and the overlays
 - [ ] The rest of the layout commands: font shadows (`FontShadow`), the
       fade of a screen (`Dissolve:`), global emitters, cached draws
       (`DrawCached:`), and the 3D models of the match
