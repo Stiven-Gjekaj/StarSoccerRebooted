@@ -138,8 +138,9 @@ target_link_libraries(layoutscan PRIVATE ssr_core)
 
 enable_testing()
 
-# The helpers that each test uses: the checks and a writer for zip archives.
-add_library(ssr_testkit STATIC tests/ssr_zipwriter.c tests/ssr_imagewriter.c)
+# The helpers that each test uses: the checks, and writers for zip archives,
+# images, and Spine files.
+add_library(ssr_testkit STATIC tests/ssr_zipwriter.c tests/ssr_imagewriter.c tests/ssr_spinewriter.c)
 target_include_directories(ssr_testkit PUBLIC tests src/third_party)
 target_link_libraries(ssr_testkit PUBLIC ssr_core)
 
