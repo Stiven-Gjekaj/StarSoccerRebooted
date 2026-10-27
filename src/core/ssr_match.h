@@ -71,6 +71,10 @@ typedef struct {
     // A big match of the remake (SSR_BIG_*): the stadium is full, and the
     // other team raises its game.
     int bigMatch;
+    // The stadium of the home team from a data pack: the name, or NULL,
+    // and the seats, or 0. The seats choose the size of the stadium.
+    const char *stadium;
+    int capacity;
 } SSRMatchSetup;
 
 // The big matches of the remake.

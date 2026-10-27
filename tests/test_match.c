@@ -354,6 +354,24 @@ static void test_plays_a_big_match(void) {
     CHECK(said == 2);
 }
 
+// The stadium of a pack: its seats choose the size, and the commentary
+// names it at the kick-off.
+static void test_plays_in_the_stadium_of_a_pack(void) {
+    SSRMatch m;
+    SSRRandom random = {11};
+    SSRMatchSetup s = setup_for();
+    s.homeStrength = 20;
+    s.stadium = "Harbour Park";
+    s.capacity = 41000;
+    ssr_match_start(&m, &s, localise, NULL, &random);
+    CHECK(m.stadiumSize == 3);
+    ssr_match_play(&m, 0);
+    SSRMatchLine line;
+    int named = 0;
+    while (ssr_match_take_line(&m, &line)) named += strcmp(line.text, "SSR_MatchStadium") == 0;
+    CHECK(named == 1);
+}
+
 static void test_the_captain_draws_runs(void) {
     SSRMatch m;
     SSRRandom random = {11};
@@ -380,6 +398,7 @@ int main(void) {
     test_plays_in_the_rain();
     test_plays_in_the_snow();
     test_plays_a_big_match();
+    test_plays_in_the_stadium_of_a_pack();
     test_plays_a_match();
     test_a_cup_tie_goes_to_extra_time_and_penalties();
     test_counts_the_goals_of_the_player();

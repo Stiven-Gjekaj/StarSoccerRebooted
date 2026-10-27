@@ -2276,6 +2276,10 @@ static void start_match(SSRGame *game) {
     // The pitch of the game: 0 dry, 1 snow, 2 worn, 3 rain.
     ssr_tweaks_set_number(game->tweaks, "Pitch", "WeatherType", s.weather == 1 ? 3 : s.weather == 2 ? 1 : worn ? 2 : 0);
     s.bigMatch = big_match(game, comp, f, pool, homeIsMine ? f->home : f->away);
+    if (ground && f->level == 0) {
+        s.stadium = ground->stadium;
+        s.capacity = ground->capacity;
+    }
     ssr_match_start(game->match, &s, game->localise, game->context, &game->random);
     game->commentaryCount = 0;
     SSRTweaks *t = game->tweaks;

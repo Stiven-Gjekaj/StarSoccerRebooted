@@ -127,6 +127,9 @@ void ssr_match_start(SSRMatch *m, const SSRMatchSetup *setup, const char *(*loca
     // c_TMatch: the stadium by the strength of the home team.
     float home = setup->homeStrength;
     m->stadiumSize = home >= 90 ? 4 : home >= 75 ? 3 : home >= 55 ? 2 : home >= 35 ? 1 : 0;
+    // [I: the seats of a stadium of a data pack choose the size.]
+    int seats = setup->capacity;
+    if (seats > 0) m->stadiumSize = seats >= 60000 ? 4 : seats >= 35000 ? 3 : seats >= 15000 ? 2 : seats >= 5000 ? 1 : 0;
     // [I: a cup final of the remake is in the biggest stadium.]
     if (setup->bigMatch == SSR_BIG_FINAL) m->stadiumSize = 4;
     set_up_chances(m, random);
@@ -151,6 +154,17 @@ int ssr_match_play(SSRMatch *m, int now) {
         m->matchTick = now;
         if (m->minute == 0) {
             say(m, 0, "Kick Off", 0, 0);
+            if (m->setup.stadium && m->setup.stadium[0]) {
+                char text[160];
+                snprintf(text, sizeof(text), "%s", text_of(m, "SSR_MatchStadium"));
+                char *at = strstr(text, "$stadium");
+                if (at) {
+                    char rest[160];
+                    snprintf(rest, sizeof(rest), "%s", at + 8);
+                    snprintf(at, sizeof(text) - (size_t)(at - text), "%s%s", m->setup.stadium, rest);
+                }
+                say(m, 0, text, 0, 0);
+            }
             if (m->setup.weather == 1) say(m, 0, text_of(m, "SSR_MatchRain"), 0, 0);
             if (m->setup.weather == 2) say(m, 0, text_of(m, "SSR_MatchSnow"), 0, 0);
             if (m->setup.bigMatch == SSR_BIG_FINAL) say(m, 0, text_of(m, "SSR_MatchFinal"), 0, 0);
