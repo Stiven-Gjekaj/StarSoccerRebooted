@@ -179,6 +179,56 @@ static void watch_a_replay(SSRGame *game, SSRTweaks *tweaks) {
 // season.
 static int seasons = 0, notPicked = 0, substitutes = 0;
 
+static int transfers = 0;
+
+// Yes to a transfer at the end of the season: a nation, a division, a
+// club, and the contract. A season with no club that wants the player
+// goes on with the club.
+static void transfer_at_season_end(SSRGame *game, SSRTweaks *tweaks) {
+    const SSRCareer *c = ssr_game_career(game);
+    ssr_game_message(game, "message.btn_Ok");
+    // A player of a low star rating: no club wants the player.
+    if (strcmp(ssr_game_screen(game), "message") == 0) {
+        CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_NOCLUBSINTERESTEDATALL") == 0);
+        ssr_game_message(game, "message.btn_Ok");
+        return;
+    }
+    CHECK(strcmp(ssr_game_screen(game), "desiredtransfer") == 0);
+    SSRUiOp ops[256];
+    int count = take_ops(game, ops, 256), division = 0;
+    CHECK(has_op(ops, count, SSR_OP_LIST_ADD, "LeagueCombo", NULL));
+    for (int i = 0; i < count; i++) {
+        if (ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "DivisionCombo") == 0) division = ops[i].id;
+    }
+    int club = 0;
+    if (division) {
+        ssr_tweaks_set_number(tweaks, "Combo", "ChosenDesiredDivision", division);
+        ssr_game_message(game, "desiredtransfer.cmb_Division");
+        count = take_ops(game, ops, 256);
+        for (int i = 0; i < count; i++) {
+            if (ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "ClubCombo") == 0) club = ops[i].id;
+        }
+    }
+    if (!club) {
+        // Back asks to stay; Yes starts the new season.
+        ssr_game_message(game, "desiredtransfer.btn_Back");
+        CHECK(strcmp(ssr_game_screen(game), "message") == 0);
+        ssr_game_message(game, "message.btn_Ok");
+        return;
+    }
+    CHECK(club != c->clubId);
+    ssr_tweaks_set_number(tweaks, "Combo", "ChosenDesiredClub", club);
+    ssr_game_message(game, "desiredtransfer.cmb_Club");
+    ssr_game_message(game, "desiredtransfer.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "contract") == 0 && ssr_tweaks_number(tweaks, "Negotiation", "IsNewClub") == 1);
+    int wage = (int)ssr_tweaks_number(tweaks, "Negotiation", "Wage");
+    ssr_game_message(game, "contract.btn_Accept");
+    // An agent gets a fee: its message comes first.
+    if (strcmp(ssr_game_screen(game), "message") == 0) ssr_game_message(game, "message.btn_Ok");
+    CHECK(c->clubId == club && c->wage == wage);
+    transfers++;
+}
+
 static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     const SSRCareer *c = ssr_game_career(game);
     int year = ssr_career_year(c);
@@ -210,7 +260,11 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(ssr_tweaks_number(tweaks, "SeasonAwards", "TeamPlayerOfYear") == 0);
     ssr_game_message(game, "playeroftheyear.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "message") == 0);
-    ssr_game_message(game, "message.btn_Cancel");
+    if (seasons < 2) {
+        transfer_at_season_end(game, tweaks);
+    } else {
+        ssr_game_message(game, "message.btn_Cancel");
+    }
     CHECK(strcmp(ssr_game_screen(game), "startransition") == 0);
     ssr_game_update(game, 60);
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
@@ -1210,8 +1264,10 @@ static void test_starts_a_new_career(void) {
     hire_and_kit_out(game, tweaks, path);
     renew_the_contract(game, tweaks, path);
     // Six rounds make a season: the career played to the next one.
-    for (int i = 0; i < 12 && seasons == 0; i++) play_a_match(game, tweaks);
-    CHECK(seasons >= 1);
+    for (int i = 0; i < 24 && seasons < 2; i++) play_a_match(game, tweaks);
+    // At the second end the star rating is near 400: the limit is about
+    // 65, so the club of strength 50 wants the player.
+    CHECK(seasons >= 2 && transfers == 1);
     // The weeks had news: tips, and a dilemma or other news.
     CHECK(newsSeen > 0 && ssr_game_career(game)->tipCount > 0);
     CHECK(interviews >= 2 && interviewsWon >= 1);

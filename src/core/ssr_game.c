@@ -224,6 +224,9 @@ struct SSRGame {
     int newBossRelCount;
     int shirts[6];
     int negTurn, lastClick, timeClickedNeg, clickDelay, negotiateAccepted, proceedAt;
+    // The desired transfer at the end of a season: the nation, the
+    // division, and the club that the player chose.
+    int desiredNation, desiredDivision, desiredClub;
     int interviewDone;
     int difficulty, buttonCount, buttons, decoys;
     int sequence[15];
@@ -1004,6 +1007,9 @@ static void call_negotiations_cancelled(SSRGame *game);
 static void call_negotiation_accepted(SSRGame *game);
 static void call_sign_new_contract(SSRGame *game);
 static void call_sign_for_new_club(SSRGame *game);
+static void call_confirm_transfer(SSRGame *game);
+static void call_new_season(SSRGame *game);
+static void call_new_season_same_club(SSRGame *game);
 static void call_trainer_get(SSRGame *game);
 static void call_boots_expired(SSRGame *game);
 static void call_dump_partner(SSRGame *game);
@@ -1043,6 +1049,9 @@ static void run_call(SSRGame *game, const char *name) {
         {"NegotiationAccepted", call_negotiation_accepted},
         {"SignNewContract", call_sign_new_contract},
         {"SignForNewClub", call_sign_for_new_club},
+        {"ConfirmSeasonEndTransfer", call_confirm_transfer},
+        {"NewSeasonNoClubsInterested", call_new_season},
+        {"NewSeasonWithSameClub", call_new_season_same_club},
         {"TrainerGet", call_trainer_get},
         {"BootsExpired", call_boots_expired},
         {"DumpGirl", call_dump_partner},
@@ -2798,8 +2807,16 @@ static void poty_play(SSRGame *game) {
 
 // The answer: No keeps the club [I: the transfer screens come with the
 // life of the player; until then Yes also keeps the club].
+static void desired_transfer_screen(SSRGame *game, int nation);
+
+// The call "SeasonEndTransfer": Yes looks for a new club.
 static void call_season_end_transfer(SSRGame *game) {
-    new_season(game);
+    if (game->returnState != 1) {
+        new_season(game);
+        return;
+    }
+    const SSRClub *club = ssr_world_club(game->world, game->career.clubId);
+    desired_transfer_screen(game, club ? club->nation : game->career.clubNationId);
 }
 
 static void match_play(SSRGame *game) {
@@ -5419,8 +5436,14 @@ static void contract_accept(SSRGame *game) {
 }
 
 static void negotiate_screen(SSRGame *game);
+static void desired_transfer_screen(SSRGame *game, int nation);
+
 static void contract_reject(SSRGame *game) {
     SSRCareer *c = &game->career;
+    if (game->offer.endOfSeason) {
+        desired_transfer_screen(game, game->desiredNation);
+        return;
+    }
     if (game->offer.clubId == c->clubId) {
         c->lastNegotiations = c->sdate;
         int *rel = new_boss_rel(game, c->clubId);
@@ -5603,6 +5626,199 @@ static void negotiate_tick(SSRGame *game) {
     }
 }
 
+
+/* ----------------------------------------------------- desired transfer */
+
+// GetRatingLimit: the strength of the clubs that want the player.
+static int rating_limit(const SSRCareer *c) {
+    int v = (c->starRating + 200) / 10;
+    return (v < 10 ? 10 : v > 100 ? 100 : v) + 5;
+}
+
+static const SSRCompetition *world_comp(const SSRWorld *w, int id) {
+    for (int i = 0; i < w->competitionCount; i++) {
+        if (w->competitions[i].id == id) return &w->competitions[i];
+    }
+    return NULL;
+}
+
+static int compare_club_strength(void *context, int a, int b) {
+    const SSRWorld *w = context;
+    return w->clubs[a].strength - w->clubs[b].strength;
+}
+
+// The clubs of the nation, the strongest first (SortListBy 11).
+static int nation_clubs(const SSRWorld *w, int nation, int *out) {
+    int n = 0;
+    for (int i = 0; i < w->clubCount; i++) {
+        if (w->clubs[i].nation == nation) out[n++] = i;
+    }
+    ssr_sort(out, n, compare_club_strength, (void *)w, 1);
+    return n;
+}
+
+static void desired_hint(SSRGame *game) {
+    char text[256];
+    if (game->desiredClub > 0) {
+        const SSRClub *club = ssr_world_club(game->world, game->desiredClub);
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_NEGOTIATEWITH"));
+        replace_all(text, sizeof(text), "$clubname", club ? club->tla : "");
+    } else {
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_CLUBSINTERESTED"));
+    }
+    add_op(game, SSR_OP_TEXT, "HintText", NULL, text, 0);
+}
+
+// ComboLeague: the divisions of the nation with clubs that want the player.
+static void desired_league(SSRGame *game) {
+    const SSRWorld *w = game->world;
+    int nation = (int)ssr_tweaks_number(game->tweaks, "Combo", "ChosenDesiredLeague");
+    const SSRNation *n = ssr_world_nation(w, nation);
+    if (!n) return;
+    game->desiredNation = nation;
+    add_op(game, SSR_OP_TEXT, "LeagueText", NULL, n->name, 0);
+    add_op(game, SSR_OP_LIST_CLEAR, "DivisionCombo", NULL, NULL, 0);
+    add_op(game, SSR_OP_LIST_CLEAR, "ClubCombo", NULL, NULL, 0);
+    add_op(game, SSR_OP_TEXT, "DivisionText", NULL, loc(game, "Choose Division"), 0);
+    add_op(game, SSR_OP_TEXT, "ClubText", NULL, loc(game, "Choose Club"), 0);
+    add_op(game, SSR_OP_HIDE, "PlayButton", NULL, NULL, 0);
+    game->desiredDivision = game->desiredClub = 0;
+    int limit = rating_limit(&game->career);
+    int *clubs = malloc(sizeof(int) * (size_t)(w->clubCount + 1));
+    if (!clubs) return;
+    int count = nation_clubs(w, nation, clubs);
+    for (int i = 0; i < w->competitionCount; i++) {
+        const SSRCompetition *comp = &w->competitions[i];
+        int found = 0;
+        for (int k = 0; k < count && !found; k++) {
+            const SSRClub *club = &w->clubs[clubs[k]];
+            found = club->league == comp->id && club->strength < limit;
+        }
+        if (found && comp->level == 0 && comp->locale == 0 && comp->type == 0 && comp->based == nation &&
+            comp->duration > 0) {
+            add_op(game, SSR_OP_LIST_ADD, "DivisionCombo", "DivisionTemplate", comp->tla, comp->id);
+        }
+    }
+    free(clubs);
+    desired_hint(game);
+}
+
+// ComboDivision: the clubs of the division that want the player.
+static void desired_division(SSRGame *game) {
+    const SSRWorld *w = game->world;
+    int division = (int)ssr_tweaks_number(game->tweaks, "Combo", "ChosenDesiredDivision");
+    const SSRCompetition *comp = world_comp(w, division);
+    if (!comp) return;
+    game->desiredDivision = division;
+    game->desiredClub = 0;
+    add_op(game, SSR_OP_TEXT, "DivisionText", NULL, comp->tla, 0);
+    add_op(game, SSR_OP_LIST_CLEAR, "ClubCombo", NULL, NULL, 0);
+    add_op(game, SSR_OP_TEXT, "ClubText", NULL, loc(game, "Choose Club"), 0);
+    add_op(game, SSR_OP_HIDE, "PlayButton", NULL, NULL, 0);
+    int limit = rating_limit(&game->career);
+    int *clubs = malloc(sizeof(int) * (size_t)(w->clubCount + 1));
+    if (!clubs) return;
+    int count = nation_clubs(w, game->desiredNation, clubs);
+    for (int k = 0; k < count; k++) {
+        const SSRClub *club = &w->clubs[clubs[k]];
+        if (club->league != division || club->strength >= limit || club->id == game->career.clubId) continue;
+        char text[64];
+        const SSRCompetition *cont = club->continentalCompetition > 0 ? world_comp(w, club->continentalCompetition) : NULL;
+        if (cont) snprintf(text, sizeof(text), "%s (%s)", club->tla, cont->tla);
+        else snprintf(text, sizeof(text), "%s", club->tla);
+        add_op(game, SSR_OP_LIST_ADD, "ClubCombo", "ClubTemplate", text, club->id);
+    }
+    free(clubs);
+    desired_hint(game);
+}
+
+// ComboClub.
+static void desired_club(SSRGame *game) {
+    int id = (int)ssr_tweaks_number(game->tweaks, "Combo", "ChosenDesiredClub");
+    const SSRClub *club = ssr_world_club(game->world, id);
+    game->desiredClub = club ? id : 0;
+    if (club) {
+        add_op(game, SSR_OP_SHOW, "PlayButton", NULL, NULL, 0);
+        add_op(game, SSR_OP_TEXT, "ClubText", NULL, club->tla, 0);
+    }
+    desired_hint(game);
+}
+
+// c_TScreen_DesiredTransfer.SetUpScreen.
+static void desired_transfer_screen(SSRGame *game, int nation) {
+    const SSRWorld *w = game->world;
+    set_screen(game, "desiredtransfer");
+    game->desiredNation = nation;
+    game->desiredDivision = game->desiredClub = 0;
+    add_op(game, SSR_OP_LIST_CLEAR, "LeagueCombo", NULL, NULL, 0);
+    add_op(game, SSR_OP_LIST_CLEAR, "DivisionCombo", NULL, NULL, 0);
+    add_op(game, SSR_OP_LIST_CLEAR, "ClubCombo", NULL, NULL, 0);
+    add_op(game, SSR_OP_TEXT, "LeagueText", NULL, loc(game, "Choose League"), 0);
+    add_op(game, SSR_OP_TEXT, "DivisionText", NULL, loc(game, "Choose Division"), 0);
+    add_op(game, SSR_OP_TEXT, "ClubText", NULL, loc(game, "Choose Club"), 0);
+    add_op(game, SSR_OP_HIDE, "PlayButton", NULL, NULL, 0);
+    add_op(game, SSR_OP_TEXT, "HintText", NULL, loc(game, "Choose League"), 0);
+    int limit = rating_limit(&game->career), any = 0;
+    for (int i = 0; i < w->nationCount; i++) {
+        const SSRNation *n = &w->nations[i];
+        int ok = 0;
+        for (int k = 0; k < w->clubCount && !ok; k++) {
+            const SSRClub *club = &w->clubs[k];
+            const SSRCompetition *comp = club->nation == n->id ? world_comp(w, club->league) : NULL;
+            ok = comp && club->strength < limit + 5 && comp->duration > 0;
+        }
+        if (!ok) continue;
+        add_op(game, SSR_OP_LIST_ADD, "LeagueCombo", "LeagueTemplate", n->name, n->id);
+        any = 1;
+    }
+    if (!any) {
+        message(game, "message", loc(game, "CMESSAGE_NOCLUBSINTERESTEDATALL"), 0, 1, "NewSeasonNoClubsInterested");
+        return;
+    }
+    ssr_tweaks_set_number(game->tweaks, "Combo", "ChosenDesiredLeague", nation);
+    desired_league(game);
+}
+
+static void desired_ok(SSRGame *game) {
+    if (!game->desiredClub) return;
+    get_offer(game, game->desiredClub, 1);
+    contract_screen(game, 0);
+}
+
+static void desired_back(SSRGame *game) {
+    ssr_tweaks_set_number(game->tweaks, "Combo", "ShowDesiredLeagues", 0);
+    ssr_tweaks_set_number(game->tweaks, "Combo", "ShowDesiredDivisions", 0);
+    ssr_tweaks_set_number(game->tweaks, "Combo", "ShowDesiredClubs", 0);
+    const SSRClub *club = ssr_world_club(game->world, game->career.clubId);
+    char text[512];
+    snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_NEWSEASONWITHSAMECLUB"));
+    replace_all(text, sizeof(text), "$clubname", club ? club->tla : "");
+    message(game, "message", text, 1, 1, "NewSeasonWithSameClub");
+}
+
+static void new_season(SSRGame *game);
+
+// The call "ConfirmSeasonEndTransfer": the new club for the new season.
+static void call_confirm_transfer(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    const SSRClub *club = offer_club(game);
+    if (club) {
+        c->clubNationId = club->nation;
+        c->clubId = club->id;
+    }
+    c->relationBoss = (float)game->messageData;
+    c->relationTeam = (float)ssr_rand2(&game->random, 35, 50);
+    c->relationFans = (float)ssr_rand2(&game->random, 50, 60);
+    new_season(game);
+}
+
+static void call_new_season(SSRGame *game) {
+    new_season(game);
+}
+
+static void call_new_season_same_club(SSRGame *game) {
+    if (game->returnState == 1) new_season(game);
+}
 
 /* ------------------------------------------------------------ the pairs */
 
@@ -5865,6 +6081,11 @@ static const Route ROUTES[] = {
     {"debug.interview", interview_screen},
     {"debug.dilemma", dilemma_screen},
     {"gamemenu.btn_Contract", game_contract},
+    {"desiredtransfer.btn_Ok", desired_ok},
+    {"desiredtransfer.btn_Back", desired_back},
+    {"desiredtransfer.cmb_League", desired_league},
+    {"desiredtransfer.cmb_Division", desired_division},
+    {"desiredtransfer.cmb_Club", desired_club},
     {"contract.btn_Accept", contract_accept},
     {"contract.btn_Reject", contract_reject},
     {"contract.btn_Negotiate", contract_negotiate},
