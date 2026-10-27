@@ -715,6 +715,21 @@ static void test_fills_lists_and_changes_elements(void) {
     const SSRSceneItem *hit = ssr_scene_hit_item(scene, 150, 350);
     CHECK(hit && strcmp(ssr_scene_click(scene, &env, hit), "choosenation.cmb_Nation") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Combo", "ChosenDesiredNation") == 63);
+    // The code colours the parts of the last entry, and changes its
+    // sub-elements.
+    ssr_scene_list_colour(scene, "NationCombo", 1, "FF0000FF");
+    ssr_scene_list_sub(scene, "NationCombo", "NationTemplate", NULL, 1);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "GreenButton"));
+    ssr_scene_list_sub(scene, "NationCombo", "NationTemplate", "Cymru", 1);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_text(scene, "Cymru") && find_text(scene, "Cymru")->colour == 0xFF0000FF);
+    ssr_scene_list_colour(scene, "NationCombo", 1, "00FF00FF");
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_text(scene, "Cymru")->colour == 0x00FF00FF);
+    ssr_scene_list_sub(scene, "NationCombo", "NationTemplate", NULL, 0);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(!find_text(scene, "Cymru") && find_text(scene, "ENGLAND"));
     ssr_scene_list_clear(scene, "NationCombo");
     ssr_scene_update(scene, &env, 16);
     CHECK(!find_text(scene, "WALES"));

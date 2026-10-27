@@ -3350,3 +3350,48 @@ void ssr_scene_spawn_clone(SSRScene *scene, int id, const char *ref, const char 
         for (int i = 0; i < at->childCount && count < 64; i++) stack[count++] = at->children[i];
     }
 }
+
+// The last entry that the code added to the list, or NULL.
+static Gel *last_entry(const SSRScene *scene, const char *list) {
+    Gel *g = scene && list ? find_ref_first(scene, list) : NULL;
+    return g && g->childCount > 0 ? g->children[g->childCount - 1] : NULL;
+}
+
+// The element with the number in the entry: the gels with the ref of the
+// entry, in the order of the file (c_GGadget.GetElement). 0 is the entry.
+static Gel *nth_element(Gel *g, const char *ref, int *index) {
+    if (g->ref && ref && strcmp(g->ref, ref) == 0) {
+        if (*index == 0) return g;
+        (*index)--;
+    }
+    for (int i = 0; i < g->childCount; i++) {
+        Gel *found = nth_element(g->children[i], ref, index);
+        if (found) return found;
+    }
+    return NULL;
+}
+
+void ssr_scene_list_colour(SSRScene *scene, const char *list, int element, const char *colour) {
+    Gel *entry = last_entry(scene, list);
+    if (!entry || !colour) return;
+    int index = element;
+    Gel *g = nth_element(entry, entry->ref, &index);
+    char text[24];
+    snprintf(text, sizeof(text), "#%s", colour[0] == '#' ? colour + 1 : colour);
+    if (g) g->hasColour = parse_colour(text, &g->colour);
+}
+
+// The gels with the ref in g: the text takes the text, and the gels show
+// or hide.
+static void change_sub(Gel *g, const char *ref, const char *text, int visible) {
+    if (g->ref && strcmp(g->ref, ref) == 0) {
+        g->hidden = !visible;
+        if (text && g->kind == GEL_TEXT) set_shown(g, text);
+    }
+    for (int i = 0; i < g->childCount; i++) change_sub(g->children[i], ref, text, visible);
+}
+
+void ssr_scene_list_sub(SSRScene *scene, const char *list, const char *ref, const char *text, int visible) {
+    Gel *entry = last_entry(scene, list);
+    if (entry && ref) change_sub(entry, ref, text, visible);
+}

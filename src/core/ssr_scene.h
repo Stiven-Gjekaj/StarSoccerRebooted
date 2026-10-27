@@ -175,6 +175,14 @@ float ssr_scene_spawn_x(const SSRScene *scene, int id);
 void ssr_scene_spawn_remove(SSRScene *scene, int id);
 int ssr_scene_list_add(SSRScene *scene, const char *list, const char *template_, const char *text, int id);
 
+// The last entry of the list: the element with the number takes the colour
+// "RRGGBBAA" (c_GGadget.SetElementColour). The elements are the gels with
+// the ref of the entry, in the order of the file. 0 is the entry.
+void ssr_scene_list_colour(SSRScene *scene, const char *list, int element, const char *colour);
+// The last entry of the list: each gel with the ref shows or hides, and a
+// text with the ref takes the text when it is not NULL.
+void ssr_scene_list_sub(SSRScene *scene, const char *list, const char *ref, const char *text, int visible);
+
 // Moves the first element with the ref to (x, y) in its parent, at the
 // scale.
 void ssr_scene_place(SSRScene *scene, const char *ref, float x, float y, float scale);
