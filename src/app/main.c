@@ -1045,6 +1045,28 @@ static void load_game(SSRApp *app) {
     // SSR_SEED fixes the random numbers, so that a test run is the same each time.
     const char *seed = SDL_getenv("SSR_SEED");
     ssr_game_set_seed(app->game, seed && *seed ? SDL_atoi(seed) : (int)SDL_GetTicks());
+    // The world of a new career gets its own seed. SSR_WORLD_SEED fixes it.
+    const char *worldSeed = SDL_getenv("SSR_WORLD_SEED");
+    ssr_game_set_world_seed(app->game, worldSeed && *worldSeed ? SDL_atoi(worldSeed)
+                                                                : (int)(SDL_GetTicksNS() % 2000000000) + 1);
+    // The names of the players of the world: the names of the pack, else
+    // the names of the remake.
+    char *names = NULL;
+    if (app->packDirectory[0]) {
+        SDL_snprintf(path, sizeof(path), "%s/world/Names.txt", app->packDirectory);
+        names = SDL_LoadFile(path, NULL);
+    }
+    if (!names) {
+        const char *base = SDL_GetBasePath();
+        SDL_snprintf(path, sizeof(path), "%sdata/names.txt", base ? base : "");
+        names = SDL_LoadFile(path, NULL);
+    }
+    if (names) {
+        ssr_game_set_names(app->game, names);
+        SDL_free(names);
+    } else {
+        SDL_Log("The app has no data/names.txt.");
+    }
     ssr_game_load_settings(app->game, app->settingsPath);
     int chosen = ssr_game_settings(app->game)->language >= 0 || language_from_device(app);
     if (ssr_game_take_settings_change(app->game) && !ssr_game_save_settings(app->game, app->settingsPath)) {
