@@ -628,6 +628,9 @@ static void test_readouts_conditions_and_click_actions(void) {
     ssr_tweaks_set_number(tweaks, "Player", "SponsorIncome1", 15);
     ssr_tweaks_set_number(tweaks, "Player", "Energy", 7.25);
     ssr_tweaks_set(tweaks, "SaveSlot", "Slot0Data", "Save Slot 1");
+    ssr_tweaks_set_number(tweaks, "Mods", "Boss", 2);
+    ssr_tweaks_set_number(tweaks, "Mods", "Team", -1);
+    ssr_tweaks_set_number(tweaks, "Player", "Cans", 3);
     ssr_tweaks_set_number(tweaks, "Menu", "OwnedBoot", 1);
     ssr_tweaks_set_number(tweaks, "Menu", "FocusedItem", 2);
     SSRUiTree *tree;
@@ -639,6 +642,14 @@ static void test_readouts_conditions_and_click_actions(void) {
              "\tReadout(Player,SponsorIncome1,,')\n"
              "Text:(Old,0,60,100,20)\n"
              "\tStringReadout(SaveSlot,Slot0Data)\n"
+             "Text:(Boss,300,300,100,20)\n"
+             "\tSignedReadoutLoc(Mods,Boss,MENU_PLAY)\n"
+             "Text:(Team,300,330,100,20)\n"
+             "\tSignedReadoutLoc(Mods,Team,MENU_PLAY)\n"
+             "Text:(Zero,300,360,100,20)\n"
+             "\tZeroSignedReadoutLoc(Always,0,MENU_PLAY)\n"
+             "Text:(Cans,300,390,100,20)\n"
+             "\tReadout(Player,Cans,, can, cans)\n"
              "Text:(Club,0,90,100,20)\n"
              "\tGS_PlayerClubName()\n"
              "Rect:(0,0,10,10)\n"
@@ -674,6 +685,11 @@ static void test_readouts_conditions_and_click_actions(void) {
     CHECK(find_text(scene, "7.25"));
     CHECK(find_text(scene, "15'"));
     CHECK(find_text(scene, "Save Slot 1"));
+    CHECK(find_text(scene, "Play+2") && find_text(scene, "Play-1") && find_text(scene, "Play+0"));
+    CHECK(find_text(scene, "3 cans"));
+    ssr_tweaks_set_number(tweaks, "Player", "Cans", 1);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(find_text(scene, "1 can"));
     CHECK(find_text(scene, "LEE"));
     CHECK(find_image(scene, "Boot1") && !find_image(scene, "Boot0"));
     CHECK(find_image(scene, "Focus")->colour == 0xFF0000FF);

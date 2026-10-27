@@ -1219,6 +1219,17 @@ static Doodad *make_doodads(SSRScene *s, Gel *g, const SSRUiNode *const *mods, i
 
 // Makes one doodad from a modifier, or changes the gel when the modifier
 // works at the parse. Returns the doodad, or NULL.
+// Argument i of a modifier as the raw text has it, with its spaces.
+static void raw_arg(const SSRUiNode *m, int i, char *out, size_t capacity) {
+    out[0] = 0;
+    if (i >= m->argCount || !m->raw) return;
+    const char *at = m->raw;
+    for (int comma = 0; *at && comma < i; at++) {
+        if (*at == ',') comma++;
+    }
+    snprintf(out, capacity, "%.*s", (int)strcspn(at, ","), at);
+}
+
 static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
     const char *n = m->name;
     Doodad *d = NULL;
@@ -1314,34 +1325,42 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
     } else if (is(n, "PlaySnd")) {
         d = new_doodad(D_PLAY_SOUND, m);
         if (d) d->text[0] = keep(s, arg(m, 0));
-    } else if (is(n, "Readout") || is(n, "ReadoutLoc")) {
+    } else if (is(n, "Readout") || is(n, "ReadoutLoc") || is(n, "SignedReadout") || is(n, "SignedReadoutLoc") ||
+               is(n, "ZeroSignedReadoutLoc")) {
         // The value of a tweak as text: prefix, number, suffix (c_Readout).
+        // A signed readout puts "+" before a number over 0, and the zero
+        // form before 0 too.
+        int localise = strstr(n, "Loc") != NULL;
         d = new_doodad(D_READOUT, m);
         if (!d) return NULL;
         d->text[0] = keep(s, arg(m, 0));
         d->text[1] = keep(s, arg(m, 1));
-        // The prefix keeps its spaces, as the game reads it.
-        char prefix[64] = "";
-        const char *at = m->raw;
-        for (int comma = 0; at && *at && comma < 2; at++) {
-            if (*at == ',') comma++;
+        // The prefix comes before the number, the suffix after it, and the
+        // plural suffix after a number that is not 1. They keep their
+        // spaces, as the game reads them.
+        char prefix[64] = "", suffix[64] = "", plural[64] = "";
+        raw_arg(m, 2, prefix, sizeof(prefix));
+        raw_arg(m, 3, suffix, sizeof(suffix));
+        if (m->argCount > 4) {
+            raw_arg(m, 4, plural, sizeof(plural));
+        } else {
+            snprintf(plural, sizeof(plural), "%s", suffix);
         }
-        if (at && m->argCount > 2) snprintf(prefix, sizeof(prefix), "%.*s", (int)strcspn(at, ","), at);
-        // The suffix comes after the number. ReadoutLoc reads both from the
-        // language. The two go in one text: prefix, 0x1f, suffix.
-        char suffix[64];
-        snprintf(suffix, sizeof(suffix), "%s", arg(m, 3));
-        if (is(n, "ReadoutLoc") && s->env && s->env->text) {
-            const char *p = prefix[0] ? s->env->text(s->env->context, prefix) : "";
-            const char *q = suffix[0] ? s->env->text(s->env->context, suffix) : "";
-            snprintf(prefix, sizeof(prefix), "%s", p ? p : "");
-            snprintf(suffix, sizeof(suffix), "%s", q ? q : "");
+        // A Loc form reads them from the language. The three go in one text:
+        // prefix, 0x1f, suffix, 0x1f, plural suffix.
+        if (localise && s->env && s->env->text) {
+            char *parts[3] = {prefix, suffix, plural};
+            for (int i = 0; i < 3; i++) {
+                const char *t = parts[i][0] ? s->env->text(s->env->context, parts[i]) : "";
+                snprintf(parts[i], 64, "%s", t ? t : "");
+            }
         }
-        char both[160];
-        snprintf(both, sizeof(both), "%s\x1f%s", prefix, suffix);
-        d->text[2] = keep(s, both);
+        char all[200];
+        snprintf(all, sizeof(all), "%s\x1f%s\x1f%s", prefix, suffix, plural);
+        d->text[2] = keep(s, all);
         d->v[0] = (float)number(s, m, 5, 0);
         d->v[1] = 1.8347578e11f;
+        d->v[2] = is(n, "ZeroSignedReadoutLoc") ? 2 : strncmp(n, "Signed", 6) == 0 ? 1 : 0;
     } else if (is(n, "StringReadout")) {
         d = new_doodad(D_STRING_READOUT, m);
         if (!d) return NULL;
@@ -2318,10 +2337,23 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         if (value == d->v[1]) break;
         d->v[1] = value;
         char number[64], text[256];
-        readout_text(value, (int)d->v[0], number, sizeof(number));
+        readout_text(value, (int)d->v[0], number + 1, sizeof(number) - 1);
+        int sign = (d->v[2] >= 1 && value > 0) || (d->v[2] == 2 && value == 0);
+        number[0] = '+';
         const char *split = strchr(d->text[2], '\x1f');
+        const char *split2 = split ? strchr(split + 1, '\x1f') : NULL;
         int prefixLength = split ? (int)(split - d->text[2]) : (int)strlen(d->text[2]);
-        snprintf(text, sizeof(text), "%.*s%s%s", prefixLength, d->text[2], number, split ? split + 1 : "");
+        const char *suffix = "";
+        int suffixLength = 0;
+        if (split && split2 && value == 1) {
+            suffix = split + 1;
+            suffixLength = (int)(split2 - suffix);
+        } else if (split2) {
+            suffix = split2 + 1;
+            suffixLength = (int)strlen(suffix);
+        }
+        snprintf(text, sizeof(text), "%.*s%s%.*s", prefixLength, d->text[2], sign ? number : number + 1, suffixLength,
+                 suffix);
         set_shown(g, text);
         break;
     }
