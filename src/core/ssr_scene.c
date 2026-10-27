@@ -90,6 +90,7 @@ typedef enum {
     D_IF,
     D_PLAY_SOUND,
     D_SCROLLING_LIST,
+    D_SCROLL_INDICATOR,
     D_SHOW_SHELL,
     D_SWIPE_PANEL,
     D_EMIT_PLACER,
@@ -1525,6 +1526,13 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         char velocity[160];
         snprintf(velocity, sizeof(velocity), "%s\x1f%s", arg(m, 3), arg(m, 4));
         d->text[2] = keep(s, velocity);
+    } else if (is(n, "ScrollIndicator")) {
+        // ScrollIndicator(ref,doodad): the bar of the ScrollingList of the
+        // element ref (c_ScrollIndicator).
+        d = new_doodad(D_SCROLL_INDICATOR, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->v[0] = g->h;
     } else if (is(n, "SwipePanel")) {
         // SwipePanel(Cat,Scroll,Cat,Velocity): a drag moves the scroll
         // (c_SwipePanel).
@@ -2374,6 +2382,8 @@ static void set_tweak_pair(const SSRScene *s, const char *pair, double value) {
 }
 
 // The bottom of the children of g and of their children, in g.
+static Gel *find_ref_first(const SSRScene *s, const char *ref);
+
 static float content_bottom(const Gel *g) {
     float bottom = 0;
     for (int i = 0; i < g->childCount; i++) {
@@ -2650,6 +2660,25 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         }
         set_tweak_pair(s, d->text[2], velocity);
         ssr_tweaks_set_number(s->env->tweaks, d->text[0], d->text[1], y);
+        // The heights for a ScrollIndicator: the contents, and the place of
+        // the contents.
+        d->v[1] = contents;
+        d->v[2] = -y;
+        break;
+    }
+    case D_SCROLL_INDICATOR: {
+        Gel *list = find_ref_first(s, d->text[0]);
+        const Doodad *l = list ? list->doodads : NULL;
+        while (l && l->kind != D_SCROLLING_LIST) l = l->next;
+        if (!l) break;
+        float display = l->v[0], contents = l->v[1], original = d->v[0];
+        if (display >= contents) {
+            g->y = 0;
+            g->h = original;
+        } else {
+            g->h = original * display / contents;
+            g->y = clampf(original * (l->v[2] / contents), 0, original - g->h);
+        }
         break;
     }
     case D_SWIPE_PANEL: {

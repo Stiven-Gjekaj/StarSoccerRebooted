@@ -1364,6 +1364,41 @@ static void test_scrolls_rows_in_a_child(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The bar of a list has the height of the part that shows, and it moves
+// down as the list scrolls (c_ScrollIndicator).
+static void test_shows_the_place_in_a_list(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Combo", "Scroll", 0);
+    layout = "Rect:(0,0,0,0) ref:TeamList\n"
+             "\tScrollingList(Combo,Scroll,300,Combo,ScrollVel)\n"
+             "{\n"
+             "\tDraw:(Row,0,0,400,600)\n"
+             "}\n"
+             "Draw:(Recess,500,0,20,200)\n"
+             "{\n"
+             "\tDraw:(SliderButton,500,0,20,200)\n"
+             "\t\tScrollIndicator(TeamList,ScrollingList)\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 16);
+    ssr_scene_update(scene, &env, 16);
+    // 300 of 600 shows: the bar is half of 200, at the top.
+    const SSRSceneItem *bar = find_image(scene, "SliderButton");
+    CHECK(bar && near(bar->h, 100) && near(bar->y, 0));
+    // At the end of the list the bar is at the bottom.
+    ssr_tweaks_set_number(tweaks, "Combo", "Scroll", -300);
+    ssr_scene_update(scene, &env, 16);
+    ssr_scene_update(scene, &env, 16);
+    bar = find_image(scene, "SliderButton");
+    CHECK(bar && near(bar->h, 100) && bar->y > 90 && bar->y <= 100);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -1696,6 +1731,7 @@ int main(void) {
     test_plays_an_animation_from_a_frame();
     test_holds_one_instance_at_a_frame();
     test_moves_the_target_of_a_converge();
+    test_shows_the_place_in_a_list();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
