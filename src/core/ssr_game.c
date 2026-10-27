@@ -114,6 +114,8 @@ struct SSRGame {
     // showed.
     SSRTraining *training;
     const char *trainingMessage;
+    // The splash message ("Success!", "Fail!") shows until this time.
+    int splashEnd;
 };
 
 enum { REPLAY_NONE, REPLAY_OFFER, REPLAY_PLAY };
@@ -741,11 +743,19 @@ static void trial_tick(SSRGame *game) {
     if (t->chance.kicking == 1) ssr_tweaks_set(game->tweaks, "Menu", "MGTrialStep", "1aim");
     ssr_tweaks_set_number(game->tweaks, "Menu", "Lifecount", t->lives);
     if (t->message && t->message != game->trainingMessage) {
-        // The banner of the result (scoreanim.uis) for the time of the
-        // message.
-        ssr_tweaks_set_number(game->tweaks, "Minigames", "Outcome", t->outcome);
-        ssr_tweaks_set_number(game->tweaks, "Chance", "IsHead", 0);
-        game->bannerEnd = t->messageEnd;
+        if (strcmp(t->message, "Success!") == 0 || strcmp(t->message, "Fail!") == 0) {
+            // TQuickMessage "splashmessage": the text in capitals.
+            char text[64];
+            snprintf(text, sizeof(text), "%s", loc(game, t->message));
+            for (char *p = text; *p; p++) *p = (char)toupper((unsigned char)*p);
+            ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+            game->splashEnd = t->messageEnd;
+        } else {
+            // The banner of the result (scoreanim.uis).
+            ssr_tweaks_set_number(game->tweaks, "Minigames", "Outcome", t->outcome);
+            ssr_tweaks_set_number(game->tweaks, "Chance", "IsHead", 0);
+            game->bannerEnd = t->messageEnd;
+        }
     }
     game->trainingMessage = t->message;
     if (t->over) end_trial(game);
@@ -2141,4 +2151,8 @@ void ssr_game_touch(SSRGame *game, int down, float x, float y) {
 
 int ssr_game_banner(const SSRGame *game) {
     return game && game->now < game->bannerEnd;
+}
+
+int ssr_game_splash(const SSRGame *game) {
+    return game && game->now < game->splashEnd;
 }

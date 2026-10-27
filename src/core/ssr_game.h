@@ -138,6 +138,10 @@ int ssr_game_replaying(const SSRGame *game);
 // the tweaks Minigames:Outcome and Chance:IsHead).
 int ssr_game_banner(const SSRGame *game);
 
+// 1 while the splash message of a drill shows (splashmessage.uis, with the
+// tweak Menu:QuickMessage).
+int ssr_game_splash(const SSRGame *game);
+
 // The touch of the player in the units of the layouts, for a chance.
 void ssr_game_touch(SSRGame *game, int down, float x, float y);
 

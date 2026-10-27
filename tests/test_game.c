@@ -101,11 +101,12 @@ static void fail_the_trials(SSRGame *game, SSRTweaks *tweaks) {
         char step[8];
         snprintf(step, sizeof(step), "%d", trial);
         CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MGTrialStep"), step) == 0);
-        int lost = 0;
+        int lost = 0, splash = 0;
         for (int i = 0; i < 200000 && ssr_game_training(game); i++) {
             t = ssr_game_training(game);
             const SSRChance *c = &t->chance;
             if (t->lives < 3) lost = 1;
+            if (ssr_game_splash(game)) splash = 1;
             if (t->instruction) {
                 ssr_game_touch(game, 1, 320, 900);
                 ssr_game_update(game, 1);
@@ -128,6 +129,10 @@ static void fail_the_trials(SSRGame *game, SSRTweaks *tweaks) {
             ssr_game_update(game, 1);
         }
         CHECK(!ssr_game_training(game) && lost);
+        // The drills of the gate, the dribble, and the dummy show "Fail!".
+        if (trial == 1 || trial == 4 || trial == 5) {
+            CHECK(splash && strcmp(ssr_tweaks_get(tweaks, "Menu", "QuickMessage"), "FAIL!") == 0);
+        }
         CHECK(ssr_game_career(game)->technique[0] == 0 && ssr_game_career(game)->pace[0] == 0);
     }
 }
