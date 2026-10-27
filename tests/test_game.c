@@ -177,7 +177,7 @@ static void watch_a_replay(SSRGame *game, SSRTweaks *tweaks) {
 
 // The end of a season: the review, the table, the awards, and the next
 // season.
-static int seasons = 0;
+static int seasons = 0, notPicked = 0, substitutes = 0;
 
 static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     const SSRCareer *c = ssr_game_career(game);
@@ -236,6 +236,26 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Match", "LeagueName"), "PRM") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Menu", "LeagueType") == 1);
     ssr_game_message(game, "leaguefixtures.btn_Play");
+    // The boss can make the player a substitute, or leave the player out.
+    if (strcmp(ssr_game_screen(game), "messageboss") == 0) {
+        CHECK(strlen(ssr_tweaks_get(tweaks, "Menu", "MessageBody")) > 0);
+        ssr_game_message(game, "message.btn_Ok");
+        if (strcmp(ssr_game_screen(game), "leaguefixtures") == 0) {
+            // Not picked: the results of the day show, with no match.
+            CHECK(ssr_tweaks_number(tweaks, "Menu", "LeagueFixturesResults") == 1);
+            CHECK(ssr_game_career(game)->apps == apps);
+            notPicked++;
+            ssr_game_message(game, "leaguefixtures.btn_Play");
+            if (strcmp(ssr_game_screen(game), "league") == 0) ssr_game_message(game, "league.btn_Continue");
+            if (strcmp(ssr_game_screen(game), "seasonreview") == 0) finish_season(game, tweaks);
+            CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+            return;
+        }
+        // A substitute comes on in the second half.
+        substitutes++;
+        const SSRMatch *bench = ssr_game_match(game);
+        CHECK(bench && bench->setup.subTime >= 46 && bench->setup.subTime <= 65);
+    }
     CHECK(strcmp(ssr_game_screen(game), "match") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 1);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchCompetition") == 1);
@@ -433,6 +453,30 @@ static void tire(SSRGame *game, const char *path) {
     ssr_game_message(game, "saveslot.btn_Slot0");
     ssr_game_update(game, 60);
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && ssr_game_career(game)->energy == 50);
+}
+
+// A player that the boss does not like is not picked: the message, then
+// the results of the day with no match.
+static void not_picked_by_the_boss(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.relationBoss = 5;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    int apps = ssr_game_career(game)->apps;
+    ssr_game_message(game, "gamemenu.btn_Play");
+    if (strcmp(ssr_game_screen(game), "league") == 0) return;
+    ssr_game_message(game, "leaguefixtures.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "messageboss") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_NOTPICKEDRELATION_NEW") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "leaguefixtures") == 0 && ssr_game_career(game)->apps == apps);
+    ssr_game_message(game, "leaguefixtures.btn_Play");
+    if (strcmp(ssr_game_screen(game), "league") == 0) ssr_game_message(game, "league.btn_Continue");
+    if (strcmp(ssr_game_screen(game), "seasonreview") == 0) finish_season(game, tweaks);
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
 // Drinks the next can after a match: a question when the energy is above
@@ -639,6 +683,7 @@ static void test_starts_a_new_career(void) {
         make_a_star(game, path);
     }
     CHECK(replays > 0);
+    not_picked_by_the_boss(game, tweaks, path);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 12 && seasons == 0; i++) play_a_match(game, tweaks);
     CHECK(seasons >= 1);

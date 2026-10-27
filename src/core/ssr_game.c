@@ -70,6 +70,8 @@ struct SSRGame {
     SSRCareer career;
     // The competitions of the career.
     SSRSeason *season;
+    // The minute when the player comes on, or 0 (c_TPlayer.m_subtime).
+    int subTime;
     // The fixture of the match that plays now: its competition, date, and
     // sides. A fixture has no fixed place in its list.
     int fixtureComp, fixtureDate, fixtureHome, fixtureAway;
@@ -896,6 +898,9 @@ static void call_start_career(SSRGame *game) {
 
 static void call_drink(SSRGame *game);
 static void call_season_end_transfer(SSRGame *game);
+static void call_play_to_date(SSRGame *game);
+static void call_set_up_fixture(SSRGame *game);
+static void call_debut_tired(SSRGame *game);
 
 static void run_call(SSRGame *game, const char *name) {
     static const struct {
@@ -912,6 +917,9 @@ static void run_call(SSRGame *game, const char *name) {
         {"StartCareer", call_start_career},
         {"DrinkNRG", call_drink},
         {"SeasonEndTransfer", call_season_end_transfer},
+        {"PlayToDate", call_play_to_date},
+        {"SetUpFixture", call_set_up_fixture},
+        {"DebutTired", call_debut_tired},
     };
     for (size_t i = 0; i < sizeof(CALLS) / sizeof(CALLS[0]); i++) {
         if (strcmp(CALLS[i].name, name) == 0) {
@@ -1228,6 +1236,7 @@ static void start_match(SSRGame *game) {
     s.starLevel = ssr_career_star_level(c);
     // c_TPlayer sets m_dodribbling to 1 for each career, new or loaded.
     s.dribbling = 1;
+    s.subTime = game->subTime;
     ssr_match_start(game->match, &s, game->localise, game->context, &game->random);
     game->commentaryCount = 0;
     SSRTweaks *t = game->tweaks;
@@ -1294,13 +1303,31 @@ static void change_relation(float *relation, float change) {
     *relation = v < 1 ? 1 : v > 100 ? 100 : v;
 }
 
-// GSMatchStatsUpdateRelationships for a club match [I: the international
-// relations come with the nations].
+// GSMatchStatsUpdateRelationships: a club match changes the relations with
+// the club, and with the boss of the nation by the strength of the club
+// against the nation. A match of the nation changes the relations with the
+// nation.
 static void after_relations(SSRGame *game) {
     SSRCareer *c = &game->career;
-    change_relation(&c->relationBoss, (float)game->after.boss);
+    SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, game->fixtureComp) : NULL;
+    float boss = (float)game->after.boss;
+    if (comp && comp->data->level == 1) {
+        change_relation(&c->relationBossInt, boss);
+        change_relation(&c->relationTeamInt, (float)game->after.team);
+        change_relation(&c->relationFansInt, (float)game->after.fans);
+        return;
+    }
+    change_relation(&c->relationBoss, boss);
     change_relation(&c->relationTeam, (float)game->after.team);
     change_relation(&c->relationFans, (float)game->after.fans);
+    SSRSeasonClub *club = game->season ? ssr_season_club(game->season, c->clubId, 0) : NULL;
+    const SSRNation *nation = ssr_world_nation(game->world, c->nationId);
+    if (!club || !nation) return;
+    float strength = (float)club->strength, of = (float)nation->strength;
+    float part = strength >= of ? 1.0f : strength > of * 0.85f ? 0.5f : strength > of * 0.7f ? 0.25f
+                                     : strength > of * 0.5f  ? 0.15f
+                                                             : 0.0f;
+    change_relation(&c->relationBossInt, boss * part);
 }
 
 // The five calls of UpdateStarRating at stage 9, in their order.
@@ -1372,6 +1399,7 @@ static void end_match(SSRGame *game) {
         ssr_career_add_form(c->form, (int)rating);
     }
     c->energy = m->energy;
+    c->debut = 0;
     // UpdateRating: one change of a skill rating for each chance.
     for (int i = 0; i < m->ratingCount; i++) ssr_career_update_rating(c, m->ratingIndex[i], m->ratingSuccess[i]);
     free(game->match);
@@ -1803,6 +1831,74 @@ static void after_play_to(SSRGame *game, int end) {
     else leaguefixtures_screen(game, 1);
 }
 
+// c_TPlayer.GetForm and GetInternationalForm: the mean of the last five
+// ratings, or 5 before five matches.
+static float form_of(const int *form, int apps) {
+    if (apps < 5) return 5.0f;
+    return (float)(form[0] + form[1] + form[2] + form[3] + form[4]) / 5.0f;
+}
+
+// GSPlayerUpdateSelectionStatus: 1 first team; 2 to 4 a substitute (energy,
+// boss, form); 5 and 6 not picked (energy, boss); 7 to 11 the same for the
+// nation.
+static int selection_status(SSRGame *game, int international) {
+    const SSRCareer *c = &game->career;
+    if (c->retired) return 1;
+    if (!international) {
+        if (c->relationBoss < 10) return 6;
+        if (c->energy < 25) return 5;
+        if (form_of(c->form, c->apps) < 3.5f ||
+            (c->seasonApps > 4 && c->form[3] < 5 && c->form[4] < 5 && c->relationBoss < 50)) {
+            return 4;
+        }
+        if (c->relationBoss < 40) return 3;
+        if (c->energy < 50) return 2;
+        return 1;
+    }
+    if (c->relationBossInt < 50) return 11;
+    if (c->energy < 25) return 10;
+    if (form_of(c->intForm, c->intApps) < 4.0f ||
+        (c->intApps > 4 && c->intForm[3] < 5 && c->intForm[4] < 5 && c->relationBossInt < 85) ||
+        (c->seasonApps > 4 && c->form[3] < 5 && c->form[4] < 5 && c->relationBossInt < 65)) {
+        return 9;
+    }
+    if (c->relationBossInt < 65) return 8;
+    if (c->energy < 50) return 7;
+    return 1;
+}
+
+// The player is not picked: the message, then the other teams play the day
+// of the match (PlayToDate) while the player rests.
+static void not_picked(SSRGame *game, const char *text) {
+    SSRCareer *c = &game->career;
+    game->wasPicked = 0;
+    season_in(game);
+    SSRFixture *f = ssr_season_next_fixture(game->season);
+    game->messageData = f ? f->sdate : c->sdate;
+    // c_TPlayer.UpdateNotPickedRecovery. The game pays no wage for it
+    // (award_not_picked_wage is "NO").
+    float energy = c->energy + (float)ssr_energy_recovery(ssr_season_rest_days(game->season), ssr_career_age(c));
+    c->energy = energy > 100 ? 100 : energy;
+    const char *shown = text && text[0] == 'C' && strncmp(text, "CMESSAGE", 8) == 0 ? loc(game, text) : text;
+    message(game, "messageboss", shown, 0, 1, "PlayToDate");
+}
+
+// The call "PlayToDate": the days up to the date in the message.
+static void call_play_to_date(SSRGame *game) {
+    season_in(game);
+    after_play_to(game, ssr_season_play_to(game->season, game->messageData));
+}
+
+// The call "SetUpFixture": the match of the next fixture.
+static void call_set_up_fixture(SSRGame *game) {
+    start_match(game);
+}
+
+// The call "DebutTired": the boss gave a can; the player presses Play again.
+static void call_debut_tired(SSRGame *game) {
+    (void)game;
+}
+
 // GSPlayerPlayMatches: the other teams play first when the round of the
 // player is not the next round, or the cup has no draw yet.
 static void play_matches(SSRGame *game) {
@@ -1821,7 +1917,76 @@ static void play_matches(SSRGame *game) {
         return;
     }
     game->wasPicked = 1;
-    start_match(game);
+    game->subTime = 0;
+    int status = selection_status(game, f->level == 1);
+    SSRCareer *c = &game->career;
+    int star = ssr_career_star_level(c);
+    const SSRNation *nation = ssr_world_nation(game->world, c->nationId);
+    char text[512];
+    switch (status) {
+    case 1:
+        // The bribe of the game takes Rand(20) for a club match [I: no bribe
+        // in the remake yet].
+        if (f->level == 0) ssr_rand(&game->random, 20);
+        start_match(game);
+        return;
+    case 2:
+    case 5:
+        if (c->debut) {
+            c->energy = 100;
+            message(game, "messageboss", loc(game, "CMESSAGE_DEBUTTIRED"), 0, 1, "DebutTired");
+            return;
+        }
+        if (status == 2) {
+            static const float BOSS_SUB[4] = {0, -3, -5, -7};
+            change_relation(&c->relationBoss, BOSS_SUB[star < 4 ? star - 1 : 3]);
+            game->subTime = ssr_rand2(&game->random, 46, 65);
+            message(game, "messageboss", loc(game, "CMESSAGE_SUBENERGY"), 0, 1, "SetUpFixture");
+            return;
+        }
+        static const float BOSS_OUT[4] = {-3, -6, -9, -12};
+        change_relation(&c->relationBoss, BOSS_OUT[star < 4 ? star - 1 : 3]);
+        not_picked(game, "CMESSAGE_NOTPICKEDENERGY");
+        return;
+    case 3:
+    case 4:
+        game->subTime = ssr_rand2(&game->random, 46, 65);
+        message(game, "messageboss", loc(game, status == 3 ? "CMESSAGE_SUBRELATION" : "CMESSAGE_SUBFORM"), 0, 1,
+                "SetUpFixture");
+        return;
+    case 6:
+        not_picked(game, "CMESSAGE_NOTPICKEDRELATION_NEW");
+        return;
+    case 7:
+    case 8:
+    case 9: {
+        if (status == 7) change_relation(&c->relationBossInt, -7.5f);
+        game->subTime = ssr_rand2(&game->random, 46, 65);
+        static const char *const SUBS[3] = {"CMESSAGE_SUBENERGYINT", "CMESSAGE_SUBRELATIONINT", "CMESSAGE_SUBFORMINT"};
+        snprintf(text, sizeof(text), "%s", loc(game, SUBS[status - 7]));
+        replace_all(text, sizeof(text), "$team", nation ? nation->tla : "");
+        message(game, "messageboss", text, 0, 1, "SetUpFixture");
+        return;
+    }
+    case 10:
+        change_relation(&c->relationBossInt, -15);
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_NOTPICKEDENERGYINT"));
+        replace_all(text, sizeof(text), "$team", nation ? nation->tla : "");
+        not_picked(game, text);
+        return;
+    default:
+        // A star hears about it, at most once in 30 days.
+        game->wasPicked = 0;
+        if (star > 3 && c->sdate > c->intNotPickedMessage + 30) {
+            c->intNotPickedMessage = c->sdate;
+            snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_NOTPICKEDRELATIONINT"));
+            replace_all(text, sizeof(text), "$team", nation ? nation->tla : "");
+            not_picked(game, text);
+            return;
+        }
+        not_picked(game, "");
+        return;
+    }
 }
 
 // leaguefixtures.btn_Play: the match, or after the results the table of a
