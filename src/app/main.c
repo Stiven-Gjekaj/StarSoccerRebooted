@@ -244,6 +244,19 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
             ssr_scene_spawn_show(app->scene, id, "PlayerCircle", 0);
             ssr_scene_spawn_show(app->scene, id, "PlayerCalling", 0);
             ssr_scene_spawn_show(app->scene, id, "OffsideFlag", 0);
+            // The team-mates wear the kit of the player, the others the kit of
+            // the other team, and the keeper a keeper shirt.
+            const SSRMatchPlayer *p = &chance->players.list[i];
+            const char *team = p->type == SSR_PLAYER_ATTACKER ? "MyTeam" : "OppTeam";
+            char shirt[32], pants[32];
+            SDL_snprintf(shirt, sizeof(shirt), "%sShirt1", team);
+            SDL_snprintf(pants, sizeof(pants), "%sPants", team);
+            if (p->type == SSR_PLAYER_KEEPER) SDL_snprintf(shirt, sizeof(shirt), "KeeperShirt1");
+            ssr_scene_spawn_clone(app->scene, id, "Shirt", "MatchColours", shirt);
+            ssr_scene_spawn_clone(app->scene, id, "Sleeves", "MatchColours", shirt);
+            ssr_scene_spawn_clone(app->scene, id, "Stripes", "MatchColours", shirt);
+            ssr_scene_spawn_clone(app->scene, id, "Hoops", "MatchColours", shirt);
+            ssr_scene_spawn_clone(app->scene, id, "Pants", "MatchColours", pants);
         }
         app->ballCopy = ssr_scene_spawn(app->scene, "MatchPitch", "Ball", 0, NULL, 0);
         ssr_scene_spawn_show(app->scene, app->ballCopy, "BallTip", 0);
