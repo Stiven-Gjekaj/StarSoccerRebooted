@@ -77,6 +77,9 @@ typedef struct {
     SSRScene *backdropScene, *backdropStaticScene;
     SSRUiTree *backdropScreen, *backdropStaticScreen;
     int backdropSize;
+    // REBOOTED under the SOCCER letters of each title (ssr_rebooted.uis).
+    SSRScene *rebootedScene;
+    SSRUiTree *rebootedScreen;
     // The HUD of a chance (minigamehud.uis): the replay offer and controls.
     SSRScene *hudScene;
     SSRUiTree *hudScreen;
@@ -461,6 +464,33 @@ static void update_run_arrow(SSRApp *app, const SSRChance *chance, int i) {
     ssr_scene_spawn_set(app->scene, id, "TacticArrow#1", SSR_GEL_W, length + 20);
 }
 
+// The areas of the SOCCER letters of the title, one for each language.
+static const char *const TITLE_LOGOS[] = {
+    "CL_Logo_English", "CL_Logo_Turkish", "CL_Logo_Italian",    "CL_Logo_Spanish",
+    "CL_Logo_German",  "CL_Logo_French",  "CL_Logo_Portuguese",
+};
+
+static void free_rebooted(SSRApp *app) {
+    for (size_t i = 0; i < SDL_arraysize(TITLE_LOGOS); i++) ssr_gfx_attach(app->gfx, TITLE_LOGOS[i], NULL);
+    ssr_scene_free(app->rebootedScene);
+    ssr_ui_free(app->rebootedScreen);
+    app->rebootedScene = NULL;
+    app->rebootedScreen = NULL;
+}
+
+// The title of the remake: REBOOTED draws under the SOCCER letters, and
+// moves with them.
+static void update_rebooted(SSRApp *app, SSRSceneEnv *env, int ms) {
+    if (!app->rebootedScene) {
+        app->rebootedScene = open_layer(app, "ssr_rebooted.uis", &app->rebootedScreen, env);
+        if (!app->rebootedScene) return;
+        for (size_t i = 0; i < SDL_arraysize(TITLE_LOGOS); i++) {
+            ssr_gfx_attach(app->gfx, TITLE_LOGOS[i], app->rebootedScene);
+        }
+    }
+    ssr_scene_update(app->rebootedScene, env, ms);
+}
+
 static void free_backdrop(SSRApp *app) {
     ssr_gfx_attach(app->gfx, "StadiumBgHook", NULL);
     ssr_gfx_attach(app->gfx, "StaticStadiumBgHook", NULL);
@@ -724,6 +754,7 @@ static void load_ticker(SSRApp *app) {
 
 static void load_game(SSRApp *app) {
     free_backdrop(app);
+    free_rebooted(app);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
     ssr_audio_free(app->audio);
@@ -1101,6 +1132,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         }
         update_chance_view(app, &env, ms);
         update_backdrop(app, &env, ms);
+        update_rebooted(app, &env, ms);
         ssr_gfx_set_tweaks(app->gfx, app->tweaks);
         const SSRChance *chance = ssr_game_chance(app->game);
         if (app->tapScene && chance && chance->state == SSR_CHANCE_TAP) {
@@ -1221,6 +1253,7 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     ssr_tweaks_free(app->tweaks);
     ssr_audio_free(app->audio);
     free_backdrop(app);
+    free_rebooted(app);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
     SDL_free(app);
