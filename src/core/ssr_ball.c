@@ -234,7 +234,7 @@ void ssr_ball_update(SSRBall *ball, const SSRGoal *goal, SSRRandom *random) {
     if (goal && ball->y < 125 && !ball->inGoal) {
         ball->alive = 0;
         ball->outcome = SSR_BALL_MISSED;
-    } else if (ball->power < 0.15f) {
+    } else if (ball->power < 0.15f && !ball->holdStop) {
         ball->alive = 0;
         ball->outcome = SSR_BALL_STOPPED;
     }

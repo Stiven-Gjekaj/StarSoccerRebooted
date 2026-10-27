@@ -47,6 +47,8 @@ typedef struct {
     int hitOutsideSideNet;
     int bounces;
     int kicks;
+    // 1 keeps a slow ball alive while the players still run (c_TBall.m_Update).
+    int holdStop;
     SSRBallOutcome outcome;
 } SSRBall;
 

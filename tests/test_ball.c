@@ -51,7 +51,21 @@ static void shoot(float dragX, float dragY, float tapX, float tapY, const Sample
     CHECK(ball.bounces == bounces);
 }
 
+// A slow ball stops, unless the players still run to it.
+static void test_holds_a_slow_ball(void) {
+    SSRBall ball;
+    ssr_ball_place(&ball, 320, 600);
+    ball.power = 0.1f;
+    ball.holdStop = 1;
+    ssr_ball_update(&ball, NULL, NULL);
+    CHECK(ball.alive);
+    ball.holdStop = 0;
+    ssr_ball_update(&ball, NULL, NULL);
+    CHECK(!ball.alive && ball.outcome == SSR_BALL_STOPPED);
+}
+
 int main(void) {
+    test_holds_a_slow_ball();
     static const Sample centre[] = {
         {10, 320.0000f, 358.0110f, 21.7500f, 1.5000f, 6.8679f, 270.0000f},
         {20, 320.0000f, 289.7088f, 28.5000f, -0.0000f, 6.7995f, 270.0000f},
