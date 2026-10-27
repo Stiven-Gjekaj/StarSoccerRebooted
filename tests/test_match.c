@@ -215,6 +215,48 @@ static void test_keeps_the_furthest_goal_and_pass(void) {
     CHECK(fabsf(m.furthest[0] - 300) < 0.01f && fabsf(m.furthest[2] - 300) < 0.01f && m.furthest[1] == 600);
 }
 
+// The match counts the post hits and the goals from a corner. A goal at a
+// level score in the 90th minute wins the match at the last minute.
+static void test_counts_the_posts_and_the_late_goals(void) {
+    SSRMatch m;
+    SSRRandom random = {11};
+    SSRMatchSetup s = setup_for();
+    ssr_match_start(&m, &s, localise, NULL, &random);
+    ssr_match_play(&m, 0);
+    SSRChance chance;
+    memset(&chance, 0, sizeof(chance));
+    m.state = SSR_MATCH_PLAYER_CHANCE;
+    m.chanceType = 2;
+    chance.info.chanceType = 2;
+    chance.result = SSR_RESULT_SAVED;
+    chance.postHits = 2;
+    ssr_match_chance_done(&m, &chance, 1000, &random);
+    CHECK(m.postHits == 2 && m.cornerGoals == 0 && m.lastMinuteWinner == 0);
+    // A goal from a corner in the 89th minute.
+    m.state = SSR_MATCH_PLAYER_CHANCE;
+    m.minute = 89;
+    chance.postHits = 0;
+    chance.actionType = 7;
+    chance.result = SSR_RESULT_GOAL;
+    ssr_match_chance_done(&m, &chance, 2000, &random);
+    CHECK(m.postHits == 2 && m.cornerGoals == 1 && m.lastMinuteWinner == 0);
+    // A goal at 1-1 in the 90th minute.
+    m.state = SSR_MATCH_PLAYER_CHANCE;
+    m.minute = 90;
+    m.score[1] = m.score[2] = 1;
+    chance.actionType = 0;
+    ssr_match_chance_done(&m, &chance, 3000, &random);
+    CHECK(m.cornerGoals == 1 && m.lastMinuteWinner == 1);
+    // A second leg counts the first leg: 1-1 now and 2-0 then is no tie.
+    m.lastMinuteWinner = 0;
+    m.state = SSR_MATCH_PLAYER_CHANCE;
+    m.setup.matchType = 5;
+    m.setup.firstLegHome = 2;
+    m.score[1] = m.score[2] = 1;
+    ssr_match_chance_done(&m, &chance, 4000, &random);
+    CHECK(m.lastMinuteWinner == 0);
+}
+
 static void test_the_captain_draws_runs(void) {
     SSRMatch m;
     SSRRandom random = {11};
@@ -236,6 +278,7 @@ int main(void) {
     test_the_captain_draws_runs();
     test_a_dribble_leads_to_an_attack();
     test_keeps_the_furthest_goal_and_pass();
+    test_counts_the_posts_and_the_late_goals();
     test_plays_a_match();
     test_a_cup_tie_goes_to_extra_time_and_penalties();
     test_counts_the_goals_of_the_player();

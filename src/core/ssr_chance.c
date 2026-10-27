@@ -645,7 +645,10 @@ void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRando
         int noGoal = is_pass_chance(c->info.chanceType) || c->info.chanceType == 12 || training == 2 || training == 6;
         int postHit = b->postHit;
         ssr_ball_update(b, noGoal ? NULL : &c->goal, random);
-        if (!postHit && b->postHit && c->lastTouchedBy == 0) c->shotsOnTarget++;
+        if (!postHit && b->postHit && c->lastTouchedBy == 0) {
+            c->shotsOnTarget++;
+            c->postHits++;
+        }
         predict_bounce(c);
         if (b->outcome == SSR_BALL_GOAL) {
             const SSRMatchPlayer *last = c->lastTouchedBy > 0 ? find_player(c, c->lastTouchedBy) : NULL;

@@ -91,6 +91,8 @@ typedef struct {
     // The shots of the player that the keeper or a post stopped
     // (c_TBall.CheckShotsOnTarget). A goal does not count.
     int shotsOnTarget;
+    // The shots of the player that hit a post.
+    int postHits;
     int now;
     // 1 for each warning beep of the tap ball, and for the kick sound.
     int beep, kicked;

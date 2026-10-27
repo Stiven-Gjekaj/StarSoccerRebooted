@@ -759,6 +759,21 @@ static int rating_of(const SSRChance *c) {
     return distance_to_goal_yards(c) < 25 ? 2 : 3;
 }
 
+// c_TMatch: a goal of the player at a level score in the 90th minute, or
+// in the 120th minute of a match with extra time, wins the match. A second
+// leg counts the score of the first leg. [I: the game also gives the award
+// for some goals in the 90th minute of a second leg with an away goal. The
+// remake does not.]
+static int last_minute_winner(const SSRMatch *m) {
+    int type = m->setup.matchType, one = m->score[1], two = m->score[2];
+    if (type == 5) {
+        one += m->setup.firstLegAway;
+        two += m->setup.firstLegHome;
+    }
+    int late = m->minute == 90 || ((type == 3 || type == 5) && m->minute == 120);
+    return late && one == two;
+}
+
 void ssr_match_chance_done(SSRMatch *m, const SSRChance *c, int now, SSRRandom *random) {
     if (m->shootoutNumber > 0) {
         // A kick of the shoot-out counts only in the shoot-out.
@@ -790,9 +805,12 @@ void ssr_match_chance_done(SSRMatch *m, const SSRChance *c, int now, SSRRandom *
         if (dist > m->furthest[1]) m->furthest[1] = dist;
         if (header && dist > m->furthest[3]) m->furthest[3] = dist;
     }
+    m->postHits += c->postHits;
     switch (c->result) {
     case SSR_RESULT_GOAL:
         m->goals++;
+        if (c->actionType == 7) m->cornerGoals++;
+        if (last_minute_winner(m)) m->lastMinuteWinner = 1;
         rate(m, rating_of(c), 1);
         goal_line(m, now);
         break;

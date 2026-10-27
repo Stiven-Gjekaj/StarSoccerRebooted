@@ -98,6 +98,9 @@ typedef struct {
     // UpdateYardage: the furthest goal, pass, headed goal, and headed pass
     // of the match in pixels.
     float furthest[4];
+    // The shots on a post, the goals from a corner, and 1 after a goal
+    // that broke a level score in the last minute.
+    int postHits, cornerGoals, lastMinuteWinner;
     int playerInBuildup;
     int lastGoalTime;
     float energy;
