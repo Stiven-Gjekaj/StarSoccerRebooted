@@ -12,6 +12,9 @@
 // Set SSR_AUTOCHANCE to "dx,dy" to play each chance of the player with a
 // drag of (dx, dy) from the ball. Set SSR_SHOT_TAP to save the frame of
 // the first tap ball, and SSR_SHOT_DRIBBLE for the first dribble.
+// Set SSR_AUTOMATCH to 1 to press Play each time that the match waits, or
+// to 2 to also go on from the match stats. Set SSR_SHOT_SCREEN to a screen
+// name to save the frame SSR_SHOT_MS after that screen opens.
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -745,6 +748,32 @@ static void auto_chance(SSRApp *app) {
     }
 }
 
+// SSR_AUTOMATCH presses the Play button of the match when the match waits
+// (Match.MatchState 1, 2, or 3), and with 2 the Continue button of the match
+// stats 3 s after it shows. The presses come 1.5 s apart.
+static void auto_match(SSRApp *app) {
+    const char *setting = SDL_getenv("SSR_AUTOMATCH");
+    if (!setting || !*setting) return;
+    static Uint64 last = 0, statsReady = 0;
+    Uint64 now = SDL_GetTicks();
+    if (now - last < 1500) return;
+    const char *screen = ssr_game_screen(app->game);
+    const char *message = NULL;
+    int state = (int)ssr_tweaks_number(app->tweaks, "Match", "MatchState");
+    if (strcmp(screen, "match") == 0 && state >= 1 && state <= 3) {
+        message = "match.btn_Play";
+    } else if (strcmp(screen, "matchstats") == 0 && SDL_atoi(setting) == 2 &&
+               ssr_tweaks_number(app->tweaks, "MatchStats", "StatStage") >= 10) {
+        if (!statsReady) statsReady = now;
+        if (now - statsReady >= 3000) message = "matchstats.btn_Play";
+    }
+    if (!message) return;
+    last = now;
+    SDL_Log("Auto press %s", message);
+    ssr_game_message(app->game, message);
+    follow_game(app);
+}
+
 SDL_AppResult SDL_AppIterate(void *state) {
     SSRApp *app = state;
     SDL_SetRenderDrawColor(app->renderer, 34, 120, 52, 255);
@@ -824,6 +853,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
     }
 
     auto_chance(app);
+    auto_match(app);
 
     const char *shot = SDL_getenv("SSR_SHOT");
     const char *shotMs = SDL_getenv("SSR_SHOT_MS");
@@ -836,6 +866,12 @@ SDL_AppResult SDL_AppIterate(void *state) {
     if (shotChance && (int)shotChance->state == wanted && !stateSeen) stateSeen = SDL_GetTicks();
     int stateReady = stateSeen && SDL_GetTicks() - stateSeen >= 1000;
     if (wanted >= 0) wait = stateReady ? 0 : 1 << 30;
+    const char *shotScreen = SDL_getenv("SSR_SHOT_SCREEN");
+    static Uint64 screenSeen = 0;
+    if (shotScreen && *shotScreen) {
+        if (!screenSeen && strcmp(ssr_game_screen(app->game), shotScreen) == 0) screenSeen = SDL_GetTicks();
+        wait = screenSeen && SDL_GetTicks() - screenSeen >= (Uint64)wait ? 0 : 1 << 30;
+    }
     if (shot && *shot && SDL_GetTicks() - firstFrame >= (Uint64)wait) {
         SDL_Surface *frame = SDL_RenderReadPixels(app->renderer, NULL);
         bool saved = frame && SDL_SavePNG(frame, shot);
