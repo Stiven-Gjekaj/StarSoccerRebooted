@@ -646,7 +646,10 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     snprintf(homeKit, sizeof(homeKit), "%s", ssr_tweaks_get(tweaks, "TeamStrip", "HomeKitColour"));
     snprintf(awayKit, sizeof(awayKit), "%s", ssr_tweaks_get(tweaks, "TeamStrip", "AwayKitColour"));
     CHECK(strlen(homeKit) == 8 && strlen(awayKit) == 8);
+    char plate[16];
+    snprintf(plate, sizeof(plate), "%s", ssr_tweaks_get(tweaks, "MatchColours", "NameplateAwayCol1"));
     for (int i = 0; i < 4; i++) ssr_game_message(game, "leaguefixtures.btn_Kits");
+    CHECK(strcmp(plate, ssr_tweaks_get(tweaks, "MatchColours", "NameplateAwayCol1")) == 0);
     CHECK(strcmp(homeKit, ssr_tweaks_get(tweaks, "TeamStrip", "HomeKitColour")) == 0);
     CHECK(strcmp(awayKit, ssr_tweaks_get(tweaks, "TeamStrip", "AwayKitColour")) == 0);
     CHECK(ssr_tweaks_kind(tweaks, "MatchColours", "MyTeamShirt1") == SSR_TWEAK_COLOUR);

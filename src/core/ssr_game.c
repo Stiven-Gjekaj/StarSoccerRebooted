@@ -1889,9 +1889,18 @@ static void team_plates(SSRGame *game, const Team *home, const Team *away, const
     Rgb col[2][2];
     for (int i = 0; i < 2; i++) {
         const Team *t = teams[i];
-        int swap = brightness(t->badge1) > 200 && brightness(t->badge2) < brightness(t->badge1);
-        col[i][0] = swap ? t->badge2 : t->badge1;
-        col[i][1] = swap ? t->badge1 : t->badge2;
+        // [I: 4.32 colours the plates with the home shirts. A team in its
+        // away kit gets the colours of that kit, so that two teams in the
+        // same home colours have plates of two colours.]
+        Rgb one = t->badge1, two = t->badge2;
+        if (t->awayKit) {
+            one = rgb(t->away->shirt1);
+            two = rgb(t->away->shorts);
+        }
+        // The swap of a light first colour is a rule of the home plates.
+        int swap = !t->awayKit && brightness(one) > 200 && brightness(two) < brightness(one);
+        col[i][0] = swap ? two : one;
+        col[i][1] = swap ? one : two;
     }
     // Two plates of near the same colour: one gets darker or brighter.
     Rgb *h = &col[0][0], *a = &col[1][0];
@@ -1970,6 +1979,9 @@ static void kits_button(SSRGame *game) {
     game->homeTeam.awayKit = KITS[game->kitNum][0];
     game->awayTeam.awayKit = KITS[game->kitNum][1];
     update_kits(game);
+    // The plates of the scores follow the kits.
+    int mineHome = game->match->setup.myTeam == 1;
+    team_plates(game, &game->homeTeam, &game->awayTeam, mineHome ? &game->homeTeam : &game->awayTeam);
 }
 
 // c_TMatch.SetUpFixture: the match of the next fixture of the player.
