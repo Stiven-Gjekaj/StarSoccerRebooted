@@ -56,6 +56,10 @@ int ssr_gfx_image_size(SSRGfx *gfx, const char *name, const char *file, float *w
 
 // Moves everything that the gfx draws by (x, y), from the units of the
 // layouts to the units of the window.
+// The art of the data pack in the directory (<directory>/art) comes before
+// the art of the remake. Set it before the first draw. NULL or "" has no
+// pack.
+void ssr_gfx_set_pack(SSRGfx *gfx, const char *directory);
 void ssr_gfx_set_offset(SSRGfx *gfx, float x, float y);
 
 // The tweaks that give the colours of the cels (CelColours), or NULL.

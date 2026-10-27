@@ -65,6 +65,11 @@ struct SSRGfx {
     // The names of the art of the remake (art/<name>.png).
     char **art;
     int artCount;
+    // The art of the data pack (<pack>/art/<name>.png). It comes before
+    // the art of the remake.
+    char packDirectory[2048];
+    char **packArt;
+    int packArtCount;
 };
 
 SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
@@ -169,6 +174,7 @@ void ssr_gfx_free(SSRGfx *gfx) {
     SDL_free(gfx->glossFrames);
     ssr_atlas_free(gfx->atlases);
     SDL_free(gfx->art);
+    SDL_free(gfx->packArt);
     SDL_free(gfx);
 }
 
@@ -224,6 +230,13 @@ static SDL_Texture *own_art(SSRGfx *gfx, const char *name) {
     if (!name || !name[0]) return NULL;
     char file[256];
     SDL_snprintf(file, sizeof(file), "%s.png", name);
+    for (int i = 0; i < gfx->packArtCount; i++) {
+        if (SDL_strcmp(gfx->packArt[i], file) != 0) continue;
+        char key[256], path[2400];
+        SDL_snprintf(key, sizeof(key), "pack:%s", name);
+        SDL_snprintf(path, sizeof(path), "%s/art/%s", gfx->packDirectory, file);
+        return cached_texture(gfx, key, path, 1);
+    }
     int found = 0;
     for (int i = 0; i < gfx->artCount && !found; i++) found = SDL_strcmp(gfx->art[i], file) == 0;
     if (!found) return NULL;
@@ -316,8 +329,10 @@ static void premultiply(SSRImage *pixels) {
 static void patch_page(SSRGfx *gfx, int page, SSRImage *pixels) {
     static const char SUFFIX[] = ".patch.png";
     const size_t suffix = sizeof(SUFFIX) - 1;
-    for (int i = 0; i < gfx->artCount; i++) {
-        const char *file = gfx->art[i];
+    // The patches of the remake first, then the patches of the pack.
+    for (int i = 0; i < gfx->artCount + gfx->packArtCount; i++) {
+        int fromPack = i >= gfx->artCount;
+        const char *file = fromPack ? gfx->packArt[i - gfx->artCount] : gfx->art[i];
         size_t length = SDL_strlen(file);
         if (length <= suffix || SDL_strcmp(file + length - suffix, SUFFIX) != 0) continue;
         char name[256];
@@ -326,7 +341,8 @@ static void patch_page(SSRGfx *gfx, int page, SSRImage *pixels) {
         if (!image || image->page != page) continue;
         char path[2400];
         const char *base = SDL_GetBasePath();
-        SDL_snprintf(path, sizeof(path), "%sart/%s", base ? base : "", file);
+        if (fromPack) SDL_snprintf(path, sizeof(path), "%s/art/%s", gfx->packDirectory, file);
+        else SDL_snprintf(path, sizeof(path), "%sart/%s", base ? base : "", file);
         SSRImage patch;
         if (!load_own_image(path, &patch)) continue;
         if (!ssr_atlas_patch(pixels, image, &patch)) SDL_Log("The patch %s does not fit its image.", file);
@@ -779,6 +795,18 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
         draw_line(gfx, slot, lines[i], left, top, scaleX, scaleY, item->colour, item->italic, 0);
         if (scroll) SDL_SetRenderClipRect(gfx->renderer, clipped ? &outer : NULL);
     }
+}
+
+void ssr_gfx_set_pack(SSRGfx *gfx, const char *directory) {
+    if (!gfx) return;
+    SDL_free(gfx->packArt);
+    gfx->packArt = NULL;
+    gfx->packArtCount = 0;
+    SDL_strlcpy(gfx->packDirectory, directory ? directory : "", sizeof(gfx->packDirectory));
+    if (!directory || !directory[0]) return;
+    char path[2100];
+    SDL_snprintf(path, sizeof(path), "%s/art", directory);
+    gfx->packArt = SDL_GlobDirectory(path, "*.png", 0, &gfx->packArtCount);
 }
 
 void ssr_gfx_set_offset(SSRGfx *gfx, float x, float y) {

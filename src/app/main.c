@@ -1,6 +1,6 @@
 // The app: imports the copy of the player, then shows the game.
 // Start it with the path of an APK, XAPK, or IPA, or drop the file on the
-// window.
+// window. A data pack (ssr_pack) installs in the same way.
 // On iOS the app imports the first APK, XAPK, or IPA in its Documents
 // folder, where Finder and the Files app can put it. On Android it imports
 // the APK of the installed New Star Soccer.
@@ -35,6 +35,7 @@
 #include "ssr_ticker.h"
 #include "ssr_gfx.h"
 #include "ssr_import.h"
+#include "ssr_pack.h"
 #include "ssr_scene.h"
 #include "ssr_spine.h"
 #include "ssr_text.h"
@@ -65,6 +66,9 @@ typedef struct {
     int pointerDown;
     char settingsPath[2048];
     char saveDirectory[2048];
+    // The installed data packs, and the directory of the chosen one, or "".
+    char packsDirectory[2048];
+    char packDirectory[2112];
     int typing;
     // The screen that shows now, from NewGUI/Screens, and its last frame.
     SSRUiTree *screen;
@@ -139,8 +143,16 @@ static char *read_screen_file(void *context, const char *name, size_t *size) {
     const char *base = SDL_GetBasePath();
     // A layout of the remake has the exact name. SDL reads it, so that the
     // app also finds it in the assets of an Android APK.
-    SDL_snprintf(asked, sizeof(asked), "%slayouts/%s", base ? base : "", name);
-    char *data = SDL_LoadFile(asked, size);
+    // A layout of the data pack comes first.
+    char *data = NULL;
+    if (app->packDirectory[0]) {
+        SDL_snprintf(asked, sizeof(asked), "%s/layouts/%s", app->packDirectory, name);
+        data = SDL_LoadFile(asked, size);
+    }
+    if (!data) {
+        SDL_snprintf(asked, sizeof(asked), "%slayouts/%s", base ? base : "", name);
+        data = SDL_LoadFile(asked, size);
+    }
     int own = data != NULL;
     if (!own) {
         SDL_snprintf(asked, sizeof(asked), "%s/NewGUI/Screens/%s", app->gameDirectory, name);
@@ -972,6 +984,30 @@ static int language_from_device(SSRApp *app) {
     return 1;
 }
 
+// The chosen data pack of the settings file. packDirectory gets its
+// directory when the pack is installed and good, else "".
+static void find_pack(SSRApp *app) {
+    app->packDirectory[0] = 0;
+    char *text = SDL_LoadFile(app->settingsPath, NULL);
+    const char *line = text ? SDL_strstr(text, "pack=") : NULL;
+    while (line && line != text && line[-1] != '\n') line = SDL_strstr(line + 1, "pack=");
+    if (line) {
+        char id[48];
+        size_t n = strcspn(line + 5, "\r\n");
+        SDL_snprintf(id, sizeof(id), "%.*s", (int)(n < sizeof(id) ? n : sizeof(id) - 1), line + 5);
+        char directory[2112];
+        SDL_snprintf(directory, sizeof(directory), "%s/%s", app->packsDirectory, id);
+        SSRPackInfo info;
+        if (id[0] && ssr_pack_info(directory, &info) && SDL_strcmp(info.id, id) == 0) {
+            SDL_strlcpy(app->packDirectory, directory, sizeof(app->packDirectory));
+            SDL_Log("The world reads the data pack %s (%s).", info.name, info.version);
+        } else if (id[0]) {
+            SDL_Log("The data pack %s is not installed.", id);
+        }
+    }
+    SDL_free(text);
+}
+
 static void load_game(SSRApp *app) {
     free_overlay(app);
     free_splash(app);
@@ -981,11 +1017,14 @@ static void load_game(SSRApp *app) {
     ssr_world_free(app->world);
     ssr_audio_free(app->audio);
     app->audio = ssr_audio_create(app->gameDirectory);
+    find_pack(app);
     app->gfx = ssr_gfx_create(app->renderer, app->gameDirectory);
     ssr_gfx_set_offset(app->gfx, -app->left, -app->top);
-    char path[2300];
+    ssr_gfx_set_pack(app->gfx, app->packDirectory);
+    char path[2300], packWorld[2200];
     SDL_snprintf(path, sizeof(path), "%s/MyData/%s", app->gameDirectory, SSR_WORLD_DEFAULT_SET);
-    app->world = ssr_world_load(path);
+    SDL_snprintf(packWorld, sizeof(packWorld), "%s/world", app->packDirectory);
+    app->world = ssr_world_load_pack(path, app->packDirectory[0] ? packWorld : NULL);
     if (!app->world) SDL_snprintf(app->message, sizeof(app->message), "The import has no data set %s.", SSR_WORLD_DEFAULT_SET);
     // The tweaks start with the values of the game.
     SDL_snprintf(path, sizeof(path), "%s/Tweaks/TweakValues.txt", app->gameDirectory);
@@ -1028,7 +1067,22 @@ static void load_game(SSRApp *app) {
     open_screen(app, screen && *screen ? screen : chosen ? "MainMenu.uis" : "language.uis");
 }
 
+// A data pack installs, and the world reads it. Returns 0 when the file
+// is not a data pack.
+static int install_pack(SSRApp *app, const char *archive) {
+    SSRPackInfo info;
+    if (!ssr_pack_install(archive, app->packsDirectory, &info)) return 0;
+    SDL_Log("Installed the data pack %s (%s) by %s.", info.name, info.version, info.author);
+    // The settings come with the game.
+    if (!app->game && ssr_import_is_done(app->gameDirectory)) load_game(app);
+    ssr_game_set_pack(app->game, info.id);
+    if (!ssr_game_save_settings(app->game, app->settingsPath)) SDL_Log("The settings were not saved.");
+    if (ssr_import_is_done(app->gameDirectory)) load_game(app);
+    return 1;
+}
+
 static void import_copy(SSRApp *app, const char *archive) {
+    if (install_pack(app, archive)) return;
     int files = 0;
     SSRSource source = ssr_import(archive, app->gameDirectory, &files);
     if (source == SSR_SOURCE_UNKNOWN) {
@@ -1145,6 +1199,7 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     SDL_snprintf(app->gameDirectory, sizeof(app->gameDirectory), "%sgame", pref);
     SDL_snprintf(app->settingsPath, sizeof(app->settingsPath), "%ssettings.txt", pref);
     SDL_snprintf(app->saveDirectory, sizeof(app->saveDirectory), "%ssaves", pref);
+    SDL_snprintf(app->packsDirectory, sizeof(app->packsDirectory), "%spacks", pref);
     SDL_CreateDirectory(app->saveDirectory);
     SDL_free(pref);
     app->tweaks = ssr_tweaks_create();
