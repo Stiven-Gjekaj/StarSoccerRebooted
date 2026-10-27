@@ -857,6 +857,13 @@ static void test_moves_copies_and_sorts_by_y(void) {
     a = find_image(scene, "ImageA");
     b = find_image(scene, "ImageB");
     CHECK(a && b && a < b);
+    // The code scales, turns, and colours a part of a copy.
+    ssr_scene_spawn_set(scene, low, "PlayerAnim#0", SSR_GEL_SCALE, 2);
+    ssr_scene_spawn_colour(scene, low, "PlayerAnim", "FF000080");
+    ssr_scene_update(scene, &env, 16);
+    a = find_image(scene, "ImageA");
+    CHECK(a && near(a->w, 20) && a->colour == 0xFF000080);
+    ssr_scene_spawn_set(scene, low, "PlayerAnim", SSR_GEL_SCALE, 1);
     // The code moves an element of the screen by its ref.
     ssr_scene_place(scene, "Pitch", 10, 20, 2);
     ssr_scene_update(scene, &env, 16);

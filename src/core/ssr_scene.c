@@ -3481,3 +3481,29 @@ void ssr_scene_list_sub(SSRScene *scene, const char *list, const char *ref, cons
     Gel *entry = last_entry(scene, list);
     if (entry && ref) change_sub(entry, ref, text, visible);
 }
+
+// The gel of the copy: ref, or "ref#n" for the element n of the ref (0 is
+// the first gel with the ref).
+static Gel *spawn_part(const SSRScene *scene, int id, const char *ref) {
+    Gel *g = spawned(scene, id);
+    if (!g || !ref) return g;
+    const char *hash = strchr(ref, '#');
+    if (!hash) return find_below(g, ref);
+    char name[64];
+    snprintf(name, sizeof(name), "%.*s", (int)(hash - ref), ref);
+    int index = atoi(hash + 1);
+    return nth_element(g, name, &index);
+}
+
+void ssr_scene_spawn_set(SSRScene *scene, int id, const char *ref, SSRGelProperty property, float value) {
+    Gel *g = spawn_part(scene, id, ref);
+    if (g) ex_set(scene, g, property, value);
+}
+
+void ssr_scene_spawn_colour(SSRScene *scene, int id, const char *ref, const char *colour) {
+    Gel *g = spawn_part(scene, id, ref);
+    if (!g || !colour) return;
+    char text[24];
+    snprintf(text, sizeof(text), "#%s", colour[0] == '#' ? colour + 1 : colour);
+    g->hasColour = parse_colour(text, &g->colour);
+}

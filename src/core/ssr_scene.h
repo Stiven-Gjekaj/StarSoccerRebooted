@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 
+#include "ssr_ex.h"
 #include "ssr_spine.h"
 #include "ssr_tweaks.h"
 #include "ssr_ui.h"
@@ -202,6 +203,12 @@ void ssr_scene_spawn_anim(SSRScene *scene, int id, const char *ref, const char *
 // The CloneTweak doodads with the ref in the copy take their value from the
 // tweak group,name.
 void ssr_scene_spawn_clone(SSRScene *scene, int id, const char *ref, const char *group, const char *name);
+// Sets a property of the copy, or of the element ref inside it: "ref" is
+// the first gel with the ref, "ref#n" is the element n of the ref (as
+// c_GGadget.GetElement), and NULL is the copy.
+void ssr_scene_spawn_set(SSRScene *scene, int id, const char *ref, SSRGelProperty property, float value);
+// The colour "RRGGBBAA" of the copy, or of the element ref inside it.
+void ssr_scene_spawn_colour(SSRScene *scene, int id, const char *ref, const char *colour);
 // Shows or hides the copy, or the element with the ref inside it.
 void ssr_scene_spawn_show(SSRScene *scene, int id, const char *ref, int visible);
 
