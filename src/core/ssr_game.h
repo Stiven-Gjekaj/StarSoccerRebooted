@@ -125,6 +125,10 @@ int ssr_game_take_settings_change(SSRGame *game);
 const SSRMatch *ssr_game_match(const SSRGame *game);
 const SSRChance *ssr_game_chance(const SSRGame *game);
 
+// The goal replay: 0 none, 1 the offer shows, 2 the replay plays. While it
+// plays, ssr_game_chance gives the recorded frame (WatchReplay.Frame).
+int ssr_game_replaying(const SSRGame *game);
+
 // 1 while the banner of the result of a chance shows (scoreanim.uis, with
 // the tweaks Minigames:Outcome and Chance:IsHead).
 int ssr_game_banner(const SSRGame *game);

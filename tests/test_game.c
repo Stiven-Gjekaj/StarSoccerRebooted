@@ -85,6 +85,40 @@ static int has_op(const SSRUiOp *ops, int count, SSRUiOpKind kind, const char *r
 // test makes: one continent, two nations, a league in England.
 // Plays a match from the game menu: the commentary, a chance of the
 // player, and the end.
+// The replays that the matches of the test watched.
+static int replays;
+
+// The offer of a goal replay: Watch, then the replay plays the recorded
+// frames in a loop until Exit.
+static void watch_a_replay(SSRGame *game, SSRTweaks *tweaks) {
+    const SSRChance *live = ssr_game_chance(game);
+    int result = live->result;
+    CHECK(result == SSR_RESULT_GOAL || result == SSR_RESULT_ASSIST);
+    ssr_game_message(game, "matchchance.btn_WatchReplay");
+    CHECK(ssr_game_replaying(game) == 2 && ssr_tweaks_number(tweaks, "WatchReplay", "Active") == 1);
+    int length = (int)ssr_tweaks_number(tweaks, "WatchReplay", "Length");
+    CHECK(length > 10);
+    // The first replay waits at frame 0 for the help.
+    if (ssr_tweaks_number(tweaks, "Player", "ReplayActive") < 3) {
+        ssr_game_update(game, 5);
+        CHECK(ssr_tweaks_number(tweaks, "WatchReplay", "Frame") == 0);
+        ssr_tweaks_set_number(tweaks, "Player", "ReplayActive", 3);
+        ssr_tweaks_set_number(tweaks, "WatchReplay", "Speed", 1);
+    }
+    const SSRChance *first = ssr_game_chance(game);
+    CHECK(first != live && first->state != SSR_CHANCE_OVER);
+    ssr_game_update(game, 5);
+    CHECK(ssr_tweaks_number(tweaks, "WatchReplay", "Frame") == 5);
+    // The last frame is the end of the chance. Then the replay starts again.
+    ssr_tweaks_set_number(tweaks, "WatchReplay", "Frame", length);
+    CHECK(ssr_game_chance(game)->state == SSR_CHANCE_OVER);
+    ssr_game_update(game, 1);
+    CHECK(ssr_tweaks_number(tweaks, "WatchReplay", "Frame") == 0);
+    ssr_game_message(game, "watchreplay.exit");
+    CHECK(ssr_game_replaying(game) == 0 && strcmp(ssr_game_screen(game), "match") == 0);
+    replays++;
+}
+
 static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     SSRUiOp ops[64];
     int apps = ssr_game_career(game)->apps, bank = ssr_game_career(game)->bank;
@@ -115,6 +149,7 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         frames++;
         ssr_game_update(game, 1);
         take_ops(game, ops, 64);
+        if (ssr_game_replaying(game) == 1) watch_a_replay(game, tweaks);
         const SSRChance *chance = ssr_game_chance(game);
         if (chance && chance->state == SSR_CHANCE_DRIBBLE) {
             // A dribble: swipe up the screen until the chance ends.
@@ -131,12 +166,16 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         if (chance && chance->state == SSR_CHANCE_AIM && chance->kicking == 0) {
             chances++;
             CHECK(strcmp(ssr_game_screen(game), "matchminigame") == 0);
-            // Aim straight up, then tap the big ball at its centre.
+            // Aim at the middle of the goal, then tap the big ball at its
+            // centre.
+            float dx = chance->ball.x - 320, dy = chance->ball.y - 128;
+            float d = sqrtf(dx * dx + dy * dy);
+            float aimX = chance->ball.x + dx / d * 60, aimY = chance->ball.y + dy / d * 60;
             ssr_game_touch(game, 1, chance->ball.x, chance->ball.y);
             ssr_game_update(game, 1);
-            ssr_game_touch(game, 1, chance->ball.x, chance->ball.y + 60);
+            ssr_game_touch(game, 1, aimX, aimY);
             ssr_game_update(game, 10);
-            ssr_game_touch(game, 0, chance->ball.x, chance->ball.y + 60);
+            ssr_game_touch(game, 0, aimX, aimY);
             ssr_game_update(game, 1);
             CHECK(chance->state == SSR_CHANCE_TAP);
             // Wait for the tap ball to come near, then tap it.
@@ -229,6 +268,21 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(c->bank == bank + (int)ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal"));
     CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal") >= c->wage);
     ssr_game_message(game, "matchreview.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+}
+
+// Saves the career with full skills and energy, and loads it again.
+static void make_a_star(SSRGame *game, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    for (int i = 0; i < SSR_CAREER_SKILL_LEVELS; i++) {
+        c.technique[i] = c.power[i] = c.pace[i] = c.vision[i] = c.setPieces[i] = 3;
+    }
+    c.energy = 100;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
@@ -328,6 +382,8 @@ static void test_starts_a_new_career(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     ssr_tweaks_set_number(tweaks, "Player", "StartingWage", 1);
     ssr_tweaks_set_number(tweaks, "Player", "StartingGoalBonus", 1);
+    ssr_tweaks_set_number(tweaks, "Menu", "ReplaysEnabled", 1);
+    ssr_tweaks_set_number(tweaks, "SplashMessage", "DelayWatchReplay", 25);
     const char *directory = ssr_test_directory("game_career");
     char path[1200];
     snprintf(path, sizeof(path), "%s/career1.txt", directory);
@@ -422,6 +478,13 @@ static void test_starts_a_new_career(void) {
     play_a_match(game, tweaks);
     tire(game, path);
     drink_a_can(game, tweaks);
+    // A star scores: the test watches the replay of a goal.
+    make_a_star(game, path);
+    for (int i = 0; i < 10 && replays == 0; i++) {
+        play_a_match(game, tweaks);
+        make_a_star(game, path);
+    }
+    CHECK(replays > 0);
     ssr_game_message(game, "gamemenu.btn_Quit");
 
     // Delete: Cancel keeps it, Ok deletes it.

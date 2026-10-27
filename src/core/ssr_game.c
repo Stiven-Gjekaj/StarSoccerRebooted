@@ -100,7 +100,19 @@ struct SSRGame {
     int recovery, payWage, payGoals, payAssists;
     // The screen under the ratings screen (c_TScreen_Ratings.m_prevscreen).
     char ratingsReturn[64];
+
+    // The goal replay: a copy of the chance for each tick that the game
+    // records, 0 or the offer or the playback, and the time when the offer
+    // goes on by itself.
+    SSRChance *replay;
+    int replayCount, replayCapacity;
+    int replayMode;
+    int offerEnd;
 };
+
+enum { REPLAY_NONE, REPLAY_OFFER, REPLAY_PLAY };
+// 60 seconds of ticks.
+#define REPLAY_MAX 3600
 
 typedef void (*Handler)(SSRGame *game);
 
@@ -1340,6 +1352,115 @@ static void show_banner(SSRGame *game) {
     game->chanceEnd = game->now + wait;
 }
 
+// One frame of the replay (RecordReplayFrame): the ticks of the aim drag,
+// the tap ball, the flight, and the end until the offer.
+static void record_replay(SSRGame *game) {
+    const SSRChance *c = game->chance;
+    if (game->replayMode != REPLAY_NONE) return;
+    if (c->state == SSR_CHANCE_AIM && c->kicking != 1) return;
+    if (game->replayCount == game->replayCapacity) {
+        if (game->replayCapacity >= REPLAY_MAX) return;
+        int capacity = game->replayCapacity ? game->replayCapacity * 2 : 256;
+        if (capacity > REPLAY_MAX) capacity = REPLAY_MAX;
+        SSRChance *more = realloc(game->replay, (size_t)capacity * sizeof(SSRChance));
+        if (!more) return;
+        game->replay = more;
+        game->replayCapacity = capacity;
+    }
+    game->replay[game->replayCount++] = *c;
+}
+
+// The end of a chance: the match goes on, and the commentary comes back.
+static void end_chance(SSRGame *game) {
+    if (game->replayMode != REPLAY_NONE) {
+        ssr_tweaks_set_number(game->tweaks, "WatchReplay", "Active", 0);
+        game->replayMode = REPLAY_NONE;
+    }
+    game->replayCount = 0;
+    ssr_match_chance_done(game->match, game->chance, game->now, &game->random);
+    free(game->chance);
+    game->chance = NULL;
+    set_screen(game, "match");
+    for (int i = 0; i < game->commentaryCount; i++) show_line(game, &game->commentary[i]);
+    scroll_commentary(game);
+    add_op(game, SSR_OP_ANIM, "NameBar", NULL, "1", 1);
+    match_state(game);
+    match_tweaks(game);
+}
+
+// c_MatchChance.m_ShowWatchReplay: the offer after a goal or an assist of
+// the player, when the option is on. The first offer waits; later offers go
+// on by themselves after SplashMessage.DelayWatchReplay seconds.
+static int offer_replay(SSRGame *game) {
+    SSRChanceResult r = game->chance->result;
+    if (r != SSR_RESULT_GOAL && r != SSR_RESULT_ASSIST) return 0;
+    if (!game->settings.replays || game->replayCount == 0) return 0;
+    SSRTweaks *t = game->tweaks;
+    if (ssr_tweaks_number(t, "Menu", "ReplaysEnabled") != 1) return 0;
+    game->replayMode = REPLAY_OFFER;
+    if (ssr_tweaks_number(t, "Player", "ReplayActive") == 0) {
+        ssr_tweaks_set_number(t, "Player", "ReplayActive", 1);
+        game->offerEnd = 0;
+    } else {
+        game->offerEnd = game->now + (int)(ssr_tweaks_number(t, "SplashMessage", "DelayWatchReplay") * 1000);
+    }
+    add_op(game, SSR_OP_SHOW, "ReplayHud", NULL, "", 0);
+    add_op(game, SSR_OP_SHOW, "WatchReplay", NULL, "", 0);
+    add_op(game, SSR_OP_HIDE, "ReplayOptions", NULL, "", 0);
+    return 1;
+}
+
+// matchchance.btn_WatchReplay: the playback (c_TMatch.m_StartReplay).
+static void watch_replay(SSRGame *game) {
+    if (game->replayMode != REPLAY_OFFER) return;
+    SSRTweaks *t = game->tweaks;
+    game->replayMode = REPLAY_PLAY;
+    add_op(game, SSR_OP_HIDE, "WatchReplay", NULL, "", 0);
+    add_op(game, SSR_OP_SHOW, "ReplayOptions", NULL, "", 0);
+    ssr_tweaks_set_number(t, "WatchReplay", "Frame", 0);
+    ssr_tweaks_set_number(t, "WatchReplay", "Speed", 1);
+    ssr_tweaks_set_number(t, "WatchReplay", "Length", game->replayCount - 1);
+    ssr_tweaks_set_number(t, "WatchReplay", "Loop", 1);
+    ssr_tweaks_set_number(t, "WatchReplay", "Active", 1);
+    ssr_tweaks_set_number(t, "WatchReplay", "Paused", 0);
+    // The first replay waits behind the help of the controls.
+    if (ssr_tweaks_number(t, "Player", "ReplayActive") < 3) ssr_tweaks_set_number(t, "WatchReplay", "Speed", 0);
+}
+
+// matchchance.btn_SkipReplay and watchreplay.exit.
+static void skip_replay(SSRGame *game) {
+    if (game->replayMode == REPLAY_NONE || !game->chance) return;
+    add_op(game, SSR_OP_HIDE, "ReplayHud", NULL, "", 0);
+    end_chance(game);
+}
+
+// One tick of the playback (c_TMatch.m_UpdateReplay): the frame goes on by
+// the speed, and wraps when the loop is on.
+static void replay_tick(SSRGame *game) {
+    SSRTweaks *t = game->tweaks;
+    float frame = (float)ssr_tweaks_number(t, "WatchReplay", "Frame");
+    float length = (float)ssr_tweaks_number(t, "WatchReplay", "Length");
+    int loop = ssr_tweaks_number(t, "WatchReplay", "Loop") == 1;
+    if (ssr_tweaks_number(t, "WatchReplay", "Paused") == 0) frame += (float)ssr_tweaks_number(t, "WatchReplay", "Speed");
+    if (frame < 0) {
+        if (loop) {
+            frame = length;
+        } else {
+            frame = 0;
+            ssr_tweaks_set_number(t, "WatchReplay", "Speed", 0);
+        }
+    } else if (frame > length) {
+        if (loop) {
+            frame = 0;
+        } else {
+            frame = length;
+            ssr_tweaks_set_number(t, "WatchReplay", "Speed", 0);
+        }
+    }
+    frame = frame < 0 ? 0 : frame > length ? length : frame;
+    ssr_tweaks_set_number(t, "WatchReplay", "Frame", frame);
+}
+
 static void start_chance(SSRGame *game) {
     free(game->chance);
     game->chance = calloc(1, sizeof(SSRChance));
@@ -1351,28 +1472,32 @@ static void start_chance(SSRGame *game) {
     s.careerPasses = (float)c->passes;
     ssr_chance_start(game->chance, &s, &game->random);
     game->chanceEnd = 0;
+    // InitChance: a new recording, and no replay.
+    game->replayCount = 0;
+    game->replayMode = REPLAY_NONE;
+    ssr_tweaks_set_number(game->tweaks, "WatchReplay", "Speed", 1);
+    ssr_tweaks_set_number(game->tweaks, "WatchReplay", "Active", 0);
     set_screen(game, "matchminigame");
 }
 
 static void match_tick(SSRGame *game) {
     if (game->chance) {
+        if (game->replayMode == REPLAY_PLAY) {
+            replay_tick(game);
+            return;
+        }
+        if (game->replayMode == REPLAY_OFFER) {
+            if (game->offerEnd && game->now >= game->offerEnd) skip_replay(game);
+            return;
+        }
         SSRTapTouch touch = game->touch;
         touch.hit = touch.down && !game->touchWasDown;
         game->touchWasDown = touch.down;
         ssr_chance_update(game->chance, game->now, &touch, &game->random);
+        record_replay(game);
         if (game->chance->state == SSR_CHANCE_OVER) {
             if (game->chanceEnd == 0) show_banner(game);
-            if (game->now >= game->chanceEnd) {
-                ssr_match_chance_done(game->match, game->chance, game->now, &game->random);
-                free(game->chance);
-                game->chance = NULL;
-                set_screen(game, "match");
-                for (int i = 0; i < game->commentaryCount; i++) show_line(game, &game->commentary[i]);
-                scroll_commentary(game);
-                add_op(game, SSR_OP_ANIM, "NameBar", NULL, "1", 1);
-                match_state(game);
-                match_tweaks(game);
-            }
+            if (game->now >= game->chanceEnd && !offer_replay(game)) end_chance(game);
         }
         return;
     }
@@ -1652,6 +1777,9 @@ static const Route ROUTES[] = {
     {"matchstats.btn_Play", stats_continue},
     {"matchreview.btn_Play", review_continue},
     {"skills.btn_Ratings", ratings_open},
+    {"matchchance.btn_WatchReplay", watch_replay},
+    {"matchchance.btn_SkipReplay", skip_replay},
+    {"watchreplay.exit", skip_replay},
     {"ratings.btn_Back", ratings_back},
     {"gamemenu.btn_DrinkNRG", drink_button},
     {"chooseboost.btn_1", boost1},
@@ -1680,6 +1808,7 @@ void ssr_game_free(SSRGame *game) {
     if (!game) return;
     free(game->match);
     free(game->chance);
+    free(game->replay);
     free(game);
 }
 
@@ -1870,7 +1999,18 @@ const SSRMatch *ssr_game_match(const SSRGame *game) {
 }
 
 const SSRChance *ssr_game_chance(const SSRGame *game) {
-    return game ? game->chance : NULL;
+    if (!game) return NULL;
+    // The playback shows the copy of the frame (int)WatchReplay.Frame.
+    if (game->replayMode == REPLAY_PLAY && game->replayCount > 0) {
+        int i = (int)ssr_tweaks_number(game->tweaks, "WatchReplay", "Frame");
+        i = i < 0 ? 0 : i >= game->replayCount ? game->replayCount - 1 : i;
+        return &game->replay[i];
+    }
+    return game->chance;
+}
+
+int ssr_game_replaying(const SSRGame *game) {
+    return game ? game->replayMode : 0;
 }
 
 void ssr_game_touch(SSRGame *game, int down, float x, float y) {
