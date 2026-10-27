@@ -2534,6 +2534,9 @@ static void test_starts_a_new_career(void) {
         CHECK(p->first[0] && p->last[0]);
     }
     CHECK(rivals == 3 && squads >= SSR_SQUAD_SIZE && apps > 0 && goals > 0);
+    // The race for the title made a rivalry of the first two clubs.
+    const SSRHonours *honours = ssr_game_honours(game);
+    CHECK(honours->count >= 2 && honours->rivalryCount >= 1 && honours->rivalries[0].points >= 2);
     // Each club of the league has a manager.
     CHECK(people && people->managerCount == 4 && ssr_people_manager(people, ssr_game_career(game)->clubId));
     char peoplePath[1200];

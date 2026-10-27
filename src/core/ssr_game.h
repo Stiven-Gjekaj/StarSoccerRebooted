@@ -9,6 +9,7 @@
 #include <stddef.h>
 
 #include "ssr_career.h"
+#include "ssr_honours.h"
 #include "ssr_match.h"
 #include "ssr_people.h"
 #include "ssr_training.h"
@@ -184,6 +185,8 @@ void ssr_game_set_names(SSRGame *game, const char *text);
 void ssr_game_set_world_seed(SSRGame *game, int seed);
 // The players of the world of the career, or NULL.
 SSRPeople *ssr_game_people(SSRGame *game);
+// The honours and the rivalries of the world of the career.
+const SSRHonours *ssr_game_honours(const SSRGame *game);
 void ssr_game_set_seed(SSRGame *game, int seed);
 
 // The career that plays now.

@@ -3656,6 +3656,13 @@ static void keep_honours(SSRGame *game) {
             h.goals = game->career.seasonGoals;
         }
         ssr_honours_add(&game->honours, &h);
+        // The first two clubs raced for the title: their rivalry grows, and
+        // more after a close race.
+        const SSRTableRow *first = &s->rows[pool->rows[0]], *second = &s->rows[pool->rows[1 < pool->count ? 1 : 0]];
+        if (first != second) {
+            ssr_honours_add_rivalry(&game->honours, first->teamId, second->teamId,
+                                    first->points - second->points <= 3 ? 3 : 2);
+        }
     }
 }
 
@@ -3821,7 +3828,13 @@ static void new_season(SSRGame *game) {
     for (int r = 0; r < 5; r++) game->career.deplete[r] = game->career.sdate + ssr_rand2(&game->random, -7, 7);
     ssr_tweaks_set_number(t, "Menu", "CanSavePlayer", 1);
     ssr_career_reset_season(&game->career);
-    if (game->people) ssr_people_new_season(game->people, game->world, game->names, ssr_career_year(&game->career));
+    if (game->people) {
+        ssr_people_new_season(game->people, game->world, game->names, ssr_career_year(&game->career));
+        // A transfer between two clubs makes their rivalry grow.
+        for (int i = 0; i < game->people->moveCount; i++) {
+            ssr_honours_add_rivalry(&game->honours, game->people->moves[i][1], game->people->moves[i][2], 1);
+        }
+    }
     save_career(game);
     player_tweaks(game);
     star_transition(game, "gamemenu");
@@ -9441,6 +9454,10 @@ SSRPeople *ssr_game_people(SSRGame *game) {
     return game ? game->people : NULL;
 }
 
+const SSRHonours *ssr_game_honours(const SSRGame *game) {
+    return game ? &game->honours : NULL;
+}
+
 void ssr_game_set_seed(SSRGame *game, int seed) {
     if (game) game->random.seed = seed;
 }
@@ -9560,13 +9577,15 @@ static SSRPerson *world_scorer(SSRGame *game) {
 
 // 1 when the next match of the player is a club match between two clubs
 // near each other. home and away get the clubs.
+// 1 for a derby, 2 for a match of a big rivalry.
 static int next_derby(SSRGame *game, int *home, int *away) {
     SSRFixture *f = game->season ? ssr_season_next_fixture(game->season) : NULL;
     SSRSeasonComp *comp = f ? ssr_season_comp(game->season, f->compId) : NULL;
     if (!f || !comp || comp->data->level != 0) return 0;
     *home = ssr_fixture_home_team(game->season, f);
     *away = ssr_fixture_away_team(game->season, f);
-    return ssr_world_is_derby(game->world, *home, *away);
+    if (ssr_world_is_derby(game->world, *home, *away)) return 1;
+    return ssr_honours_rivalry(&game->honours, *home, *away) >= SSR_RIVALRY_POINTS ? 2 : 0;
 }
 
 // The league table of the player after 3 matches or more: the first, the
@@ -9837,9 +9856,9 @@ void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_
     }
     case SSR_TICKER_WORLD_DERBY: {
         season_in(game);
-        int home = 0, away = 0;
-        if (!next_derby(game, &home, &away)) return;
-        snprintf(text, capacity, "%s", loc(game, "SSR_TICKER_DERBY"));
+        int home = 0, away = 0, kind = next_derby(game, &home, &away);
+        if (!kind) return;
+        snprintf(text, capacity, "%s", loc(game, kind == 1 ? "SSR_TICKER_DERBY" : "SSR_TICKER_RIVALRY"));
         replace_all(text, capacity, "$home", club_name(game, home));
         replace_all(text, capacity, "$away", club_name(game, away));
         snprintf(number, sizeof(number), "%d", (int)(ssr_world_club_distance(game->world, home, away) + 0.5));

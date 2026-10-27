@@ -30,3 +30,4 @@ SSR_StyleBalanced	balanced	ausgewogenen	équilibré	equilibrado	equilibrato	equi
 SSR_StyleYouth	youth	jugendlichen	jeunesse	juvenil	giovanile	jovem	jovem		
 SSR_StyleAttacking	attacking	offensiven	offensif	ofensivo	offensivo	ofensivo	ofensivo		
 SSR_MomentManager	A new manager arrives: $name.	Ein neuer Trainer kommt: $name.	Un nouvel entraîneur arrive : $name.	Llega un nuevo entrenador: $name.	Arriva un nuovo allenatore: $name.	Chega um novo técnico: $name.	Chega um novo treinador: $name.		
+SSR_TICKER_RIVALRY	A big rivalry next: $home against $away.	Als Nächstes ein großes Duell: $home gegen $away.	Prochain match, une grande rivalité : $home contre $away.	Próximo partido, una gran rivalidad: $home contra $away.	Prossima partita, una grande rivalità: $home contro $away.	Próximo jogo é uma grande rivalidade: $home contra $away.	Próximo jogo é uma grande rivalidade: $home contra $away.		
