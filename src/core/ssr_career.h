@@ -42,6 +42,8 @@ typedef struct {
     // The energy drinks of each kind.
     int nrg[10];
     float ratings[10];
+    // The matches, the goals, the assists, and the passes of the career.
+    int apps, goals, assists, passes;
     int retired;
     // The news that the next screen shows, or "".
     char headline[512];
@@ -53,6 +55,10 @@ typedef struct {
 // contract (wage, goal bonus, assist bonus).
 void ssr_career_create(SSRCareer *career, const char *first, const char *last, int gender, int hardMode,
                        int clubNationId, int wage, int goalBonus, int assistBonus);
+
+// The value of a skill: the sum of its levels, from 1 to 100
+// (GSPlayerUtility.GetSkill).
+int ssr_career_skill(const int *levels);
 
 // The year and the week of the career, from 1.
 int ssr_career_year(const SSRCareer *career);

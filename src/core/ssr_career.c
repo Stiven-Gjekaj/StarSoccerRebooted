@@ -88,6 +88,7 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     write_ints(file, "power", c->power, SSR_CAREER_SKILL_LEVELS);
     write_ints(file, "nrg", c->nrg, 10);
     write_floats(file, "ratings", c->ratings, 10);
+    fprintf(file, "apps=%d\ngoals=%d\nassists=%d\npasses=%d\n", c->apps, c->goals, c->assists, c->passes);
     fprintf(file, "retired=%d\n", c->retired);
     // A line ends the headline, so the save keeps its new lines as "\n".
     fputs("headline=", file);
@@ -166,6 +167,10 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "power") == 0) read_ints(value, c->power, SSR_CAREER_SKILL_LEVELS);
         else if (strcmp(key, "nrg") == 0) read_ints(value, c->nrg, 10);
         else if (strcmp(key, "ratings") == 0) read_floats(value, c->ratings, 10);
+        else if (strcmp(key, "apps") == 0) c->apps = number;
+        else if (strcmp(key, "goals") == 0) c->goals = number;
+        else if (strcmp(key, "assists") == 0) c->assists = number;
+        else if (strcmp(key, "passes") == 0) c->passes = number;
         else if (strcmp(key, "retired") == 0) c->retired = number;
         else if (strcmp(key, "headline") == 0) {
             size_t used = 0;
@@ -185,4 +190,10 @@ int ssr_career_load(SSRCareer *c, const char *path) {
     }
     fclose(file);
     return c->clubId != 0;
+}
+
+int ssr_career_skill(const int *levels) {
+    int sum = 0;
+    for (int i = 0; i < SSR_CAREER_SKILL_LEVELS; i++) sum += levels[i];
+    return sum < 1 ? 1 : sum > 100 ? 100 : sum;
 }

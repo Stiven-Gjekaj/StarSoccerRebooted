@@ -28,6 +28,10 @@ static void test_saves_and_loads_a_career(void) {
     c.technique[0] = 3;
     c.power[99] = 7;
     c.ratings[4] = 6.5f;
+    c.apps = 12;
+    c.goals = 5;
+    c.assists = 3;
+    c.passes = 40;
     snprintf(c.headline, sizeof(c.headline), "Line one\nA \\ two");
     char path[1200];
     snprintf(path, sizeof(path), "%s/slot0.txt", ssr_test_directory("career_save"));
@@ -37,11 +41,23 @@ static void test_saves_and_loads_a_career(void) {
     CHECK(back.technique[0] == 3 && back.power[99] == 7 && fabsf(back.ratings[4] - 6.5f) < 1e-6f);
     CHECK(back.bank == 15 && back.relationFans == 75 && back.nrg[1] == 1);
     CHECK(strcmp(back.headline, c.headline) == 0 && strcmp(back.gameVersion, "v2.32") == 0);
+    CHECK(back.apps == 12 && back.goals == 5 && back.assists == 3 && back.passes == 40);
     snprintf(path, sizeof(path), "%s/none.txt", ssr_test_directory("career_save"));
     CHECK(!ssr_career_load(&back, path));
 }
 
+static void test_sums_a_skill(void) {
+    int levels[SSR_CAREER_SKILL_LEVELS] = {0};
+    CHECK(ssr_career_skill(levels) == 1);
+    levels[0] = 30;
+    levels[5] = 12;
+    CHECK(ssr_career_skill(levels) == 42);
+    levels[9] = 80;
+    CHECK(ssr_career_skill(levels) == 100);
+}
+
 int main(void) {
+    test_sums_a_skill();
     test_creates_a_career();
     test_saves_and_loads_a_career();
     return TEST_RESULT();
