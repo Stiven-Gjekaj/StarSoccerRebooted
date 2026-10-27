@@ -134,7 +134,12 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 
 ## 0.7 The life of the player
 
-- [ ] Relationships (`Relationships`)
+- [x] Relationships (`Relationships`, `Pairs`)
+- [ ] The sounds of the relationships screen and of the pairs game
+      (`CError`, `Card_Dealt_1`, `CSuccess`). The game logic has no sounds
+      yet.
+- [ ] The NRG overlay when the energy is too low for an activity
+      (`upsellnrg`, `NRGOverlay`). A message shows now.
 - [ ] Dilemmas and interviews (`Dilemma`, `Interview`), with the
       interview after a match
 - [ ] Money, the lifestyle shop, boots, and match balls (`ShopLifestyle`,
@@ -189,7 +194,8 @@ place of the atlas image with the same name (`art/NewStarLogo.png`).
 - [x] The boards and the roof of the stadiums (`BannerTopS2`,
       `BannerFrontAbv`)
 - [ ] The other marks: `BannerFrontLogo`, `LogoStrip`, `CLNewStar`, the
-      sponsor images of `Images/`
+      sponsor images of `Images/`, the shirt card of the pairs game
+      (`PShirt`), and the back of the cards (`PCardBackPattern1`)
 
 ## Not in the remake
 
