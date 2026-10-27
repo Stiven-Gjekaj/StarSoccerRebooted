@@ -39,4 +39,23 @@ android {
     lint {
         abortOnError = false
     }
+    // The art and the layouts of the remake go into the APK as assets.
+    sourceSets {
+        main {
+            assets.srcDirs += [layout.buildDirectory.dir('ssrAssets')]
+        }
+    }
 }
+
+def copyRemakeAssets = tasks.register('copyRemakeAssets', Copy) {
+    from('../../art') {
+        include '*.png'
+        into 'art'
+    }
+    from('../../layouts') {
+        include '*.uis', '*.uih', '*.patch'
+        into 'layouts'
+    }
+    into layout.buildDirectory.dir('ssrAssets')
+}
+preBuild.dependsOn copyRemakeAssets
