@@ -310,6 +310,7 @@ static void ask_for_pack(SSRApp *app) {
 }
 
 static int install_pack(SSRApp *app, const char *archive);
+static void follow_game(SSRApp *app);
 
 // A copy of the chosen file goes to the data folder first: on Android the
 // dialog gives a content URI that only SDL can read.
@@ -325,6 +326,7 @@ static void install_chosen_pack(SSRApp *app, const char *chosen) {
     else if (app->game) {
         ssr_game_show_packs(app->game);
         app->gameScreen = -1;
+        follow_game(app);
     }
     SDL_RemovePath(copy);
 }
@@ -444,6 +446,7 @@ static void browse_done(SSRApp *app, const SDL_Event *event) {
         if (SDL_SaveFile(copy, data, d->size) && install_pack(app, copy) && app->game) {
             ssr_game_show_packs(app->game);
             app->gameScreen = -1;
+            follow_game(app);
         } else if (app->game) {
             ssr_game_download_failed(app->game);
         }
@@ -466,11 +469,11 @@ static void follow_game(SSRApp *app) {
         apply_settings(app);
         if (ssr_game_take_pack_change(app->game)) {
             // The world reads the chosen pack: the app loads the game again,
-            // and the packs screen shows the choice.
+            // and the packs screen shows the choice. The screen opens below,
+            // before the next frame gives it the rows of the new game.
             load_game(app);
             ssr_game_show_packs(app->game);
             app->gameScreen = -1;
-            return;
         }
         if (ssr_game_settings(app->game)->language != app->textLanguage) {
             // c_TScreen_Language.SetLanguage: the screens open again with the
