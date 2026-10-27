@@ -551,6 +551,17 @@ static const char *arg(const SSRUiNode *node, int index) {
     return node && index < node->argCount ? node->args[index] : "";
 }
 
+// A number with text after it, as "19>", is the number at its start, as
+// the Float() of Monkey X reads it.
+static double leading_number(SSRScene *s, const SSRUiNode *node, int index, double fallback) {
+    double value = number(s, node, index, NAN);
+    if (!isnan(value)) return value;
+    const char *text = arg(node, index);
+    char *end = NULL;
+    value = strtod(text, &end);
+    return end && end != text ? value : fallback;
+}
+
 static int is(const char *name, const char *word) {
     return strcmp(name, word) == 0;
 }
@@ -1961,8 +1972,8 @@ static void build_node(SSRScene *s, const SSRUiNode *node, Gel *parent) {
     } else if (is(name, "During")) {
         g = new_gel(GEL_DURING, node);
         if (!g) return;
-        g->first = (float)number(s, node, 0, 0);
-        g->last = (float)number(s, node, 1, g->first);
+        g->first = (float)leading_number(s, node, 0, 0);
+        g->last = (float)leading_number(s, node, 1, g->first);
         g->tfirst = g->first;
         g->tlength = g->last - g->first;
         const char *f = arg(node, 2);

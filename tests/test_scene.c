@@ -585,11 +585,11 @@ static void test_holds_one_instance_at_a_frame(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     layout = "Animation:(40,Loop) ref:RoseAnim\n"
              "{\n"
-             "\tDuring:(0,19)\n"
+             "\tDuring:(0,19>)\n"
              "\t{\n"
              "\t\tDraw:(PRose,0,0,10,10)\n"
              "\t}\n"
-             "\tDuring:(20,39)\n"
+             "\tDuring:(20,39>)\n"
              "\t{\n"
              "\t\tDraw:(PCardBack,0,0,10,10)\n"
              "\t}\n"
@@ -607,6 +607,11 @@ static void test_holds_one_instance_at_a_frame(void) {
     CHECK(!ssr_scene_anim_frame(scene, "Reel", 2, 25));
     for (int i = 0; i < 10; i++) ssr_scene_update(scene, &env, 16);
     const SSRSceneItem *back = find_image(scene, "PCardBack");
+    CHECK(find_image(scene, "PRose") && back && back->x == 20);
+    // "19>" ends the first range at 19: frame 10 is in it.
+    CHECK(ssr_scene_anim_frame(scene, "Reel", 0, 10) && ssr_scene_anim_frame(scene, "Reel", 1, 30));
+    ssr_scene_update(scene, &env, 16);
+    back = find_image(scene, "PCardBack");
     CHECK(find_image(scene, "PRose") && back && back->x == 20);
     ssr_scene_free(scene);
     ssr_ui_free(tree);
