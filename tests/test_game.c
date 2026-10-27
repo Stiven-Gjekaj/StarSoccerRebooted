@@ -600,6 +600,27 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(strlen(ssr_tweaks_get(tweaks, "MatchColours", "NameplateHomeCol1")) == 8);
     const char *home = ssr_tweaks_get(tweaks, "Match", "HomeName");
     CHECK(strlen(home) == 3 && strcmp(home, ssr_tweaks_get(tweaks, "Match", "AwayName")) != 0);
+    if (!ballChecked) {
+        // The ball button opens the balls, with a tick on the ball of the
+        // league. A tap on a ball picks it for the league, and closes.
+        int before = ssr_game_career(game)->ballLeague;
+        ssr_game_message(game, "btn_MatchBall");
+        CHECK(strcmp(ssr_game_overlay(game), "matchballs") == 0);
+        char owned[32];
+        snprintf(owned, sizeof(owned), "MB_%d_Owned", before);
+        CHECK(ssr_tweaks_number(tweaks, "Products", owned) == 1);
+        CHECK(strcmp(ssr_tweaks_get(tweaks, "Products", "MB_3_Speed"), "3") == 0);
+        CHECK(ssr_tweaks_number(tweaks, "Menu", "BallSpecialEffect") == 0);
+        ssr_game_message(game, "matchballs.btn_Back");
+        CHECK(ssr_game_overlay(game)[0] == 0 && ssr_game_career(game)->ballLeague == before);
+        ssr_game_message(game, "btn_MatchBall");
+        ssr_tweaks_set(tweaks, "Menu", "ItemString", before == 3 ? "MB_5" : "MB_3");
+        ssr_game_message(game, "chooseball.btn_OK");
+        int picked = before == 3 ? 5 : 3;
+        CHECK(ssr_game_overlay(game)[0] == 0);
+        CHECK(ssr_game_career(game)->ballLeague == picked);
+        CHECK(ssr_tweaks_number(tweaks, "Match", "MatchBall") == picked - 1);
+    }
     ssr_game_message(game, "match.btn_Time");
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchSpeed") == 350);
     ssr_game_message(game, "match.btn_Play");

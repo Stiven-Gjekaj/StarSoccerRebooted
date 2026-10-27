@@ -8253,6 +8253,66 @@ static void quit_career(SSRGame *game) {
     }
 }
 
+// The type of ball of the fixture of the match, or the league with no
+// fixture (c_TScreen_ChooseMatchBall.ButtonOK).
+static int match_ball_type(const SSRGame *game) {
+    return game->matchBallType >= 1 && game->matchBallType <= 4 ? game->matchBallType : 1;
+}
+
+// c_Product_Ball: the tweaks of the nine balls of the overlay. The balls of
+// SpecialEffect (7 to 9) are a purchase in 4.32. BallSpecialEffect 0 keeps
+// them hidden.
+static void match_ball_products(SSRGame *game) {
+    static const char *NAMES[] = {"NS_Pro", "NS_Rocket", "NS_Arrow", "NS_Bender", "NS_Bouncer",
+                                  "NS_Floater", "NS_SFX", "NS_SFX", "NS_SFX"};
+    static const char *ATTRIBUTES[] = {"Speed", "Bounce", "Weight", "Curl"};
+    int selected = ssr_career_selected_ball(&game->career, match_ball_type(game));
+    char name[48], value[16];
+    for (int ball = 1; ball <= SSR_BALL_TYPES; ball++) {
+        int attributes[4] = {0};
+        ssr_ball_type_attributes(ball, attributes);
+        for (int i = 0; i < 4; i++) {
+            snprintf(name, sizeof(name), "MB_%d_%s", ball, ATTRIBUTES[i]);
+            snprintf(value, sizeof(value), "%d", attributes[i]);
+            ssr_tweaks_set(game->tweaks, "Products", name, value);
+        }
+        snprintf(name, sizeof(name), "MB_%d_Owned", ball);
+        ssr_tweaks_set_number(game->tweaks, "Products", name, ball == selected);
+        snprintf(name, sizeof(name), "MB_%d_DisplayString", ball);
+        ssr_tweaks_set(game->tweaks, "Products", name, loc(game, NAMES[ball - 1]));
+    }
+    snprintf(value, sizeof(value), "MB_%d", selected);
+    ssr_tweaks_set(game->tweaks, "Menu", "ItemString", value);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "BallSpecialEffect", 0);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "MatchBallScroll", 0);
+}
+
+// btn_MatchBall: c_TScreen_MatchBalls.SetUpScreen opens the overlay.
+static void match_balls_open(SSRGame *game) {
+    match_ball_products(game);
+    snprintf(game->overlay, sizeof(game->overlay), "matchballs");
+}
+
+// chooseball.btn_OK: the ball of the item becomes the ball of this type of
+// match. A ball costs nothing.
+static void match_ball_pick(SSRGame *game) {
+    const char *item = ssr_tweaks_get(game->tweaks, "Menu", "ItemString");
+    int ball = strncmp(item, "MB_", 3) == 0 ? atoi(item + 3) : 0;
+    if (ball >= 1 && ball <= SSR_BALL_TYPES) {
+        ssr_career_set_selected_ball(&game->career, ball, match_ball_type(game));
+    }
+    match_ball_tweak(game);
+    save_career(game);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "GameMenuHelpIncrement", 0);
+    game->overlay[0] = 0;
+}
+
+// matchballs.btn_Back: c_TScreen_MatchBalls.ButtonBack.
+static void match_balls_back(SSRGame *game) {
+    save_career(game);
+    game->overlay[0] = 0;
+}
+
 static const Route ROUTES[] = {
     {"gamemenu.btn_Life", relationships},
     {"relationships.btn_Home", relationships_home},
@@ -8415,6 +8475,9 @@ static const Route ROUTES[] = {
     {"slots.btn_Quit", slots_quit},
     {"retirement.btn_Play", retirement_play},
     {"match.btn_Play", match_play},
+    {"btn_MatchBall", match_balls_open},
+    {"chooseball.btn_OK", match_ball_pick},
+    {"matchballs.btn_Back", match_balls_back},
     {"leaguefixtures.btn_Kits", kits_button},
     {"match.btn_Time", match_speed},
     {"match.btn_WorkRate", match_work_rate},
