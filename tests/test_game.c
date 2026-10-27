@@ -1165,9 +1165,9 @@ static void play_blackjack(SSRGame *game, SSRTweaks *tweaks, const char *path) {
 
 // Runs a race to the result screen. Returns the number of updates.
 static int run_race(SSRGame *game) {
-    CHECK(strcmp(ssr_game_screen(game), "horserace") == 0);
+    CHECK(strcmp(ssr_game_screen(game), "RacingMiniGame") == 0);
     int ticks = 0;
-    while (strcmp(ssr_game_screen(game), "horserace") == 0 && ticks < 2000) {
+    while (strcmp(ssr_game_screen(game), "RacingMiniGame") == 0 && ticks < 2000) {
         ssr_game_update(game, 1);
         ticks++;
     }

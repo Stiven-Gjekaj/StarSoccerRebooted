@@ -6960,11 +6960,12 @@ static void racing_screen(SSRGame *game) {
 static const float HORSE_START[SSR_RUNNERS][2] = {{350, 60}, {282, 120}, {214, 180},
                                                   {146, 240}, {82, 300},  {15, 360}};
 
-// TRacing.SetUp: the race screen. The track animation runs at 3.15 frames
-// in each update.
+// TRacing.SetUp: the race screen ("horserace" in the game, the layout
+// RacingMiniGame.uis). The track animation runs at 3.15 frames in each
+// update.
 static void race_setup(SSRGame *game, int own) {
     SSRHorses *h = &game->horses;
-    set_screen(game, "horserace");
+    set_screen(game, "RacingMiniGame");
     game->raceFrame = 0;
     game->standingsReady = 0;
     game->ownRace = own;
@@ -8167,9 +8168,9 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->now += 16;
             if (strcmp(game->screen, "playeroftheyear") == 0) poty_tick(game);
         }
-    } else if (strcmp(game->screen, "horserace") == 0) {
+    } else if (strcmp(game->screen, "RacingMiniGame") == 0) {
         game->ticks += frames;
-        while (game->ticks >= 1 && strcmp(game->screen, "horserace") == 0) {
+        while (game->ticks >= 1 && strcmp(game->screen, "RacingMiniGame") == 0) {
             game->ticks -= 1;
             game->now += 16;
             race_tick(game);
