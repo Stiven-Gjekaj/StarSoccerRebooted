@@ -113,6 +113,18 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         ssr_game_update(game, 1);
         take_ops(game, ops, 64);
         const SSRChance *chance = ssr_game_chance(game);
+        if (chance && chance->state == SSR_CHANCE_DRIBBLE) {
+            // A dribble: swipe up the screen until the chance ends.
+            chances++;
+            CHECK(strcmp(ssr_game_screen(game), "matchminigame") == 0);
+            for (int i = 0; i < 200 && chance->state == SSR_CHANCE_DRIBBLE; i++) {
+                ssr_game_touch(game, 1, 320, 900);
+                ssr_game_update(game, 1);
+                ssr_game_touch(game, 0, 320, 720);
+                for (int k = 0; k < 10; k++) ssr_game_update(game, 1);
+            }
+            CHECK(chance->state == SSR_CHANCE_OVER);
+        }
         if (chance && chance->state == SSR_CHANCE_AIM && chance->kicking == 0) {
             chances++;
             CHECK(strcmp(ssr_game_screen(game), "matchminigame") == 0);

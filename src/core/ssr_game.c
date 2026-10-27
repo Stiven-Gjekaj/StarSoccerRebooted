@@ -1005,6 +1005,7 @@ static void start_chance(SSRGame *game) {
     if (!game->chance) return;
     const SSRCareer *c = &game->career;
     SSRChanceSetup s = ssr_match_chance_setup(game->match, ssr_career_skill(c->technique), ssr_career_skill(c->power), 1);
+    s.pace = ssr_career_skill(c->pace);
     s.careerGoals = (float)c->goals;
     s.careerPasses = (float)c->passes;
     ssr_chance_start(game->chance, &s, &game->random);
