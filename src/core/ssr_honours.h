@@ -21,8 +21,8 @@ typedef struct {
     int lastDay;
 } SSRHonour;
 
-// The rivalry of two clubs. It grows when the clubs race for a title or
-// when a player goes from one to the other.
+// The rivalry of two clubs. It grows when the clubs race for a title, meet
+// in a cup final, or when a player goes from one to the other.
 typedef struct {
     int a, b;
     int points;
@@ -30,6 +30,9 @@ typedef struct {
 
 // The points of a rivalry that make the match of the two clubs a rivalry.
 #define SSR_RIVALRY_POINTS 4
+// The points of a cup final for the rivalry of the two finalists. Two
+// finals make a rivalry.
+#define SSR_RIVALRY_FINAL 2
 
 typedef struct {
     SSRHonour *list;

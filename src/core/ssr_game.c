@@ -735,6 +735,11 @@ static void people_played(void *context, SSRSeason *s, const SSRSeasonComp *comp
         if (mine && teams[k] == game->career.clubId) g = g > game->facts.goals ? g - game->facts.goals : 0;
         ssr_people_play(game->people, teams[k], g);
     }
+    // A cup final makes the rivalry of the two clubs grow.
+    if (teams[0] && teams[1] &&
+        (ssr_season_won_final(s, comp, f, teams[0]) || ssr_season_won_final(s, comp, f, teams[1]))) {
+        ssr_honours_add_rivalry(&game->honours, teams[0], teams[1], SSR_RIVALRY_FINAL);
+    }
 }
 
 // The people of a new world: the squad of the club of the player, and
