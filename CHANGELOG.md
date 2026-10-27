@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.27.0 (2026-10-28)
+
+- Big matches: a cup final is in a full stadium, and the other team raises
+  its game. A league match near the end of the season that the club must
+  win counts more for the fans and the boss.
+- Snow in the winter far from the equator, and the worn pitch of a small
+  club in the winter.
+- Real ratings and scores: a match rating starts at 6, and the leagues
+  have 2.7 goals in a match. The World screen can choose the classic
+  ratings and scores of 4.32.
+- The custom career chooses the position, the first club, and the Bux.
+  The list of the rivals changes the position later.
+- The honours have the records of the leagues, the club, and the nation.
+- The news: a crisis at a big club, a transfer rumour, the chase of the
+  scoring record, and the press after an interview.
+- Contract drama: a young player with few matches can go on loan, and the
+  club of a key player asks for the release clause.
+- A new boss can change the role of the player, and a sacked boss can
+  call the player to the new club.
+- Charity and business for a rich player.
+- A cup final makes a rivalry grow.
+- The squad screen shows the manager, the titles, and the budget of the
+  club.
+- A new career in a continued world meets the player of the last career.
+
 ## 0.26.0 (2026-10-27)
 
 - A custom career: after the nation, the screen "Your start" chooses the
