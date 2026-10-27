@@ -191,6 +191,10 @@ void ssr_scene_list_colour(SSRScene *scene, const char *list, int element, const
 // text with the ref takes the text when it is not NULL.
 void ssr_scene_list_sub(SSRScene *scene, const char *list, const char *ref, const char *text, int visible);
 
+// The AnimInstance elements with the ref play at the speed, and jump to the
+// end of their animation when toEnd is 1 (c_GelAnimInstance).
+void ssr_scene_anim(SSRScene *scene, const char *ref, float speed, int toEnd);
+
 // Moves the first element with the ref to (x, y) in its parent, at the
 // scale.
 void ssr_scene_place(SSRScene *scene, const char *ref, float x, float y, float scale);

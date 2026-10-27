@@ -3507,3 +3507,18 @@ void ssr_scene_spawn_colour(SSRScene *scene, int id, const char *ref, const char
     snprintf(text, sizeof(text), "#%s", colour[0] == '#' ? colour + 1 : colour);
     g->hasColour = parse_colour(text, &g->colour);
 }
+
+// The AnimInstance gels with the ref, from the gel down.
+static void anim_speed(Gel *g, const char *ref, float speed, int toEnd) {
+    if (g->kind == GEL_ANIM && g->ref && strcmp(g->ref, ref) == 0) {
+        g->speed = speed;
+        if (toEnd && g->animation) g->frame = g->animation->length - 1;
+    }
+    for (int i = 0; i < g->childCount; i++) anim_speed(g->children[i], ref, speed, toEnd);
+}
+
+void ssr_scene_anim(SSRScene *scene, const char *ref, float speed, int toEnd) {
+    if (!scene || !ref) return;
+    if (scene->root) anim_speed(scene->root, ref, speed, toEnd);
+    for (int i = 0; i < scene->detachedCount; i++) anim_speed(scene->detached[i], ref, speed, toEnd);
+}

@@ -471,7 +471,7 @@ static void test_plays_an_animation(void) {
              "\t\tDraw:(Glow2,0,0,50,50,241,#FFFFFFFF)\n"
              "\t}\n"
              "}\n"
-             "AnimInstance:(40,160,Glow)\n";
+             "AnimInstance:(40,160,Glow) ref:GlowInstance\n";
     SSRUiFiles files = {read_layout, NULL};
     tree = ssr_ui_parse("Screen.uis", &files);
     SSRSceneEnv env = test_env(tweaks);
@@ -479,6 +479,14 @@ static void test_plays_an_animation(void) {
     ssr_scene_update(scene, &env, 0);
     const SSRSceneItem *glow = find_image(scene, "Glow");
     CHECK(ssr_scene_count(scene) == 1 && glow);
+    // The code can stop an animation, and send it to its end.
+    ssr_scene_anim(scene, "GlowInstance", 0, 1);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "Glow2") && !find_image(scene, "Glow"));
+    ssr_scene_free(scene);
+    scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    glow = find_image(scene, "Glow");
     CHECK(glow && near(glow->w, 100) && near(glow->pivotX, 40) && near(glow->x, -10) && near(glow->angle, 0));
     CHECK(glow && glow->colour == 0x80808000 && glow->blend == SSR_BLEND_ADD);
     // Frames of 16 ms are one frame of the game each. Frame 299: t is 1.
