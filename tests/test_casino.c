@@ -1,4 +1,6 @@
-// Tests ssr_casino: the stakes and the slot reels.
+// Tests ssr_casino: the stakes, the slot reels, and roulette.
+
+#include <math.h>
 
 #include "ssr_casino.h"
 #include "ssr_test.h"
@@ -72,7 +74,52 @@ static void test_gives_the_frame_of_a_reel(void) {
     CHECK(ssr_slots_frame(&reel) == -1 + 96);
 }
 
+// A spin from the seed on a new wheel. Returns the number of updates.
+static int roulette_spin(SSRRoulette *roulette, int seed) {
+    SSRRandom random = {seed};
+    roulette->made = 0;
+    ssr_roulette_setup(roulette, 545);
+    ssr_roulette_spin(roulette, &random);
+    int updates = 1;
+    while (!ssr_roulette_update(roulette, &random) && updates < 1000) updates++;
+    return updates;
+}
+
+static void test_spins_the_roulette_wheel(void) {
+    SSRRoulette roulette = {0};
+    ssr_roulette_setup(&roulette, 545);
+    CHECK(roulette.wheelSize == 179 && roulette.rimSize == 228 && roulette.result == 1);
+    // The spin ends 3 to 4 seconds later, on the pocket of the ball.
+    CHECK(roulette_spin(&roulette, 12345) == 195 && roulette.ballNum == 22);
+    CHECK(roulette.speed == 0 && roulette.stopped && roulette.result == 1);
+    CHECK(roulette_spin(&roulette, 1000000) == 246 && roulette.ballNum == 8);
+    CHECK(roulette_spin(&roulette, -7) == 209 && roulette.ballNum == 32);
+    // The ball sits in the pockets: between 0.42 and 0.5 of the wheel size
+    // from the centre, two pixels for each unit.
+    float dx = roulette.x - roulette.cx, dy = roulette.y - roulette.cy, d = sqrtf(dx * dx + dy * dy) / 2;
+    CHECK(d >= 179 * 0.42f - 0.01f && d <= 179 * 0.5f + 0.01f);
+    // A second spin waits until the first ends.
+    SSRRandom random = {1};
+    ssr_roulette_spin(&roulette, &random);
+    float speed = roulette.speed;
+    ssr_roulette_spin(&roulette, &random);
+    CHECK(roulette.speed == speed && roulette.result == 0);
+}
+
+static void test_pays_the_roulette_bets(void) {
+    CHECK(ssr_roulette_colour(0) == -1 && ssr_roulette_colour(37) == -1);
+    CHECK(ssr_roulette_colour(1) == 1 && ssr_roulette_colour(2) == 0 && ssr_roulette_colour(36) == 1);
+    CHECK(ssr_roulette_prize(37, SSR_BET_GREEN, 2) == 36 && ssr_roulette_prize(0, SSR_BET_GREEN, 1) == 18);
+    CHECK(ssr_roulette_prize(19, SSR_BET_RED, 5) == 10 && ssr_roulette_prize(19, SSR_BET_BLACK, 5) == 0);
+    CHECK(ssr_roulette_prize(22, SSR_BET_BLACK, 5) == 10 && ssr_roulette_prize(0, SSR_BET_BLACK, 5) == 0);
+    CHECK(ssr_roulette_prize(12, SSR_BET_1TO12, 7) == 21 && ssr_roulette_prize(13, SSR_BET_1TO12, 7) == 0);
+    CHECK(ssr_roulette_prize(24, SSR_BET_13TO24, 1) == 3 && ssr_roulette_prize(25, SSR_BET_25TO36, 1) == 3);
+    CHECK(ssr_roulette_prize(37, SSR_BET_25TO36, 1) == 0);
+}
+
 int main(void) {
+    test_spins_the_roulette_wheel();
+    test_pays_the_roulette_bets();
     test_gives_the_stakes();
     test_spins_the_reels();
     test_pays_the_prizes();

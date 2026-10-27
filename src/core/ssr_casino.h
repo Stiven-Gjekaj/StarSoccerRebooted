@@ -54,4 +54,52 @@ int ssr_slots_prize(const SSRSlotReel reels[3], int bet);
 // shows frame 12 * i + 8 + the frame, in an animation of 96 frames.
 int ssr_slots_frame(const SSRSlotReel *reel);
 
+// Roulette: an American wheel of 38 pockets. 37 is "00".
+#define SSR_ROULETTE_POCKETS 38
+
+// The bets of roulette (TScreen_Roulette.betcol).
+typedef enum {
+    SSR_BET_GREEN = 1,
+    SSR_BET_RED,
+    SSR_BET_BLACK,
+    SSR_BET_1TO12,
+    SSR_BET_13TO24,
+    SSR_BET_25TO36,
+} SSRRouletteBet;
+
+// The wheel and the ball (c_TRouletteWheel, c_TRouletteBall). They keep
+// their places between visits.
+typedef struct {
+    // The wheel: its angle, its speed, its centre, and its sizes.
+    float rot, speed, cx, cy;
+    int wheelSize, rimSize;
+    // The ball: its place, its speed round the wheel, its angle, its
+    // pocket (a float), its speed to the centre, and its distance.
+    float x, y, ballSpeed, lineRot, pocket, vel, dist;
+    int stopped;
+    // 1 after the ball first drops into a pocket in a spin.
+    int dropped;
+    // 0 while a spin runs. The number of the last spin.
+    int result, ballNum;
+    int made;
+} SSRRoulette;
+
+// TRoulette.SetUp: makes the wheel one time, then gives it the sizes of
+// the wheel image of width wheelWidth.
+void ssr_roulette_setup(SSRRoulette *roulette, float wheelWidth);
+
+// TRoulette.Spin: the wheel gets a speed from 3.1 to 4.1, and the ball
+// starts at an angle from 1 to 360. Does nothing while a spin runs.
+void ssr_roulette_spin(SSRRoulette *roulette, SSRRandom *random);
+
+// TRoulette.Update: one update. Each bounce of the ball takes a number.
+// Returns 1 when the spin ends in this update (GetResult).
+int ssr_roulette_update(SSRRoulette *roulette, SSRRandom *random);
+
+// TRouletteWheel.GetColour: 1 red, 0 black, -1 green.
+int ssr_roulette_colour(int number);
+
+// GetResult: what the bet pays on the number, the stake included.
+int ssr_roulette_prize(int number, SSRRouletteBet bet, int stake);
+
 #endif
