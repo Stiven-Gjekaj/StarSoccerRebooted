@@ -73,6 +73,9 @@ typedef enum {
     // The AnimInstance number id of the elements ref stops at the frame in
     // text.
     SSR_OP_ANIM_FRAME,
+    // The property id (SSRGelProperty) of the first element ref takes the
+    // number in text.
+    SSR_OP_GEL,
 } SSRUiOpKind;
 
 typedef struct {
