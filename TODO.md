@@ -135,9 +135,8 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 ## 0.7 The life of the player (done)
 
 - [x] Relationships (`Relationships`, `Pairs`)
-- [ ] The sounds of the relationships screen and of the pairs game
-      (`CError`, `Card_Dealt_1`, `CSuccess`). The game logic has no sounds
-      yet.
+- [x] The sounds of the relationships screen and of the pairs game
+      (`CError`, `Card_Dealt_1`, `CSuccess`)
 - [ ] The NRG overlay when the energy is too low for an activity
       (`upsellnrg`, `NRGOverlay`). A message shows now.
 - [x] Dilemmas and interviews (`Dilemma`, `Interview`), with the
@@ -170,7 +169,8 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       player under 18
 - [x] Horses: the stable, the market, training, sales, and races
       (`MyStable`, `Racing`, `RacingResult`)
-- [ ] The sounds of the casino and of the races
+- [x] The sounds of the casino and of the races. The gallop plays every
+      890 ms on one channel; the original has two loops.
 - [ ] The alerts at the bottom of the screen: the energy of the bets
 - [ ] The coin shower and the ticker tape of a win (`Spawn`)
 - [ ] The camera of the race moves all horses; check it against the
