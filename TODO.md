@@ -179,7 +179,9 @@ that use the modifier.
 - [ ] `FontShadow` (65) and `ShadowCol` (62): the shadow of a text
 - [ ] `DownloadImage` (56): an image from the web of the game
 - [ ] `ScrollIndicator` (29): the bar that shows the place in a list
-- [ ] `Message` (18), `SetMessage` (1): a message box from a layout
+- [x] `Message` (18) in the block of a click: the click sends the
+      message
+- [ ] `SetMessage` (1): a message box from a layout
 - [ ] `Spawn` (5), `Slot` (1), `SortByRef` (1): copies made by a layout
 - [ ] `ReadoutConcat` (5): a readout of two values in one text
 - [ ] `FontStyle` (5), `LineSpacing` (4), `Padding` (3): text layout
