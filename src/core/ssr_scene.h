@@ -184,6 +184,10 @@ int ssr_scene_set_visible(SSRScene *scene, const char *ref, int visible);
 // Gives the colour "RRGGBBAA" to each element with the ref
 // (c_GGadget.SetColour). Returns the number of elements.
 int ssr_scene_set_colour(SSRScene *scene, const char *ref, const char *colour);
+// Only the element number index (from 0) of the elements with the ref takes
+// the colour, as an element of a gadget of the game. Returns 1 when the
+// element is there.
+int ssr_scene_set_element_colour(SSRScene *scene, const char *ref, int index, const char *colour);
 
 // The lists that the code fills (c_ACombo). list is the ref of the element
 // that holds the entries. An entry is a copy of the template with the ref

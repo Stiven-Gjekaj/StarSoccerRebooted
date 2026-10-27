@@ -487,6 +487,12 @@ static void test_plays_an_animation_from_a_frame(void) {
     ssr_scene_anim_play(scene, "Card", NULL, 0, 1);
     for (int i = 0; i < 60; i++) ssr_scene_update(scene, &env, 16);
     CHECK(!find_image(scene, "PRose") && find_image(scene, "PCardBack"));
+    // Only the second element with the ref, the instance, takes the tint.
+    CHECK(ssr_scene_set_element_colour(scene, "Card", 1, "0000FFFF") == 1);
+    CHECK(ssr_scene_set_element_colour(scene, "Card", 2, "0000FFFF") == 0);
+    ssr_scene_update(scene, &env, 16);
+    const SSRSceneItem *back = find_image(scene, "PCardBack");
+    CHECK(back && back->colour == 0x0000FFFF);
     // Back: the face shows again.
     ssr_scene_anim_play(scene, "Card", NULL, 40, -1);
     ssr_scene_update(scene, &env, 16);
