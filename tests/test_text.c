@@ -61,16 +61,18 @@ static void test_puts_the_names_of_the_remake(void) {
           "Credits_NS_Title\tNew Star Soccer\tNew Star Soccer\n"
           "CMESSAGE_CREDITS\tNew Star Soccer was created by Simon Read.\t\n"
           "GWL_TITLE_NSC\tNew Star Cricket\t\n"
+          "TICKER_NEWPLAYER_1\tWelcome to the NSS Leagues! NSSX and XNSS stay.\t\n"
           "CNEWS_PLAIN\tNothing to change.\t\n",
           file);
     fclose(file);
     SSRText *text = ssr_text_load(path);
-    CHECK(ssr_text_rebrand(text) == 4);
+    CHECK(ssr_text_rebrand(text) == 5);
     CHECK(strcmp(ssr_text_get(text, "help_newplayer", 0), "Welcome to Star Soccer Rebooted.") == 0);
     CHECK(strcmp(ssr_text_get(text, "help_newplayer", 1), "Welcome to Star Soccer Rebooted!") == 0);
     CHECK(strcmp(ssr_text_get(text, "Title_NS-Pure", 1), "SSR-Pure") == 0);
     CHECK(strcmp(ssr_text_get(text, "NS-Pure", 0), "[S2] SSR-Pure") == 0);
     CHECK(strcmp(ssr_text_get(text, "PRO_COLOUR", 0), "The SSR-Pro is balanced. TRANS-FER and BONUS-X stay.") == 0);
+    CHECK(strcmp(ssr_text_get(text, "TICKER_NEWPLAYER_1", 0), "Welcome to the SSR Leagues! NSSX and XNSS stay.") == 0);
     // The credits of the original and the other games keep their names.
     CHECK(strcmp(ssr_text_get(text, "Credits_NS_Title", 0), "New Star Soccer") == 0);
     CHECK(strcmp(ssr_text_get(text, "CMESSAGE_CREDITS", 0), "New Star Soccer was created by Simon Read.") == 0);

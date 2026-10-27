@@ -22,8 +22,8 @@ int ssr_text_count(const SSRText *text);
 const char *ssr_text_get(const SSRText *text, const char *tag, int female);
 
 // Puts the names of the remake in the place of the names of New Star
-// Games: "New Star Soccer" becomes "Star Soccer Rebooted", and "NS-" at the
-// start of a word becomes "SSR-". The credits of the original and the
+// Games: "New Star Soccer" becomes "Star Soccer Rebooted", "NS-" at the
+// start of a word becomes "SSR-", and the word "NSS" becomes "SSR". The credits of the original and the
 // other games of New Star Games keep their names. Returns the number of
 // texts that change.
 int ssr_text_rebrand(SSRText *text);

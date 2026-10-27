@@ -79,9 +79,10 @@ const char *ssr_text_get(const SSRText *text, const char *tag, int female) {
 
 static const struct {
     const char *from, *to;
-    // 1 when the name must be at the start of a word.
-    int wordStart;
-} RENAMES[] = {{"New Star Soccer", "Star Soccer Rebooted", 0}, {"NS-", "SSR-", 1}};
+    // 1 when the name must be at the start of a word, 2 when it must be a
+    // full word.
+    int word;
+} RENAMES[] = {{"New Star Soccer", "Star Soccer Rebooted", 0}, {"NS-", "SSR-", 1}, {"NSS", "SSR", 2}};
 
 static const char *const KEEP[] = {"Credits_", "CMESSAGE_CREDITS", "GWL_"};
 
@@ -97,7 +98,8 @@ static char *rename_text(const char *s) {
         for (size_t r = 0; r < sizeof(RENAMES) / sizeof(RENAMES[0]) && !done; r++) {
             size_t n = strlen(RENAMES[r].from);
             if (strncmp(s + i, RENAMES[r].from, n) != 0) continue;
-            if (RENAMES[r].wordStart && i > 0 && isalnum((unsigned char)s[i - 1])) continue;
+            if (RENAMES[r].word && i > 0 && isalnum((unsigned char)s[i - 1])) continue;
+            if (RENAMES[r].word == 2 && isalnum((unsigned char)s[i + n])) continue;
             size_t m = strlen(RENAMES[r].to);
             if (o + m + 1 > capacity) break;
             memcpy(out + o, RENAMES[r].to, m);
