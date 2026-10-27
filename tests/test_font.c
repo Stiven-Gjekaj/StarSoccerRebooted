@@ -26,6 +26,37 @@ static void test_reads_utf8(void) {
     CHECK(ssr_utf8_next(&bad) == 0);
 }
 
+static void test_reads_a_font_set(void) {
+    const char *text = "// WARNING\n"
+                       "FONTSET new 2\n"
+                       "\t0:Small.ttf:14:-1,0:6,5,32,29,-26:1.75:0\n"
+                       "ENDSET\n"
+                       "#ANDROID\r\n"
+                       "FONTSET other 1\r\n"
+                       "\t0:Other.ttf:99:0,0:1,1,1,1,1\r\n"
+                       "ENDSET\r\n"
+                       "FONTSET new 2\r\n"
+                       "\t0:Veriox-Rg.ttf:31:-1,0:6,5,32,28,-26\r\n"
+                       "\t\tInject:9733:newstarbuck32.png:0:28:30:255\r\n"
+                       "\t1:Veriox-Rg.ttf:44:-2,0:6,5,45,40,-40\r\n"
+                       "ENDSET\r\n"
+                       "FONTSET default 1\r\n"
+                       "\t0:TCB.ttf:33:-1,0:16,15,32,28,-26\r\n"
+                       "ENDSET\r\n";
+    SSRFontSlot slots[4];
+    CHECK(ssr_font_read_set(text, "new", slots, 4) == 2);
+    CHECK(strcmp(slots[0].file, "Veriox-Rg.ttf") == 0 && slots[0].size == 31 && slots[0].spacing == -1);
+    CHECK(slots[1].size == 44 && slots[1].spacing == -2 && slots[1].padLeft == 6 && slots[1].padRight == 5);
+    CHECK(slots[1].padTop == 45 && slots[1].padMiddle == 40 && slots[1].padBottom == -40);
+    // A set that is not there gives the default set.
+    CHECK(ssr_font_read_set(text, "classic", slots, 4) == 1 && strcmp(slots[0].file, "TCB.ttf") == 0);
+    // A file with no "#ANDROID" uses all of its text.
+    CHECK(ssr_font_read_set("FONTSET new 1\n0:A.ttf:14:-1,0:6,5,32,29,-26\nENDSET\n", "new", slots, 4) == 1);
+    CHECK(slots[0].size == 14 && slots[0].padTop == 32);
+    // A slot out of the range is not read.
+    CHECK(ssr_font_read_set("FONTSET new 1\n9:A.ttf:14:0,0\nENDSET\n", "new", slots, 4) == 0);
+}
+
 static const char *system_font(void) {
     static const char *paths[] = {
         "/System/Library/Fonts/Supplemental/Arial.ttf",
@@ -93,6 +124,7 @@ static void test_refuses_a_file_that_is_not_a_font(void) {
 
 int main(void) {
     test_reads_utf8();
+    test_reads_a_font_set();
     test_refuses_a_file_that_is_not_a_font();
     const char *path = system_font();
     if (!path) {

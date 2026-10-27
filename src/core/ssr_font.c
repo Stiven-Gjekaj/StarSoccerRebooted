@@ -86,6 +86,78 @@ uint32_t ssr_utf8_next(const char **text) {
     return c;
 }
 
+// Copies the next part of the line up to stop, or to the end of the line,
+// into out. Returns the place after the stop, or NULL at the end.
+static const char *field(const char *p, char stop, char *out, size_t size) {
+    size_t n = 0;
+    while (*p && *p != stop && *p != '\n' && *p != '\r') {
+        if (n + 1 < size) out[n++] = *p;
+        p++;
+    }
+    out[n] = 0;
+    return *p == stop ? p + 1 : NULL;
+}
+
+static const char *skip_space(const char *p) {
+    while (*p == ' ' || *p == '\t') p++;
+    return p;
+}
+
+int ssr_font_read_set(const char *text, const char *set, SSRFontSlot *slots, int max) {
+    if (!text || !set || !slots || max <= 0) return 0;
+    const char *android = strstr(text, "#ANDROID");
+    const char *p = android ? android + 8 : text;
+    int inSet = 0, count = 0;
+    while (*p) {
+        const char *line = skip_space(p);
+        const char *end = line;
+        while (*end && *end != '\n') end++;
+        p = *end ? end + 1 : end;
+        if (line == end || (line[0] == '/' && line[1] == '/')) continue;
+        if (strncmp(line, "ENDSET", 6) == 0) {
+            if (inSet) break;
+            continue;
+        }
+        if (strncmp(line, "FONTSET", 7) == 0) {
+            char name[64];
+            field(skip_space(line + 7), ' ', name, sizeof(name));
+            inSet = strcmp(name, set) == 0 || strcmp(name, "default") == 0;
+            continue;
+        }
+        if (!inSet || strncmp(line, "Inject", 6) == 0) continue;
+        char part[128];
+        const char *q = field(line, ':', part, sizeof(part));
+        int index = atoi(part);
+        if (!q || index < 0 || index >= max) continue;
+        SSRFontSlot *slot = &slots[index];
+        memset(slot, 0, sizeof(*slot));
+        q = field(q, ':', slot->file, sizeof(slot->file));
+        if (q) q = field(q, ':', part, sizeof(part));
+        slot->size = (float)atof(part);
+        if (q) {
+            q = field(q, ':', part, sizeof(part));
+            slot->spacing = atoi(part);
+        }
+        if (q) {
+            field(q, ':', part, sizeof(part));
+            float pad[5] = {0};
+            const char *r = part;
+            for (int i = 0; i < 5 && r; i++) {
+                char number[32];
+                r = field(r, ',', number, sizeof(number));
+                pad[i] = (float)atof(number);
+            }
+            slot->padLeft = pad[0];
+            slot->padRight = pad[1];
+            slot->padTop = pad[2];
+            slot->padMiddle = pad[3];
+            slot->padBottom = pad[4];
+        }
+        if (index + 1 > count) count = index + 1;
+    }
+    return count;
+}
+
 SSRFont *ssr_font_load(const char *path, float pixelHeight) {
     FILE *file = ssr_fs_open(path, "rb");
     if (!file) return NULL;

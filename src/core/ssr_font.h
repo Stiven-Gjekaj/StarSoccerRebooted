@@ -41,6 +41,25 @@ float ssr_font_measure(SSRFont *font, const char *text);
 // that the font adds glyphs, so that the caller knows when to upload it.
 const unsigned char *ssr_font_atlas(const SSRFont *font, int *version);
 
+// One size of font from the font set of Fonts.txt (c_FontManagerFR). The
+// line is "slot:file:size:kernX,kernY:left,right,top,middle,bottom".
+typedef struct {
+    char file[64];
+    // The size of the em, in pixels.
+    float size;
+    // The pixels that the game adds after each character.
+    int spacing;
+    // The space at the sides of a box, and the distance from the top of a
+    // box, of the middle, and of the bottom to the baseline.
+    float padLeft, padRight, padTop, padMiddle, padBottom;
+} SSRFontSlot;
+
+// Reads the slots of the first font set with the name set, or of the set
+// "default", from the text of Fonts.txt. The text after "#ANDROID" is used
+// when the file has it, as the game does. Returns the number of slots, up
+// to max.
+int ssr_font_read_set(const char *text, const char *set, SSRFontSlot *slots, int max);
+
 // Reads one character of UTF-8 text and moves text past it. A bad byte
 // gives U+FFFD. Returns 0 at the end of the text.
 uint32_t ssr_utf8_next(const char **text);
