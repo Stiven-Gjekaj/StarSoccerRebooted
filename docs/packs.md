@@ -180,8 +180,14 @@ same seed and the same club start with the same players.
 
 ## The editor
 
-A tap on the name of the club on the squad screen changes the name. The
-app keeps the edit in the pack `custom` (`packs/custom/world/Clubs.txt`)
-and chooses that pack. The world reads the pack at each start. A zip file
-of the folder `packs/custom` is a data pack that other players can
-install.
+The squad screen edits the world. The app keeps the edits of the clubs and
+the leagues in the pack `custom` (`packs/custom/world/`) and chooses that
+pack. The world reads the pack at each start. A zip file of the folder
+`packs/custom` is a data pack that other players can install.
+
+- A tap on the name of the club renames the club (`Clubs.txt`).
+- The Kit button gives the club the next of twelve kits (`Clubs.txt`).
+- On the list of the scorers, a tap on the name of the league renames the
+  league (`Competitions.txt`).
+- A tap on a player renames the player. The players of the career keep
+  the new name (`saves/peopleN.txt`).
