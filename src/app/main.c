@@ -370,6 +370,31 @@ static void update_trail(SSRApp *app, const SSRChance *chance) {
     ssr_scene_spawn_set(app->scene, id, "BallAnim", SSR_GEL_ANIM_SPEED, 0);
 }
 
+// MinigameHud.ShowWind: the wind of a chance, but not of a dribble. The
+// blades point with the wind, and the colour goes from green to red at a
+// speed of 5.
+static void show_wind(SSRApp *app, const SSRChance *chance) {
+    if (!app->hudScene) return;
+    float speed = chance->setup.windSpeed;
+    int shown = speed != 0 && chance->info.chanceType != 11 && chance->info.training != 8;
+    ssr_scene_set_visible(app->hudScene, "WindIndicator", shown);
+    if (!shown) return;
+    ssr_scene_spawn_set(app->hudScene, 0, "WindIndicator#1", SSR_GEL_ANGLE, chance->setup.windDirection - 90);
+    ssr_tweaks_set_number(app->tweaks, "HUD", "WindSpeed", speed);
+    ssr_tweaks_set_number(app->tweaks, "HUD", "WindSpeedSpin", -speed);
+    Uint32 lo = (Uint32)SDL_strtoul(ssr_tweaks_get(app->tweaks, "HUD", "WindIndicatorMin"), NULL, 16);
+    Uint32 hi = (Uint32)SDL_strtoul(ssr_tweaks_get(app->tweaks, "HUD", "WindIndicatorMax"), NULL, 16);
+    float t = SDL_clamp(speed / 5.0f, 0, 1);
+    Uint32 mixed = 0;
+    for (int shift = 0; shift < 32; shift += 8) {
+        float a = (float)((lo >> shift) & 0xFF), b = (float)((hi >> shift) & 0xFF);
+        mixed |= (Uint32)(a + (b - a) * t) << shift;
+    }
+    char colour[16];
+    SDL_snprintf(colour, sizeof(colour), "%08X", (unsigned)mixed);
+    ssr_tweaks_set(app->tweaks, "HUD", "WindIndicator", colour);
+}
+
 // The objects of a drill at their places. A line goes when the ball cuts
 // it, a hit pole and a hit dummy change colour, and a cone that falls goes
 // [I: the remake does not play the fall of a cone].
@@ -452,6 +477,9 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         int training = ssr_game_training(app->game) != NULL;
         if (app->hudScene) ssr_scene_set_visible(app->hudScene, "TrainingHUD", training);
         if (app->hudScene) ssr_scene_set_visible(app->hudScene, "QuitButton", 0);
+        // A match chance shows the names and the score (ShowGame).
+        if (app->hudScene) ssr_scene_set_visible(app->hudScene, "GameHUD", !training);
+        show_wind(app, chance);
     }
     if (app->viewScene != app->scene) {
         // A new screen: the copies of the players and of the ball.
