@@ -48,7 +48,8 @@ typedef struct {
     // The year of the retirement, or 0.
     int retired;
     // 1 for a player who started in the same year as the player of the
-    // user, at the same age.
+    // user, at the same age. SSR_FORMER_PLAYER for the player of the last
+    // career of the user, who still plays in the world.
     int rival;
     int apps, goals, assists;
     int seasonApps, seasonGoals, seasonAssists;
@@ -181,6 +182,15 @@ void ssr_people_rebase(SSRPeople *people, int shift);
 // old career in the world. Returns the player, or NULL.
 SSRPerson *ssr_people_add_legend(SSRPeople *people, const char *first, const char *last, int nation, int born,
                                  int retired, int apps, int goals, int assists);
+
+// The mark (SSRPerson.rival) of the player of the last career.
+#define SSR_FORMER_PLAYER 2
+
+// Adds the player of the last career, who did not retire, to the club with
+// the counts and the skill of that career. The next player of the user can
+// play against the player. Returns the player, or NULL.
+SSRPerson *ssr_people_add_former(SSRPeople *people, const char *first, const char *last, int nation, int born,
+                                 int club, int skill, int apps, int goals, int assists);
 
 // Keeps the people in a text file, one player a line. Returns 1 on
 // success.

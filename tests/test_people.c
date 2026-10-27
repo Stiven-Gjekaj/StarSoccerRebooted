@@ -251,6 +251,10 @@ static void test_continues_an_old_world(void) {
     CHECK(ssr_people_manager(people, 10)->since == 1);
     // The legend is not in a squad, and the hall of fame counts the goals.
     CHECK(ssr_people_squad(people, 10, NULL, 0) == SSR_SQUAD_SIZE - 2);
+    // The player of the last career plays on at the club.
+    SSRPerson *former = ssr_people_add_former(people, "Last", "Hero", 1, -5, 10, 75, 120, 60, 20);
+    CHECK(former && !former->retired && former->club == 10 && former->skill == 75 && former->rival == SSR_FORMER_PLAYER);
+    CHECK(ssr_people_squad(people, 10, NULL, 0) == SSR_SQUAD_SIZE - 1);
     ssr_people_free(people);
     ssr_names_free(names);
     ssr_world_free(world);

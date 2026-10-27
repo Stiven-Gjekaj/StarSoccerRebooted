@@ -661,6 +661,18 @@ void ssr_people_rebase(SSRPeople *people, int shift) {
     people->year -= shift;
 }
 
+SSRPerson *ssr_people_add_former(SSRPeople *people, const char *first, const char *last, int nation, int born,
+                                 int club, int skill, int apps, int goals, int assists) {
+    SSRPerson *p = ssr_people_add_legend(people, first, last, nation, born, 0, apps, goals, assists);
+    if (!p) return NULL;
+    p->retired = 0;
+    p->club = club;
+    p->skill = skill < 1 ? 1 : skill > 99 ? 99 : skill;
+    p->potential = p->skill;
+    p->rival = SSR_FORMER_PLAYER;
+    return p;
+}
+
 SSRPerson *ssr_people_add_legend(SSRPeople *people, const char *first, const char *last, int nation, int born,
                                  int retired, int apps, int goals, int assists) {
     SSRPerson *p = people ? add_person(people) : NULL;
