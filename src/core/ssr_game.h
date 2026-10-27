@@ -35,6 +35,10 @@ const SSRSettings *ssr_game_settings(const SSRGame *game);
 // Handles the message of a Click. Returns 1 when the game knows it.
 int ssr_game_message(SSRGame *game, const char *message);
 
+// The text of a GS_ function of a layout, for example "GS_ShowNameF", or
+// NULL when the game does not know the name.
+const char *ssr_game_text(SSRGame *game, const char *name);
+
 // The name of the layout of the screen to show, for example "options"
 // for options.uis.
 const char *ssr_game_screen(const SSRGame *game);

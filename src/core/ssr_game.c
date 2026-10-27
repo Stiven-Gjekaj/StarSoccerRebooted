@@ -148,6 +148,12 @@ int ssr_game_message(SSRGame *game, const char *message) {
     return 0;
 }
 
+const char *ssr_game_text(SSRGame *game, const char *name) {
+    (void)game;
+    (void)name;
+    return NULL;
+}
+
 const char *ssr_game_screen(const SSRGame *game) {
     return game ? game->screen : "";
 }

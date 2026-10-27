@@ -145,6 +145,20 @@ static void follow_game(SSRApp *app) {
     open_screen(app, name);
 }
 
+static SSRSceneEnv scene_env(SSRApp *app);
+
+// A click: the actions of the block of the Click() run, its sounds play,
+// and the logic gets the message.
+static void click(SSRApp *app, const SSRSceneItem *item) {
+    SSRSceneEnv env = scene_env(app);
+    const char *message = ssr_scene_click(app->scene, &env, item);
+    SDL_Log("Pressed %s (%s)", item->ref ? item->ref : "-", message ? message : "-");
+    const char *sound;
+    while ((sound = ssr_scene_take_sound(app->scene)) != NULL) ssr_audio_play(app->audio, sound);
+    if (message && *message && !ssr_game_message(app->game, message)) SDL_Log("No logic for %s yet.", message);
+    follow_game(app);
+}
+
 static void load_game(SSRApp *app) {
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
@@ -340,12 +354,7 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
         // A click is when the touch goes up on the element, as in the game.
         int up = event->type == SDL_EVENT_MOUSE_BUTTON_UP || event->type == SDL_EVENT_FINGER_UP;
         const SSRSceneItem *item = up ? ssr_scene_hit_item(app->scene, x + app->left, y + app->top) : NULL;
-        if (item) {
-            SDL_Log("Pressed %s (%s)", item->ref ? item->ref : "-", item->click ? item->click : "-");
-            ssr_audio_play(app->audio, item->clickSound ? item->clickSound : "UISelect");
-            if (item->click && !ssr_game_message(app->game, item->click)) SDL_Log("No logic for %s yet.", item->click);
-            follow_game(app);
-        }
+        if (item) click(app, item);
     }
     return SDL_APP_CONTINUE;
 }
@@ -355,6 +364,27 @@ static void draw_centered_text(const SSRApp *app, float y, const char *text) {
     SDL_RenderDebugText(app->renderer, (app->width - width) / 2, y, text);
 }
 
+static const char *provide(void *context, const char *name) {
+    SSRApp *app = context;
+    return ssr_game_text(app->game, name);
+}
+
+static SSRSceneEnv scene_env(SSRApp *app) {
+    SSRSceneEnv env = {
+        .left = app->left,
+        .top = app->top,
+        .width = app->width,
+        .height = app->height,
+        .tweaks = app->tweaks,
+        .text = translate,
+        .image_size = image_size,
+        .spine = spine_file,
+        .provide = provide,
+        .context = app,
+    };
+    return env;
+}
+
 SDL_AppResult SDL_AppIterate(void *state) {
     SSRApp *app = state;
     SDL_SetRenderDrawColor(app->renderer, 34, 120, 52, 255);
@@ -362,17 +392,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
     SDL_SetRenderDrawColor(app->renderer, 255, 255, 255, 255);
 
     if (app->screen) {
-        SSRSceneEnv env = {
-            .left = app->left,
-            .top = app->top,
-            .width = app->width,
-            .height = app->height,
-            .tweaks = app->tweaks,
-            .text = translate,
-            .image_size = image_size,
-            .spine = spine_file,
-            .context = app,
-        };
+        SSRSceneEnv env = scene_env(app);
         Uint64 now = SDL_GetTicks();
         int ms = 0;
         if (!app->scene) {
@@ -404,10 +424,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         float x = 0, y = 0;
         if (SDL_sscanf(press, "%f,%f", &x, &y) == 2) {
             const SSRSceneItem *item = ssr_scene_hit_item(app->scene, x + app->left, y + app->top);
-            SDL_Log("Pressed %s (%s)", item && item->ref ? item->ref : "-", item && item->click ? item->click : "-");
-            if (item) ssr_audio_play(app->audio, item->clickSound ? item->clickSound : "UISelect");
-            if (item && item->click) ssr_game_message(app->game, item->click);
-            follow_game(app);
+            if (item) click(app, item);
         }
     }
 
