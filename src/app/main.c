@@ -229,7 +229,7 @@ static void pitch_name(const SSRChance *chance, char *out, size_t capacity) {
         SDL_snprintf(out, capacity, "Pitch_Mb_AM.uis");
         return;
     case 8:
-        SDL_snprintf(out, capacity, "Pitch_Prac_AM.uis");
+        SDL_snprintf(out, capacity, "Pitch_Prac_PM.uis");
         return;
     default:
         break;
@@ -239,8 +239,9 @@ static void pitch_name(const SSRChance *chance, char *out, size_t capacity) {
         return;
     }
     if (type == 11) {
-        // The dribble plays on the practice pitch (GSGetChanceScreenName).
-        SDL_snprintf(out, capacity, "Pitch_Prac_AM.uis");
+        // The dribble plays on the practice pitch at night
+        // (GSGetDribblingScreenName: m_daytime is always 0).
+        SDL_snprintf(out, capacity, "Pitch_Prac_PM.uis");
         return;
     }
     const char *kind = type == 1 || type == 9 ? "M" : "A";
@@ -513,13 +514,14 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     }
     if (!app->tapScene) {
         // The tap ball shows in front of the stadium of the home team
-        // (c_MatchTapBallChance): "Stadium" + size + "AM", and its Static
-        // part under it.
+        // (GSGetStadiumScreenName): "Stadium" + size + "PM", and its Static
+        // part under it. The game never sets m_daytime, so it is always
+        // the night stadium.
         const SSRMatch *match = ssr_game_match(app->game);
         char stadium[64];
-        SDL_snprintf(stadium, sizeof(stadium), "Stadium%dAMStatic.uis", match ? match->stadiumSize : 0);
+        SDL_snprintf(stadium, sizeof(stadium), "Stadium%dPMStatic.uis", match ? match->stadiumSize : 0);
         app->stadiumStaticScene = open_layer(app, stadium, &app->stadiumStaticScreen, env);
-        SDL_snprintf(stadium, sizeof(stadium), "Stadium%dAM.uis", match ? match->stadiumSize : 0);
+        SDL_snprintf(stadium, sizeof(stadium), "Stadium%dPM.uis", match ? match->stadiumSize : 0);
         app->stadiumScene = open_layer(app, stadium, &app->stadiumScreen, env);
         app->tapScene = open_layer(app, "tapball.uis", &app->tapScreen, env);
         // The HUD of a career chance has no training part (MinigameHud
