@@ -201,6 +201,17 @@ struct SSRGame {
     int dilemmaRelation[2], dilemmaImage[2], dilemmaInt[2];
     int dilemmaChoice, dilemmaChosen, dilemmaEnd;
     int lastAccident;
+
+    // The interview after a match (c_TScreen_Interview): 1 once a match
+    // has had one, the words to repeat, the buttons, the decoys, the
+    // sequence (a decoy is below 0), the word of the sequence, the time of
+    // the next step, the state, and the sentence so far.
+    int interviewDone;
+    int difficulty, buttonCount, buttons, decoys;
+    int sequence[15];
+    char words[15][64];
+    int countdown, beepDone, ready, interviewFail;
+    char sentence[512];
 };
 
 enum { REPLAY_NONE, REPLAY_OFFER, REPLAY_PLAY };
@@ -1539,7 +1550,10 @@ static void end_match(SSRGame *game) {
     game->statStage = 0;
     game->statTime = game->now;
     game->oldStarLevel = ssr_career_star_level(c);
+    game->interviewDone = 0;
 }
+
+static int start_interview(SSRGame *game);
 
 // One stage of the match stats screen (GSMatchStatsUpdate).
 static void stats_stage(SSRGame *game) {
@@ -1570,6 +1584,8 @@ static void stats_stage(SSRGame *game) {
         game->statStage = stage = 8;
         after_relations(game);
         skill_tweaks(game);
+        ssr_tweaks_set_number(t, "MatchStats", "StatStage", stage);
+        if (start_interview(game)) return;
         break;
     case 9:
         after_star_rating(game);
@@ -3956,6 +3972,241 @@ static void call_expired_item(SSRGame *game) {
     game_menu(game);
 }
 
+
+/* ---------------------------------------------------------- the interview */
+
+static void interview_button(char *out, size_t capacity, int i) {
+    snprintf(out, capacity, "Button%d", i);
+}
+
+static void interview_outline(SSRGame *game, int i, const char *outline, int visible) {
+    char ref[16];
+    interview_button(ref, sizeof(ref), i);
+    add_op(game, SSR_OP_SUB, ref, outline, NULL, visible);
+}
+
+static void interview_sentence(SSRGame *game, const char *text) {
+    add_op(game, SSR_OP_TEXT, "Sentence", NULL, text, 0);
+}
+
+// The text with its first letter in capitals.
+static void capitalise(char *out, size_t capacity, const char *text) {
+    snprintf(out, capacity, "%s", text);
+    if (out[0]) out[0] = (char)toupper((unsigned char)out[0]);
+}
+
+// c_TScreen_Interview.SetUpScreen. The debug console of the game opens it
+// with "forcescreen interview".
+static void interview_screen(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    set_screen(game, "interview");
+    char text[64];
+    snprintf(text, sizeof(text), "%s", loc(game, "Interview!"));
+    upper(text);
+    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+    game->splashEnd = game->now + 1500;
+    if (c->interviewSkill < 3) c->interviewSkill = 3;
+    int skill = c->interviewSkill;
+    game->difficulty = skill < 3 ? 3 : skill > 5 ? 5 : skill;
+    game->buttons = skill > 8 ? 15 : skill > 5 ? 12 : 9;
+    int decoys = skill - game->difficulty;
+    game->decoys = decoys < 0 ? 0 : decoys > 3 ? 3 : decoys;
+    game->ready = 0;
+    game->interviewFail = 0;
+    game->sentence[0] = 0;
+    interview_sentence(game, loc(game, "interview_Instrucs"));
+    game->countdown = game->now + 2500;
+    game->buttonCount = 1;
+    game->beepDone = 0;
+    char ref[16], shown[64], tag[32];
+    for (int i = 1; i <= 15; i++) {
+        if (i <= 3) {
+            snprintf(tag, sizeof(tag), "CLICHE_%d", i);
+            snprintf(game->words[i - 1], sizeof(game->words[i - 1]), "%s", loc(game, tag));
+        } else {
+            // Each word differs from the words before it.
+            for (;;) {
+                snprintf(tag, sizeof(tag), "CLICHE_%d", ssr_rand2(&game->random, 4, 25));
+                snprintf(game->words[i - 1], sizeof(game->words[i - 1]), "%s", loc(game, tag));
+                capitalise(shown, sizeof(shown), game->words[i - 1]);
+                int same = 0;
+                for (int k = 0; k < i - 1 && !same; k++) {
+                    char other[64];
+                    capitalise(other, sizeof(other), game->words[k]);
+                    same = strcmp(shown, other) == 0;
+                }
+                if (!same) break;
+            }
+        }
+        capitalise(shown, sizeof(shown), game->words[i - 1]);
+        interview_button(ref, sizeof(ref), i);
+        add_op(game, SSR_OP_TEXT, ref, NULL, shown, 0);
+        add_op(game, i <= game->buttons ? SSR_OP_SHOW : SSR_OP_HIDE, ref, NULL, NULL, 0);
+        add_op(game, SSR_OP_ELEMENT_COLOUR, ref, NULL, "FFFFFFFF", 0);
+    }
+    int decoysLeft = game->decoys;
+    for (int j = 0; j < game->buttons; j++) {
+        int unique;
+        do {
+            game->sequence[j] = ssr_rand(&game->random, game->buttons);
+            unique = 1;
+            for (int k = 0; k < j; k++) unique &= game->sequence[k] != game->sequence[j];
+        } while (!unique);
+        if (ssr_rand(&game->random, 3) == 1 && decoysLeft > 0) {
+            decoysLeft--;
+            game->sequence[j] = -game->sequence[j];
+        }
+    }
+}
+
+// GSMatchStatsUpdateRelationships, its end: the press wants a word after
+// some matches with gains for the boss, the team, and the fans.
+static int start_interview(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    // [I: the captain gets an interview more often; the captaincy comes
+    // with its part.]
+    int n = 8, gap = 21;
+    if (game->interviewDone || ssr_rand(&game->random, n) != 1 || c->sdate <= c->lastInterview + gap) return 0;
+    if (game->after.boss <= 0 || game->after.team <= 0 || game->after.fans <= 0) return 0;
+    game->interviewDone = 1;
+    c->lastInterview = c->sdate;
+    interview_screen(game);
+    return 1;
+}
+
+// c_TScreen_Interview.ButtonOk: back to the match stats.
+static void interview_ok(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    set_screen(game, "matchstats");
+    if (!game->interviewFail) {
+        // InterviewSuccess.
+        c->starRating = ssr_star_rating_add(c->starRating, 10);
+    } else {
+        // InterviewFail: the gains of the match go.
+        float a = fabsf((float)game->after.boss), b = fabsf((float)game->after.team), f = fabsf((float)game->after.fans);
+        SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, game->fixtureComp) : NULL;
+        int national = comp && comp->data->level == 1;
+        ssr_career_update_relation(c, national ? SSR_RELATION_BOSS_INT : SSR_RELATION_BOSS, -a);
+        ssr_career_update_relation(c, national ? SSR_RELATION_TEAM_INT : SSR_RELATION_TEAM, -b);
+        ssr_career_update_relation(c, national ? SSR_RELATION_FANS_INT : SSR_RELATION_FANS, -f);
+        c->starRating = ssr_star_rating_add(c->starRating, (int)-a);
+        c->starRating = ssr_star_rating_add(c->starRating, (int)-b);
+        c->starRating = ssr_star_rating_add(c->starRating, (int)-f);
+        game->after.boss = game->after.team = game->after.fans = 0;
+        static const char *MODS[3] = {"Boss", "Team", "Fans"};
+        for (int i = 0; i < 3; i++) ssr_tweaks_set_number(game->tweaks, "RelationshipMods", MODS[i], 0);
+        ssr_tweaks_set_number(game->tweaks, "Menu", "ZeroRelChange", 1);
+        skill_tweaks(game);
+    }
+    star_tweaks(game);
+    ssr_tweaks_set_number(game->tweaks, "MatchStats", "StatStage", game->statStage);
+}
+
+static void interview_end(SSRGame *game, int success) {
+    char text[64];
+    snprintf(text, sizeof(text), "%s", loc(game, success ? "Success!" : "Fail!"));
+    upper(text);
+    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+    game->splashEnd = game->now + 1000;
+    if (success) game->career.interviewSkill++;
+    else game->interviewFail = 1;
+    game->ready = game->now > 1 ? game->now : 2;
+}
+
+// c_TScreen_Interview.ButtonAddText.
+static void interview_click(SSRGame *game, int i) {
+    if (!game->ready || game->ready > 1 || game->buttonCount < 0 || game->buttonCount > 5) return;
+    if (i < 1 || i > game->buttons) return;
+    int want = game->sequence[game->buttonCount - 1];
+    want = want < 0 ? -want : want;
+    char ref[16];
+    interview_button(ref, sizeof(ref), i);
+    size_t used = strlen(game->sentence);
+    if (i == want) {
+        interview_outline(game, i, "CorrectOutline", 1);
+        const char *w = game->words[i - 1];
+        if (game->buttonCount == 1) {
+            char first[64];
+            capitalise(first, sizeof(first), w);
+            snprintf(game->sentence + used, sizeof(game->sentence) - used, "%s", first);
+        } else if (game->buttonCount == game->difficulty) {
+            snprintf(game->sentence + used, sizeof(game->sentence) - used, ", %s.", w);
+        } else {
+            snprintf(game->sentence + used, sizeof(game->sentence) - used, ", %s", w);
+        }
+        interview_sentence(game, game->sentence);
+        if (game->buttonCount == game->difficulty) {
+            game->buttonCount++;
+            interview_end(game, 1);
+            return;
+        }
+        game->buttonCount++;
+        return;
+    }
+    add_op(game, SSR_OP_ELEMENT_COLOUR, ref, NULL, "FF0000FF", 0);
+    snprintf(game->sentence + used, sizeof(game->sentence) - used, "...");
+    interview_sentence(game, game->sentence);
+    game->buttonCount = -game->buttonCount;
+    interview_end(game, 0);
+}
+
+// c_TScreen_Interview.Update.
+static void interview_tick(SSRGame *game) {
+    int t = game->now;
+    if (!game->ready) {
+        int b = game->sequence[game->buttonCount - 1];
+        int at = b < 0 ? -b : b;
+        if (t > game->countdown + 1000 && t < game->countdown + 1500 && !game->beepDone) {
+            game->beepDone = 1;
+            interview_outline(game, at, b < 0 ? "IncorrectOutline" : "CorrectOutline", 1);
+            if (game->buttonCount == 1) interview_sentence(game, "");
+        } else if (t > game->countdown + 1500) {
+            game->beepDone = 0;
+            interview_outline(game, at, "CorrectOutline", 0);
+            interview_outline(game, at, "IncorrectOutline", 0);
+            game->countdown = t;
+            if (b < 0) {
+                for (int k = game->buttonCount - 1; k < 14; k++) game->sequence[k] = game->sequence[k + 1];
+            } else {
+                game->buttonCount++;
+            }
+            if (game->buttonCount > game->difficulty) {
+                interview_sentence(game, loc(game, "Go!"));
+                game->buttonCount = 1;
+                game->ready = 1;
+            }
+        }
+        return;
+    }
+    // After a fault the right button flashes.
+    if (game->interviewFail && t >= game->splashEnd && game->buttonCount < 0) {
+        int b = game->sequence[-game->buttonCount - 1];
+        interview_outline(game, b < 0 ? -b : b, "CorrectOutline", t % 1000 >= 500);
+    }
+    if (game->ready > 1 && (t > game->ready + 3000 || game->touch.down)) interview_ok(game);
+}
+
+#define WORD(n)                                                                                                        \
+    static void word##n(SSRGame *game) {                                                                               \
+        interview_click(game, n);                                                                                      \
+    }
+WORD(1)
+WORD(2)
+WORD(3)
+WORD(4)
+WORD(5)
+WORD(6)
+WORD(7)
+WORD(8)
+WORD(9)
+WORD(10)
+WORD(11)
+WORD(12)
+WORD(13)
+WORD(14)
+WORD(15)
+#undef WORD
+
 /* ------------------------------------------------------------ the pairs */
 
 // The face of each card by relation and image id (c_<X>CardAnimations).
@@ -4198,6 +4449,23 @@ static const Route ROUTES[] = {
     {"relationships.btn_Girlfriend", activity_partner},
     {"relationships.btn_Sponsors", activity_sponsors},
     {"relationships.btn_DumpGirl", dump_partner},
+    {"interview.btn_1", word1},
+    {"interview.btn_2", word2},
+    {"interview.btn_3", word3},
+    {"interview.btn_4", word4},
+    {"interview.btn_5", word5},
+    {"interview.btn_6", word6},
+    {"interview.btn_7", word7},
+    {"interview.btn_8", word8},
+    {"interview.btn_9", word9},
+    {"interview.btn_10", word10},
+    {"interview.btn_11", word11},
+    {"interview.btn_12", word12},
+    {"interview.btn_13", word13},
+    {"interview.btn_14", word14},
+    {"interview.btn_15", word15},
+    {"interview.btn_ok", interview_ok},
+    {"debug.interview", interview_screen},
     {"debug.dilemma", dilemma_screen},
     {"dilemma.btn_relationship1", dilemma_top},
     {"dilemma.btn_relationship2", dilemma_bottom},
@@ -4474,6 +4742,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->ticks -= 1;
             game->now += 16;
             if (strcmp(game->screen, "playeroftheyear") == 0) poty_tick(game);
+        }
+    } else if (strcmp(game->screen, "interview") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1 && strcmp(game->screen, "interview") == 0) {
+            game->ticks -= 1;
+            game->now += 16;
+            interview_tick(game);
         }
     } else if (strcmp(game->screen, "dilemma") == 0) {
         game->ticks += frames;

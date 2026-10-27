@@ -221,7 +221,45 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     seasons++;
 }
 
-static int winnerPages = 0, newsSeen = 0, dilemmasSeen = 0;
+static int winnerPages = 0, newsSeen = 0, dilemmasSeen = 0, interviews = 0, interviewsWon = 0;
+
+// The interview after a match: the green buttons light one at a time, then
+// the player repeats them. Every second interview the test makes a fault.
+static void give_an_interview(SSRGame *game, SSRTweaks *tweaks) {
+    const SSRCareer *c = ssr_game_career(game);
+    int skill = c->interviewSkill, stars = c->starRating;
+    int order[16], count = 0, go = 0;
+    SSRUiOp ops[64];
+    for (int f = 0; f < 2000 && !go; f++) {
+        ssr_game_update(game, 1);
+        int n = take_ops(game, ops, 64);
+        for (int i = 0; i < n; i++) {
+            int b;
+            if (ops[i].kind == SSR_OP_SUB && ops[i].id == 1 && strcmp(ops[i].ref2, "CorrectOutline") == 0 &&
+                sscanf(ops[i].ref, "Button%d", &b) == 1 && count < 16) {
+                order[count++] = b;
+            }
+            if (ops[i].kind == SSR_OP_TEXT && strcmp(ops[i].ref, "Sentence") == 0 && strcmp(ops[i].text, "Go!") == 0) go = 1;
+        }
+    }
+    CHECK(go && count >= 3 && count <= 5);
+    int fault = interviews++ % 2 == 1;
+    for (int i = 0; i < count; i++) {
+        char message[32];
+        int b = order[i];
+        if (fault && i == count - 1) b = b % 9 + 1;
+        snprintf(message, sizeof(message), "interview.btn_%d", b);
+        ssr_game_message(game, message);
+    }
+    for (int f = 0; f < 400 && strcmp(ssr_game_screen(game), "interview") == 0; f++) ssr_game_update(game, 1);
+    CHECK(strcmp(ssr_game_screen(game), "matchstats") == 0);
+    if (!fault) {
+        interviewsWon++;
+        CHECK(c->interviewSkill == skill + 1 && c->starRating == stars + 10);
+    } else {
+        CHECK(c->interviewSkill == skill && ssr_tweaks_number(tweaks, "Menu", "ZeroRelChange") == 1);
+    }
+}
 
 // Play on the game menu: the news of the week comes first. The test
 // answers it until the fixtures show.
@@ -414,13 +452,25 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     // 750 ms is 47 ticks of 16 ms.
     ssr_game_update(game, 48);
     CHECK(ssr_tweaks_number(tweaks, "MatchStats", "StatStage") == 2);
+    int interviewed = 0;
     for (int i = 0; i < 2000 && ssr_tweaks_number(tweaks, "MatchStats", "StatStage") < 10; i++) {
         ssr_game_update(game, 1);
+        if (strcmp(ssr_game_screen(game), "interview") == 0) {
+            give_an_interview(game, tweaks);
+            interviewed = 1;
+        }
+    }
+    // The first two matches also give an interview, one won and one lost.
+    if (!interviewed && interviews < 2) {
+        ssr_game_message(game, "debug.interview");
+        CHECK(strcmp(ssr_game_screen(game), "interview") == 0);
+        give_an_interview(game, tweaks);
+        interviewed = 1;
     }
     float rating = ssr_tweaks_number(tweaks, "MatchStats", "MatchRating");
     CHECK(rating >= 1 && rating <= 10);
     int mod = (int)ssr_tweaks_number(tweaks, "RelationshipMods", "Boss");
-    CHECK(c->relationBoss == (boss + mod < 1 ? 1 : boss + mod > 100 ? 100 : boss + mod));
+    if (!interviewed) CHECK(c->relationBoss == (boss + mod < 1 ? 1 : boss + mod > 100 ? 100 : boss + mod));
     CHECK(ssr_tweaks_number(tweaks, "Player", "StarRating") == c->starRating / 100 + 1);
 
     // The ratings screen opens over the stats, and Back comes back to them.
@@ -936,6 +986,7 @@ static void test_starts_a_new_career(void) {
     CHECK(seasons >= 1);
     // The weeks had news: tips, and a dilemma or other news.
     CHECK(newsSeen > 0 && ssr_game_career(game)->tipCount > 0);
+    CHECK(interviews >= 2 && interviewsWon >= 1);
     ssr_game_message(game, "gamemenu.btn_Quit");
 
     // Delete: Cancel keeps it, Ok deletes it.
