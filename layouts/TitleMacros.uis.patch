@@ -1,2 +1,5 @@
-# The title of the remake has its own logo, so the TM of the original goes.
+# The title of the remake has its own logo. REBOOTED takes the place of
+# the TM of the original, under the SOCCER letters. It takes the colour
+# and the place of the letters, so it fades and moves with them.
 - Text:(TM,
++ Draw:(SSRRebooted,-32,168,497.5,,,#FFFFFF?COL?)
