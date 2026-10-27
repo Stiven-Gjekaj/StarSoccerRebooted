@@ -1,0 +1,2 @@
+// The icon of the app on Windows.
+IDI_ICON1 ICON "app.ico"
