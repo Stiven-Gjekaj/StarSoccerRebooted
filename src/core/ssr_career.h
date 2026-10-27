@@ -127,6 +127,9 @@ typedef struct {
     char headline[512];
     // The news of a cup winner that the results show next, or "".
     char headlineResult[256];
+    // The race horses that the player owns: "id:energy:strength:colour#"
+    // for each (THorse.GetHorsesOwned).
+    char horses[2048];
     // 1 when the news of this match week is done: the next Play goes to
     // the match (c_TPlayer.newsdone).
     int newsDone;

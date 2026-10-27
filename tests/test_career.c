@@ -87,6 +87,7 @@ static void test_saves_and_loads_a_career(void) {
     c.interviewSkill = 4;
     c.lastInterview = 90;
     snprintf(c.headlineResult, sizeof(c.headlineResult), "ARS have won the CUP!");
+    snprintf(c.horses, sizeof(c.horses), "3:61.5:4:454545FF00000000#12:100:1:B0B0B0FF00000000#");
     char path[1200];
     snprintf(path, sizeof(path), "%s/slot0.txt", ssr_test_directory("career_save"));
     CHECK(ssr_career_save(&c, path));
@@ -106,6 +107,7 @@ static void test_saves_and_loads_a_career(void) {
     CHECK(back.intNotPickedMessage == 400);
     CHECK(back.interviewSkill == 4 && back.lastInterview == 90);
     CHECK(back.tipCount == 7 && back.newsDone == 0 && strcmp(back.headlineResult, "ARS have won the CUP!") == 0);
+    CHECK(strcmp(back.horses, "3:61.5:4:454545FF00000000#12:100:1:B0B0B0FF00000000#") == 0);
     CHECK(back.relationPartner == 40.5f && back.relationSponsors == 22 && back.spentTime == 2);
     CHECK(back.lastSpendTimePartner == 28 && back.lastSpendTimeFriends == 28);
     CHECK(back.sponsors[3] == 9 && back.sponsors[0] == 0);

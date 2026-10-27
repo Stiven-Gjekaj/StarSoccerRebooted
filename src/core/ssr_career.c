@@ -360,6 +360,7 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     fprintf(file, "interviewskill=%d\nlastinterview=%d\n", c->interviewSkill, c->lastInterview);
     write_text(file, "headline", c->headline);
     write_text(file, "headlineresult", c->headlineResult);
+    write_text(file, "horses", c->horses);
     int ok = !ferror(file);
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
@@ -516,6 +517,7 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "lastinterview") == 0) c->lastInterview = number;
         else if (strcmp(key, "headline") == 0) read_text(value, c->headline, sizeof(c->headline));
         else if (strcmp(key, "headlineresult") == 0) read_text(value, c->headlineResult, sizeof(c->headlineResult));
+        else if (strcmp(key, "horses") == 0) read_text(value, c->horses, sizeof(c->horses));
     }
     fclose(file);
     return c->clubId != 0;
