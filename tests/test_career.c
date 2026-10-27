@@ -317,6 +317,27 @@ static void test_keeps_the_awards(void) {
     CHECK(back.awards[33] == 40 && back.awards[125] == 50 && ssr_career_award_count(&back) == 2);
 }
 
+// The records: the hat tricks of the career, the form of the seasons, and
+// the furthest goals and passes. A new season forgets its furthest values.
+static void test_keeps_the_records(void) {
+    static SSRCareer c, back;
+    ssr_career_create(&c, "The", "Kid", 0, 0, 62, 1, 1, 0);
+    c.clubId = 10;
+    c.hatTricks = 4;
+    int form[5] = {0, 0, 6, 7, 8};
+    memcpy(c.careerForm, form, sizeof(form));
+    c.seasonFurthest[0] = 300.5f;
+    c.furthest[1] = 640;
+    c.intFurthest[3] = 250;
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/records.txt", ssr_test_directory("career_records"));
+    CHECK(ssr_career_save(&c, path) && ssr_career_load(&back, path));
+    CHECK(back.hatTricks == 4 && memcmp(back.careerForm, form, sizeof(form)) == 0);
+    CHECK(back.seasonFurthest[0] == 300.5f && back.furthest[1] == 640 && back.intFurthest[3] == 250);
+    ssr_career_reset_season(&back);
+    CHECK(back.seasonFurthest[0] == 0 && back.furthest[1] == 640 && back.intFurthest[3] == 250);
+}
+
 // StoreOldStats: a career of the second year with no history gets a row
 // of year 0 with the counts before the season.
 static void test_stores_the_old_stats(void) {
@@ -358,6 +379,7 @@ static void test_chooses_the_match_balls(void) {
 int main(void) {
     test_chooses_the_match_balls();
     test_keeps_the_awards();
+    test_keeps_the_records();
     test_keeps_the_trophies_and_the_history();
     test_stores_the_old_stats();
     test_keeps_the_days_of_training();

@@ -143,8 +143,14 @@ typedef struct {
     float seasonTotalRating, totalRating;
     int intApps, intGoals, intAssists, intPasses, intHatTricks, intStarMan, intChances;
     float intTotalRating;
-    // The ratings of the last five matches, the oldest first.
-    int form[5], intForm[5];
+    // The ratings of the last five matches, the oldest first. careerForm
+    // holds the mean rating of the last five seasons.
+    int form[5], intForm[5], careerForm[5];
+    // The hat tricks of the career with the clubs.
+    int hatTricks;
+    // The furthest goal, pass, headed goal, and headed pass in pixels: of
+    // this season, of the career with the clubs, and with the nation.
+    float seasonFurthest[4], furthest[4], intFurthest[4];
     // The awards of the player of the year, and 1 after a continental final
     // won in this season.
     int potyAwards, wonMajorAward;

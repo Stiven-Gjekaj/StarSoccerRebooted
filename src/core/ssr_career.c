@@ -291,6 +291,7 @@ void ssr_career_reset_season(SSRCareer *c) {
     c->seasonApps = c->seasonGoals = c->seasonAssists = c->seasonPasses = 0;
     c->seasonHatTricks = c->seasonStarMan = c->seasonChances = 0;
     c->seasonTotalRating = 0;
+    memset(c->seasonFurthest, 0, sizeof(c->seasonFurthest));
     c->wonMajorAward = 0;
     c->headlineResult[0] = 0;
     c->energy = 100;
@@ -361,6 +362,11 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
             c->intTotalRating);
     write_ints(file, "form", c->form, 5);
     write_ints(file, "intform", c->intForm, 5);
+    write_ints(file, "careerform", c->careerForm, 5);
+    fprintf(file, "hattricks=%d\n", c->hatTricks);
+    write_floats(file, "seasonfurthest", c->seasonFurthest, 4);
+    write_floats(file, "furthest", c->furthest, 4);
+    write_floats(file, "intfurthest", c->intFurthest, 4);
     fprintf(file, "potyawards=%d\nwonmajoraward=%d\n", c->potyAwards, c->wonMajorAward);
     fprintf(file, "starrating=%d\n", c->starRating);
     fprintf(file, "retired=%d\n", c->retired);
@@ -534,6 +540,11 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "inttotalrating") == 0) c->intTotalRating = real;
         else if (strcmp(key, "form") == 0) read_ints(value, c->form, 5);
         else if (strcmp(key, "intform") == 0) read_ints(value, c->intForm, 5);
+        else if (strcmp(key, "careerform") == 0) read_ints(value, c->careerForm, 5);
+        else if (strcmp(key, "hattricks") == 0) c->hatTricks = number;
+        else if (strcmp(key, "seasonfurthest") == 0) read_floats(value, c->seasonFurthest, 4);
+        else if (strcmp(key, "furthest") == 0) read_floats(value, c->furthest, 4);
+        else if (strcmp(key, "intfurthest") == 0) read_floats(value, c->intFurthest, 4);
         else if (strcmp(key, "potyawards") == 0) c->potyAwards = number;
         else if (strcmp(key, "wonmajoraward") == 0) c->wonMajorAward = number;
         else if (strcmp(key, "starrating") == 0) c->starRating = number;
