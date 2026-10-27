@@ -283,8 +283,11 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       third list of the squad screen)
 - [ ] Teammates who matter: a strike partner, a captain, a young player
       that the player mentors
-- [ ] Managers with styles: a new manager can drop the player, change the
-      role, or bring the player to a new club
+- [x] Managers with styles (balanced, youth, attacking). The managers of
+      the bottom clubs can go at the end of a season. A new manager of the
+      club of the player starts the boss relation again at 50.
+- [ ] A new manager who changes the role of the player or brings the
+      player to a new club
 - [x] New young players each season, so the world stays full after the
       real players retire
 
