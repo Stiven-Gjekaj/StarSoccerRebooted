@@ -71,6 +71,11 @@ typedef struct {
     int playerCopies[SSR_PLAYERS_MAX];
     // The run arrow of each team-mate (c_MatchCaptainArrow).
     int runArrows[SSR_PLAYERS_MAX];
+    // The trail of the ball (c_BallTrailFXParticles): 40 faint copies of
+    // the ball, the time of each, and its scale at the start.
+    int trail[40];
+    Uint64 trailTime[40];
+    float trailScale[40];
     int ballCopy, arrowCopy;
     SSRAudio *audio;
     // The Spine files that the screens use, and when the screen opened.
@@ -286,6 +291,44 @@ static void update_ball_view(SSRApp *app, const SSRChance *chance) {
     }
 }
 
+// The trail of a fast ball (c_BallTrailFXParticles): a copy of the ball in
+// #FFFFFF18 comes each frame while power / 50 > 0.08 after the kick. It
+// fades in 0.5 s and shrinks to nothing, and it goes after 600 ms
+// [I: the remake makes one each frame, the game one each tick].
+static void update_trail(SSRApp *app, const SSRChance *chance) {
+    const SSRBall *b = &chance->ball;
+    Uint64 now = SDL_GetTicks();
+    int free = -1;
+    for (int i = 0; i < 40; i++) {
+        int id = app->trail[i];
+        if (!app->trailTime[i]) {
+            if (free < 0) free = i;
+            continue;
+        }
+        float t = (float)(now - app->trailTime[i]);
+        if (t > 600) {
+            app->trailTime[i] = 0;
+            ssr_scene_spawn_show(app->scene, id, NULL, 0);
+            continue;
+        }
+        char colour[16];
+        SDL_snprintf(colour, sizeof(colour), "FFFFFF%02X", (int)(0x18 * SDL_max(0.0f, 1 - t / 500)));
+        ssr_scene_spawn_colour(app->scene, id, "BallHook", colour);
+        ssr_scene_spawn_set(app->scene, id, "BallHook", SSR_GEL_SCALE, app->trailScale[i] * (1 - t / 600));
+    }
+    if (free < 0 || b->kicks == 0 || b->power / 50 <= 0.08f) return;
+    int id = app->trail[free];
+    app->trailTime[free] = now;
+    // The scale of the template (0.6) times 1 + the scale of the ball.
+    app->trailScale[free] = 0.6f * (2 + b->z / 100);
+    ssr_scene_spawn_show(app->scene, id, NULL, 1);
+    ssr_scene_spawn_place(app->scene, id, NULL, b->x, b->y);
+    ssr_scene_spawn_place(app->scene, id, "BallHook", 0, -b->z);
+    ssr_scene_spawn_colour(app->scene, id, "BallHook", "FFFFFF18");
+    ssr_scene_spawn_set(app->scene, id, "BallHook", SSR_GEL_SCALE, app->trailScale[free]);
+    ssr_scene_spawn_set(app->scene, id, "BallAnim", SSR_GEL_ANIM_SPEED, 0);
+}
+
 // The circle of a team-mate that the captain can send on a run, and the
 // arrow of its run (c_MatchCaptainArrow.Update). They show until the kick.
 static void update_run_arrow(SSRApp *app, const SSRChance *chance, int i) {
@@ -354,6 +397,13 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
             ssr_scene_spawn_clone(app->scene, id, "Pants", "MatchColours", pants);
             app->runArrows[i] = ssr_scene_spawn(app->scene, "MatchPitch", "TacticArrow", 0, NULL, 0);
         }
+        for (int i = 0; i < 40; i++) {
+            app->trail[i] = ssr_scene_spawn(app->scene, "MatchPitch", "Ball", 0, NULL, 0);
+            app->trailTime[i] = 0;
+            ssr_scene_spawn_show(app->scene, app->trail[i], NULL, 0);
+            ssr_scene_spawn_show(app->scene, app->trail[i], "Ball", 0);
+            ssr_scene_spawn_show(app->scene, app->trail[i], "BallTip", 0);
+        }
         app->ballCopy = ssr_scene_spawn(app->scene, "MatchPitch", "Ball", 0, NULL, 0);
         ssr_scene_spawn_show(app->scene, app->ballCopy, "BallTip", 0);
         app->arrowCopy = ssr_scene_spawn(app->scene, "MatchPitch", "Arrow", 0, NULL, 0);
@@ -380,6 +430,7 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         }
     }
     update_ball_view(app, chance);
+    update_trail(app, chance);
     ssr_scene_update(app->pitchScene, env, ms);
     // The banner of the result (c_TQuickMessage "scoreanim") starts again
     // for each chance.
