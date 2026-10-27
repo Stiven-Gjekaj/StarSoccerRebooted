@@ -630,7 +630,8 @@ static Gel *new_gel(GelKind kind, const SSRUiNode *node) {
     g->baked = mat_identity();
     g->alignX = 'C';
     g->alignY = 'M';
-    g->font = 1;
+    // A text with no FontSize takes the first font (c_GelText.m_fntsize).
+    g->font = 0;
     g->fontScaleX = g->fontScaleY = 1;
     g->italic = -0.25f;
     g->speed = 1;
@@ -1305,8 +1306,8 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         g->yDepth = 1;
         g->yDepthOffset = (float)number(s, m, 0, 0);
     } else if (is(n, "FontSize")) {
-        g->font = (int)number(s, m, 0, 1);
-        if (g->font < 0 || g->font > 3) g->font = 1;
+        g->font = (int)number(s, m, 0, 0);
+        if (g->font < 0 || g->font > 3) g->font = 0;
     } else if (is(n, "FontScale")) {
         g->fontScaleX = (float)number(s, m, 0, 1);
         g->fontScaleY = (float)number(s, m, 1, g->fontScaleX);

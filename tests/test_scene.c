@@ -1257,7 +1257,9 @@ static void test_player_shadows(void) {
 static void test_aligns_text_as_the_game(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     layout = "TextBox:(A,0,0,150,80,C,C)\n"
+             "\tFontSize(2)\n"
              "Text:(B,0,0,150,80,R,B)\n"
+             "\tFontSize()\n"
              "Text:(C,0,0,150,80,X,L)\n"
              "Text:(D,0,0,150,80)\n";
     SSRUiFiles files = {read_layout, NULL};
@@ -1270,6 +1272,8 @@ static void test_aligns_text_as_the_game(void) {
     for (int i = 0; i < 4 && i < ssr_scene_count(scene); i++) {
         const SSRSceneItem *item = ssr_scene_item(scene, i);
         CHECK(item->alignX == want[i][0] && item->alignY == want[i][1]);
+        // A text with no FontSize, or with no size in it, takes the first font.
+        CHECK(item->font == (i == 0 ? 2 : 0));
     }
     ssr_scene_free(scene);
     ssr_ui_free(tree);
