@@ -47,6 +47,9 @@ typedef enum {
     SSR_OP_LIST_PARAM,
     // The next entry of the list ref goes at the y in id.
     SSR_OP_LIST_START,
+    // The AnimInstance elements ref play the animation ref2 (their own one
+    // when ref2 is "") from the frame id at the speed in text.
+    SSR_OP_ANIM_PLAY,
 } SSRUiOpKind;
 
 typedef struct {
