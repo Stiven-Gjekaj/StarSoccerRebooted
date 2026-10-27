@@ -11,7 +11,7 @@
 // "type:text" types the text. Set SSR_WINDOW to "WxH" for the size of the window in points.
 // Set SSR_AUTOCHANCE to "dx,dy" to play each chance of the player with a
 // drag of (dx, dy) from the ball. Set SSR_SHOT_TAP to save the frame of
-// the first tap ball.
+// the first tap ball, and SSR_SHOT_DRIBBLE for the first dribble.
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -828,13 +828,14 @@ SDL_AppResult SDL_AppIterate(void *state) {
     const char *shot = SDL_getenv("SSR_SHOT");
     const char *shotMs = SDL_getenv("SSR_SHOT_MS");
     int wait = shotMs ? SDL_atoi(shotMs) : 0;
-    // SSR_SHOT_TAP saves the frame 1 s after the first tap ball shows,
-    // in place of a time.
-    static Uint64 tapSeen = 0;
+    // SSR_SHOT_TAP saves the frame 1 s after the first tap ball shows, and
+    // SSR_SHOT_DRIBBLE 1 s after the first dribble starts, in place of a time.
+    static Uint64 stateSeen = 0;
     const SSRChance *shotChance = ssr_game_chance(app->game);
-    if (shotChance && shotChance->state == SSR_CHANCE_TAP && !tapSeen) tapSeen = SDL_GetTicks();
-    int tapReady = tapSeen && SDL_GetTicks() - tapSeen >= 1000;
-    if (SDL_getenv("SSR_SHOT_TAP")) wait = tapReady ? 0 : 1 << 30;
+    int wanted = SDL_getenv("SSR_SHOT_TAP") ? SSR_CHANCE_TAP : SDL_getenv("SSR_SHOT_DRIBBLE") ? SSR_CHANCE_DRIBBLE : -1;
+    if (shotChance && (int)shotChance->state == wanted && !stateSeen) stateSeen = SDL_GetTicks();
+    int stateReady = stateSeen && SDL_GetTicks() - stateSeen >= 1000;
+    if (wanted >= 0) wait = stateReady ? 0 : 1 << 30;
     if (shot && *shot && SDL_GetTicks() - firstFrame >= (Uint64)wait) {
         SDL_Surface *frame = SDL_RenderReadPixels(app->renderer, NULL);
         bool saved = frame && SDL_SavePNG(frame, shot);
