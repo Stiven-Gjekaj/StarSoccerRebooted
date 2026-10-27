@@ -39,9 +39,8 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       swipe, and lists that the code fills from a template
 - [x] The expression language of the layouts: `set(...)`, `fmt()`,
       `oneof()`, `lerp()`, `if`, and `%` variables
-- [ ] The colours of the slots of a Spine gel (`gel.slotcol.rgba()`) and
-      of the text shadow (`gel.text.shadcol`). The language reads them,
-      but the scene does not draw them yet.
+- [x] The colours of the slots of a Spine gel (`gel.slotcol.rgba()`) and
+      of the text shadow (`gel.text.shadcol`)
 - [x] The news ticker shell (`ShowShell(Ticker)`, `ticker.uis`) with the
       welcome texts
 - [x] The texts of the ticker that tell of the career (low energy, the
