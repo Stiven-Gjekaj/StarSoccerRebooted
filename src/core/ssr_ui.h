@@ -35,6 +35,9 @@ struct SSRUiNode {
     unsigned flags;
     char **args;
     int argCount;
+    // The text between the brackets as the line has it, with its spaces.
+    // NULL when the line has no brackets.
+    char *raw;
     char *ref;
     SSRUiNode **children;
     int childCount;

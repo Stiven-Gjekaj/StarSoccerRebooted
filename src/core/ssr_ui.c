@@ -111,6 +111,7 @@ static void free_node(SSRUiNode *node) {
     for (int i = 0; i < node->modifierCount; i++) free_node(node->modifiers[i]);
     free(node->modifiers);
     free(node->ref);
+    free(node->raw);
     free(node->name);
     free(node);
 }
@@ -471,9 +472,19 @@ static void parse_statement(Parser *p, const char *line) {
     }
     char **args = NULL;
     int argCount = 0;
+    char *raw = NULL;
     if (*line == '(') {
         line++;
+        const char *start = line;
         argCount = read_args(&line, &args);
+        const char *end = start;
+        int depth = 0;
+        while (*end && !(*end == ')' && depth == 0)) {
+            if (*end == '(' || *end == '[') depth++;
+            if ((*end == ')' || *end == ']') && depth > 0) depth--;
+            end++;
+        }
+        raw = copy_text(start, (size_t)(end - start));
     }
     char *ref = NULL;
     const char *refAt = strstr(line, "ref:");
@@ -489,6 +500,7 @@ static void parse_statement(Parser *p, const char *line) {
     if (!name) {
         free_args(args, argCount);
         free(ref);
+        free(raw);
         return;
     }
 
@@ -510,6 +522,8 @@ static void parse_statement(Parser *p, const char *line) {
             node->flags = flags;
             node->args = args;
             node->argCount = argCount;
+            node->raw = raw;
+            raw = NULL;
             node->ref = ref;
             node->file = p->file;
             node->line = p->line;
@@ -535,6 +549,7 @@ static void parse_statement(Parser *p, const char *line) {
     free(name);
     free_args(args, argCount);
     free(ref);
+    free(raw);
 }
 
 // Handles the If:, Else, and EndIf lines. Returns 1 when the line was one

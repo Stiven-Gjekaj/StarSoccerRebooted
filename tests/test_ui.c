@@ -73,6 +73,7 @@ static void test_reads_elements_modifiers_and_blocks(void) {
     CHECK(draw->ref && strcmp(draw->ref, "Sky") == 0);
     CHECK(draw->modifierCount == 2 && is(draw->modifiers[0], "Handle") && is(draw->modifiers[1], "Additive"));
     CHECK(draw->modifiers[1]->argCount == 0);
+    CHECK(draw->raw && strcmp(draw->raw, "Title_Sky,@L,@T,@W,@H") == 0);
     CHECK(draw->line == 2);
 
     const SSRUiNode *rect = child(root, 1);
