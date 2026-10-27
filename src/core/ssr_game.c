@@ -247,6 +247,9 @@ struct SSRGame {
         int start, finish, id;
     } alerts[32];
     int alertCount, alertIds;
+    // The furthest goal, pass, headed goal, and headed pass of the last
+    // match, in pixels.
+    float matchFurthest[4];
 
     // The relationships screen (c_TScreen_Relationships): the national
     // view, and the bars whose button sends no click (Boss, Team, Fans,
@@ -1906,6 +1909,7 @@ static void end_match(SSRGame *game) {
         c->totalRating += rating;
         ssr_career_add_form(c->form, (int)rating);
     }
+    memcpy(game->matchFurthest, m->furthest, sizeof(game->matchFurthest));
     c->energy = m->energy;
     c->debut = 0;
     game->extraTime = m->half >= 3;
@@ -2178,6 +2182,47 @@ static float form_of(const int *form, int apps);
 // TScreen_MatchStats.CheckAchievements: the awards of a match. [I: the
 // remake keeps no count of the hits of the post and of the goals from a
 // corner, so the awards 115, 117, and 118 do not come yet.]
+// GetStringDistance: pixels as yards or metres, with one decimal that the
+// game cuts, not rounds. tla gives "yd" or "m", else "yards" or "metres".
+static void distance_string(SSRGame *game, float pixels, int tla, char *out, size_t capacity) {
+    float value = pixels / 19.2f;
+    if (game->settings.distance) value *= 0.9144f;
+    const char *tag = game->settings.distance ? (tla ? "tla_Metres" : "Metres") : (tla ? "tla_Yards" : "Yards");
+    char unit[32];
+    snprintf(unit, sizeof(unit), "%s", loc(game, tag));
+    for (char *p = unit; *p; p++) *p = (char)tolower((unsigned char)*p);
+    int tenths = (int)(value * 10.0f + 0.0001f);
+    snprintf(out, capacity, "%d.%d %s", tenths / 10, tenths % 10, unit);
+}
+
+// c_TScreen_MatchStats.CheckRecords and CheckInternationalRecords: the
+// furthest values of the match go into the season and the career, or into
+// the career with the nation. A new record of the career gives an alert.
+static void match_records(SSRGame *game, int nation) {
+    SSRCareer *c = &game->career;
+    static const char *const TAGS[4] = {"CMESSAGE_NEWFURTHESTGOAL", "CMESSAGE_NEWFURTHESTPASS",
+                                        "CMESSAGE_NEWFURTHESTHEADEDGOAL", "CMESSAGE_NEWFURTHESTHEADEDPASS"};
+    // The game checks the goal, the headed goal, the pass, the headed pass.
+    static const int ORDER[4] = {0, 2, 1, 3};
+    for (int k = 0; k < 4; k++) {
+        int i = ORDER[k];
+        float value = game->matchFurthest[i];
+        if (nation) {
+            if (value > c->intFurthest[i]) c->intFurthest[i] = value;
+            continue;
+        }
+        if (value > c->seasonFurthest[i]) c->seasonFurthest[i] = value;
+        if (value <= c->furthest[i]) continue;
+        c->furthest[i] = value;
+        char text[256], dist[48];
+        snprintf(text, sizeof(text), "%s", loc(game, TAGS[i]));
+        distance_string(game, value, 0, dist, sizeof(dist));
+        replace_all(text, sizeof(text), "$dist", dist);
+        alert(game, "bottommessagerecord", text, 5000);
+        play_sound(game, "CAchievement");
+    }
+}
+
 static void match_awards(SSRGame *game, SSRFixture *f) {
     SSRCareer *c = &game->career;
     const SSRAfterMatchFacts *m = &game->facts;
@@ -2196,6 +2241,7 @@ static void match_awards(SSRGame *game, SSRFixture *f) {
     int won = m->myScore > m->opponentScore;
     int margin = m->home ? m->score1 - m->score2 : m->score2 - m->score1;
     if (comp && comp->data->level == 0) {
+        match_records(game, 0);
         if (m->goals > 0) award(game, 2);
         if (hatTricks > 0) award(game, 3);
         if (form_of(c->form, c->apps) >= 10) award(game, 12);
@@ -2229,6 +2275,7 @@ static void match_awards(SSRGame *game, SSRFixture *f) {
         if (clubApps > 250) award(game, 77);
         if (clubApps > 500) award(game, 78);
     } else if (comp && comp->data->level == 1) {
+        match_records(game, 1);
         award(game, 51);
         if (m->goals > 0) award(game, 52);
         if (hatTricks > 0) award(game, 53);
@@ -4145,8 +4192,7 @@ static void career_form_string(const int *form, char *out, size_t capacity) {
     else snprintf(out, capacity, "%d-%d-%d-%d", form[1], form[2], form[3], form[4]);
 }
 
-// TweakInterface.UpdatePlayerStats. [I: the remake keeps no furthest
-// goals and passes, so these show nothing.]
+// TweakInterface.UpdatePlayerStats.
 static void update_player_stats(SSRGame *game) {
     const SSRCareer *c = &game->career;
     player_stat(game, "Matches", c->seasonApps, c->apps, c->intApps);
@@ -4156,7 +4202,13 @@ static void update_player_stats(SSRGame *game) {
     player_stat(game, "Assists", c->seasonAssists, c->assists, c->intAssists);
     player_stat(game, "StarMan", c->seasonStarMan, c->starMan, c->intStarMan);
     static const char *const FURTHEST[4] = {"FurthestGoal", "FurthestPass", "FurthestHeadedGoal", "FurthestHeadedPass"};
-    for (int i = 0; i < 4; i++) player_string_stat(game, FURTHEST[i], "", "", "");
+    for (int i = 0; i < 4; i++) {
+        char season[48], career[48], international[48];
+        distance_string(game, c->seasonFurthest[i], 1, season, sizeof(season));
+        distance_string(game, c->furthest[i], 1, career, sizeof(career));
+        distance_string(game, c->intFurthest[i], 1, international, sizeof(international));
+        player_string_stat(game, FURTHEST[i], season, career, international);
+    }
     player_stat(game, "AverageRating", c->seasonApps > 0 ? c->seasonTotalRating / (float)c->seasonApps : 0,
                 c->apps > 0 ? c->totalRating / (float)c->apps : 0,
                 c->intApps > 0 ? c->intTotalRating / (float)c->intApps : 0);

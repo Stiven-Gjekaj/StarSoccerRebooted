@@ -228,7 +228,7 @@ static void watch_a_replay(SSRGame *game, SSRTweaks *tweaks) {
 
 // The end of a season: the review, the table, the awards, and the next
 // season.
-static int seasons = 0, notPicked = 0, substitutes = 0;
+static int seasons = 0, notPicked = 0, substitutes = 0, records = 0;
 
 static int transfers = 0;
 
@@ -582,6 +582,8 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     int apps = ssr_game_career(game)->apps, bank = ssr_game_career(game)->bank;
     int goals = ssr_game_career(game)->goals, assists = ssr_game_career(game)->assists;
     int passes = ssr_game_career(game)->passes;
+    float furthest[4];
+    memcpy(furthest, ssr_game_career(game)->furthest, sizeof(furthest));
     float ratings[10];
     memcpy(ratings, ssr_game_career(game)->ratings, sizeof(ratings));
     // The first season has the counts of a great season, for the awards
@@ -818,6 +820,22 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     if (c->passes >= passes + 5) CHECK(c->awards[4] > 0);
     if (c->assists > assists) CHECK(c->awards[6] > 0);
     CHECK((c->awards[23] > 0) == (c->goals >= 50));
+    // The records: a pass of the match goes into the furthest pass of the
+    // season, and the career keeps the best of all seasons. A new record
+    // of the career gives an alert.
+    if (c->passes > passes) CHECK(c->seasonFurthest[1] > 0);
+    for (int i = 0; i < 4; i++) CHECK(c->seasonFurthest[i] <= c->furthest[i] && c->furthest[i] >= furthest[i]);
+    if (c->furthest[1] > furthest[1]) {
+        int id = 0;
+        const char *layout = ssr_game_alert(game, &id);
+        for (int k = 0; k < 64 && layout && strcmp(layout, "bottommessagerecord") != 0; k++) {
+            ssr_game_message(game, "message.dismiss");
+            layout = ssr_game_alert(game, &id);
+        }
+        CHECK(layout && strcmp(layout, "bottommessagerecord") == 0);
+        CHECK(!strstr(ssr_tweaks_get(tweaks, "Menu", "BottomQuickMessage"), "$DIST"));
+        records++;
+    }
     CHECK(ssr_tweaks_number(tweaks, "Menu", "LeagueFixturesResults") == 1);
     rows = take_ops(game, ops, 256);
     CHECK(has_op(ops, rows, SSR_OP_LIST_ADD, "FixtureList", "") && !has_op(ops, rows, SSR_OP_LIST_TEXT, "FixtureList", "vs."));
@@ -1282,13 +1300,21 @@ static void look_at_achievements(SSRGame *game, SSRTweaks *tweaks) {
     memcpy(kept, form->careerForm, sizeof(kept));
     int forms[2][5] = {{0, 0, 6, 7, 8}, {10, 10, 10, 10, 9}};
     const char *texts[2] = {"6-7-8", "10-10-10-9"};
+    float pass = form->furthest[1], headed = form->seasonFurthest[3];
+    form->furthest[1] = 640;
+    form->seasonFurthest[3] = 0;
     for (int k = 0; k < 2; k++) {
         memcpy(form->careerForm, forms[k], sizeof(kept));
         ssr_game_message(game, "relationships.btn_Achievements");
         CHECK(strcmp(ssr_tweaks_get(tweaks, "PlayerStats", "CareerForm"), texts[k]) == 0);
+        // 640 pixels are 33.33 yards; the game cuts the text to 33.3.
+        CHECK(strncmp(ssr_tweaks_get(tweaks, "PlayerStats", "CareerFurthestPass"), "33.3 ", 5) == 0);
+        CHECK(strncmp(ssr_tweaks_get(tweaks, "PlayerStats", "SeasonFurthestHeadedPass"), "0.0 ", 4) == 0);
         ssr_game_message(game, "achievements.btn_Home");
     }
     memcpy(form->careerForm, kept, sizeof(kept));
+    form->furthest[1] = pass;
+    form->seasonFurthest[3] = headed;
     while (ssr_game_take_op(game, &drop)) {
     }
     ssr_game_message(game, "relationships.btn_Achievements");
@@ -2453,6 +2479,8 @@ static void test_starts_a_new_career(void) {
     for (int i = 0; i < 40 && ssr_game_career(game)->tipCount == 0; i++) play_a_match(game, tweaks);
     CHECK(newsSeen > 0 && ssr_game_career(game)->tipCount > 0);
     CHECK(interviews >= 2 && interviewsWon >= 1);
+    // A pass of the first match is a record of the career.
+    CHECK(records >= 1);
     gambling_news(game, tweaks, path);
     // The player retires at the end of the next season.
     retireNow = 1;
