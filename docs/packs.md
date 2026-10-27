@@ -31,6 +31,7 @@ in one folder.
     world/PromotionPlaces.txt
     world/Names.txt
     world/Players.txt
+    world/Stadiums.txt
     crests/<club id>.png
     art/<name>.png
     art/<name>.patch.png
@@ -109,6 +110,24 @@ screen. See [layouts/README.md](../layouts/README.md).
   be in a pack. Another kind stops the install.
 - A file of more than 16 MB stops the install.
 - The checks come before the app writes a file.
+
+### world/Stadiums.txt
+
+The stadiums of the clubs. The game has no file of stadiums, so this file
+is new. The first row has the names of the columns.
+
+| Column | Value |
+| --- | --- |
+| `club` | The `id` of the club in `Clubs.txt` |
+| `name` | The name of the stadium |
+| `capacity` | The number of seats |
+
+- The commentary names the stadium at the kick-off of a home match.
+- The seats choose the size of the stadium of the match: 60000 and more is
+  the biggest, then 35000, 15000, and 5000.
+
+    club	name	capacity
+    817	The Eyrie	5000
 
 ### world/Players.txt
 
