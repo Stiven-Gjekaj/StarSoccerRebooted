@@ -5558,9 +5558,13 @@ static void not_enough_cash(SSRGame *game, int shortBy) {
 }
 
 // UpdateBank: the bank does not go under 0.
+static void award(SSRGame *game, int id);
+
 static void update_bank(SSRGame *game, int change) {
     SSRCareer *c = &game->career;
     c->bank = c->bank + change < 0 ? 0 : c->bank + change;
+    // UpdateBank: the award of 10,000 bux, for any change.
+    if (c->bank >= 10000) award(game, 67);
     player_tweaks(game);
 }
 
@@ -5576,6 +5580,16 @@ static void buy_product(SSRGame *game, const SSRShopItem *item) {
     SSRCareer *c = &game->career;
     update_bank(game, -item->price);
     product_array(c, item->type)[item->id - 1] += 1;
+    // MadePurchaseCheck: the awards of all the items, all the vehicles,
+    // all the properties, and all three.
+    int all[4] = {0, 1, 1, 1};
+    for (int type = SSR_SHOP_ITEM; type <= SSR_SHOP_PROPERTY; type++) {
+        for (int i = 0; i < ssr_shop_count_by_type((SSRShopType)type); i++) all[type] &= product_array(c, type)[i] > 0;
+    }
+    if (all[SSR_SHOP_ITEM]) award(game, 27);
+    if (all[SSR_SHOP_VEHICLE]) award(game, 28);
+    if (all[SSR_SHOP_PROPERTY]) award(game, 29);
+    if (all[SSR_SHOP_ITEM] && all[SSR_SHOP_VEHICLE] && all[SSR_SHOP_PROPERTY]) award(game, 30);
     save_career(game);
     ssr_tweaks_set_number(game->tweaks, "Player", "Lifestyle", ssr_career_lifestyle(c));
     if (c->teamShopping > -1) c->teamShopping += item->type;
@@ -6027,6 +6041,7 @@ static void buy_staff(SSRGame *game, int kind) {
     int *staff = kind == PRODUCT_AGENT ? c->agent : c->trainer;
     staff[0] = staff[1] = staff[2] = 0;
     staff[0] = STAFF_PERIOD[0];
+    award(game, kind == PRODUCT_AGENT ? 73 : 74);
     save_career(game);
     game->overlay[0] = 0;
     message(game, kind == PRODUCT_AGENT ? "messageagent" : "messagetrainer",
@@ -6043,6 +6058,8 @@ static void buy_boots(SSRGame *game, int id) {
     c->bootId = id;
     c->bootUses = boot->uses;
     update_bank(game, -boot->price);
+    award(game, 26);
+    if (boot->control > 0) award(game, 66);
     save_career(game);
     // [I: the information screen of the control and swerve boots comes
     // with the tutorials.]
@@ -6054,7 +6071,10 @@ static void buy_boots(SSRGame *game, int id) {
 static void buy_nrg(SSRGame *game, int id) {
     SSRCareer *c = &game->career;
     int price = nrg_price(c, id);
-    if (price > 0) update_bank(game, -price);
+    if (price > 0) {
+        update_bank(game, -price);
+        award(game, 25);
+    }
     c->nrg[id - 1]++;
     if (c->teamShopping > -1) c->teamShopping++;
     save_career(game);

@@ -7,6 +7,7 @@
 
 #include "ssr_ball.h"
 #include "ssr_game.h"
+#include "ssr_shop.h"
 #include "ssr_test.h"
 #include "ssr_zipwriter.h"
 
@@ -1767,6 +1768,8 @@ static void go_shopping(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     ssr_game_message(game, "shopoverlay.buy");
     ssr_game_message(game, "message.btn_Ok");
     CHECK(now->properties[0] == 1 && now->bank == 6);
+    // Not all the items, vehicles, or properties: no award.
+    CHECK(now->awards[27] == 0 && now->awards[28] == 0 && now->awards[29] == 0 && now->awards[30] == 0);
     // The trip ends: three purchases give the team 5.
     float team = now->relationTeam;
     ssr_game_message(game, "UpsellMsg.CloseLifestyle");
@@ -1804,6 +1807,7 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     // The agent costs 5 for each star level and 25.
     ssr_game_message(game, "shopoverlay.buy");
     CHECK(now->bank == 170 && now->agent[0] == 51 && ssr_career_agent(now) == 1);
+    CHECK(now->awards[73] > 0 && now->awards[74] == 0);
     CHECK(strcmp(ssr_game_screen(game), "messageagent") == 0 && ssr_game_overlay(game)[0] == 0);
     ssr_game_message(game, "message.btn_Ok");
     CHECK(strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0);
@@ -1816,6 +1820,7 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     ssr_tweaks_set(tweaks, "Menu", "ItemString", "Trainer_1");
     ssr_game_message(game, "shopoverlay.buy");
     CHECK(now->bank == 140 && now->trainer[0] == 51 && strcmp(ssr_game_screen(game), "messagetrainer") == 0);
+    CHECK(now->awards[74] > 0);
     ssr_game_message(game, "message.btn_Ok");
     ssr_game_message(game, "PurchaseAnim.Close");
     // Boots: the first pair, then a question for a second pair.
@@ -1823,6 +1828,8 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "Boot_10") == 0);
     ssr_game_message(game, "shopoverlay.buy");
     CHECK(now->bootId == 10 && now->bootUses == 15 && now->bank == 110);
+    // The awards of boots, and of boots with control or swerve.
+    CHECK(now->awards[26] > 0 && (now->awards[66] > 0) == (ssr_shop_boot(10)->control > 0));
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "Boot_10") == 0);
     ssr_game_message(game, "PurchaseAnim.Close");
     ssr_tweaks_set(tweaks, "Menu", "ItemString", "Boot_1");
@@ -1836,10 +1843,20 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "NRG_1") == 0);
     ssr_game_message(game, "shopoverlay.buy");
     CHECK(now->nrg[0] == 1 && now->bank == 105 && strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0);
+    CHECK(now->awards[25] > 0 && now->awards[67] == 0);
     ssr_game_message(game, "PurchaseAnim.Close");
     // The energy is 60, so the can goes at once.
     ssr_game_message(game, "UpsellMsg.DrinkNRG");
     CHECK(now->nrg[0] == 0 && now->energy == 100 && ssr_game_overlay(game)[0] == 0);
+    // A bank of 10,000 after a change gives an award, a spend too.
+    ((SSRCareer *)now)->bank = 10002;
+    ssr_game_message(game, "gamemenu.btn_Shop");
+    ssr_game_message(game, "shop.tab.nrg");
+    ssr_game_message(game, "shopoverlay.buy");
+    CHECK(now->bank == 10000 && now->awards[67] > 0);
+    ssr_game_message(game, "PurchaseAnim.Close");
+    ssr_game_message(game, "UpsellMsg.Close");
+    ((SSRCareer *)now)->bank = 105;
     // A match with the agent and the trainer: each counts one match, and
     // the agent adds a tenth of the wage, at least 1.
     int apps = now->apps;
