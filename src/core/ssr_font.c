@@ -464,6 +464,14 @@ const unsigned char *ssr_font_atlas(const SSRFont *font, int *version) {
 
 // Puts the glyph into the atlas. A glyph that does not fit gets no pixels,
 // but keeps its advance.
+// Takes the last row of the glyph out of the atlas.
+static void drop_last_row(SSRFont *font, Glyph *g) {
+    if (g->h < 2) return;
+    memset(font->atlas + (g->ay + g->h - 1) * SSR_FONT_ATLAS_SIZE + g->ax, 0, (size_t)g->w);
+    g->h--;
+    font->version++;
+}
+
 static void bake(SSRFont *font, Glyph *g) {
     const Face *face = &font->faces[g->face];
     int x0, y0, x1, y1;
@@ -489,6 +497,7 @@ static void bake(SSRFont *font, Glyph *g) {
     g->ay = font->shelfY + PAD;
     stbtt_MakeGlyphBitmap(&face->info, font->atlas + g->ay * SSR_FONT_ATLAS_SIZE + g->ax, g->w, g->h,
                           SSR_FONT_ATLAS_SIZE, face->scale, face->scale, g->glyph);
+
     font->shelfX += g->w + PAD * 2;
     if (g->h + PAD * 2 > font->shelfHeight) font->shelfHeight = g->h + PAD * 2;
     font->version++;
@@ -536,6 +545,12 @@ static const Glyph *glyph_for(SSRFont *font, uint32_t codepoint) {
         g->advance = t->advance;
         g->inkWidth = t->w;
         g->xoff = t->bearingX;
+        // A round letter goes a part of a pixel under the baseline. Android
+        // hints the outline onto the baseline when the table says that the
+        // letter ends there. With no hinting, the faint row under the
+        // baseline puts the letter one pixel lower than the flat letters, so
+        // the remake drops that row. [I: an approximation of the hinting.]
+        if (g->present && g->h > 0 && t->h - t->bearingY == 0 && g->yoff + g->h == 1) drop_last_row(font, g);
     }
     return g;
 }

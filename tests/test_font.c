@@ -237,6 +237,30 @@ static void test_uses_a_glyph_table(const char *path) {
     CHECK(ssr_font_set_glyph_table(font, data, size, 0, 0) == 2);
     CHECK(ssr_font_set_glyph_table(font, NULL, 0, 0, 0) == 0);
     CHECK(ssr_font_measure(font, "H") == own);
+    // A round letter that the table puts on the baseline loses the faint
+    // row under the baseline, as the hinting of Android does.
+    CHECK(ssr_font_set_glyph_table(font, NULL, 0, 0, 0) == 0);
+    SSRGlyphQuad o;
+    CHECK(ssr_font_layout(font, "o", 0, 0, &o, 1) == 1);
+    float base = floorf(ssr_font_ascent(font) + 0.5f);
+    if (o.y1 - base == 1) {
+        unsigned char round[64];
+        put_int(round, 1);
+        int blocks[4] = {0, 0, 20, 34};
+        for (int i = 0; i < 4; i++) put_int(round + 4 + 4 * i, blocks[i]);
+        put_entry(round + 20, 'o', 14, 17, 1, 17, 18);
+        CHECK(ssr_font_set_glyph_table(font, round, 34, 0, 0) == 1);
+        SSRGlyphQuad snapped;
+        CHECK(ssr_font_layout(font, "o", 0, 0, &snapped, 1) == 1);
+        CHECK(snapped.y1 - base == 0 && snapped.y0 == o.y0);
+        // A table that puts the bottom one pixel under keeps the row.
+        put_entry(round + 20, 'o', 14, 18, 1, 17, 18);
+        CHECK(ssr_font_set_glyph_table(font, round, 34, 0, 0) == 1);
+        CHECK(ssr_font_layout(font, "o", 0, 0, &snapped, 1) == 1);
+        CHECK(snapped.y1 - base == 1);
+    } else {
+        fprintf(stderr, "skipped the check of the baseline: the font puts \"o\" on it\n");
+    }
     // A count of blocks that the data cannot hold.
     put_int(data, 1000);
     CHECK(ssr_font_set_glyph_table(font, data, size, 0, 0) == 0);
