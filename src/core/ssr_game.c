@@ -164,7 +164,8 @@ struct SSRGame {
     float initDelay;
     int oldStarLevel;
     // The energy that the rest days give, and the pay of the match.
-    int recovery, payWage, payGoals, payAssists;
+    int recovery, payWage, payGoals, payAssists, paySponsors;
+    float propertyBoost;
     // The screen under the ratings screen (c_TScreen_Ratings.m_prevscreen).
     char ratingsReturn[64];
 
@@ -1625,12 +1626,20 @@ static void review_stage(SSRGame *game) {
     case 2:
         ssr_tweaks_set_number(t, "Player", "RecoveryBoostTrainer", 0);
         break;
-    case 3:
-        ssr_tweaks_set_number(t, "Player", "RecoveryBoostProperties", 0);
+    case 3: {
+        // Each property gives 1.5 more energy.
+        float e = c->energy + game->propertyBoost;
+        c->energy = e < 0 ? 0 : e > 100 ? 100 : e;
+        ssr_tweaks_set_number(t, "Player", "RecoveryBoostProperties", game->propertyBoost);
+        ssr_tweaks_set_number(t, "Player", "Energy", c->energy);
         break;
-    case 4:
-        ssr_tweaks_set_number(t, "Player", "RecoveryTotal", game->recovery > 100 ? 100 : game->recovery);
+    }
+    case 4: {
+        float total = (float)game->recovery + game->propertyBoost;
+        int shown = (int)(total < 0 ? 0 : total > 100 ? 100 : total);
+        ssr_tweaks_set_number(t, "Player", "RecoveryTotal", shown);
         break;
+    }
     case 5:
         ssr_tweaks_set_number(t, "MatchReview", "EarningsWage", game->payWage);
         break;
@@ -1650,14 +1659,14 @@ static void review_stage(SSRGame *game) {
         ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentBonusAssists", 0);
         break;
     case 11:
-        ssr_tweaks_set_number(t, "MatchReview", "EarningsSponsors", 0);
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsSponsors", game->paySponsors);
         break;
     case 12:
         ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentSponsors", 0);
         break;
     case 13: {
         // GSPlayerAwardWages: the pay goes into the bank once.
-        int total = game->payWage + game->payGoals + game->payAssists;
+        int total = game->payWage + game->payGoals + game->payAssists + game->paySponsors;
         c->bank += total;
         ssr_tweaks_set_number(t, "MatchReview", "EarningsTotal", total);
         ssr_tweaks_set_number(t, "Player", "Bux", c->bank);
@@ -1739,6 +1748,7 @@ static void season_review(SSRGame *game);
 // result counts in the table (c_TPlayer.MyMatchPlayed), the other teams
 // play up to the day of the match (PlayToDate), and the results show.
 static void match_recovery(SSRGame *game);
+static int count_owned(const SSRCareer *c, SSRShopType type);
 
 static void stats_continue(SSRGame *game) {
     if (game->statStage < 6) after_relations(game);
@@ -1760,6 +1770,18 @@ static void stats_continue(SSRGame *game) {
     game->payWage = c->wage;
     game->payGoals = game->facts.goals * c->goalBonus;
     game->payAssists = game->facts.assists * c->assistBonus;
+    game->propertyBoost = 30.0f / (float)ssr_shop_count_by_type(SSR_SHOP_PROPERTY) * (float)count_owned(c, SSR_SHOP_PROPERTY);
+    // GetSponsorAmount: the sponsors pay for a club match only. [I: the
+    // boost of a captain comes with the captaincy.]
+    game->paySponsors = 0;
+    SSRSeasonComp *played = game->season ? ssr_season_comp(game->season, game->fixtureComp) : NULL;
+    if (!(played && played->data->level == 1)) {
+        game->payGoals = game->facts.goals * c->goalBonus;
+        for (int i = 0; i < 10; i++) game->paySponsors += c->sponsors[i];
+    } else {
+        // A match of the nation pays the wage only.
+        game->payGoals = game->payAssists = 0;
+    }
     int end = game->season ? ssr_season_play_to(game->season, game->fixtureDate) : 0;
     season_out(game);
     game->reviewWaits = 1;

@@ -531,6 +531,12 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     // The match pays the wage and the bonuses.
     CHECK(c->bank == bank + (int)ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal"));
     CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal") >= c->wage);
+    // Each property gives 1.5 energy, and each sponsor pays each week.
+    int properties = 0, sponsors = 0;
+    for (int i = 0; i < SSR_CAREER_ITEMS; i++) properties += c->properties[i] > 0;
+    for (int i = 0; i < 10; i++) sponsors += c->sponsors[i];
+    CHECK(fabs(ssr_tweaks_number(tweaks, "Player", "RecoveryBoostProperties") - 1.5 * properties) < 1e-4);
+    CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsSponsors") == sponsors);
     ssr_game_message(game, "matchreview.btn_Play");
     if (strcmp(ssr_game_screen(game), "seasonreview") == 0) finish_season(game, tweaks);
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
