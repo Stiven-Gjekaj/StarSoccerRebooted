@@ -250,6 +250,9 @@ struct SSRGame {
     // The furthest goal, pass, headed goal, and headed pass of the last
     // match, in pixels.
     float matchFurthest[4];
+    // The post hits, the goals from a corner, and the last minute winner
+    // of the last match.
+    int matchPostHits, matchCornerGoals, matchLastMinuteWinner;
 
     // The relationships screen (c_TScreen_Relationships): the national
     // view, and the bars whose button sends no click (Boss, Team, Fans,
@@ -1910,6 +1913,9 @@ static void end_match(SSRGame *game) {
         ssr_career_add_form(c->form, (int)rating);
     }
     memcpy(game->matchFurthest, m->furthest, sizeof(game->matchFurthest));
+    game->matchPostHits = m->postHits;
+    game->matchCornerGoals = m->cornerGoals;
+    game->matchLastMinuteWinner = m->lastMinuteWinner;
     c->energy = m->energy;
     c->debut = 0;
     game->extraTime = m->half >= 3;
@@ -2232,7 +2238,11 @@ static void match_awards(SSRGame *game, SSRFixture *f) {
     if (m->passes >= 10) award(game, 5);
     if (m->assists > 0) award(game, 6);
     if (m->assists >= 3) award(game, 7);
+    if (game->matchCornerGoals > 0) award(game, 115);
     if (m->dribbles >= 3) award(game, 116);
+    if (game->matchPostHits > 0) award(game, 117);
+    if (game->matchPostHits >= 3) award(game, 118);
+    if (game->matchLastMinuteWinner) award(game, 79);
     // A rating at 10, from the short pass to the dribble.
     for (int i = 0; i < 8; i++) {
         if (c->ratings[i] >= 10) award(game, 101 + i);
