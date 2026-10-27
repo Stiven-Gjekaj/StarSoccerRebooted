@@ -17,6 +17,7 @@
 #include "ssr_fs.h"
 #include "ssr_horses.h"
 #include "ssr_match.h"
+#include "ssr_people.h"
 #include "ssr_random.h"
 #include "ssr_season.h"
 #include "ssr_shop.h"
@@ -142,6 +143,13 @@ struct SSRGame {
     // are final, 1 in the race of the own horse, the places of the horses
     // and the badges on the screen, the runner of the player, and the
     // commentary.
+    // The players of the world, the names for new players, the seed of
+    // the world of the next new career, and the last day that the people
+    // counted.
+    SSRPeople *people;
+    SSRNames *names;
+    int nextWorldSeed;
+    int peopleDate;
     SSRHorses horses;
     char *horseNames;
     int horsesLoaded;
@@ -551,6 +559,61 @@ static void season_path(const SSRGame *game, int slot, char *out, size_t capacit
     snprintf(out, capacity, "%s/season%d.txt", game->saveDirectory, slot + 1);
 }
 
+static void people_path(const SSRGame *game, int slot, char *out, size_t capacity) {
+    snprintf(out, capacity, "%s/people%d.txt", game->saveDirectory, slot + 1);
+}
+
+// A fixture of a club league or cup counts for the players of its clubs.
+// A club with no squad gets one. The goals of the player of the user do
+// not go to the people.
+static void people_played(void *context, SSRSeason *s, const SSRSeasonComp *comp, const SSRFixture *f) {
+    SSRGame *game = context;
+    if (!game->people || !game->names || !game->world || comp->data->level != 0) return;
+    if (f->sdate > game->peopleDate) {
+        ssr_people_pass_days(game->people, f->sdate - game->peopleDate);
+        game->peopleDate = f->sdate;
+    }
+    int teams[2] = {ssr_fixture_home_team(s, f), ssr_fixture_away_team(s, f)};
+    int goals[2] = {f->score1, f->score2};
+    int mine = f->compId == game->fixtureComp && f->sdate == game->fixtureDate;
+    for (int k = 0; k < 2; k++) {
+        if (!teams[k]) continue;
+        ssr_people_make_squad(game->people, game->world, game->names, teams[k], ssr_date_year(f->sdate));
+        int g = goals[k];
+        if (mine && teams[k] == game->career.clubId) g = g > game->facts.goals ? g - game->facts.goals : 0;
+        ssr_people_play(game->people, teams[k], g);
+    }
+}
+
+// The people of a new world: the squad of the club of the player, and
+// three rivals of the same age in the league.
+static void people_start(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    ssr_people_free(game->people);
+    if (c->worldSeed == 0) c->worldSeed = game->nextWorldSeed ? game->nextWorldSeed : 1;
+    game->people = ssr_people_create(c->worldSeed);
+    game->peopleDate = c->sdate;
+    if (!game->people || !game->names || !game->world) return;
+    int year = ssr_career_year(c);
+    ssr_people_make_squad(game->people, game->world, game->names, c->clubId, year);
+    int league = game->season ? ssr_season_actual_league(game->season, c->clubId) : 0;
+    if (!league) {
+        const SSRClub *club = ssr_world_club(game->world, c->clubId);
+        league = club ? club->league : 0;
+    }
+    ssr_people_make_rivals(game->people, game->world, game->names, league, c->nationId, year - ssr_career_age(c), 3,
+                           year);
+}
+
+static void people_load(SSRGame *game, int slot) {
+    char path[2200];
+    people_path(game, slot, path, sizeof(path));
+    ssr_people_free(game->people);
+    game->people = game->saveDirectory[0] ? ssr_people_load(path) : NULL;
+    game->peopleDate = game->career.sdate;
+    if (!game->people) people_start(game);
+}
+
 // The season reads the date and the team of the player from the career,
 // and gives back the date.
 static void season_in(SSRGame *game) {
@@ -579,6 +642,10 @@ static void season_out(SSRGame *game) {
 static void new_season_state(SSRGame *game) {
     ssr_season_free(game->season);
     game->season = game->world ? ssr_season_create(game->world, &game->random) : NULL;
+    if (game->season) {
+        game->season->played = people_played;
+        game->season->playedContext = game;
+    }
     season_in(game);
 }
 
@@ -659,6 +726,7 @@ static void open_slot(SSRGame *game, int slot) {
             ssr_season_set_up(game->season);
             skip_to_first_match(game);
         }
+        people_load(game, slot);
         // LoadCareer: the star transition, then the game menu.
         player_tweaks(game);
         reset_progress(game);
@@ -706,6 +774,8 @@ static void call_delete_career(SSRGame *game) {
         slot_path(game, game->slot, path, sizeof(path));
         remove(path);
         season_path(game, game->slot, path, sizeof(path));
+        remove(path);
+        people_path(game, game->slot, path, sizeof(path));
         remove(path);
     }
     save_slot_screen(game);
@@ -1177,6 +1247,10 @@ static void save_career(SSRGame *game) {
         season_path(game, game->slot, path, sizeof(path));
         ssr_season_save(game->season, path);
     }
+    if (game->people) {
+        people_path(game, game->slot, path, sizeof(path));
+        ssr_people_save(game->people, path);
+    }
 }
 
 static void webpage(SSRGame *game);
@@ -1189,6 +1263,8 @@ static void call_start_career(SSRGame *game) {
         if (skills[i][0] == 0) skills[i][0] = 1;
     }
     skip_to_first_match(game);
+    c->worldSeed = 0;
+    people_start(game);
     const SSRClub *club = game->world ? ssr_world_club(game->world, c->clubId) : NULL;
     snprintf(c->headline, sizeof(c->headline), "%s", loc(game, "CNEWS_FIRSTCONTRACTMOBILE"));
     replace_all(c->headline, sizeof(c->headline), "$clubname", club ? club->name : "");
@@ -3322,6 +3398,7 @@ static void new_season(SSRGame *game) {
     for (int r = 0; r < 5; r++) game->career.deplete[r] = game->career.sdate + ssr_rand2(&game->random, -7, 7);
     ssr_tweaks_set_number(t, "Menu", "CanSavePlayer", 1);
     ssr_career_reset_season(&game->career);
+    if (game->people) ssr_people_new_season(game->people, game->world, game->names, ssr_career_year(&game->career));
     save_career(game);
     player_tweaks(game);
     star_transition(game, "gamemenu");
@@ -8888,6 +8965,8 @@ void ssr_game_free(SSRGame *game) {
     free(game->replay);
     free(game->training);
     ssr_season_free(game->season);
+    ssr_people_free(game->people);
+    ssr_names_free(game->names);
     free(game->horseNames);
     free(game);
 }
@@ -8909,6 +8988,20 @@ void ssr_game_set_horse_names(SSRGame *game, const char *text) {
     size_t n = strlen(text);
     game->horseNames = malloc(n + 1);
     if (game->horseNames) memcpy(game->horseNames, text, n + 1);
+}
+
+void ssr_game_set_names(SSRGame *game, const char *text) {
+    if (!game) return;
+    ssr_names_free(game->names);
+    game->names = ssr_names_parse(text);
+}
+
+void ssr_game_set_world_seed(SSRGame *game, int seed) {
+    if (game) game->nextWorldSeed = seed;
+}
+
+SSRPeople *ssr_game_people(SSRGame *game) {
+    return game ? game->people : NULL;
 }
 
 void ssr_game_set_seed(SSRGame *game, int seed) {

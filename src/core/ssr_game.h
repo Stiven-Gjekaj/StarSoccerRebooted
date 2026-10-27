@@ -10,6 +10,7 @@
 
 #include "ssr_career.h"
 #include "ssr_match.h"
+#include "ssr_people.h"
 #include "ssr_training.h"
 #include "ssr_tweaks.h"
 #include "ssr_world.h"
@@ -164,6 +165,13 @@ void ssr_game_set_data(SSRGame *game, const SSRWorld *world, SSRLocalise localis
 // the first club, so the app gives the time.
 // The text of "MyData/Horse.txt": the names of the race horses.
 void ssr_game_set_horse_names(SSRGame *game, const char *text);
+// The name lists of the players of the world (data/names.txt). The game
+// keeps a copy.
+void ssr_game_set_names(SSRGame *game, const char *text);
+// The seed of the world of the next new career. 0 takes 1.
+void ssr_game_set_world_seed(SSRGame *game, int seed);
+// The players of the world of the career, or NULL.
+SSRPeople *ssr_game_people(SSRGame *game);
 void ssr_game_set_seed(SSRGame *game, int seed);
 
 // The career that plays now.

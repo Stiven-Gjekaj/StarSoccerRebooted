@@ -2329,6 +2329,8 @@ static void test_starts_a_new_career(void) {
     size_t used = (size_t)snprintf(horses, sizeof(horses), "Header\r\n");
     for (int i = 1; i <= 210; i++) used += (size_t)snprintf(horses + used, sizeof(horses) - used, "Horse %03d\r\n", i);
     ssr_game_set_horse_names(game, horses);
+    ssr_game_set_names(game, "first test Ann Bob Cid\nlast test Lake Hill Moor\n");
+    ssr_game_set_world_seed(game, 99);
     SSRUiOp ops[64];
 
     ssr_game_message(game, "mainmenu.btn_Career");
@@ -2476,6 +2478,25 @@ static void test_starts_a_new_career(void) {
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 24 && seasons < 2; i++) play_a_match(game, tweaks);
     CHECK(seasons >= 2 && transfers == 1);
+    // The world has players: the clubs of the matches have squads that
+    // played and scored, and three rivals of the same age.
+    SSRPeople *people = ssr_game_people(game);
+    CHECK(people && people->seed == 99 && ssr_game_career(game)->worldSeed == 99);
+    int rivals = 0, squads = 0, apps = 0, goals = 0;
+    for (int i = 0; people && i < people->count; i++) {
+        const SSRPerson *p = &people->list[i];
+        rivals += p->rival;
+        apps += p->apps;
+        goals += p->goals;
+        squads += p->club == ssr_game_career(game)->clubId && !p->retired;
+        CHECK(p->first[0] && p->last[0]);
+    }
+    CHECK(rivals == 3 && squads >= SSR_SQUAD_SIZE && apps > 0 && goals > 0);
+    char peoplePath[1200];
+    snprintf(peoplePath, sizeof(peoplePath), "%s/people1.txt", directory);
+    SSRPeople *saved = ssr_people_load(peoplePath);
+    CHECK(saved && saved->count > 0);
+    ssr_people_free(saved);
     // The weeks had news: a dilemma or other news, and a tip in a week
     // with no other news.
     for (int i = 0; i < 40 && ssr_game_career(game)->tipCount == 0; i++) play_a_match(game, tweaks);
@@ -2504,6 +2525,7 @@ static void test_starts_a_new_career(void) {
     seasonFile = fopen(seasonPath, "r");
     CHECK(seasonFile == NULL);
     if (seasonFile) fclose(seasonFile);
+    CHECK(ssr_people_load(peoplePath) == NULL);
     ssr_game_free(game);
     ssr_tweaks_free(tweaks);
 }
