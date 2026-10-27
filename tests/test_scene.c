@@ -1280,6 +1280,39 @@ static void test_aligns_text_as_the_game(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static void test_gives_text_a_shadow(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "Text:(A,0,0,100,50)\n"
+             "Text:(B,0,0,100,50,C,M,#FF000080)\n"
+             "Text:(C,0,0,100,50)\n"
+             "\tFontShadow(4,3.5)\n"
+             "\tShadowCol(#FF000060)\n"
+             "Text:(D,0,0,100,50)\n"
+             "\tFontShadow(0,0)\n"
+             "\tFontShadow(4,4)\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(ssr_scene_count(scene) == 4);
+    if (ssr_scene_count(scene) == 4) {
+        // Black at half the alpha of the text, 2 units down and right.
+        const SSRSceneItem *a = ssr_scene_item(scene, 0);
+        CHECK(a->shadow && a->shadowX == 2 && a->shadowY == 2 && a->shadowColour == 0x00000080);
+        const SSRSceneItem *b = ssr_scene_item(scene, 1);
+        CHECK(b->colour == 0xFF000080 && b->shadowColour == 0x00000040);
+        // The offset is in whole units. A colour with no mix replaces.
+        const SSRSceneItem *c = ssr_scene_item(scene, 2);
+        CHECK(c->shadowX == 4 && c->shadowY == 3 && c->shadowColour == 0xFF000060);
+        // A shadow that is gone does not come back.
+        CHECK(!ssr_scene_item(scene, 3)->shadow);
+    }
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_lists_unknown_modifiers(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     layout = "Draw:(A,0,0,10,10)\n"
@@ -1330,5 +1363,6 @@ int main(void) {
     test_player_shadows();
     test_lists_unknown_modifiers();
     test_aligns_text_as_the_game();
+    test_gives_text_a_shadow();
     return TEST_RESULT();
 }

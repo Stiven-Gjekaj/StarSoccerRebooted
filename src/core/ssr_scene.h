@@ -73,6 +73,11 @@ typedef struct {
     // SSR_ITEM_TEXT: the slant of the glyphs, x += (y - baseline) * italic.
     // The game slants all text by -0.25 if Italicise() does not change it.
     float italic;
+    // SSR_ITEM_TEXT: 1 when the text draws a shadow first, moved by
+    // shadowX and shadowY units of the font, in shadowColour (0xRRGGBBAA).
+    int shadow;
+    float shadowX, shadowY;
+    uint32_t shadowColour;
     // The index of the layer of the screen. The list is in draw order.
     int layer;
     const char *ref;

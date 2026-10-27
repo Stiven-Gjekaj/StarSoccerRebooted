@@ -173,6 +173,13 @@ struct Gel {
     float fontScaleX, fontScaleY;
     int wrap;
     float italic;
+    // GEL_TEXT: the shadow of the text (the first c_StyleElement), with its
+    // offset in units of the font. hasShadowColour is 0 when the shadow
+    // takes the colours of the text.
+    int shadow;
+    float shadowX, shadowY;
+    int hasShadowColour;
+    Colour shadowColour;
     // Click(message) < PlaySnd(name) >, and the actions of its block.
     const char *click, *clickSound;
     Doodad *clickChain;
@@ -634,6 +641,11 @@ static Gel *new_gel(GelKind kind, const SSRUiNode *node) {
     g->font = 0;
     g->fontScaleX = g->fontScaleY = 1;
     g->italic = -0.25f;
+    // Each text of the game has a shadow (c_TextFR_Factory): 2 units down
+    // and to the right, in black at half the alpha of the text.
+    g->shadow = 1;
+    g->shadowX = g->shadowY = 2;
+    g->hasShadowColour = parse_colour("00000080000000FF", &g->shadowColour);
     g->speed = 1;
     g->repeats = 1;
     return g;
@@ -1311,6 +1323,16 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
     } else if (is(n, "FontScale")) {
         g->fontScaleX = (float)number(s, m, 0, 1);
         g->fontScaleY = (float)number(s, m, 1, g->fontScaleX);
+    } else if (is(n, "FontShadow") && g->kind == GEL_TEXT) {
+        // An offset of 0, 0 removes the shadow. A text with no shadow keeps
+        // none (c_FontShadowHelper).
+        if (g->shadow) {
+            g->shadowX = (float)number(s, m, 0, g->shadowX);
+            g->shadowY = (float)number(s, m, 1, g->shadowY);
+            if (g->shadowX == 0 && g->shadowY == 0) g->shadow = 0;
+        }
+    } else if (is(n, "ShadowCol") && g->kind == GEL_TEXT) {
+        if (g->shadow) g->hasShadowColour = parse_colour(arg(m, 0), &g->shadowColour);
     } else if (is(n, "Italicise")) {
         g->italic = (float)number(s, m, 0, -0.25);
     } else if (is(n, "WrapX") && g->kind == GEL_TEXT) {
@@ -2851,6 +2873,13 @@ static void draw_text(SSRScene *s, const Gel *g, const Frame *f) {
     item->italic = g->italic;
     item->colour = colour_rgba(f->colour);
     item->blend = g->blend;
+    if (g->shadow) {
+        item->shadow = 1;
+        // The game moves the shadow by whole units of the font.
+        item->shadowX = (float)(int)g->shadowX;
+        item->shadowY = (float)(int)g->shadowY;
+        item->shadowColour = g->hasShadowColour ? colour_rgba(colour_mix(g->shadowColour, f->colour)) : item->colour;
+    }
 }
 
 // Gives the value of a Range: tweak of the emitter, or the fallback when the
