@@ -2021,6 +2021,30 @@ static int agent_boost(float v) {
     return (int)(v > 0 && v < 1 ? 1 : v);
 }
 
+static const char *my_club_tla(SSRGame *game);
+
+// c_TScreen_MatchStats.SetUpScreen: a won final goes into the trophy log:
+// the cup, the continental cup, or the cup of the nations. The last two
+// count as a major award. [I: the game logs it when the stats open; the
+// remake logs it when they close.]
+static void cup_trophy(SSRGame *game, const SSRFixture *f) {
+    SSRCareer *c = &game->career;
+    SSRSeasonComp *comp = game->season && f ? ssr_season_comp(game->season, game->fixtureComp) : NULL;
+    if (!comp || comp->data->type != 1) return;
+    int nation = comp->data->level == 1;
+    if (!ssr_season_won_final(game->season, comp, f, nation ? c->nationId : c->clubId)) return;
+    int medal = nation ? 5 : comp->data->locale == 0 ? 3 : comp->data->locale == 1 ? 4 : 0;
+    if (!medal) return;
+    const SSRNation *n = ssr_world_nation(game->world, c->nationId);
+    const char *team = nation ? (n ? n->tla : "") : my_club_tla(game);
+    char winner[64], text[96];
+    snprintf(winner, sizeof(winner), "%s", loc(game, "Winner"));
+    upper(game, winner);
+    snprintf(text, sizeof(text), "%s %s", comp->data->tla, winner);
+    ssr_career_add_trophy(c, ssr_career_year(c), team, text, medal);
+    if (medal >= 4) c->wonMajorAward = 1;
+}
+
 static void stats_continue(SSRGame *game) {
     if (game->statStage < 6) after_relations(game);
     if (game->statStage < 9) after_star_rating(game);
@@ -2040,6 +2064,7 @@ static void stats_continue(SSRGame *game) {
     } else if (f) {
         ssr_season_my_result(game->season, f, game->facts.score1, game->facts.score2);
     }
+    cup_trophy(game, f);
     // MatchRecovery comes first in PlayToDate, with the rest days to the
     // next match.
     match_recovery(game);
