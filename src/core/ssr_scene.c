@@ -3891,6 +3891,16 @@ static int copy_into(SSRScene *scene, const char *hook, const char *template_, i
     return 1;
 }
 
+int ssr_scene_converge_x(SSRScene *scene, const char *ref, float x) {
+    Gel *g = scene && ref ? find_ref_first(scene, ref) : NULL;
+    for (Doodad *d = g ? g->doodads : NULL; d; d = d->next) {
+        if (d->kind != D_CONVERGE_POS) continue;
+        d->v[0] = x;
+        return 1;
+    }
+    return 0;
+}
+
 int ssr_scene_set_hook(SSRScene *scene, const char *hook, const char *template_) {
     return copy_into(scene, hook, template_, 0);
 }

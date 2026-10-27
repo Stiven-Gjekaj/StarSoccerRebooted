@@ -635,6 +635,29 @@ static void test_sends_the_messages_of_an_update(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static void test_moves_the_target_of_a_converge(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "Rect:(0,0,0,0) ref:Badge\n"
+             "\tConvergeTo(85,0,Soft)\n"
+             "{\n"
+             "\tDraw:(Rider1,0,0,10,10)\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    for (int i = 0; i < 300; i++) ssr_scene_update(scene, &env, 16);
+    const SSRSceneItem *rider = find_image(scene, "Rider1");
+    CHECK(rider && near(rider->x, 85));
+    CHECK(ssr_scene_converge_x(scene, "Badge", 430) == 1 && ssr_scene_converge_x(scene, "Nothing", 1) == 0);
+    for (int i = 0; i < 300; i++) ssr_scene_update(scene, &env, 16);
+    rider = find_image(scene, "Rider1");
+    CHECK(rider && near(rider->x, 430));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_holds_one_instance_at_a_frame(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     layout = "Animation:(40,Loop) ref:RoseAnim\n"
@@ -1657,6 +1680,7 @@ int main(void) {
     test_plays_an_animation();
     test_plays_an_animation_from_a_frame();
     test_holds_one_instance_at_a_frame();
+    test_moves_the_target_of_a_converge();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
