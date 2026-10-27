@@ -82,6 +82,10 @@ typedef struct {
     SSRUiTree *rebootedScreen;
     // The HUD of a chance (minigamehud.uis): the replay offer and controls.
     SSRScene *hudScene;
+    // The overlay of the logic over the screen (the shop), and its name.
+    SSRScene *overlayScene;
+    SSRUiTree *overlayScreen;
+    char overlayName[48];
     SSRUiTree *hudScreen;
     char pitchName[64];
     SSRScene *viewScene;
@@ -195,12 +199,38 @@ static void apply_settings(SSRApp *app) {
 }
 
 // Opens the screen that the logic chose, and saves the changed settings.
+static SSRScene *open_layer(SSRApp *app, const char *name, SSRUiTree **tree, SSRSceneEnv *env);
+static SSRSceneEnv scene_env(SSRApp *app);
+
+static void free_overlay(SSRApp *app) {
+    ssr_scene_free(app->overlayScene);
+    ssr_ui_free(app->overlayScreen);
+    app->overlayScene = NULL;
+    app->overlayScreen = NULL;
+    app->overlayName[0] = 0;
+}
+
+// The overlay that the logic names opens over the screen, and goes when
+// the name is "".
+static void follow_overlay(SSRApp *app) {
+    const char *name = ssr_game_overlay(app->game);
+    if (SDL_strcmp(name, app->overlayName) == 0) return;
+    free_overlay(app);
+    if (!name[0]) return;
+    SDL_strlcpy(app->overlayName, name, sizeof(app->overlayName));
+    char file[80];
+    SDL_snprintf(file, sizeof(file), "%s.uis", name);
+    SSRSceneEnv env = scene_env(app);
+    app->overlayScene = open_layer(app, file, &app->overlayScreen, &env);
+}
+
 static void follow_game(SSRApp *app) {
     if (!app->game) return;
     if (ssr_game_take_settings_change(app->game)) {
         if (!ssr_game_save_settings(app->game, app->settingsPath)) SDL_Log("The settings were not saved.");
         apply_settings(app);
     }
+    follow_overlay(app);
     int version = ssr_game_screen_version(app->game);
     if (version == app->gameScreen) return;
     app->gameScreen = version;
@@ -670,58 +700,66 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
 }
 
 // Gives the changes that the logic asks for to the elements of the screen.
+// Gives one change of the logic to the scene.
+static void apply_op(SSRApp *app, SSRScene *s, const SSRUiOp *o) {
+    SSRUiOp op = *o;
+    switch (op.kind) {
+    case SSR_OP_TEXT:
+        ssr_scene_set_text(s, op.ref, op.text);
+        break;
+    case SSR_OP_SHOW:
+    case SSR_OP_HIDE:
+        ssr_scene_set_visible(s, op.ref, op.kind == SSR_OP_SHOW);
+        if (app->hudScene) ssr_scene_set_visible(app->hudScene, op.ref, op.kind == SSR_OP_SHOW);
+        break;
+    case SSR_OP_LIST_CLEAR:
+        ssr_scene_list_clear(s, op.ref);
+        break;
+    case SSR_OP_COLOUR:
+        ssr_scene_set_colour(s, op.ref, op.text);
+        break;
+    case SSR_OP_ANIM:
+        ssr_scene_anim(s, op.ref, (float)SDL_atof(op.text), op.id);
+        break;
+    case SSR_OP_HOOK:
+        ssr_scene_set_hook(s, op.ref, op.ref2);
+        break;
+    case SSR_OP_SUB:
+        ssr_scene_sub(s, op.ref, op.ref2, op.text[0] ? op.text : NULL, op.id);
+        break;
+    case SSR_OP_ELEMENT_COLOUR:
+        ssr_scene_set_element_colour(s, op.ref, op.id, op.text);
+        break;
+    case SSR_OP_ANIM_PLAY:
+        ssr_scene_anim_play(s, op.ref, op.ref2[0] ? op.ref2 : NULL, (float)op.id, (float)SDL_atof(op.text));
+        break;
+    case SSR_OP_LIST_COLOUR:
+        ssr_scene_list_colour(s, op.ref, op.id, op.text);
+        break;
+    case SSR_OP_LIST_SUB:
+        ssr_scene_list_sub(s, op.ref, op.ref2, op.text[0] ? op.text : NULL, op.id);
+        break;
+    case SSR_OP_LIST_ADD:
+        ssr_scene_list_add(s, op.ref, op.ref2, op.text, op.id);
+        break;
+    case SSR_OP_LIST_TEXT:
+        ssr_scene_list_text(s, op.ref, op.id, op.text);
+        break;
+    case SSR_OP_LIST_PARAM:
+        ssr_scene_list_param(s, op.ref, op.id);
+        break;
+    case SSR_OP_LIST_START:
+        ssr_scene_list_start(s, op.ref, (float)op.id);
+        break;
+    }
+}
+
 static void apply_ops(SSRApp *app) {
     SSRUiOp op;
     while (app->scene && ssr_game_take_op(app->game, &op)) {
-        switch (op.kind) {
-        case SSR_OP_TEXT:
-            ssr_scene_set_text(app->scene, op.ref, op.text);
-            break;
-        case SSR_OP_SHOW:
-        case SSR_OP_HIDE:
-            ssr_scene_set_visible(app->scene, op.ref, op.kind == SSR_OP_SHOW);
-            if (app->hudScene) ssr_scene_set_visible(app->hudScene, op.ref, op.kind == SSR_OP_SHOW);
-            break;
-        case SSR_OP_LIST_CLEAR:
-            ssr_scene_list_clear(app->scene, op.ref);
-            break;
-        case SSR_OP_COLOUR:
-            ssr_scene_set_colour(app->scene, op.ref, op.text);
-            break;
-        case SSR_OP_ANIM:
-            ssr_scene_anim(app->scene, op.ref, (float)SDL_atof(op.text), op.id);
-            break;
-        case SSR_OP_HOOK:
-            ssr_scene_set_hook(app->scene, op.ref, op.ref2);
-            break;
-        case SSR_OP_SUB:
-            ssr_scene_sub(app->scene, op.ref, op.ref2, op.text[0] ? op.text : NULL, op.id);
-            break;
-        case SSR_OP_ELEMENT_COLOUR:
-            ssr_scene_set_element_colour(app->scene, op.ref, op.id, op.text);
-            break;
-        case SSR_OP_ANIM_PLAY:
-            ssr_scene_anim_play(app->scene, op.ref, op.ref2[0] ? op.ref2 : NULL, (float)op.id, (float)SDL_atof(op.text));
-            break;
-        case SSR_OP_LIST_COLOUR:
-            ssr_scene_list_colour(app->scene, op.ref, op.id, op.text);
-            break;
-        case SSR_OP_LIST_SUB:
-            ssr_scene_list_sub(app->scene, op.ref, op.ref2, op.text[0] ? op.text : NULL, op.id);
-            break;
-        case SSR_OP_LIST_ADD:
-            ssr_scene_list_add(app->scene, op.ref, op.ref2, op.text, op.id);
-            break;
-        case SSR_OP_LIST_TEXT:
-            ssr_scene_list_text(app->scene, op.ref, op.id, op.text);
-            break;
-        case SSR_OP_LIST_PARAM:
-            ssr_scene_list_param(app->scene, op.ref, op.id);
-            break;
-        case SSR_OP_LIST_START:
-            ssr_scene_list_start(app->scene, op.ref, (float)op.id);
-            break;
-        }
+        apply_op(app, app->scene, &op);
+        // An overlay over the screen takes the changes too.
+        if (app->overlayScene) apply_op(app, app->overlayScene, &op);
     }
 }
 
@@ -765,6 +803,7 @@ static void load_ticker(SSRApp *app) {
 }
 
 static void load_game(SSRApp *app) {
+    free_overlay(app);
     free_backdrop(app);
     free_rebooted(app);
     ssr_gfx_free(app->gfx);
@@ -971,6 +1010,16 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
             y = event->tfinger.y;
             down = event->type != SDL_EVENT_FINGER_UP;
         }
+        // An overlay takes all the touches while it shows.
+        if (app->overlayScene) {
+            ssr_scene_touch(app->overlayScene, down, x + app->left, y + app->top);
+            int released = event->type == SDL_EVENT_MOUSE_BUTTON_UP || event->type == SDL_EVENT_FINGER_UP;
+            const SSRSceneItem *hit = released && !ssr_scene_dragged(app->overlayScene)
+                                          ? ssr_scene_hit_item(app->overlayScene, x + app->left, y + app->top)
+                                          : NULL;
+            if (hit) click_in(app, app->overlayScene, hit);
+            return SDL_APP_CONTINUE;
+        }
         ssr_scene_touch(app->scene, down, x + app->left, y + app->top);
         if (app->hudScene) ssr_scene_touch(app->hudScene, down, x + app->left, y + app->top);
         ssr_game_touch(app->game, down, x + app->left, y + app->top);
@@ -1145,6 +1194,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         update_chance_view(app, &env, ms);
         update_backdrop(app, &env, ms);
         update_rebooted(app, &env, ms);
+        if (app->overlayScene) ssr_scene_update(app->overlayScene, &env, ms);
         ssr_gfx_set_tweaks(app->gfx, app->tweaks);
         const SSRChance *chance = ssr_game_chance(app->game);
         if (app->tapScene && chance && chance->state == SSR_CHANCE_TAP) {
@@ -1159,6 +1209,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         if (app->bannerScene) ssr_gfx_draw_scene(app->gfx, app->bannerScene);
         if (app->splashScene) ssr_gfx_draw_scene(app->gfx, app->splashScene);
         if (app->hudScene && chance) ssr_gfx_draw_scene(app->gfx, app->hudScene);
+        if (app->overlayScene) ssr_gfx_draw_scene(app->gfx, app->overlayScene);
         draw_ticker(app, &env);
     }
     if (!app->gfx) {
@@ -1264,6 +1315,7 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     ssr_ticker_free(app->ticker);
     ssr_tweaks_free(app->tweaks);
     ssr_audio_free(app->audio);
+    free_overlay(app);
     free_backdrop(app);
     free_rebooted(app);
     ssr_gfx_free(app->gfx);

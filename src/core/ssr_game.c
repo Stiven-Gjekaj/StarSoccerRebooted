@@ -122,6 +122,8 @@ struct SSRGame {
     // The star transition: the screen after it, and its frames.
     char afterTransition[64];
     float transitionFrames;
+    // The layout of the overlay over the screen, or "".
+    char overlay[48];
     // The headline that the news page shows, and the screen after it.
     char news[512];
     char newsNext[32];
@@ -4794,6 +4796,10 @@ int ssr_game_take_op(SSRGame *game, SSRUiOp *op) {
     memmove(game->ops, game->ops + 1, (size_t)(game->opCount - 1) * sizeof(SSRUiOp));
     game->opCount--;
     return 1;
+}
+
+const char *ssr_game_overlay(const SSRGame *game) {
+    return game ? game->overlay : "";
 }
 
 const char *ssr_game_screen(const SSRGame *game) {

@@ -134,6 +134,10 @@ int ssr_game_take_op(SSRGame *game, SSRUiOp *op);
 // for options.uis.
 const char *ssr_game_screen(const SSRGame *game);
 
+// The layout of the overlay over the screen (a GShell like the shop), or
+// "" when none shows. It takes the touches first.
+const char *ssr_game_overlay(const SSRGame *game);
+
 // Grows by 1 each time that the screen changes. A screen that opens again
 // counts too.
 int ssr_game_screen_version(const SSRGame *game);
