@@ -114,7 +114,8 @@ struct SSRGame {
     // The squad screen: the club, and the list: 0 the squad, 1 the top
     // scorers of the league, 2 the player and the rivals.
     int squadClub, squadMode;
-    // The honours screen: 0 the world, 1 the timeline of the career.
+    // The honours screen: 0 the world, 1 the timeline of the career, 2 the
+    // hall of fame.
     int honoursMode;
     int fixturesTeam, fixturesLevel;
     // c_TScreen_League.m_flagContinueButton: the table shows Continue.
@@ -3488,6 +3489,60 @@ static void squad_mode(SSRGame *game) {
 
 // squad.btn_Honours: the champions and the top scorers, the newest
 // season first. A title of the club of the player shows its highlight.
+static const char *club_name(SSRGame *game, int id);
+
+static int by_career_goals(const void *a, const void *b) {
+    const SSRPerson *p = *(SSRPerson *const *)a, *q = *(SSRPerson *const *)b;
+    if (p->goals != q->goals) return q->goals - p->goals;
+    return p->apps - q->apps;
+}
+
+// The hall of fame: the 30 players of the world with the most goals with
+// the clubs, and the player of the user among them.
+static void hall_of_fame(SSRGame *game) {
+    SSRTweaks *t = game->tweaks;
+    ssr_tweaks_set(t, "Honours", "Title", loc(game, "SSR_HallOfFame"));
+    ssr_tweaks_set(t, "Honours", "Column", loc(game, "Goals"));
+    ssr_tweaks_set(t, "Honours", "ModeText", loc(game, "SSR_Honours"));
+    int n = game->people ? game->people->count : 0;
+    SSRPerson **all = malloc(sizeof(SSRPerson *) * (size_t)(n + 1));
+    if (!all) return;
+    SSRPerson me;
+    memset(&me, 0, sizeof(me));
+    const SSRCareer *c = &game->career;
+    snprintf(me.first, sizeof(me.first), "%s", c->firstName);
+    snprintf(me.last, sizeof(me.last), "%s", c->lastName);
+    me.club = c->clubId;
+    me.goals = c->goals;
+    me.apps = c->apps;
+    me.assists = c->assists;
+    me.id = -1;
+    int count = 0;
+    all[count++] = &me;
+    for (int i = 0; i < n; i++) {
+        if (game->people->list[i].goals > 0) all[count++] = &game->people->list[i];
+    }
+    qsort(all, (size_t)count, sizeof(SSRPerson *), by_career_goals);
+    for (int i = 0; i < count && i < 30; i++) {
+        const SSRPerson *p = all[i];
+        char name[160], line[256], number[16];
+        if (p->retired) snprintf(name, sizeof(name), "%d. %s %s (%s)", i + 1, p->first, p->last, loc(game, "SSR_Retired"));
+        else snprintf(name, sizeof(name), "%d. %s %s, %s", i + 1, p->first, p->last, club_name(game, p->club));
+        snprintf(line, sizeof(line), "%s", loc(game, "SSR_FameRow"));
+        snprintf(number, sizeof(number), "%d", p->goals);
+        replace_all(line, sizeof(line), "$goals", number);
+        snprintf(number, sizeof(number), "%d", p->apps);
+        replace_all(line, sizeof(line), "$apps", number);
+        snprintf(number, sizeof(number), "%d", p->assists);
+        replace_all(line, sizeof(line), "$assists", number);
+        add_op(game, SSR_OP_LIST_ADD, "HonourList", "HonourEntry", "", 0);
+        add_op(game, SSR_OP_LIST_TEXT, "HonourList", NULL, name, 1);
+        add_op(game, SSR_OP_LIST_TEXT, "HonourList", NULL, line, 2);
+        if (p->id == -1 || p->rival) add_op(game, SSR_OP_LIST_SUB, "HonourList", "Highlight", NULL, 1);
+    }
+    free(all);
+}
+
 static void honours_fill(SSRGame *game) {
     SSRTweaks *t = game->tweaks;
     int career = game->honoursMode == 1;
@@ -3497,10 +3552,14 @@ static void honours_fill(SSRGame *game) {
     snprintf(seed, sizeof(seed), "%d", game->career.worldSeed);
     replace_all(column, sizeof(column), "$seed", seed);
     ssr_tweaks_set(t, "Honours", "Column", column);
-    ssr_tweaks_set(t, "Honours", "ModeText", loc(game, career ? "World" : "Career"));
+    ssr_tweaks_set(t, "Honours", "ModeText", loc(game, career ? "SSR_HallOfFame" : "Career"));
     ssr_tweaks_set_number(t, "Honours", "Scroll", 0);
     add_op(game, SSR_OP_LIST_CLEAR, "HonourList", NULL, NULL, 0);
     add_op(game, SSR_OP_LIST_START, "HonourList", NULL, NULL, 82);
+    if (game->honoursMode == 2) {
+        hall_of_fame(game);
+        return;
+    }
     if (career) {
         // The timeline: the newest moment first.
         const SSRCareer *c = &game->career;
@@ -3551,7 +3610,7 @@ static void honours_screen(SSRGame *game) {
 }
 
 static void honours_mode(SSRGame *game) {
-    game->honoursMode = !game->honoursMode;
+    game->honoursMode = (game->honoursMode + 1) % 3;
     honours_fill(game);
 }
 

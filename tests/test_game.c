@@ -2597,6 +2597,15 @@ static void test_starts_a_new_career(void) {
         momentRows += honourOps[i].kind == SSR_OP_LIST_ADD && strcmp(honourOps[i].ref, "HonourList") == 0;
     }
     CHECK(momentRows >= 3 && momentRows == ssr_game_career(game)->momentCount);
+    // The hall of fame: the scorers of the world and the player.
+    ssr_game_message(game, "honours.btn_Mode");
+    honourCount = take_ops(game, honourOps, 256);
+    int fameRows = 0;
+    for (int i = 0; i < honourCount; i++) {
+        fameRows += honourOps[i].kind == SSR_OP_LIST_ADD && strcmp(honourOps[i].ref, "HonourList") == 0;
+    }
+    CHECK(fameRows >= 2 && fameRows <= 30);
+    ssr_game_message(game, "honours.btn_Mode");
     ssr_game_message(game, "honours.btn_Back");
     CHECK(strcmp(ssr_game_screen(game), "squad") == 0);
     ssr_game_message(game, "squad.btn_Back");
