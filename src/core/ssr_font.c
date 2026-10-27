@@ -25,6 +25,8 @@
 
 typedef struct {
     uint32_t codepoint;
+    // The face of the glyph: 0 the font, 1 or more a fallback font.
+    int face;
     int glyph;
     int present;
     // The place in the atlas, and the offset from the pen to the top left.
@@ -44,6 +46,21 @@ typedef struct {
     float factor;
 } KernPair;
 
+// The metrics of a character from a glyph table of the game.
+typedef struct {
+    uint32_t code;
+    short w, h, bearingX, bearingY, advance;
+} TableEntry;
+
+#define MAX_FACES 4
+
+// A TTF or OTF file.
+typedef struct {
+    unsigned char *file;
+    stbtt_fontinfo info;
+    float scale;
+} Face;
+
 // An image in the place of a character.
 typedef struct {
     uint32_t code;
@@ -51,9 +68,10 @@ typedef struct {
 } Icon;
 
 struct SSRFont {
-    unsigned char *file;
-    stbtt_fontinfo info;
-    float scale;
+    // The font, then the fallback fonts.
+    Face faces[MAX_FACES];
+    int faceCount;
+    float emSize;
     float ascent;
     float lineHeight;
     unsigned char *atlas;
@@ -69,6 +87,9 @@ struct SSRFont {
     int kernCount;
     Icon icons[8];
     int iconCount;
+    // The glyph table, in the order of the characters.
+    TableEntry *table;
+    int tableCount;
 };
 
 static int icon_for(const SSRFont *font, uint32_t c) {
@@ -224,28 +245,41 @@ int ssr_font_read_set(const char *text, const char *set, SSRFontSlot *slots, int
     return count;
 }
 
-SSRFont *ssr_font_load(const char *path, float emSize) {
+// Reads a font file. Returns 0 when it cannot.
+static int load_face(Face *face, const char *path, float emSize) {
     FILE *file = ssr_fs_open(path, "rb");
-    if (!file) return NULL;
-    SSRFont *font = calloc(1, sizeof(SSRFont));
+    if (!file) return 0;
     long length = -1;
-    if (font && fseek(file, 0, SEEK_END) == 0) length = ftell(file);
-    if (length > 0) font->file = malloc((size_t)length);
-    int ok = font && font->file && fseek(file, 0, SEEK_SET) == 0 &&
-             fread(font->file, 1, (size_t)length, file) == (size_t)length;
+    if (fseek(file, 0, SEEK_END) == 0) length = ftell(file);
+    if (length > 0) face->file = malloc((size_t)length);
+    int ok = face->file && fseek(file, 0, SEEK_SET) == 0 && fread(face->file, 1, (size_t)length, file) == (size_t)length;
     fclose(file);
-    if (ok) ok = stbtt_InitFont(&font->info, font->file, stbtt_GetFontOffsetForIndex(font->file, 0));
-    if (ok) font->atlas = calloc(SSR_FONT_ATLAS_SIZE, SSR_FONT_ATLAS_SIZE);
-    if (!ok || !font->atlas) {
+    if (ok) ok = stbtt_InitFont(&face->info, face->file, stbtt_GetFontOffsetForIndex(face->file, 0));
+    if (!ok) {
+        free(face->file);
+        face->file = NULL;
+        return 0;
+    }
+    face->scale = stbtt_ScaleForMappingEmToPixels(&face->info, emSize);
+    return 1;
+}
+
+SSRFont *ssr_font_load(const char *path, float emSize) {
+    SSRFont *font = calloc(1, sizeof(SSRFont));
+    if (!font) return NULL;
+    font->emSize = emSize;
+    if (load_face(&font->faces[0], path, emSize)) font->faceCount = 1;
+    if (font->faceCount) font->atlas = calloc(SSR_FONT_ATLAS_SIZE, SSR_FONT_ATLAS_SIZE);
+    if (!font->faceCount || !font->atlas) {
         ssr_font_free(font);
         return NULL;
     }
     // Android takes the top and the bottom of the font from its box.
+    const Face *face = &font->faces[0];
     int x0, y0, x1, y1;
-    stbtt_GetFontBoundingBox(&font->info, &x0, &y0, &x1, &y1);
-    font->scale = stbtt_ScaleForMappingEmToPixels(&font->info, emSize);
-    font->ascent = y1 * font->scale;
-    font->lineHeight = floorf((y1 - y0) * font->scale);
+    stbtt_GetFontBoundingBox(&face->info, &x0, &y0, &x1, &y1);
+    font->ascent = y1 * face->scale;
+    font->lineHeight = floorf((y1 - y0) * face->scale);
     char metrics[1024];
     const char *dot = strrchr(path, '.');
     size_t stem = dot ? (size_t)(dot - path) : strlen(path);
@@ -255,6 +289,87 @@ SSRFont *ssr_font_load(const char *path, float emSize) {
         ssr_font_load_kerning(font, metrics);
     }
     return font;
+}
+
+// Forgets the glyphs, so that they come again with new metrics or faces.
+static void clear_glyphs(SSRFont *font) {
+    font->glyphCount = 0;
+    font->shelfX = font->shelfY = font->shelfHeight = 0;
+    memset(font->atlas, 0, (size_t)SSR_FONT_ATLAS_SIZE * SSR_FONT_ATLAS_SIZE);
+    font->version++;
+}
+
+int ssr_font_add_fallback(SSRFont *font, const char *path) {
+    if (!font || !path || font->faceCount >= MAX_FACES) return 0;
+    if (!load_face(&font->faces[font->faceCount], path, font->emSize)) return 0;
+    font->faceCount++;
+    clear_glyphs(font);
+    return 1;
+}
+
+void ssr_font_clear_fallbacks(SSRFont *font) {
+    if (!font) return;
+    for (int i = 1; i < font->faceCount; i++) {
+        free(font->faces[i].file);
+        memset(&font->faces[i], 0, sizeof(Face));
+    }
+    font->faceCount = font->faceCount ? 1 : 0;
+    clear_glyphs(font);
+}
+
+static uint32_t read_big(const unsigned char *p) {
+    return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3];
+}
+
+static short read_short(const unsigned char *p) {
+    return (short)((uint16_t)p[0] << 8 | p[1]);
+}
+
+int ssr_font_set_glyph_table(SSRFont *font, const unsigned char *data, size_t size, int face, int sizeIndex) {
+    if (!font) return 0;
+    free(font->table);
+    font->table = NULL;
+    font->tableCount = 0;
+    clear_glyphs(font);
+    if (!data || size < 4) return 0;
+    uint32_t headers = read_big(data);
+    if (headers > (size - 4) / 16) return 0;
+    for (uint32_t i = 0; i < headers; i++) {
+        const unsigned char *h = data + 4 + 16 * i;
+        uint32_t start = read_big(h + 8), end = read_big(h + 12);
+        if ((int)read_big(h) != face || (int)read_big(h + 4) != sizeIndex) continue;
+        if (start > end || end > size) return 0;
+        int count = (int)((end - start) / 14);
+        font->table = malloc((size_t)(count ? count : 1) * sizeof(TableEntry));
+        if (!font->table) return 0;
+        for (int k = 0; k < count; k++) {
+            const unsigned char *e = data + start + 14 * k;
+            TableEntry *t = &font->table[k];
+            t->code = read_big(e);
+            t->w = read_short(e + 4);
+            t->h = read_short(e + 6);
+            t->bearingX = read_short(e + 8);
+            t->bearingY = read_short(e + 10);
+            t->advance = read_short(e + 12);
+        }
+        font->tableCount = count;
+        return count;
+    }
+    return 0;
+}
+
+// The entry of the character in the glyph table, or NULL. The game sorts
+// the table by character (GlyphMetricsLibrary.GetGlyphMetrics).
+static const TableEntry *table_entry(const SSRFont *font, uint32_t code) {
+    int low = 0, high = font->tableCount - 1;
+    while (low <= high) {
+        int middle = (low + high) / 2;
+        uint32_t c = font->table[middle].code;
+        if (c == code) return &font->table[middle];
+        if (c < code) low = middle + 1;
+        else high = middle - 1;
+    }
+    return NULL;
 }
 
 static int read_int(FILE *file, int32_t *value) {
@@ -312,10 +427,11 @@ void ssr_font_set_spacing(SSRFont *font, int spacing) {
 
 void ssr_font_free(SSRFont *font) {
     if (!font) return;
+    for (int i = 0; i < font->faceCount; i++) free(font->faces[i].file);
     free(font->glyphs);
     free(font->kerns);
+    free(font->table);
     free(font->atlas);
-    free(font->file);
     free(font);
 }
 
@@ -335,8 +451,9 @@ const unsigned char *ssr_font_atlas(const SSRFont *font, int *version) {
 // Puts the glyph into the atlas. A glyph that does not fit gets no pixels,
 // but keeps its advance.
 static void bake(SSRFont *font, Glyph *g) {
+    const Face *face = &font->faces[g->face];
     int x0, y0, x1, y1;
-    stbtt_GetGlyphBitmapBox(&font->info, g->glyph, font->scale, font->scale, &x0, &y0, &x1, &y1);
+    stbtt_GetGlyphBitmapBox(&face->info, g->glyph, face->scale, face->scale, &x0, &y0, &x1, &y1);
     g->w = x1 - x0;
     g->h = y1 - y0;
     g->xoff = x0;
@@ -356,8 +473,8 @@ static void bake(SSRFont *font, Glyph *g) {
     }
     g->ax = font->shelfX + PAD;
     g->ay = font->shelfY + PAD;
-    stbtt_MakeGlyphBitmap(&font->info, font->atlas + g->ay * SSR_FONT_ATLAS_SIZE + g->ax, g->w, g->h,
-                          SSR_FONT_ATLAS_SIZE, font->scale, font->scale, g->glyph);
+    stbtt_MakeGlyphBitmap(&face->info, font->atlas + g->ay * SSR_FONT_ATLAS_SIZE + g->ax, g->w, g->h,
+                          SSR_FONT_ATLAS_SIZE, face->scale, face->scale, g->glyph);
     font->shelfX += g->w + PAD * 2;
     if (g->h + PAD * 2 > font->shelfHeight) font->shelfHeight = g->h + PAD * 2;
     font->version++;
@@ -377,16 +494,33 @@ static const Glyph *glyph_for(SSRFont *font, uint32_t codepoint) {
     Glyph *g = &font->glyphs[font->glyphCount++];
     memset(g, 0, sizeof(*g));
     g->codepoint = codepoint;
-    g->glyph = stbtt_FindGlyphIndex(&font->info, (int)codepoint);
+    // A character that the font does not have comes from the first fallback
+    // font that has it (FontNative.GetTextPaint).
+    for (int i = 0; i < font->faceCount && !g->glyph; i++) {
+        g->face = i;
+        g->glyph = stbtt_FindGlyphIndex(&font->faces[i].info, (int)codepoint);
+    }
+    if (!g->glyph) g->face = 0;
     g->present = g->glyph != 0;
+    const Face *face = &font->faces[g->face];
     int advance, bearing;
-    stbtt_GetGlyphHMetrics(&font->info, g->glyph, &advance, &bearing);
+    stbtt_GetGlyphHMetrics(&face->info, g->glyph, &advance, &bearing);
     // Android gives the hinted advance in whole pixels.
-    g->advance = roundf(advance * font->scale);
+    g->advance = roundf(advance * face->scale);
     int x0, y0, x1, y1;
-    stbtt_GetGlyphBitmapBox(&font->info, g->glyph, font->scale, font->scale, &x0, &y0, &x1, &y1);
+    stbtt_GetGlyphBitmapBox(&face->info, g->glyph, face->scale, face->scale, &x0, &y0, &x1, &y1);
     g->inkWidth = x1 - x0;
     if (g->present) bake(font, g);
+    // The glyph table gives the place of the ink and the advance that the
+    // game had: the ink starts bearingX after the pen, and bearingY above
+    // the baseline (c_FontRenderer.Write).
+    const TableEntry *t = table_entry(font, codepoint);
+    if (t) {
+        g->advance = t->advance;
+        g->inkWidth = t->w;
+        g->xoff = t->bearingX;
+        g->yoff = -t->bearingY;
+    }
     return g;
 }
 

@@ -176,6 +176,111 @@ static void test_lays_out_text(const char *path) {
     ssr_font_free(font);
 }
 
+static void put_int(unsigned char *p, int value) {
+    p[0] = (unsigned char)(value >> 24);
+    p[1] = (unsigned char)(value >> 16);
+    p[2] = (unsigned char)(value >> 8);
+    p[3] = (unsigned char)value;
+}
+
+static void put_entry(unsigned char *p, int code, int w, int h, int bearingX, int bearingY, int advance) {
+    put_int(p, code);
+    int values[] = {w, h, bearingX, bearingY, advance};
+    for (int i = 0; i < 5; i++) {
+        p[4 + 2 * i] = (unsigned char)(values[i] >> 8);
+        p[5 + 2 * i] = (unsigned char)values[i];
+    }
+}
+
+// A glyph table of two blocks, as GlyphMetricsLibrary writes it. Size 0
+// has "H" and "i". Size 1 has "H" only.
+static size_t make_table(unsigned char *data) {
+    put_int(data, 2);
+    int start0 = 4 + 2 * 16, start1 = start0 + 2 * 14;
+    int blocks[2][4] = {{0, 0, start0, start1}, {0, 1, start1, start1 + 14}};
+    for (int b = 0; b < 2; b++) {
+        for (int i = 0; i < 4; i++) put_int(data + 4 + 16 * b + 4 * i, blocks[b][i]);
+    }
+    put_entry(data + start0, 'H', 12, 20, 3, 20, 40);
+    put_entry(data + start0 + 14, 'i', 4, 20, -2, 21, 9);
+    put_entry(data + start1, 'H', 12, 20, 1, 20, 99);
+    return (size_t)(start1 + 14);
+}
+
+// A character of the table takes its advance and the place of its ink
+// from the table. Another character keeps the metrics of the font.
+static void test_uses_a_glyph_table(const char *path) {
+    SSRFont *font = ssr_font_load(path, 32);
+    CHECK(font != NULL);
+    if (!font) return;
+    float x = ssr_font_measure(font, "x");
+    unsigned char data[256];
+    size_t size = make_table(data);
+    CHECK(ssr_font_set_glyph_table(font, data, size, 0, 0) == 2);
+    CHECK(ssr_font_measure(font, "H") == 40);
+    CHECK(ssr_font_measure(font, "Hix") == 40 + 9 + x);
+    SSRGlyphQuad quads[4];
+    CHECK(ssr_font_layout(font, "Hi", 10, 0, quads, 4) == 2);
+    float baseline = floorf(ssr_font_ascent(font) + 0.5f);
+    CHECK(quads[0].x0 == 10 + 3 && quads[0].y0 == baseline - 20);
+    CHECK(quads[1].x0 == 10 + 40 - 2 && quads[1].y0 == baseline - 21);
+    CHECK(ssr_font_set_glyph_table(font, data, size, 0, 1) == 1);
+    CHECK(ssr_font_measure(font, "H") == 99);
+    // No table, or a table with no block for the size.
+    CHECK(ssr_font_set_glyph_table(font, data, size, 1, 0) == 0);
+    float own = ssr_font_measure(font, "H");
+    CHECK(own != 99 && own != 40);
+    CHECK(ssr_font_set_glyph_table(font, data, size, 0, 0) == 2);
+    CHECK(ssr_font_set_glyph_table(font, NULL, 0, 0, 0) == 0);
+    CHECK(ssr_font_measure(font, "H") == own);
+    // A count of blocks that the data cannot hold.
+    put_int(data, 1000);
+    CHECK(ssr_font_set_glyph_table(font, data, size, 0, 0) == 0);
+    ssr_font_free(font);
+}
+
+// A font with CJK characters, for the fallback test, or NULL.
+static const char *cjk_font(void) {
+    static const char *paths[] = {
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "/System/Library/Fonts/AquaKana.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    };
+    for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
+        FILE *file = fopen(paths[i], "rb");
+        if (file) {
+            fclose(file);
+            return paths[i];
+        }
+    }
+    return NULL;
+}
+
+// A character that the font does not have comes from the fallback font.
+static void test_draws_with_a_fallback_font(const char *path) {
+    const char *cjk = cjk_font();
+    if (!cjk) {
+        fprintf(stderr, "skipped the fallback test: no CJK font\n");
+        return;
+    }
+    SSRFont *font = ssr_font_load(path, 32);
+    CHECK(font != NULL);
+    if (!font) return;
+    const char *kana = "\xE3\x81\x82";
+    SSRGlyphQuad quads[4];
+    CHECK(ssr_font_layout(font, kana, 0, 0, quads, 4) == 0);
+    CHECK(!ssr_font_add_fallback(font, "/nonexistent/font.ttf"));
+    CHECK(ssr_font_add_fallback(font, cjk));
+    CHECK(ssr_font_layout(font, kana, 0, 0, quads, 4) == 1);
+    CHECK(quads[0].x1 - quads[0].x0 > 10 && ssr_font_measure(font, kana) > 20);
+    // The font keeps its own characters.
+    float h = ssr_font_measure(font, "H");
+    ssr_font_clear_fallbacks(font);
+    CHECK(ssr_font_measure(font, "H") == h);
+    CHECK(ssr_font_layout(font, kana, 0, 0, quads, 4) == 0);
+    ssr_font_free(font);
+}
+
 static void test_refuses_a_file_that_is_not_a_font(void) {
     CHECK(ssr_font_load("/nonexistent/font.ttf", 20) == NULL);
 }
@@ -191,5 +296,7 @@ int main(void) {
     }
     test_lays_out_text(path);
     test_lays_out_an_icon(path);
+    test_uses_a_glyph_table(path);
+    test_draws_with_a_fallback_font(path);
     return TEST_RESULT();
 }

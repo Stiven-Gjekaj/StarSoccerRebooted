@@ -34,6 +34,22 @@ void ssr_font_free(SSRFont *font);
 // factor of the width of the first character. Returns 0 when it cannot.
 int ssr_font_load_kerning(SSRFont *font, const char *path);
 
+// Adds a font for the characters that the font does not have, at the same
+// em size. The first fallback font that has a character draws it. Returns
+// 0 when the file is not a font. ssr_font_clear_fallbacks takes them away.
+int ssr_font_add_fallback(SSRFont *font, const char *path);
+void ssr_font_clear_fallbacks(SSRFont *font);
+
+// The glyph table of the game for the face and the size of this font
+// ("Fonts/Glyphs/modern_<code>_glyphs.bin", GlyphMetricsLibrary): an int
+// count of blocks, then for each block the face, the size, the start, and
+// the end, then 14 bytes for each character: an int character, then the
+// width, the height, bearingX, bearingY, and the advance as shorts. All
+// numbers are big endian. A character of the table takes its advance, its
+// ink width, and the place of its ink from the table. NULL data takes the
+// table away. Returns the number of characters of the block.
+int ssr_font_set_glyph_table(SSRFont *font, const unsigned char *data, size_t size, int face, int sizeIndex);
+
 // The pixels that each character adds after its advance (the kernX of
 // Fonts.txt).
 void ssr_font_set_spacing(SSRFont *font, int spacing);
