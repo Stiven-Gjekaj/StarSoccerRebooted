@@ -97,3 +97,43 @@ body += (f'<g filter="url(#sh)"><rect x="{x0}" y="5" width="{S}" height="{S}" fi
 d = text_path('SSR', x0 + S + 6, 7, tw, th, track=0.03)
 body += f'<g filter="url(#sh)"><path d="{d}" fill="url(#silver)"/></g></g>'
 save('BlackJackLogo.patch', body, 481, 123)
+
+
+# SlotsTitlePanel.patch (598 x 126): the word above SLOTS. The light rays
+# of the panel come from (300, 64), in the wedges of these angles from the
+# vertical. The patch draws the rays again where the old word was, then
+# STAR SOCCER in yellow, low enough to cover the foot of the old word.
+CX, CY = 300, 64
+WEDGES = [(-52.9, -30.5), (-9.5, 9.5), (30.5, 53.1)]
+# The dark red of each row from 7 to 32. A ray is lighter by (16, 14, 14).
+DARK = [(91, 14, 14), (92, 12, 12), (96, 14, 14), (98, 14, 14), (101, 15, 15), (103, 15, 15), (104, 15, 15),
+        (105, 16, 16), (104, 16, 15), (102, 15, 15), (102, 15, 15), (104, 16, 16), (105, 15, 15), (105, 16, 15),
+        (105, 15, 15), (105, 15, 15), (104, 16, 16), (102, 15, 15), (101, 15, 15), (101, 15, 15), (101, 15, 15),
+        (101, 16, 15), (100, 15, 15), (101, 15, 15), (103, 15, 15), (107, 14, 14)]
+X0, X1, Y0 = 224, 374, 7
+body = ''
+for i, (r, g, b) in enumerate(DARK):
+    y = Y0 + i
+    x = X0
+    while x < X1:
+        a = math.degrees(math.atan2(x + 0.5 - CX, CY - (y + 0.5)))
+        light = any(lo <= a <= hi for lo, hi in WEDGES)
+        run = x
+        while run < X1:
+            b2 = math.degrees(math.atan2(run + 0.5 - CX, CY - (y + 0.5)))
+            if any(lo <= b2 <= hi for lo, hi in WEDGES) != light:
+                break
+            run += 1
+        c = (r + 16, g + 14, b + 14) if light else (r, g, b)
+        body += f'<rect x="{x}" y="{y}" width="{run - x}" height="1" fill="rgb{c}"/>'
+        x = run
+body += ('<linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">'
+         '<stop offset="0" stop-color="#fff35a"/><stop offset="1" stop-color="#f7b800"/></linearGradient>')
+th = 19
+tw = natural_width('STAR SOCCER', th, track=0.05)
+q = min(1.0, 134 / tw)
+d = text_path('STAR SOCCER', 0, 0, tw * q, th, track=0.05)
+body += (f'<g transform="translate({300 - tw * q / 2 + 3:.1f} 15) skewX(-14)">'
+         f'<path d="{d}" fill="#3a0000" stroke="#3a0000" stroke-width="3" stroke-linejoin="round" transform="translate(1.5 2)"/>'
+         f'<path d="{d}" fill="url(#gold)" stroke="#5a0a00" stroke-width="1.2" stroke-linejoin="round" paint-order="stroke"/></g>')
+save('SlotsTitlePanel.patch', body, 598, 126)
