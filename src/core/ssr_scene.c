@@ -93,6 +93,7 @@ typedef enum {
     D_SCROLL_INDICATOR,
     D_SORT_BY_REF,
     D_RANDOM_TWEAK,
+    D_SPAWN,
     D_SHOW_SHELL,
     D_SWIPE_PANEL,
     D_EMIT_PLACER,
@@ -1842,6 +1843,14 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         d->text[1] = keep(s, arg(m, 1));
         d->v[0] = (float)number(s, m, 2, 0);
         d->v[1] = (float)number(s, m, 3, 0);
+    } else if (is(n, "Spawn")) {
+        // Spawn(source,destination): a copy of the element with the ref
+        // source goes under the element with the ref destination, at its
+        // own local place (c_Spawner).
+        d = new_doodad(D_SPAWN, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
     } else if (is(n, "SetMessage")) {
         // SetMessage(screen) names the layout of the next message
         // (c_SetMessageScreen). The save slots are its only user, and the
@@ -2760,6 +2769,16 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         // the contents.
         d->v[1] = contents;
         d->v[2] = -y;
+        break;
+    }
+    case D_SPAWN: {
+        Gel *source = find_ref_first(s, d->text[0]);
+        Gel *destination = find_ref_first(s, d->text[1]);
+        if (!source || !destination) break;
+        Gel *copy = clone_gel(source);
+        if (!copy) break;
+        add_child(destination, copy);
+        copy->baked = mat_concat(destination->baked, local_matrix(copy));
         break;
     }
     case D_RANDOM_TWEAK:

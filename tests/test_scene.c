@@ -1605,6 +1605,59 @@ static void test_puts_a_random_number_in_a_tweak(void) {
     CHECK(seen[0] && seen[1]);
 }
 
+// Spawn() puts a copy of an emitter under a point of the screen, as the
+// coins of the match review go up from the earnings (c_Spawner). The
+// emitter alone emits nothing.
+static void test_spawns_an_emitter_at_a_point(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/TweakValues.txt", ssr_test_directory("scene_spawn"));
+    FILE *file = fopen(path, "wb");
+    fputs("Category:(Coins)\n"
+          "\tRange:(Rate,Rate,0.1,0.1,1)\n"
+          "\tRange:(Lifetime,Life,1,1,1)\n"
+          "EndCategory\n"
+          "Category:(Menu)\n"
+          "\tFloat:(Pay,Pay,0,0,100,0)\n"
+          "EndCategory\n",
+          file);
+    fclose(file);
+    CHECK(ssr_tweaks_load(tweaks, path) == 3);
+    SSRUiTree *tree;
+    layout = "Draw:(Coin,0,0,10,10) ref:CoinTemplate\n"
+             "\tEmitPlacer()\n"
+             "\tEmitLifetime()\n"
+             "{\n"
+             "} Template\n"
+             "Emitter:(Coins,CoinTemplate) ref:CoinShower\n"
+             "Rect:(355,560) ref:SpawnPoint\n"
+             "\tif(twk(Menu,Pay)>0)\n"
+             "\t<\n"
+             "\t\t.:Spawn(CoinShower,SpawnPoint)\n"
+             "\t>\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    for (int i = 0; i < 10; i++) ssr_scene_update(scene, &env, 17);
+    CHECK(!find_image(scene, "Coin"));
+    ssr_tweaks_set_number(tweaks, "Menu", "Pay", 30);
+    for (int i = 0; i < 10; i++) ssr_scene_update(scene, &env, 17);
+    const SSRSceneItem *coin = find_image(scene, "Coin");
+    CHECK(coin && near(coin->x, 355) && near(coin->y, 560));
+    // The dot spawns one time: one emitter, one coin each 100 ms.
+    for (int i = 0; i < 30; i++) ssr_scene_update(scene, &env, 17);
+    int coins = 0;
+    for (int i = 0; i < ssr_scene_count(scene); i++) {
+        const char *image = ssr_scene_item(scene, i)->image;
+        if (image && strcmp(image, "Coin") == 0) coins++;
+    }
+    CHECK(coins >= 5 && coins <= 7);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -1989,6 +2042,7 @@ int main(void) {
     test_spaces_the_lines_of_a_text_box();
     test_knows_set_message();
     test_puts_a_random_number_in_a_tweak();
+    test_spawns_an_emitter_at_a_point();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
