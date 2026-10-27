@@ -123,9 +123,22 @@ static void test_sets_up_the_leagues_and_the_cup(void) {
     ssr_season_free(s);
 }
 
+// The hook of the played fixtures counts each fixture once.
+static int playedCount, playedGoals;
+
+static void count_played(void *context, SSRSeason *season, const SSRSeasonComp *comp, const SSRFixture *fixture) {
+    (void)season;
+    (void)comp;
+    CHECK(context == &playedCount && fixture->result == 1);
+    playedCount++;
+    playedGoals += fixture->score1 + fixture->score2;
+}
+
 static void test_plays_a_season(void) {
     SSRRandom random = {SSR_RANDOM_START};
     SSRSeason *s = new_season(&random);
+    s->played = count_played;
+    s->playedContext = &playedCount;
     SSRSeasonComp *one = ssr_season_comp(s, 10), *two = ssr_season_comp(s, 20), *cup = ssr_season_comp(s, 30);
     int end = ssr_season_play_to(s, ssr_date_make(1, 1, 2));
     CHECK(end && ssr_date_year(s->player.sdate) == 2);
@@ -141,6 +154,11 @@ static void test_plays_a_season(void) {
         against += row->goalsAgainst;
     }
     CHECK(played == 24 && goals == against);
+    int fixtures = 0;
+    for (int i = 0; i < s->compCount; i++) {
+        for (int k = 0; k < s->comps[i].fixtureCount; k++) fixtures += s->comps[i].fixtures[k].result == 1;
+    }
+    CHECK(playedCount == fixtures && playedGoals >= goals);
     // The last of LG1 and the first of LG2 change places.
     ssr_season_sort_pool(s, &one->pools[0], 4);
     ssr_season_sort_pool(s, &two->pools[0], 4);

@@ -1340,10 +1340,12 @@ int ssr_season_play_fixtures(SSRSeason *s) {
             if (f->result == -1) {
                 f->result = 1;
                 played = 1;
+                if (s->played) s->played(s->playedContext, s, c, f);
             }
             if (f->result == 0) {
                 play_fixture(s, c, f);
                 played = 1;
+                if (s->played && f->result == 1) s->played(s->playedContext, s, c, f);
             }
         }
         if (!played) continue;

@@ -121,7 +121,7 @@ typedef struct {
     int careerApps;
 } SSRSeasonPlayer;
 
-typedef struct {
+typedef struct SSRSeason {
     const SSRWorld *world;
     SSRRandom *random;
     SSRSeasonComp *comps;
@@ -146,6 +146,11 @@ typedef struct {
     char winnerTla[16];
     char winnerCompetition[16];
     int hasWinnerNews;
+    // Called for each fixture when it counts: a match of other teams when
+    // it plays, and the match of the player when its result counts. NULL
+    // calls nothing.
+    void (*played)(void *context, struct SSRSeason *season, const SSRSeasonComp *comp, const SSRFixture *fixture);
+    void *playedContext;
 } SSRSeason;
 
 // Makes the season of a new career: all the clubs of the data set are
