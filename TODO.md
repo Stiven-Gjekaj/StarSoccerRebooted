@@ -73,12 +73,10 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       (`GetProspectiveClubs`).
 - [x] The first contract and the start skills. The original has no
       contract screen for a new career.
-- [ ] The five trials that set the first skills. They need the match, so
-      they come in 0.5. Until then the skills start at 1.
+- [x] The five trials that set the first skills
 - [x] The news of the first contract and the star transition (`WebPage`,
       `StarTransition`)
-- [ ] The game menu between matches (`GameMenu`): it shows the player
-      and quits to the main menu. Its buttons open screens of later parts.
+- [x] The game menu between matches (`GameMenu`)
 
 ## 0.5 The match
 
