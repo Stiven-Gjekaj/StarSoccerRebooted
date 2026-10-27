@@ -18,6 +18,12 @@ typedef struct {
     int loaded;
 } RlePage;
 
+typedef struct {
+    const char *base;
+    const char **names;
+    int count;
+} CelGroup;
+
 struct SSRAtlases {
     char *directory;
     SSRAtlasPage *pages;
@@ -29,6 +35,9 @@ struct SSRAtlases {
     RlePage *rle;
     char **strings;
     int stringCount;
+    // The cel groups of the key files: a base image and its cels.
+    CelGroup *cels;
+    int celCount;
 };
 
 // The key reader. Each value starts at a multiple of its size from the
@@ -244,13 +253,27 @@ static int load_key(SSRAtlases *a, const unsigned char *data, size_t size) {
             read_image(&r, a, image);
         }
     }
-    // The cel chains follow. The app does not use them yet, so the reader
-    // only checks that they are there.
+    // The cel groups follow: "Base, cel1, cel2, ..., ''". The image of a
+    // cel is "cel_Base".
     for (;;) {
-        const char *first = read_string(&r, a);
-        if (!r.ok || !*first) break;
-        while (r.ok && *read_string(&r, a)) {
+        const char *base = read_string(&r, a);
+        if (!r.ok || !*base) break;
+        CelGroup group = {base, NULL, 0};
+        for (;;) {
+            const char *cel = read_string(&r, a);
+            if (!r.ok || !*cel) break;
+            const char **names = realloc(group.names, (size_t)(group.count + 1) * sizeof(char *));
+            if (!names) break;
+            group.names = names;
+            group.names[group.count++] = cel;
         }
+        CelGroup *groups = realloc(a->cels, (size_t)(a->celCount + 1) * sizeof(CelGroup));
+        if (!groups) {
+            free(group.names);
+            break;
+        }
+        a->cels = groups;
+        a->cels[a->celCount++] = group;
     }
     return r.ok;
 }
@@ -315,6 +338,8 @@ void ssr_atlas_free(SSRAtlases *a) {
     }
     free(a->rle);
     free(a->byName);
+    for (int i = 0; i < a->celCount; i++) free(a->cels[i].names);
+    free(a->cels);
     for (int i = 0; i < a->stringCount; i++) free(a->strings[i]);
     free(a->strings);
     free(a->directory);
@@ -335,6 +360,17 @@ int ssr_atlas_image_count(const SSRAtlases *a) {
 
 const SSRAtlasImage *ssr_atlas_image(const SSRAtlases *a, int index) {
     return a && index >= 0 && index < a->imageCount ? &a->images[index] : NULL;
+}
+
+int ssr_atlas_cels(const SSRAtlases *a, const char *base, const char **names, int max) {
+    if (!a || !base) return 0;
+    for (int i = a->celCount - 1; i >= 0; i--) {
+        if (strcmp(a->cels[i].base, base) != 0) continue;
+        int n = a->cels[i].count < max ? a->cels[i].count : max;
+        for (int k = 0; k < n; k++) names[k] = a->cels[i].names[k];
+        return a->cels[i].count;
+    }
+    return 0;
 }
 
 const SSRAtlasImage *ssr_atlas_find(const SSRAtlases *a, const char *name) {

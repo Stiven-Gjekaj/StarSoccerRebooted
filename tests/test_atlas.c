@@ -164,6 +164,9 @@ static void test_reads_the_key(void) {
     CHECK(ssr_atlas_page(atlases, 0)->rle == 1 && ssr_atlas_page(atlases, 1)->rle == 0);
     CHECK(ssr_atlas_page(atlases, 1)->width == 4 && ssr_atlas_page(atlases, 1)->imageCount == 3);
 
+    const char *cels[4];
+    CHECK(ssr_atlas_cels(atlases, "Plain", cels, 4) == 1 && strcmp(cels[0], "Shadow") == 0);
+    CHECK(ssr_atlas_cels(atlases, "Sliced", cels, 4) == 0);
     const SSRAtlasImage *plain = ssr_atlas_find(atlases, "Plain");
     CHECK(plain && plain->kind == SSR_ATLAS_PLAIN && plain->page == 1 && plain->frame == 0);
     CHECK(plain && plain->unpackCount == 1 && plain->unpacks[0].x == 1 && plain->unpacks[0].width == 2);

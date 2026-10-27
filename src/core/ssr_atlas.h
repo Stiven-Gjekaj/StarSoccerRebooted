@@ -72,6 +72,11 @@ const SSRAtlasImage *ssr_atlas_image(const SSRAtlases *atlases, int index);
 // The image with the name, or NULL.
 const SSRAtlasImage *ssr_atlas_find(const SSRAtlases *atlases, const char *name);
 
+// The cels of a base image, for example "Seats" for the base "Stand": the
+// image "Seats_Stand" draws over the base in the colour of the tweak
+// CelColours:Seats. Puts up to max names in names and returns the number.
+int ssr_atlas_cels(const SSRAtlases *atlases, const char *base, const char **names, int max);
+
 // The pixels of a PNG page, with the RLE frames that it gets put in.
 // Returns 1 on success.
 int ssr_atlas_page_pixels(SSRAtlases *atlases, int page, SSRImage *out);
