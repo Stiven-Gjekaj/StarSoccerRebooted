@@ -56,6 +56,14 @@ typedef struct {
     SSRScene *tickerScene;
     SSRTicker *ticker;
     Uint64 tickerFrame;
+    // A chance of the player: the pitch under the screen, the tap ball over
+    // it, and the copies of the players and of the ball on the screen.
+    SSRUiTree *pitchScreen, *tapScreen;
+    SSRScene *pitchScene, *tapScene;
+    char pitchName[64];
+    SSRScene *viewScene;
+    int playerCopies[SSR_PLAYERS_MAX];
+    int ballCopy;
     SSRAudio *audio;
     // The Spine files that the screens use, and when the screen opened.
     struct {
@@ -158,6 +166,104 @@ static void follow_game(SSRApp *app) {
 }
 
 static SSRSceneEnv scene_env(SSRApp *app);
+
+/* ------------------------------------------------------- the chance */
+
+// The pitch of a chance (c_MatchChance): "Pitch_" + Pen, A, or M, and the
+// side [I: the side letters of the pitches].
+static void pitch_name(const SSRChance *chance, char *out, size_t capacity) {
+    int type = chance->info.chanceType, side = chance->info.pitchSide;
+    if (type == 4) {
+        SDL_snprintf(out, capacity, "Pitch_Pen_AM.uis");
+    } else if (type == 1 || type == 9) {
+        if (side == 2) {
+            SDL_snprintf(out, capacity, "Pitch_Ma_AM_Rev.uis");
+        } else {
+            SDL_snprintf(out, capacity, "Pitch_%s_AM.uis", side == 0 ? "Ma" : "Mb");
+        }
+    } else {
+        SDL_snprintf(out, capacity, "Pitch_%s_AM.uis", side == 0 ? "Aa" : side == 2 ? "Ac" : "Ab");
+    }
+}
+
+static void free_chance_view(SSRApp *app) {
+    ssr_scene_free(app->pitchScene);
+    ssr_ui_free(app->pitchScreen);
+    ssr_scene_free(app->tapScene);
+    ssr_ui_free(app->tapScreen);
+    app->pitchScene = app->tapScene = NULL;
+    app->pitchScreen = app->tapScreen = NULL;
+    app->pitchName[0] = 0;
+    app->viewScene = NULL;
+}
+
+static SSRScene *open_layer(SSRApp *app, const char *name, SSRUiTree **tree, SSRSceneEnv *env) {
+    SSRUiFiles files = {read_screen_file, app};
+    *tree = ssr_ui_parse(name, &files);
+    return *tree ? ssr_scene_open(*tree, env) : NULL;
+}
+
+// The animation of a player: the kind, and one of 8 headings.
+static void player_anim(const SSRMatchPlayer *p, char *out, size_t capacity) {
+    static const char *HEADINGS[] = {"E", "SE", "S", "SW", "W", "NW", "N", "NE"};
+    float a = p->direction;
+    if (p->anim == SSR_ANIM_STAND || p->inWall) {
+        static const float FACING[] = {0, 90, 180, 270};
+        a = FACING[p->facing & 3];
+    }
+    while (a < 0) a += 360;
+    int heading = ((int)((a + 22.5f) / 45)) % 8;
+    const char *kind = p->type == SSR_PLAYER_KEEPER ? (p->anim == SSR_ANIM_STAND ? "KStand" : "KRun")
+                       : p->inWall                  ? "FWallStand"
+                       : p->anim == SSR_ANIM_RUN    ? "FRun"
+                                                    : "FStand";
+    SDL_snprintf(out, capacity, "%s%s", kind, HEADINGS[heading]);
+}
+
+static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
+    const SSRChance *chance = ssr_game_chance(app->game);
+    if (!chance || SDL_strcmp(ssr_game_screen(app->game), "matchminigame") != 0 || !app->scene) {
+        if (app->pitchScene || app->tapScene) free_chance_view(app);
+        return;
+    }
+    char name[64];
+    pitch_name(chance, name, sizeof(name));
+    if (SDL_strcmp(name, app->pitchName) != 0) {
+        ssr_scene_free(app->pitchScene);
+        ssr_ui_free(app->pitchScreen);
+        app->pitchScene = open_layer(app, name, &app->pitchScreen, env);
+        SDL_snprintf(app->pitchName, sizeof(app->pitchName), "%s", name);
+    }
+    if (!app->tapScene) app->tapScene = open_layer(app, "tapball.uis", &app->tapScreen, env);
+    if (app->viewScene != app->scene) {
+        // A new screen: the copies of the players and of the ball.
+        app->viewScene = app->scene;
+        for (int i = 0; i < chance->players.count; i++) {
+            int id = ssr_scene_spawn(app->scene, "MatchPitch", "Player", 0, NULL, 0);
+            app->playerCopies[i] = id;
+            ssr_scene_spawn_show(app->scene, id, "PlayerCircle", 0);
+            ssr_scene_spawn_show(app->scene, id, "PlayerCalling", 0);
+            ssr_scene_spawn_show(app->scene, id, "OffsideFlag", 0);
+        }
+        app->ballCopy = ssr_scene_spawn(app->scene, "MatchPitch", "Ball", 0, NULL, 0);
+        ssr_scene_spawn_show(app->scene, app->ballCopy, "BallTip", 0);
+    }
+    for (int i = 0; i < chance->players.count && i < SSR_PLAYERS_MAX; i++) {
+        const SSRMatchPlayer *p = &chance->players.list[i];
+        char anim[32];
+        player_anim(p, anim, sizeof(anim));
+        ssr_scene_spawn_place(app->scene, app->playerCopies[i], NULL, p->x, p->y - p->z);
+        ssr_scene_spawn_anim(app->scene, app->playerCopies[i], "PlayerAnim", anim);
+    }
+    ssr_scene_spawn_place(app->scene, app->ballCopy, NULL, chance->ball.x, chance->ball.y);
+    ssr_scene_spawn_place(app->scene, app->ballCopy, "BallHook", 0, -chance->ball.z);
+    ssr_scene_update(app->pitchScene, env, ms);
+    if (app->tapScene) {
+        const SSRTapBall *tap = &chance->tap;
+        ssr_scene_place(app->tapScene, "TapBall", tap->x, tap->y, tap->depth);
+        ssr_scene_update(app->tapScene, env, ms);
+    }
+}
 
 // Gives the changes that the logic asks for to the elements of the screen.
 static void apply_ops(SSRApp *app) {
@@ -420,6 +526,7 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
             down = event->type != SDL_EVENT_FINGER_UP;
         }
         ssr_scene_touch(app->scene, down, x + app->left, y + app->top);
+        ssr_game_touch(app->game, down, x + app->left, y + app->top);
         // A click is when the touch goes up on the element, as in the game.
         // A touch that moved a list is a swipe, not a click.
         int up = (event->type == SDL_EVENT_MOUSE_BUTTON_UP || event->type == SDL_EVENT_FINGER_UP) &&
@@ -503,8 +610,12 @@ SDL_AppResult SDL_AppIterate(void *state) {
                 SDL_StopTextInput(app->window);
             }
         }
+        update_chance_view(app, &env, ms);
         ssr_gfx_set_tweaks(app->gfx, app->tweaks);
+        if (app->pitchScene) ssr_gfx_draw_scene(app->gfx, app->pitchScene);
         ssr_gfx_draw_scene(app->gfx, app->scene);
+        const SSRChance *chance = ssr_game_chance(app->game);
+        if (app->tapScene && chance && chance->state == SSR_CHANCE_TAP) ssr_gfx_draw_scene(app->gfx, app->tapScene);
         draw_ticker(app, &env);
     }
     if (!app->gfx) {
@@ -558,6 +669,7 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     (void)result;
     SSRApp *app = state;
     if (!app) return;
+    free_chance_view(app);
     ssr_scene_free(app->scene);
     for (int i = 0; i < app->spineCount; i++) ssr_spine_free(app->spines[i].spine);
     ssr_ui_free(app->screen);
