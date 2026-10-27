@@ -175,6 +175,14 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 - **The type of the player is the type that its ratings give now.** The
   game shows the last type that a rating news named, and a news comes
   only once in 60 days for each type. Reason: the news come later.
+- **The replay keeps a full copy of the chance for each tick.** The game
+  keeps a stack of frames for each object, and the stacks do not always
+  line up. One copy of the chance keeps all parts in step, and the view
+  draws a copy as it draws the live chance.
+- **The help of the first replay (`Player.ReplayActive`) is not saved.** It
+  shows again after the app starts again.
+- **The chance HUD (`minigamehud.uis`) shows the replay only.** The game
+  HUD of a career chance, with the wind and the chance bars, comes later.
 - **`AnimateProgress` moves the value of a bar but draws no highlight, no
   overlay, and no burst.** Reason: these are gadgets of the game that the
   remake does not make yet. The bar has the same length at each frame.

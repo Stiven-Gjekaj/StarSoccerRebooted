@@ -102,7 +102,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       its children each frame in its place, which gives the same picture.
 - [x] The dribble game (type 11). The intercept game (type 6) never starts
       in 4.32.
-- [ ] The replays of a goal (`WatchReplay`), the ball trail, and the
+- [x] The replays of a goal (`WatchReplay`), the ball trail, and the
       make-run arrows of the team-mates
 - [ ] Extra time and the penalty shoot-out of a cup match
 - [x] After the match: the match stats (`MatchStats`) with the rating, the
