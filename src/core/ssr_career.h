@@ -66,6 +66,9 @@ typedef struct {
     // The lifestyle products: 0 is not owned. A value above 0 is the wear
     // of the product, and above 10000 the product is broken.
     int items[SSR_CAREER_ITEMS], vehicles[SSR_CAREER_ITEMS], properties[SSR_CAREER_ITEMS];
+    // A shopping trip with the team-mates: -1 none, else the purchases of
+    // the trip so far (c_TPlayer.teammatesshoppingcount).
+    int teamShopping;
     // 1 before the first match of the career (c_TPlayer.m_debut).
     int debut;
     // The day of the last message of the nation that did not pick the

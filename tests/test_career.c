@@ -61,6 +61,9 @@ static void test_saves_and_loads_a_career(void) {
     c.items[0] = 120;
     c.vehicles[19] = 10500;
     c.properties[4] = 1;
+    // No shopping trip runs in a new career.
+    CHECK(c.teamShopping == -1);
+    c.teamShopping = 2;
     snprintf(c.headline, sizeof(c.headline), "Line one\nA \\ two");
     // A new career has no news in its first week.
     CHECK(c.newsDone == 1);
@@ -91,6 +94,7 @@ static void test_saves_and_loads_a_career(void) {
     CHECK(back.relationPartner == 40.5f && back.relationSponsors == 22 && back.spentTime == 2);
     CHECK(back.lastSpendTimePartner == 28 && back.lastSpendTimeFriends == 28);
     CHECK(back.sponsors[3] == 9 && back.sponsors[0] == 0);
+    CHECK(back.teamShopping == 2);
     CHECK(back.items[0] == 120 && back.vehicles[19] == 10500 && back.properties[4] == 1);
     // The new season starts the counts again.
     back.energy = 20;

@@ -42,6 +42,7 @@ void ssr_career_create(SSRCareer *c, const char *first, const char *last, int ge
     c->debut = 1;
     c->lastSpendTimeFriends = c->lastSpendTimePartner = 28;
     c->newsDone = 1;
+    c->teamShopping = -1;
     c->energy = 100;
     c->nrg[0] = c->nrg[1] = c->nrg[2] = 1;
     for (int i = 0; i < 10; i++) c->ratings[i] = 5;
@@ -312,6 +313,7 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     write_ints(file, "items", c->items, SSR_CAREER_ITEMS);
     write_ints(file, "vehicles", c->vehicles, SSR_CAREER_ITEMS);
     write_ints(file, "properties", c->properties, SSR_CAREER_ITEMS);
+    fprintf(file, "teammatesshoppingcount=%d\n", c->teamShopping);
     fprintf(file, "debut=%d\nintnotpickedmsg=%d\n", c->debut, c->intNotPickedMessage);
     write_ints(file, "technique", c->technique, SSR_CAREER_SKILL_LEVELS);
     write_ints(file, "pace", c->pace, SSR_CAREER_SKILL_LEVELS);
@@ -367,6 +369,8 @@ int ssr_career_load(SSRCareer *c, const char *path) {
     FILE *file = ssr_fs_open(path, "rb");
     if (!file) return 0;
     memset(c, 0, sizeof(*c));
+    // An older save has no shopping trip.
+    c->teamShopping = -1;
     static char line[4096];
     while (fgets(line, sizeof(line), file)) {
         line[strcspn(line, "\r\n")] = 0;
@@ -408,6 +412,7 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "items") == 0) read_ints(value, c->items, SSR_CAREER_ITEMS);
         else if (strcmp(key, "vehicles") == 0) read_ints(value, c->vehicles, SSR_CAREER_ITEMS);
         else if (strcmp(key, "properties") == 0) read_ints(value, c->properties, SSR_CAREER_ITEMS);
+        else if (strcmp(key, "teammatesshoppingcount") == 0) c->teamShopping = number;
         else if (strcmp(key, "debut") == 0) c->debut = number;
         else if (strcmp(key, "intnotpickedmsg") == 0) c->intNotPickedMessage = number;
         else if (strcmp(key, "technique") == 0) read_ints(value, c->technique, SSR_CAREER_SKILL_LEVELS);
