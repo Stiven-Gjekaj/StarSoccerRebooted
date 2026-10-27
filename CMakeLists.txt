@@ -106,6 +106,12 @@ if(SSR_ART)
     target_sources(ssr PRIVATE ${SSR_ART})
     set_source_files_properties(${SSR_ART} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/art)
 endif()
+# The fallback fonts draw the characters that the font of the game has not.
+file(GLOB SSR_FONTS ${CMAKE_SOURCE_DIR}/fonts/*.ttf ${CMAKE_SOURCE_DIR}/fonts/LICENSE-*)
+if(SSR_FONTS)
+    target_sources(ssr PRIVATE ${SSR_FONTS})
+    set_source_files_properties(${SSR_FONTS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/fonts)
+endif()
 set_target_properties(ssr PROPERTIES
     OUTPUT_NAME "Star Soccer Rebooted"
     MACOSX_BUNDLE_BUNDLE_NAME "Star Soccer Rebooted"

@@ -903,6 +903,7 @@ static void load_language(SSRApp *app) {
     }
     ssr_text_rebrand(app->text);
     app->textLanguage = language;
+    ssr_gfx_set_language(app->gfx, ssr_text_language_code(language));
 }
 
 // GSSetLanguageFromDevice: the first language of the device that the table

@@ -4,6 +4,7 @@
 
 #include "ssr_atlas.h"
 #include "ssr_font.h"
+#include "ssr_fs.h"
 #include "ssr_image.h"
 
 // The Android "new" font set of Fonts.txt, for an import that has no
@@ -116,6 +117,37 @@ SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
     SDL_snprintf(path, sizeof(path), "%sart", base ? base : "");
     gfx->art = SDL_GlobDirectory(path, "*.png", 0, &gfx->artCount);
     return gfx;
+}
+
+void ssr_gfx_set_language(SSRGfx *gfx, const char *code) {
+    if (!gfx || !code) return;
+    char path[2400], resolved[2400];
+    SDL_snprintf(path, sizeof(path), "%s/Fonts/Glyphs/modern_%s_glyphs.bin", gfx->gameDirectory, code);
+    size_t tableSize = 0;
+    void *table = ssr_fs_resolve(path, resolved, sizeof(resolved)) ? SDL_LoadFile(resolved, &tableSize) : NULL;
+    if (!table) SDL_Log("The import has no %s.", path);
+    // SDL reads the fonts of the app, so that it finds them in the assets of
+    // an Android APK too.
+    const char *base = SDL_GetBasePath();
+    size_t sizes[2] = {0, 0};
+    void *fallbacks[2];
+    SDL_snprintf(path, sizeof(path), "%sfonts/Fallback.ttf", base ? base : "");
+    fallbacks[0] = SDL_LoadFile(path, &sizes[0]);
+    if (!fallbacks[0]) SDL_Log("The app has no %s.", path);
+    SDL_snprintf(path, sizeof(path), "%sfonts/Fallback-%s.ttf", base ? base : "", code);
+    fallbacks[1] = SDL_LoadFile(path, &sizes[1]);
+    for (int i = 0; i < SSR_FONT_COUNT; i++) {
+        SSRFont *font = gfx->fonts[i].font;
+        if (!font) continue;
+        // The slots of the set are the sizes of face 0, in their order.
+        ssr_font_set_glyph_table(font, table, tableSize, 0, i);
+        ssr_font_clear_fallbacks(font);
+        for (int k = 0; k < 2; k++) {
+            if (fallbacks[k]) ssr_font_add_fallback(font, fallbacks[k], sizes[k]);
+        }
+    }
+    for (int k = 0; k < 2; k++) SDL_free(fallbacks[k]);
+    SDL_free(table);
 }
 
 void ssr_gfx_free(SSRGfx *gfx) {

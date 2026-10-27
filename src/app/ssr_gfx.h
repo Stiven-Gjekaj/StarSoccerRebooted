@@ -35,6 +35,13 @@ void ssr_gfx_free(SSRGfx *gfx);
 // image is not there.
 SDL_Texture *ssr_gfx_texture(SSRGfx *gfx, const char *name);
 
+// The glyph table and the fallback fonts of a language, for example "ja"
+// (c_TLocale.ReloadGlyphsData). The table is
+// "Fonts/Glyphs/modern_<code>_glyphs.bin" of the import. The fallback fonts
+// are "fonts/Fallback.ttf" of the app, and "fonts/Fallback-<code>.ttf" when
+// it is there.
+void ssr_gfx_set_language(SSRGfx *gfx, const char *code);
+
 // Draws the text. x is the left, the centre, or the right of the text, as
 // align tells. y is the top of the first line. color is 0xRRGGBB.
 void ssr_gfx_text(SSRGfx *gfx, SSRFontSize size, const char *text, float x, float y, uint32_t color,
