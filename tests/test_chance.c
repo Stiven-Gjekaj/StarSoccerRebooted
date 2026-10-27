@@ -249,6 +249,46 @@ static void test_dribbles_past_the_defenders(void) {
     CHECK(c.result == SSR_RESULT_INTERCEPTED);
 }
 
+// The captain drags a run for a team-mate before the aim.
+static void test_the_captain_draws_a_run(void) {
+    SSRRandom random = {SSR_RANDOM_START};
+    SSRChance c;
+    SSRChanceSetup s = setup_for(2);
+    ssr_chance_start(&c, &s, &random);
+    for (int i = 0; i < c.players.count; i++) CHECK(!c.players.list[i].canMakeRun);
+    random.seed = SSR_RANDOM_START;
+    s.captain = 1;
+    ssr_chance_start(&c, &s, &random);
+    SSRMatchPlayer *mate = NULL;
+    for (int i = 0; i < c.players.count && !mate; i++) {
+        SSRMatchPlayer *p = &c.players.list[i];
+        // A team-mate away from the ball, so that the touch takes it.
+        if (p->type == SSR_PLAYER_ATTACKER && fabsf(p->x - c.ball.x) + fabsf(p->y - c.ball.y) > 120) mate = p;
+    }
+    CHECK(mate && mate->canMakeRun);
+    if (!mate) return;
+    int now = 1000;
+    float x = mate->x, y = mate->y;
+    SSRTapTouch touch = {x + 10, y, 1, 1};
+    ssr_chance_update(&c, now += 16, &touch, &random);
+    CHECK(c.players.makeRun == mate->id && c.kicking == 0);
+    // A drag of 300 to the right gives the longest run.
+    touch.hit = 0;
+    touch.x = x + 300;
+    ssr_chance_update(&c, now += 16, &touch, &random);
+    CHECK(mate->makeRunDistance == SSR_MAKE_RUN_MAX && mate->makeRunX == (int)(x + SSR_MAKE_RUN_MAX));
+    // The release keeps the run. The team-mate has not moved yet.
+    touch.down = 0;
+    ssr_chance_update(&c, now += 16, &touch, &random);
+    CHECK(c.players.makeRun == 0 && mate->makeRunDistance == SSR_MAKE_RUN_MAX && mate->x == x && mate->y == y);
+    // A tap on the team-mate and a release on it end the run.
+    SSRTapTouch again = {x, y, 1, 1};
+    ssr_chance_update(&c, now += 16, &again, &random);
+    again.down = again.hit = 0;
+    ssr_chance_update(&c, now += 16, &again, &random);
+    CHECK(mate->makeRunDistance == 0);
+}
+
 int main(void) {
     test_dribbles_past_the_defenders();
     test_places_the_ball();
@@ -260,5 +300,6 @@ int main(void) {
     test_a_defender_takes_the_ball();
     test_a_defender_closes_down_the_aim();
     test_a_short_tap_cancels_the_aim();
+    test_the_captain_draws_a_run();
     return TEST_RESULT();
 }

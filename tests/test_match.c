@@ -144,7 +144,25 @@ static void test_a_dribble_leads_to_an_attack(void) {
     CHECK(event == SSR_MATCH_EVENT_CHANCE && (m.chanceType == 2 || m.chanceType == 8));
 }
 
+static void test_the_captain_draws_runs(void) {
+    SSRMatch m;
+    SSRRandom random = {11};
+    SSRMatchSetup s = setup_for();
+    ssr_match_start(&m, &s, localise, NULL, &random);
+    m.chanceType = 2;
+    CHECK(!ssr_match_chance_setup(&m, 50, 50, 1).captain);
+    m.setup.captain = 1;
+    CHECK(ssr_match_chance_setup(&m, 50, 50, 1).captain);
+    // The cup captain is not the captain of a league match.
+    m.setup.captain = 2;
+    CHECK(!ssr_match_chance_setup(&m, 50, 50, 1).captain);
+    m.setup.captain = 3;
+    m.setup.subTime = 60;
+    CHECK(!ssr_match_chance_setup(&m, 50, 50, 1).captain);
+}
+
 int main(void) {
+    test_the_captain_draws_runs();
     test_a_dribble_leads_to_an_attack();
     test_plays_a_match();
     test_counts_the_goals_of_the_player();

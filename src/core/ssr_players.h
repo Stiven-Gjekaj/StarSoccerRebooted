@@ -73,6 +73,9 @@ typedef struct {
     float startX, startY;
     // 1 when the chance came from a corner: no offside.
     int wasCorner;
+    // 1 when the player is the captain of the team in this match and
+    // started it. The captain draws the runs of the team-mates.
+    int captain;
 } SSRChanceInfo;
 
 // What the players see of the ball (c_TBall).

@@ -231,6 +231,8 @@ SSRMatchPlayer *ssr_players_add_attacker(SSRPlayers *players, const SSRChanceInf
     if (!p) return NULL;
     p->image = ssr_rand(random, 2);
     if (chance->chanceType != 4) p->calling = ssr_rand_float(random, -1.5f, 1.5f);
+    int type = chance->chanceType;
+    p->canMakeRun = chance->captain && type != 9 && type != 10 && type != 4;
     int k = count_type(players, SSR_PLAYER_ATTACKER);
     int minDefY = 960;
     for (int i = 0; i < players->count; i++) {

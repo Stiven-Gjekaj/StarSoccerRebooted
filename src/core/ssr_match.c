@@ -548,6 +548,11 @@ SSRChanceSetup ssr_match_chance_setup(const SSRMatch *m, int technique, int powe
     c.chances = m->chances;
     c.windSpeed = m->windSpeed;
     c.windDirection = m->windDirection;
+    // The captain of a club match is captain 1 or 3, of a nation match 2 or
+    // 3. Only a player that started the match draws runs.
+    int cap = s->captain;
+    int captain = s->level == 0 ? cap == 1 || cap == 3 : s->level == 1 ? cap == 2 || cap == 3 : 0;
+    c.captain = captain && s->subTime == 0;
     return c;
 }
 

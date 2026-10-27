@@ -16,6 +16,14 @@ static float direction_to(float ax, float ay, float bx, float by) {
     return a < 0 ? a + 360 : a;
 }
 
+static float cos_degrees(float a) {
+    return (float)cos((double)(a * D2R));
+}
+
+static float sin_degrees(float a) {
+    return (float)sin((double)(a * D2R));
+}
+
 // The x of the start of the ball of a midfield or attack chance.
 static float start_x(int pitchSide, SSRRandom *random) {
     if (pitchSide == 0) return ssr_rand_float(random, 140, 320);
@@ -145,6 +153,7 @@ void ssr_chance_start(SSRChance *c, const SSRChanceSetup *setup, SSRRandom *rand
     c->info.minute = setup->minute;
     c->info.starLevel = setup->starLevel;
     c->info.clubId = setup->clubId;
+    c->info.captain = setup->captain;
     // LoadPitchImages chooses the side of the pitch. A penalty has its own
     // pitch, with the goal in the middle [I].
     c->info.pitchSide = ssr_rand(random, 3) - 1;
@@ -440,15 +449,46 @@ static void update_players(SSRChance *c, SSRRandom *random) {
     ssr_players_update(&c->players, &c->info, &b, c->now, random);
 }
 
+// c_TMatchPlayer.UpdateMakeRun for each team-mate that can make a run (the
+// fallback form). A touch within 48 of the team-mate takes it. The drag
+// sets the run, from 25 to the max. A release within 25 of the team-mate
+// ends the run.
+static void make_runs(SSRChance *c, const SSRTapTouch *touch) {
+    SSRPlayers *ps = &c->players;
+    for (int i = 0; i < ps->count; i++) {
+        SSRMatchPlayer *p = &ps->list[i];
+        if (!p->canMakeRun) continue;
+        if (ps->makeRun == 0 || ps->makeRun != p->id) {
+            if (distance(touch->x, touch->y, p->x, p->y) < 48 && touch->hit) ps->makeRun = p->id;
+        } else if (!touch->down) {
+            ps->makeRun = 0;
+            if (distance(touch->x, touch->y, p->x, p->y) < 25) {
+                p->makeRunDirection = 0;
+                p->makeRunDistance = 0;
+            }
+        } else {
+            p->makeRunDirection = direction_to(p->x, p->y, touch->x, touch->y);
+            float d = distance(p->x, p->y, touch->x, touch->y);
+            float most = (float)SSR_MAKE_RUN_MAX;
+            p->makeRunDistance = d < 25 ? 25 : d > most ? most : d;
+            p->makeRunX = (int)(p->x + cos_degrees(p->makeRunDirection) * p->makeRunDistance);
+            p->makeRunY = (int)(p->y + sin_degrees(p->makeRunDirection) * p->makeRunDistance);
+        }
+    }
+}
+
 static void aim(SSRChance *c, const SSRTapTouch *touch, SSRRandom *random) {
     SSRBall *b = &c->ball;
     if (c->kicking == 0) {
-        if (touch->hit && distance(touch->x, touch->y, b->x, b->y) < b->z * 0.5f + 48) {
+        // The ball waits while the finger draws a run.
+        if (c->players.makeRun == 0 && touch->hit && distance(touch->x, touch->y, b->x, b->y) < b->z * 0.5f + 48) {
             c->kicking = 1;
             c->touchTime = c->now;
             c->touchX = touch->x;
             c->touchY = touch->y;
+            return;
         }
+        make_runs(c, touch);
         return;
     }
     if (touch->down) {

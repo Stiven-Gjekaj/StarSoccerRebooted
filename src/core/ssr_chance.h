@@ -54,10 +54,16 @@ typedef struct {
     float careerGoals, careerPasses;
     // 1 when the boots push the tap ball.
     int controlBoots;
+    // 1 when the player is the captain in this match (SSRChanceInfo).
+    int captain;
     float windSpeed, windDirection;
     // 0 normal, 1 rain, 2 snow.
     int weather;
 } SSRChanceSetup;
+
+// GetMakeRunMaxDist: (int)(Player.FakeStat * 150 / 10 + 150), with the
+// FakeStat 3 of 4.32.
+#define SSR_MAKE_RUN_MAX 195
 
 typedef struct {
     SSRChanceSetup setup;
