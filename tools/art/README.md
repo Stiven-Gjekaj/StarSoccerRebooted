@@ -16,3 +16,4 @@ Impact of macOS.
     /tmp/artenv/bin/python tools/art/stadium.py art
     /tmp/artenv/bin/python tools/art/cards.py art
     /tmp/artenv/bin/python tools/art/casino.py art
+    /tmp/artenv/bin/python tools/art/banners.py art
