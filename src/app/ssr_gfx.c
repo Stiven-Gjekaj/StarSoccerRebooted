@@ -721,20 +721,25 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
     float ascent = ssr_font_ascent(slot->font) * scaleY;
     float rightLean = lineHeight * 0.5f * item->italic;
     float lean = item->italic * lineHeight * 0.2f;
+    // LineSpacing() of a TextBox moves the lines apart. The block of lines
+    // keeps its middle, or its bottom (c_GelTextBoxFR).
+    float spacing = item->wrap && item->lineSpacing > 0 ? item->lineSpacing : 1;
+    float extra = (float)(count - 1) * (spacing - 1) * fontHeight;
     for (int i = 0; i < count; i++) {
         // The baseline of the line, from the top of the box.
-        float below = (float)i * fontHeight;
+        float below = (float)i * fontHeight * spacing;
         float baseline;
         if (item->alignY == 'T') {
             baseline = scaleY * (below + config->padTop);
         } else if (item->alignY == 'B') {
-            baseline = item->h + scaleY * (below - (float)count * fontHeight - config->padBottom);
+            baseline = item->h + scaleY * (below - (float)count * fontHeight - extra - config->padBottom);
         } else if (item->wrap) {
             // c_GelTextBoxFR: the lines start half of their height above
             // the middle of the box. The middle padding then gives the
             // baseline. The game divides the padding by the scale before
             // it scales the lines, so the padding keeps its full size.
-            baseline = item->h * 0.5f + scaleY * (below - (float)count * fontHeight * 0.5f) + config->padMiddle;
+            baseline = item->h * 0.5f + scaleY * (below - (float)count * fontHeight * 0.5f - extra * 0.5f) +
+                       config->padMiddle;
         } else {
             baseline = (item->h - lineHeight) * 0.5f + scaleY * config->padMiddle;
         }

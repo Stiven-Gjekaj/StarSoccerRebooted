@@ -1540,6 +1540,25 @@ static void test_pads_a_text(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// LineSpacing() spaces the lines of a TextBox. A Text has one line, and it
+// keeps the spacing 1 (c_LineSpacingHelper).
+static void test_spaces_the_lines_of_a_text_box(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    SSRScene *scene = build("TextBox:(Home,0,0,200,100)\n"
+                            "\tLineSpacing(1.3)\n"
+                            "TextBox:(Away,0,100,200,100)\n"
+                            "Text:(Draw,0,200,200,40)\n"
+                            "\tLineSpacing(1.3)\n",
+                            tweaks, &tree);
+    CHECK(find_text(scene, "Home") && near(find_text(scene, "Home")->lineSpacing, 1.3f));
+    CHECK(find_text(scene, "Away") && near(find_text(scene, "Away")->lineSpacing, 1));
+    CHECK(find_text(scene, "Draw") && near(find_text(scene, "Draw")->lineSpacing, 1));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -1921,6 +1940,7 @@ int main(void) {
     test_shows_the_place_in_a_list();
     test_sorts_children_by_ref();
     test_pads_a_text();
+    test_spaces_the_lines_of_a_text_box();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
