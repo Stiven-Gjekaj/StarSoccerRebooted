@@ -310,9 +310,13 @@ static void draw_atlas_image(SSRGfx *gfx, const SSRAtlasImage *image, const Plac
         float u0 = r[2], v0 = r[3], u1 = r[6], v1 = r[7];
         if (page->rle) {
             // The frame has a texture of its own, so the coordinates are
-            // the whole texture.
-            u0 = v0 = 0;
-            u1 = v1 = 1;
+            // the whole texture. The key can give the box from the bottom
+            // up (y0 > y1), so the top of the frame goes to the top of the
+            // box.
+            u0 = r[0] <= r[4] ? 0.0f : 1.0f;
+            v0 = r[1] <= r[5] ? 0.0f : 1.0f;
+            u1 = 1 - u0;
+            v1 = 1 - v0;
         }
         draw_quad(gfx, texture, p, r[0], r[1], r[4], r[5], u0, v0, u1, v1);
     } else if (image->kind == SSR_ATLAS_SLICED) {
