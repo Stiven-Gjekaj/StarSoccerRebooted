@@ -164,7 +164,29 @@ static void test_the_keeper_dives_at_a_penalty(void) {
     CHECK(!ssr_player_diving(k) && k->z == 0);
 }
 
+// In a dribble chance the nearest defender chases the ball. A defender far
+// above the ball only creeps on its heading.
+static void test_defenders_chase_a_dribble(void) {
+    SSRPlayers players;
+    SSRRandom random = {SSR_RANDOM_START};
+    SSRChanceInfo chance = {.chanceType = 11, .pitchSide = 1, .startX = 320, .startY = 850};
+    ssr_players_clear(&players);
+    SSRMatchPlayer *near = ssr_players_add_defender(&players, &chance, 100, 0, 1, 0, &random);
+    SSRMatchPlayer *far = ssr_players_add_defender(&players, &chance, 100, 0, 1, 0, &random);
+    near->x = 320;
+    near->y = 700;
+    far->x = 100;
+    far->y = 200;
+    SSRPlayerBall ball = {.x = 320, .y = 850, .alive = 1, .kicking = 3, .power = 1, .kickDirection = 270};
+    for (int i = 0; i < 30; i++) ssr_players_update(&players, &chance, &ball, 1000 + i * 16, &random);
+    CHECK(near->chasing && !far->chasing);
+    CHECK(near->y > 700 + 10 && near->anim == SSR_ANIM_RUN);
+    // The far one moves less than one unit a tick.
+    CHECK(fabsf(far->x - 100) + fabsf(far->y - 200) < 30);
+}
+
 int main(void) {
+    test_defenders_chase_a_dribble();
     test_places_the_keeper();
     test_spreads_the_players();
     test_builds_a_wall();

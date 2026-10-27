@@ -49,6 +49,8 @@ typedef struct {
     float calling;
     // A run that the player draws with a finger.
     int canMakeRun;
+    // 1 for the defender nearest the ball in a dribble chance.
+    int chasing;
     float makeRunDirection, makeRunDistance;
     int makeRunX, makeRunY;
 } SSRMatchPlayer;

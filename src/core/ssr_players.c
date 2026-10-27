@@ -482,8 +482,36 @@ static int is_set_piece(int type) {
     return type == 7 || type == 3 || type == 4;
 }
 
+// p_Update for a dribble chance (type 11): the nearest defender chases where
+// the ball goes, the others step along x to the ball. Each always adds a
+// little speed on its heading.
+static void update_dribble_defender(SSRMatchPlayer *p, const SSRPlayerBall *ball) {
+    float sp = ssr_player_speed(p, ball);
+    p->direction = (float)intercept(p, ball, 0, 0);
+    if (!ball->alive) {
+        set_anim(p, SSR_ANIM_STAND);
+        stop(p);
+        return;
+    }
+    if (p->chasing) {
+        p->direction = (float)intercept(p, ball, 1, 0);
+    } else if (ball->y < p->y - 50 || ball->y >= p->y + 250) {
+        stop(p);
+    } else {
+        p->direction = direction_to(p->x, p->y, ball->x, p->y);
+    }
+    p->xVelocity += cos_deg(p->direction) * 0.065f * sp;
+    p->yVelocity += sin_deg(p->direction) * 0.065f * sp;
+    float speed = (float)sqrt((double)(p->xVelocity * p->xVelocity + p->yVelocity * p->yVelocity));
+    set_anim(p, speed > 0.5f ? SSR_ANIM_RUN : SSR_ANIM_STAND);
+}
+
 static void update_player(SSRPlayers *players, SSRMatchPlayer *p, const SSRChanceInfo *chance,
                           const SSRPlayerBall *ball, int now, SSRRandom *random) {
+    if (chance->chanceType == 11 && p->type == SSR_PLAYER_DEFENDER) {
+        update_dribble_defender(p, ball);
+        goto integrate;
+    }
     float ballDistance = distance(p->x, p->y, ball->x, ball->y);
     float bounceDistance = distance(p->x, p->y, ball->bounceX, ball->bounceY);
     float sp = ssr_player_speed(p, ball);
@@ -536,10 +564,11 @@ static void update_player(SSRPlayers *players, SSRMatchPlayer *p, const SSRChanc
             }
         }
     }
+integrate:
     p->x += p->xVelocity;
     p->y += p->yVelocity;
     p->z += p->zVelocity;
-    float f = 0.98f;
+    float f = chance->chanceType == 11 ? 0.96f : 0.98f;
     p->xVelocity *= f;
     p->yVelocity *= f;
     p->zVelocity -= 0.15f;
@@ -566,6 +595,21 @@ static void update_player(SSRPlayers *players, SSRMatchPlayer *p, const SSRChanc
 void ssr_players_update(SSRPlayers *players, const SSRChanceInfo *chance, const SSRPlayerBall *ball, int now,
                         SSRRandom *random) {
     if (ball->kicking < 2) players->offsideLine = ssr_players_offside_line(players, chance, ball);
+    if (chance->chanceType == 11) {
+        // UpdateDribbleChasers: the nearest player chases, the first on a tie.
+        int best = -1;
+        float bestDistance = 0;
+        for (int i = 0; i < players->count; i++) {
+            SSRMatchPlayer *p = &players->list[i];
+            p->chasing = 0;
+            float d = distance(p->x, p->y, ball->x, ball->y);
+            if (best < 0 || d < bestDistance) {
+                best = i;
+                bestDistance = d;
+            }
+        }
+        if (best >= 0) players->list[best].chasing = 1;
+    }
     for (int i = 0; i < players->count; i++) {
         SSRMatchPlayer *p = &players->list[i];
         update_player(players, p, chance, ball, now, random);
