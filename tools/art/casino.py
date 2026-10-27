@@ -148,3 +148,64 @@ tw = natural_width('SSR', 11, track=0.06)
 d = text_path('SSR', 0, 0, tw, 11, track=0.06)
 body += f'<g transform="translate({39 - tw / 2 + 1:.1f} 49) skewX(-14)"><path d="{d}" fill="#ffffff"/></g>'
 save('CardBack.patch', body, 77, 110)
+
+
+# IBlackJackColour.patch (273 x 210): the icon of blackjack has three
+# marks. Each part of the patch covers one.
+body = TABLE
+# The mark on the table, above the arc of the banner. Each column gets the
+# felt again: a blend from the colour above the mark at the top to the
+# colour above the banner at the bottom (x, the last row, top, bottom).
+FELT = [(128, 170, 0x1f5546, 0x104c3c), (132, 171, 0x1f5747, 0x0f4c3c), (136, 169, 0x1f5748, 0x104e3d),
+        (140, 169, 0x205949, 0x104f3d), (144, 170, 0x225a4a, 0x10503e), (148, 170, 0x225b4a, 0x10513e),
+        (152, 170, 0x235c4c, 0x10523f), (156, 169, 0x235d4c, 0x105340), (160, 169, 0x245e4f, 0x105340),
+        (164, 167, 0x245f4f, 0x105441), (168, 168, 0x256050, 0x105441), (172, 166, 0x256150, 0x115643),
+        (176, 167, 0x256151, 0x105542), (180, 165, 0x276253, 0x115642), (184, 166, 0x276453, 0x115743),
+        (188, 164, 0x276453, 0x125643), (192, 165, 0x286554, 0x115643), (196, 164, 0x286454, 0x125643),
+        (200, 163, 0x296756, 0x125743), (204, 162, 0x296655, 0x125743), (208, 160, 0x2a6757, 0x135845),
+        (212, 161, 0x2a6657, 0x135845), (216, 159, 0x2a6756, 0x145846), (220, 158, 0x2a6656, 0x145946),
+        (224, 158, 0x2a6656, 0x145946), (228, 157, 0x2a6757, 0x155847), (232, 156, 0x2b6656, 0x185b47),
+        (236, 155, 0x2b6756, 0x175b48), (240, 152, 0x2b6656, 0x175b49), (244, 151, 0x2c6757, 0x175b48),
+        (248, 150, 0x2c6557, 0x185c49), (252, 148, 0x2d6656, 0x195c4a), (256, 147, 0x2e6657, 0x195c4a),
+        (260, 145, 0x2e6657, 0x1a5c4b), (264, 144, 0x2f6557, 0x1a5b4b), (272, 142, 0x2f6557, 0x1a5b4b)]
+
+
+def rgb(v):
+    return (v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff
+
+
+def blend(a, b, t):
+    return tuple(int(round(p + (q - p) * t)) for p, q in zip(a, b))
+
+
+for x in range(128, 271):
+    k = min((x - 128) // 4, len(FELT) - 2)
+    (xa, ba, ta, ua), (xb, bb, tb, ub) = FELT[k], FELT[k + 1]
+    f = (x - xa) / (xb - xa)
+    top = int(132 - 0.23 * (x - 133))
+    last = int(round(ba + (bb - ba) * f))
+    upper = blend(rgb(ta), rgb(tb), f)
+    lower = blend(rgb(ua), rgb(ub), f)
+    for y in range(top, last + 1):
+        c = blend(upper, lower, (y - top) / max(1, last - top))
+        body += f'<rect x="{x}" y="{y}" width="1" height="1" fill="rgb{c}"/>'
+S = 30
+th = 28
+tw = natural_width('SSR', th, track=0.03)
+body += '<g transform="translate(140 130) rotate(-7.4)">'
+cx, cy = S / 2, S * 0.53
+body += (f'<g filter="url(#sh)"><rect x="0" y="0" width="{S}" height="{S}" fill="url(#green)"/>'
+         f'{bevel_star(cx, cy, S * 0.43, S * 0.175)}</g>')
+d = text_path('SSR', S + 5, 1, tw, th, track=0.03)
+body += f'<g filter="url(#sh)"><path d="{d}" fill="url(#silver)"/></g></g>'
+# The top of the ace: NEW goes, so that the card says STAR and SOCCER
+# round the spade. The card is white there.
+body += '<path d="M85,41 H106 V54 L102,55 L101,59 H85 Z" fill="#ffffff"/>'
+# The band of the card back: a white plate across the band, with SSR in
+# the blue of the card.
+body += ('<g transform="translate(64.5 93) rotate(-10.8)">'
+         '<rect x="-22" y="-8" width="44" height="16" fill="#f5f8fe"/>')
+tw = natural_width('SSR', 12, track=0.06)
+d = text_path('SSR', -tw / 2, -6, tw, 12, track=0.06)
+body += f'<path d="{d}" fill="#5493e8"/></g>'
+save('IBlackJackColour.patch', body, 273, 210)
