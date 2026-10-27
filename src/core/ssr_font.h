@@ -17,6 +17,9 @@ typedef struct SSRFont SSRFont;
 typedef struct {
     float x0, y0, x1, y1;
     float u0, v0, u1, v1;
+    // 0 for a glyph of the atlas, or the number from 1 of the icon of the
+    // font that the quad shows (u and v are then 0 to 1).
+    int icon;
 } SSRGlyphQuad;
 
 // Reads the TTF font at path with an em of emSize pixels, as the text size
@@ -49,6 +52,12 @@ int ssr_font_layout(SSRFont *font, const char *text, float x, float y, SSRGlyphQ
 // The width of the widest line of the text.
 float ssr_font_measure(SSRFont *font, const char *text);
 
+// An image in the place of a character (Inject: of Fonts.txt), for example
+// the star of the bux. The image is width x height pixels. Its left is at
+// the pen plus bearingX, its top is bearingY above the baseline, and the pen
+// moves by advance. Returns the number of the icon from 1, or 0.
+int ssr_font_add_icon(SSRFont *font, uint32_t code, int width, int height, int bearingX, int bearingY, int advance);
+
 // The atlas: one byte of coverage for each pixel. version changes each time
 // that the font adds glyphs, so that the caller knows when to upload it.
 const unsigned char *ssr_font_atlas(const SSRFont *font, int *version);
@@ -64,6 +73,14 @@ typedef struct {
     // The space at the sides of a box, and the distance from the top of a
     // box, of the middle, and of the bottom to the baseline.
     float padLeft, padRight, padTop, padMiddle, padBottom;
+    // The images in the place of characters: "Inject:code:file:bearingX:
+    // bearingY:advance:flags".
+    struct {
+        uint32_t code;
+        char file[64];
+        int bearingX, bearingY, advance, flags;
+    } icons[4];
+    int iconCount;
 } SSRFontSlot;
 
 // Reads the slots of the first font set with the name set, or of the set

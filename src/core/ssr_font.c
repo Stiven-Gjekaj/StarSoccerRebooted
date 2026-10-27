@@ -44,6 +44,12 @@ typedef struct {
     float factor;
 } KernPair;
 
+// An image in the place of a character.
+typedef struct {
+    uint32_t code;
+    int w, h, bearingX, bearingY, advance;
+} Icon;
+
 struct SSRFont {
     unsigned char *file;
     stbtt_fontinfo info;
@@ -61,7 +67,28 @@ struct SSRFont {
     int spacing;
     KernPair *kerns;
     int kernCount;
+    Icon icons[8];
+    int iconCount;
 };
+
+static int icon_for(const SSRFont *font, uint32_t c) {
+    for (int i = 0; i < font->iconCount; i++) {
+        if (font->icons[i].code == c) return i + 1;
+    }
+    return 0;
+}
+
+int ssr_font_add_icon(SSRFont *font, uint32_t code, int width, int height, int bearingX, int bearingY, int advance) {
+    if (!font || font->iconCount >= 8) return 0;
+    int i = font->iconCount++;
+    font->icons[i].code = code;
+    font->icons[i].w = width;
+    font->icons[i].h = height;
+    font->icons[i].bearingX = bearingX;
+    font->icons[i].bearingY = bearingY;
+    font->icons[i].advance = advance;
+    return i + 1;
+}
 
 uint32_t ssr_utf8_next(const char **text) {
     const unsigned char *p = (const unsigned char *)*text;
@@ -121,7 +148,7 @@ int ssr_font_read_set(const char *text, const char *set, SSRFontSlot *slots, int
     if (!text || !set || !slots || max <= 0) return 0;
     const char *android = strstr(text, "#ANDROID");
     const char *p = android ? android + 8 : text;
-    int inSet = 0, count = 0;
+    int inSet = 0, count = 0, last = -1;
     while (*p) {
         const char *line = skip_space(p);
         const char *end = line;
@@ -138,8 +165,32 @@ int ssr_font_read_set(const char *text, const char *set, SSRFontSlot *slots, int
             inSet = strcmp(name, set) == 0 || strcmp(name, "default") == 0;
             continue;
         }
-        if (!inSet || strncmp(line, "Inject", 6) == 0) continue;
+        if (!inSet) continue;
         char part[128];
+        if (strncmp(line, "Inject", 6) == 0) {
+            // The icon belongs to the slot of the line before it.
+            if (last < 0) continue;
+            SSRFontSlot *slot = &slots[last];
+            if (slot->iconCount >= 4) continue;
+            int values[5] = {0};
+            const char *q = field(line, ':', part, sizeof(part));
+            if (q) q = field(q, ':', part, sizeof(part));
+            uint32_t code = (uint32_t)strtoul(part, NULL, 10);
+            char file[64] = "";
+            if (q) q = field(q, ':', file, sizeof(file));
+            for (int i = 0; i < 4 && q; i++) {
+                q = field(q, ':', part, sizeof(part));
+                values[i] = atoi(part);
+            }
+            int at = slot->iconCount++;
+            slot->icons[at].code = code;
+            snprintf(slot->icons[at].file, sizeof(slot->icons[at].file), "%.*s", (int)strcspn(file, " \t\r"), file);
+            slot->icons[at].bearingX = values[0];
+            slot->icons[at].bearingY = values[1];
+            slot->icons[at].advance = values[2];
+            slot->icons[at].flags = values[3];
+            continue;
+        }
         const char *q = field(line, ':', part, sizeof(part));
         int index = atoi(part);
         if (!q || index < 0 || index >= max) continue;
@@ -168,6 +219,7 @@ int ssr_font_read_set(const char *text, const char *set, SSRFontSlot *slots, int
             slot->padBottom = pad[4];
         }
         if (index + 1 > count) count = index + 1;
+        last = index;
     }
     return count;
 }
@@ -370,6 +422,24 @@ int ssr_font_layout(SSRFont *font, const char *text, float x, float y, SSRGlyphQ
             previous = 0;
             continue;
         }
+        int icon = icon_for(font, c);
+        if (icon) {
+            const Icon *n = &font->icons[icon - 1];
+            if (quads && count < max) {
+                SSRGlyphQuad *q = &quads[count];
+                q->x0 = floorf(penX + 0.5f) + (float)n->bearingX;
+                q->y0 = floorf(baseline + 0.5f) - (float)n->bearingY;
+                q->x1 = q->x0 + (float)n->w;
+                q->y1 = q->y0 + (float)n->h;
+                q->u0 = q->v0 = 0;
+                q->u1 = q->v1 = 1;
+                q->icon = icon;
+            }
+            count++;
+            penX += (float)n->advance + (float)font->spacing;
+            previous = 0;
+            continue;
+        }
         const Glyph *g = glyph_for(font, c);
         if (!g) continue;
         if (previous) penX += kerning(font, previous, previousInk, c);
@@ -384,6 +454,7 @@ int ssr_font_layout(SSRFont *font, const char *text, float x, float y, SSRGlyphQ
                 q->v0 = (float)g->ay / SSR_FONT_ATLAS_SIZE;
                 q->u1 = (float)(g->ax + g->w) / SSR_FONT_ATLAS_SIZE;
                 q->v1 = (float)(g->ay + g->h) / SSR_FONT_ATLAS_SIZE;
+                q->icon = 0;
             }
             count++;
         }
@@ -404,6 +475,12 @@ float ssr_font_measure(SSRFont *font, const char *text) {
         if (c == '\n') {
             if (penX > widest) widest = penX;
             penX = 0;
+            previous = 0;
+            continue;
+        }
+        int icon = icon_for(font, c);
+        if (icon) {
+            penX += (float)font->icons[icon - 1].advance + (float)font->spacing;
             previous = 0;
             continue;
         }

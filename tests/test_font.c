@@ -50,6 +50,10 @@ static void test_reads_a_font_set(void) {
     CHECK(strcmp(slots[0].file, "Veriox-Rg.ttf") == 0 && slots[0].size == 31 && slots[0].spacing == -1);
     CHECK(slots[1].size == 44 && slots[1].spacing == -2 && slots[1].padLeft == 6 && slots[1].padRight == 5);
     CHECK(slots[1].padTop == 45 && slots[1].padMiddle == 40 && slots[1].padBottom == -40);
+    // The Inject: line gives the star of the bux to the slot above it.
+    CHECK(slots[0].iconCount == 1 && slots[1].iconCount == 0 && slots[0].icons[0].code == 9733);
+    CHECK(strcmp(slots[0].icons[0].file, "newstarbuck32.png") == 0 && slots[0].icons[0].bearingY == 28);
+    CHECK(slots[0].icons[0].advance == 30 && slots[0].icons[0].flags == 255);
     // A set that is not there gives the default set.
     CHECK(ssr_font_read_set(text, "classic", slots, 4) == 1 && strcmp(slots[0].file, "TCB.ttf") == 0);
     // A file with no "#ANDROID" uses all of its text.
@@ -75,6 +79,25 @@ static const char *system_font(void) {
         }
     }
     return NULL;
+}
+
+// The star of the bux takes the place of its character: a quad of the size
+// of the image, above the baseline, and the advance of the Inject: line.
+static void test_lays_out_an_icon(const char *path) {
+    SSRFont *font = ssr_font_load(path, 32);
+    CHECK(font != NULL);
+    if (!font) return;
+    CHECK(ssr_font_add_icon(font, 9733, 32, 32, 0, 28, 30) == 1);
+    SSRGlyphQuad quads[8];
+    float star = ssr_font_measure(font, "\xE2\x98\x85");
+    CHECK(star == 30 + 0);
+    float plain = ssr_font_measure(font, "9");
+    CHECK(ssr_font_measure(font, "\xE2\x98\x85" "9") == 30 + plain);
+    CHECK(ssr_font_layout(font, "\xE2\x98\x85" "9", 10, 0, quads, 8) == 2);
+    float baseline = floorf(ssr_font_ascent(font) + 0.5f);
+    CHECK(quads[0].icon == 1 && quads[0].x0 == 10 && quads[0].y0 == baseline - 28);
+    CHECK(quads[0].x1 - quads[0].x0 == 32 && quads[0].u1 == 1 && quads[1].icon == 0 && quads[1].x0 >= 40);
+    ssr_font_free(font);
 }
 
 static void test_lays_out_text(const char *path) {
@@ -167,5 +190,6 @@ int main(void) {
         return TEST_RESULT() ? 1 : SKIPPED;
     }
     test_lays_out_text(path);
+    test_lays_out_an_icon(path);
     return TEST_RESULT();
 }
