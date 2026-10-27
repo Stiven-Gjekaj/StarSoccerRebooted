@@ -72,6 +72,10 @@ typedef struct {
     // The seed of the world, and the stream of the people.
     int seed;
     SSRRandom random;
+    // The transfers of the last new season: the player, the old club, and
+    // the new club. They are not in the file.
+    int moves[16][3];
+    int moveCount;
 } SSRPeople;
 
 SSRPeople *ssr_people_create(int seed);

@@ -123,12 +123,15 @@ static void test_runs_the_seasons(void) {
     squad[21]->seasonGoals = 20;
     int moved = 0;
     for (int year = 2; year <= 24; year++) {
-        moved += ssr_people_new_season(people, world, names, year);
+        int now = ssr_people_new_season(people, world, names, year);
+        moved += now;
+        CHECK(people->moveCount == (now < 16 ? now : 16));
+        for (int m = 0; m < people->moveCount; m++) CHECK(ssr_people_find(people, people->moves[m][0])->club == people->moves[m][2]);
         CHECK(ssr_people_squad(people, 10, NULL, 0) >= SSR_SQUAD_SIZE);
         CHECK(ssr_people_squad(people, 11, NULL, 0) >= SSR_SQUAD_SIZE);
         if (year == 2) CHECK(ssr_people_find(people, star)->seasonGoals == 0);
     }
-    CHECK(moved > 0);
+    CHECK(moved > 0 && people->moveCount <= moved);
     int retired = 0, firstSquad = 0;
     for (int i = 0; i < people->count; i++) {
         retired += people->list[i].retired > 0;

@@ -416,6 +416,12 @@ static int transfers(SSRPeople *people, const SSRWorld *world, const int *clubs,
         if (!out || out->skill >= p->skill) continue;
         out->club = from->id;
         p->club = to->id;
+        if (people->moveCount < 16) {
+            int *move = people->moves[people->moveCount++];
+            move[0] = p->id;
+            move[1] = from->id;
+            move[2] = to->id;
+        }
         moves++;
     }
     return moves;
@@ -438,6 +444,7 @@ int ssr_people_new_season(SSRPeople *people, const SSRWorld *world, const SSRNam
     }
     int clubs[4096];
     int clubCount = squad_clubs(people, clubs, 4096);
+    people->moveCount = 0;
     int moves = transfers(people, world, clubs, clubCount, year);
     // New young players fill each squad.
     for (int k = 0; k < clubCount; k++) {
