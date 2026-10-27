@@ -39,6 +39,7 @@ void ssr_career_create(SSRCareer *c, const char *first, const char *last, int ge
     // The values of the remote configuration of the game, when it is off.
     c->bank = 15;
     c->relationBoss = c->relationTeam = c->relationFans = 75;
+    c->debut = 1;
     c->energy = 100;
     c->nrg[0] = c->nrg[1] = c->nrg[2] = 1;
     for (int i = 0; i < 10; i++) c->ratings[i] = 5;
@@ -195,6 +196,8 @@ void ssr_career_reset_season(SSRCareer *c) {
     // The boss and the team forget a tenth of the relation.
     c->relationBoss -= c->relationBoss * 0.1f;
     c->relationTeam -= c->relationTeam * 0.1f;
+    c->relationBossInt -= c->relationBossInt * 0.1f;
+    c->relationTeamInt -= c->relationTeamInt * 0.1f;
 }
 
 int ssr_career_save(const SSRCareer *c, const char *path) {
@@ -213,6 +216,9 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     fprintf(file, "energy=%g\n", c->energy);
     fprintf(file, "relationboss=%g\nrelationteam=%g\nrelationfans=%g\n", c->relationBoss, c->relationTeam,
             c->relationFans);
+    fprintf(file, "relationbossint=%g\nrelationteamint=%g\nrelationfansint=%g\n", c->relationBossInt,
+            c->relationTeamInt, c->relationFansInt);
+    fprintf(file, "debut=%d\nintnotpickedmsg=%d\n", c->debut, c->intNotPickedMessage);
     write_ints(file, "technique", c->technique, SSR_CAREER_SKILL_LEVELS);
     write_ints(file, "pace", c->pace, SSR_CAREER_SKILL_LEVELS);
     write_ints(file, "vision", c->vision, SSR_CAREER_SKILL_LEVELS);
@@ -303,6 +309,11 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "relationboss") == 0) c->relationBoss = real;
         else if (strcmp(key, "relationteam") == 0) c->relationTeam = real;
         else if (strcmp(key, "relationfans") == 0) c->relationFans = real;
+        else if (strcmp(key, "relationbossint") == 0) c->relationBossInt = real;
+        else if (strcmp(key, "relationteamint") == 0) c->relationTeamInt = real;
+        else if (strcmp(key, "relationfansint") == 0) c->relationFansInt = real;
+        else if (strcmp(key, "debut") == 0) c->debut = number;
+        else if (strcmp(key, "intnotpickedmsg") == 0) c->intNotPickedMessage = number;
         else if (strcmp(key, "technique") == 0) read_ints(value, c->technique, SSR_CAREER_SKILL_LEVELS);
         else if (strcmp(key, "pace") == 0) read_ints(value, c->pace, SSR_CAREER_SKILL_LEVELS);
         else if (strcmp(key, "vision") == 0) read_ints(value, c->vision, SSR_CAREER_SKILL_LEVELS);

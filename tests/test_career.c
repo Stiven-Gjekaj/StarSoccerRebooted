@@ -9,6 +9,12 @@
 #include "ssr_zipwriter.h"
 
 static void test_creates_a_career(void) {
+    {
+        SSRCareer fresh;
+        ssr_career_create(&fresh, "A", "B", 0, 0, 62, 1, 1, 1);
+        // The nation does not know the player yet.
+        CHECK(fresh.debut == 1 && fresh.relationBossInt == 0);
+    }
     SSRCareer c;
     ssr_career_create(&c, " Billy ", "", 1, 0, 62, 1, 1, 0);
     CHECK(strcmp(c.fullName, "Billy") == 0 && strcmp(c.shortName, "Billy") == 0);
@@ -43,6 +49,10 @@ static void test_saves_and_loads_a_career(void) {
     ssr_career_add_form(c.form, 8);
     c.intForm[0] = 3;
     c.potyAwards = 2;
+    c.relationBossInt = 60;
+    c.relationFansInt = 12.5f;
+    c.debut = 0;
+    c.intNotPickedMessage = 400;
     c.wonMajorAward = 1;
     snprintf(c.headline, sizeof(c.headline), "Line one\nA \\ two");
     char path[1200];
@@ -60,11 +70,13 @@ static void test_saves_and_loads_a_career(void) {
     // The newest form is last.
     CHECK(back.form[3] == 6 && back.form[4] == 8 && back.form[0] == 0 && back.intForm[0] == 3);
     CHECK(back.potyAwards == 2 && back.wonMajorAward == 1);
+    CHECK(back.relationBossInt == 60 && back.relationFansInt == 12.5f && back.debut == 0);
+    CHECK(back.intNotPickedMessage == 400);
     // The new season starts the counts again.
     back.energy = 20;
     back.relationBoss = 50;
     ssr_career_reset_season(&back);
-    CHECK(back.relationBoss == 45);
+    CHECK(back.relationBoss == 45 && back.relationBossInt == 54);
     CHECK(back.seasonApps == 0 && back.seasonTotalRating == 0 && back.wonMajorAward == 0 && back.energy == 100);
     CHECK(back.apps == 12 && back.potyAwards == 2 && back.form[4] == 8);
     back.sdate = 1;

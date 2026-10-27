@@ -33,6 +33,14 @@ typedef struct {
     int assistBonus;
     float energy;
     float relationBoss, relationTeam, relationFans;
+    // The relations with the boss, the team, and the fans of the nation.
+    // They start at 0, so a young player is not picked for the nation.
+    float relationBossInt, relationTeamInt, relationFansInt;
+    // 1 before the first match of the career (c_TPlayer.m_debut).
+    int debut;
+    // The day of the last message of the nation that did not pick the
+    // player (c_TPlayer.internationalnotpickedmsg).
+    int intNotPickedMessage;
     // The skills: the score of each level of each skill. 0 is not trained.
     int technique[SSR_CAREER_SKILL_LEVELS];
     int pace[SSR_CAREER_SKILL_LEVELS];
