@@ -202,18 +202,22 @@ place of the atlas image with the same name (`art/NewStarLogo.png`).
 
 - [x] Replace an atlas image with a file of `art/`
 - [x] The logo of Star Soccer Rebooted on the title (`NewStarLogo`)
-- [ ] The "TM" after the SOCCER letters of the title (`TitleMacros.uis`)
+- [x] The "TM" after the SOCCER letters of the title (`TitleMacros.uis`)
 - [x] The TV of the match (`MapNSGTVLogo`) and the sponsor of the match
       (`NSGamesLogo`)
 - [x] The newspaper (`NSNewsLogo`, `CLHeaderNewsLogo`)
 - [x] The boards and the roof of the stadiums (`BannerTopS2`,
       `BannerFrontAbv`)
-- [ ] The other marks: `BannerFrontLogo`, `LogoStrip`, `CLNewStar`, the
-      sponsor images of `Images/`, the shirt card of the pairs game
-      (`PShirt`), the back of the cards (`PCardBackPattern1`), the
-      microphones of the interview (`InterviewMics`), the background of
-      the scroll windows (`M_BGScrollWindow`), and the "NS-" names of the
-      boots and the balls
+- [x] The shirt card of the pairs game (`PShirt`), the back of the cards
+      (`PCardBackPattern1`), the strip behind the scroll windows
+      (`LogoStrip`), and the banner of the classic match (`CLNewStar`)
+- [x] The names in the text: "New Star Soccer", "NSS", and the "NS-" names
+      of the boots and the balls. The credits keep the names of the
+      original.
+- [ ] The microphones of the interview (`InterviewMics`). It is a
+      stripped image, and a patch works only on a plain image.
+- [ ] The sponsor images of `Images/`
+- `BannerFrontLogo` stays: it is a ball with a star, with no name.
 
 ## Not in the remake
 
