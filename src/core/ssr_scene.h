@@ -137,6 +137,10 @@ const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y);
 // NULL when the item has no click.
 const char *ssr_scene_click(SSRScene *scene, const SSRSceneEnv *env, const SSRSceneItem *item);
 
+// 1 when the last touch moved a swipe panel by more than 10 units. Then
+// the touch is not a click, as in the game.
+int ssr_scene_dragged(const SSRScene *scene);
+
 // The next sound that a click asked for, or NULL when there is none.
 const char *ssr_scene_take_sound(SSRScene *scene);
 

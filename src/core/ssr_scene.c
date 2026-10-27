@@ -81,6 +81,8 @@ typedef enum {
     D_INCREMENT_TWEAK,
     D_IF,
     D_PLAY_SOUND,
+    D_SCROLLING_LIST,
+    D_SWIPE_PANEL,
     D_EMIT_PLACER,
     D_EMIT_MOVER,
     D_EMIT_SPINNER,
@@ -248,6 +250,13 @@ struct SSRScene {
     float touchX, touchY;
     Gel *pressed;
     Gel *candidate;
+    // The swipe (SwipePanel): the gel that the touch started on, and if the
+    // touch moved more than 10 units, so that it is not a click.
+    int touchWasDown;
+    int touchStarted;
+    Gel *swipe;
+    Gel *swipeCandidate;
+    int dragged;
 
     // The state of the walk of a frame.
     const SSRSceneEnv *env;
@@ -971,6 +980,26 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         d->text[1] = keep(s, arg(m, 1));
         d->v[0] = (float)number(s, m, 2, 0);
         d->v[1] = (float)number(s, m, 3, 0);
+    } else if (is(n, "ScrollingList")) {
+        // ScrollingList(Cat,Scroll,height,Cat,Velocity) (c_ScrollingList).
+        d = new_doodad(D_SCROLLING_LIST, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+        d->v[0] = (float)number(s, m, 2, 0);
+        char velocity[160];
+        snprintf(velocity, sizeof(velocity), "%s\x1f%s", arg(m, 3), arg(m, 4));
+        d->text[2] = keep(s, velocity);
+    } else if (is(n, "SwipePanel")) {
+        // SwipePanel(Cat,Scroll,Cat,Velocity): a drag moves the scroll
+        // (c_SwipePanel).
+        d = new_doodad(D_SWIPE_PANEL, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+        char velocity[160];
+        snprintf(velocity, sizeof(velocity), "%s\x1f%s", arg(m, 2), arg(m, 3));
+        d->text[2] = keep(s, velocity);
     } else if (is(n, "if")) {
         d = new_doodad(D_IF, m);
         if (!d) return NULL;
@@ -1669,6 +1698,23 @@ static void readout_text(float value, int decimals, char *out, size_t capacity) 
     snprintf(out, capacity, "%.*s", keep, text);
 }
 
+// The second tweak of a doodad: "Group\x1fName" in text[2].
+static double tweak_pair(const SSRScene *s, const char *pair) {
+    char group[80];
+    const char *split = strchr(pair, '\x1f');
+    if (!split) return 0;
+    snprintf(group, sizeof(group), "%.*s", (int)(split - pair), pair);
+    return ssr_tweaks_number(s->env->tweaks, group, split + 1);
+}
+
+static void set_tweak_pair(const SSRScene *s, const char *pair, double value) {
+    char group[80];
+    const char *split = strchr(pair, '\x1f');
+    if (!split) return;
+    snprintf(group, sizeof(group), "%.*s", (int)(split - pair), pair);
+    ssr_tweaks_set_number(s->env->tweaks, group, split + 1, value);
+}
+
 static void update(SSRScene *s, Gel *g, Doodad *d) {
     float t = s->tweenT;
     switch (d->kind) {
@@ -1837,6 +1883,54 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
             if (d->flags & F_FIRED) rearm(d->chain);
             pump(s, g, d->other);
             d->flags &= ~F_FIRED;
+        }
+        break;
+    }
+    case D_SCROLLING_LIST: {
+        float at = (float)ssr_tweaks_number(s->env->tweaks, d->text[0], d->text[1]);
+        float contents = 0;
+        for (int i = 0; i < g->childCount; i++) {
+            const Gel *child = g->children[i];
+            if (!child->hidden && child->y + child->h > contents) contents = child->y + child->h;
+        }
+        float lowest = d->v[0] - contents;
+        if (lowest > 0) lowest = 0;
+        float velocity = (float)tweak_pair(s, d->text[2]);
+        float y = clampf(at + velocity, lowest - 64, 64);
+        velocity *= 0.95f;
+        g->y = y;
+        // Past an end, the list goes back with a spring.
+        if (y > 0) {
+            y *= 0.9f;
+            if (velocity > 0) velocity = 0;
+        }
+        if (y < lowest) {
+            y = (y - lowest) * 0.9f + lowest;
+            if (velocity < 0) velocity = 0;
+        }
+        set_tweak_pair(s, d->text[2], velocity);
+        ssr_tweaks_set_number(s->env->tweaks, d->text[0], d->text[1], y);
+        break;
+    }
+    case D_SWIPE_PANEL: {
+        if (s->swipe != g) break;
+        float lx, ly;
+        mat_apply(mat_inverse(g->baked), s->touchX, s->touchY, &lx, &ly);
+        if (s->touchStarted) {
+            d->v[0] = ly;
+            d->v[1] = ly;
+            d->v[2] = (float)ssr_tweaks_number(s->env->tweaks, d->text[0], d->text[1]);
+            d->v[3] = 0;
+        } else if (s->touchDown) {
+            d->v[3] = ly - d->v[1];
+            d->v[1] = ly;
+            ssr_tweaks_set_number(s->env->tweaks, d->text[0], d->text[1], d->v[2] + (ly - d->v[0]));
+            if (fabsf(d->v[0] - ly) > 10) s->dragged = 1;
+        } else {
+            // The list keeps the speed of the last move.
+            if (d->v[3] != 0) set_tweak_pair(s, d->text[2], d->v[3]);
+            d->v[3] = 0;
+            s->swipe = NULL;
         }
         break;
     }
@@ -2265,6 +2359,12 @@ static void draw_gel(SSRScene *s, Gel *g, const Frame *parent) {
     for (Doodad *d = g->doodads; d; d = d->next) {
         if (d->kind == D_PRESS || d->kind == D_NOPRESS) pressable = 1;
     }
+    for (Doodad *d = g->doodads; d; d = d->next) {
+        if (d->kind != D_SWIPE_PANEL || !s->touchDown) continue;
+        float lx, ly;
+        mat_apply(mat_inverse(f.m), s->touchX, s->touchY, &lx, &ly);
+        if (lx >= -g->hx && lx < g->w - g->hx && ly >= -g->hy && ly < g->h - g->hy) s->swipeCandidate = g;
+    }
     if (pressable && s->touchDown) {
         float lx, ly;
         mat_apply(mat_inverse(f.m), s->touchX, s->touchY, &lx, &ly);
@@ -2393,10 +2493,22 @@ void ssr_scene_update(SSRScene *s, const SSRSceneEnv *env, int ms) {
     s->tweenT = 0;
     s->instance = NULL;
     s->candidate = NULL;
+    s->swipeCandidate = NULL;
     s->crowdRandom.seed = SSR_RANDOM_START;
     Frame top = {mat_identity(), colour_white(), 0, 0};
     draw_children(s, s->root, &top);
     s->pressed = s->touchDown ? s->candidate : NULL;
+    // A new touch picks the swipe panel under it. The panel starts the
+    // swipe in the next frame, as the touch packets of the game do.
+    if (s->touchDown && !s->touchWasDown) {
+        s->swipe = s->swipeCandidate;
+        s->dragged = 0;
+        s->touchStarted = s->swipe != NULL;
+        s->touchWasDown = 1;
+    } else {
+        s->touchStarted = 0;
+        s->touchWasDown = s->touchDown;
+    }
     sweep(s->root);
 
     if (s->count > 1) {
@@ -2601,4 +2713,8 @@ int ssr_scene_list_add(SSRScene *scene, const char *list, const char *template_,
         d->text[2] = keep(scene, value);
     }
     return 1;
+}
+
+int ssr_scene_dragged(const SSRScene *scene) {
+    return scene ? scene->dragged : 0;
 }

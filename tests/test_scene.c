@@ -715,7 +715,53 @@ static void test_fills_lists_and_changes_elements(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// A drag on a swipe panel scrolls the list under it, and the list keeps
+// the speed of the drag, then slows down and stops at its ends.
+static void test_scrolls_a_list_by_a_swipe(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    layout = "Rect:(0,0,400,300)\n"
+             "\tSwipePanel(Combo,Scroll,Combo,ScrollVel)\n"
+             "{\n"
+             "\tRect:(0,0,0,0) ref:List\n"
+             "\t\tScrollingList(Combo,Scroll,300,Combo,ScrollVel)\n"
+             "\t{\n"
+             "\t\tDraw:(Entry,0,0,400,1000)\n"
+             "\t}\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(near(find_image(scene, "Entry")->y, 0));
+    ssr_scene_touch(scene, 1, 200, 200);
+    ssr_scene_update(scene, &env, 16);
+    ssr_scene_update(scene, &env, 16);
+    ssr_scene_touch(scene, 1, 200, 150);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(ssr_scene_dragged(scene));
+    CHECK(near((float)ssr_tweaks_number(tweaks, "Combo", "Scroll"), -50));
+    // The touch goes up while it moves: the list keeps the speed. The list
+    // moves in the same frame, then slows by 0.95.
+    ssr_scene_touch(scene, 0, 200, 150);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(near(find_image(scene, "Entry")->y, -100));
+    CHECK(near((float)ssr_tweaks_number(tweaks, "Combo", "ScrollVel"), -47.5f));
+    for (int i = 0; i < 400; i++) ssr_scene_update(scene, &env, 16);
+    float at = (float)ssr_tweaks_number(tweaks, "Combo", "Scroll");
+    CHECK(at < -100 && at > -710);
+    // A long throw stops at the end of the list: 300 - 1000 = -700.
+    ssr_tweaks_set_number(tweaks, "Combo", "ScrollVel", -500);
+    for (int i = 0; i < 400; i++) ssr_scene_update(scene, &env, 16);
+    CHECK(fabsf((float)ssr_tweaks_number(tweaks, "Combo", "Scroll") + 700) < 1);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_scrolls_a_list_by_a_swipe();
     test_fills_lists_and_changes_elements();
     test_readouts_conditions_and_click_actions();
     test_converges_after_a_delay_and_on_press();
