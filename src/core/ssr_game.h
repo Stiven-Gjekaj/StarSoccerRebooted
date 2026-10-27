@@ -191,6 +191,8 @@ int ssr_game_banner(const SSRGame *game);
 // 1 while the splash message of a drill shows (splashmessage.uis, with the
 // tweak Menu:QuickMessage).
 int ssr_game_splash(const SSRGame *game);
+// The layout of the splash message, for example "splashmessagebux".
+const char *ssr_game_splash_layout(const SSRGame *game);
 
 // The touch of the player in the units of the layouts, for a chance.
 void ssr_game_touch(SSRGame *game, int down, float x, float y);

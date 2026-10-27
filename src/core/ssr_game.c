@@ -205,8 +205,10 @@ struct SSRGame {
     // showed.
     SSRTraining *training;
     const char *trainingMessage;
-    // The splash message ("Success!", "Fail!") shows until this time.
+    // The splash message ("Success!", "Fail!") shows until this time, in
+    // its layout (TQuickMessage).
     int splashEnd;
+    char splashLayout[32];
 
     // The relationships screen (c_TScreen_Relationships): the national
     // view, and the bars whose button sends no click (Boss, Team, Fans,
@@ -280,6 +282,13 @@ static void add_op(SSRGame *game, SSRUiOpKind kind, const char *ref, const char 
     snprintf(op->ref2, sizeof(op->ref2), "%s", ref2 ? ref2 : "");
     snprintf(op->text, sizeof(op->text), "%s", text ? text : "");
     op->id = id;
+}
+
+// TQuickMessage.Create: the text of Menu.QuickMessage shows in the layout
+// for ms.
+static void show_splash(SSRGame *game, const char *layout, int ms) {
+    snprintf(game->splashLayout, sizeof(game->splashLayout), "%s", layout);
+    game->splashEnd = game->now + ms;
 }
 
 // Opens the screen with the layout name.uis (c_TScreen.SetActive). The
@@ -967,7 +976,7 @@ static void trial_tick(SSRGame *game) {
             snprintf(text, sizeof(text), "%s", loc(game, t->message));
             for (char *p = text; *p; p++) *p = (char)toupper((unsigned char)*p);
             ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
-            game->splashEnd = t->messageEnd;
+            show_splash(game, "splashmessage", t->messageEnd - game->now);
         } else {
             // The banner of the result (scoreanim.uis).
             ssr_tweaks_set_number(game->tweaks, "Minigames", "Outcome", t->outcome);
@@ -2749,7 +2758,7 @@ static void season_review(SSRGame *game) {
     // TQuickMessage "splashmessage" for 1500 ms.
     for (char *p = text; *p; p++) *p = (char)toupper((unsigned char)*p);
     ssr_tweaks_set(t, "Menu", "QuickMessage", text);
-    game->splashEnd = game->now + 1500;
+    show_splash(game, "splashmessage", 1500);
     // c_AScreen_SeasonReview.Init.
     ssr_tweaks_set(t, "PlayerStats", "SeasonClub", club->data->tla);
     ssr_tweaks_set(t, "PlayerStats", "SeasonLeague", comp->data->tla);
@@ -3836,7 +3845,7 @@ static void dilemma_screen(SSRGame *game) {
     snprintf(text, sizeof(text), "%s", loc(game, "Dilemma!"));
     upper(text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
-    game->splashEnd = game->now + 2000;
+    show_splash(game, "splashmessage", 2000);
 }
 
 // The fuse parameter dilemma_not_chosen_decay of 4.32.
@@ -4592,7 +4601,7 @@ static void interview_screen(SSRGame *game) {
     snprintf(text, sizeof(text), "%s", loc(game, "Interview!"));
     upper(text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
-    game->splashEnd = game->now + 1500;
+    show_splash(game, "splashmessage", 1500);
     if (c->interviewSkill < 3) c->interviewSkill = 3;
     int skill = c->interviewSkill;
     game->difficulty = skill < 3 ? 3 : skill > 5 ? 5 : skill;
@@ -4697,7 +4706,7 @@ static void interview_end(SSRGame *game, int success) {
     snprintf(text, sizeof(text), "%s", loc(game, success ? "Success!" : "Fail!"));
     upper(text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
-    game->splashEnd = game->now + 1000;
+    show_splash(game, "splashmessage", 1000);
     if (success) game->career.interviewSkill++;
     else game->interviewFail = 1;
     game->ready = game->now > 1 ? game->now : 2;
@@ -5005,7 +5014,7 @@ static void not_enough_cash(SSRGame *game, int shortBy) {
     if (shortBy <= 0) return;
     ssr_tweaks_set_number(game->tweaks, "Menu", "BuxShort", shortBy);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "CMESSAGE_NOTENOUGHCASHSHORT"));
-    game->splashEnd = game->now + 1500;
+    show_splash(game, "splashmessage", 1500);
 }
 
 // UpdateBank: the bank does not go under 0.
@@ -5040,7 +5049,7 @@ static void shop_buy(SSRGame *game) {
     SSRCareer *c = &game->career;
     if (c->retired) {
         ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "Retired"));
-        game->splashEnd = game->now + 1500;
+        show_splash(game, "splashmessage", 1500);
         return;
     }
     const SSRShopItem *item = shop_product(ssr_tweaks_get(game->tweaks, "Menu", "ItemString"));
@@ -5593,7 +5602,7 @@ static void shop_drink(SSRGame *game) {
     if (c->nrg[can] < 1) return;
     if (c->energy >= 100) {
         ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "CMESSAGE_ENERGYFULL"));
-        game->splashEnd = game->now + 1500;
+        show_splash(game, "splashmessage", 1500);
         return;
     }
     shop_close(game);
@@ -5915,7 +5924,7 @@ static void negotiate_screen(SSRGame *game) {
     snprintf(text, sizeof(text), "%s", loc(game, "Negotiate!"));
     upper(text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
-    game->splashEnd = game->now + 1500;
+    show_splash(game, "splashmessage", 1500);
     game->negotiateAccepted = 0;
     game->negTurn = 1;
     game->lastClick = 0;
@@ -6011,7 +6020,7 @@ static void negotiate_tick(SSRGame *game) {
             snprintf(text, sizeof(text), "%s", loc(game, "Fail!"));
             upper(text);
             ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
-            game->splashEnd = game->now + 1000;
+            show_splash(game, "splashmessage", 1000);
             game->proceedAt = game->now + 1000;
             return;
         }
@@ -6026,7 +6035,7 @@ static void negotiate_tick(SSRGame *game) {
             snprintf(text, sizeof(text), "%s", loc(game, "Success!"));
             upper(text);
             ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
-            game->splashEnd = game->now + 1000;
+            show_splash(game, "splashmessage", 1000);
             game->proceedAt = game->now + 3000;
             return;
         }
@@ -6435,7 +6444,7 @@ static void start_pairs(SSRGame *game, int relation) {
     game->random.seed = game->now;
     game->turn = 0;
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "Find a pair!"));
-    game->splashEnd = game->now + 1500;
+    show_splash(game, "splashmessage", 1500);
     // AScreen_Pairs.Init: each card shows its face.
     char ref[16];
     for (int k = 0; k < 16; k++) {
@@ -6486,7 +6495,7 @@ static void pairs_success(SSRGame *game, int imgId) {
     snprintf(text, sizeof(text), "%s", loc(game, "Success!"));
     upper(text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
-    game->splashEnd = game->now + 4000;
+    show_splash(game, "splashmessage", 4000);
     ssr_career_update_relation(&game->career, BAR_RELATIONS[r], 5.0f);
     relation_tweaks(game, 0);
     char tag[32];
@@ -6502,7 +6511,7 @@ static void pairs_fail(SSRGame *game) {
     snprintf(text, sizeof(text), "%s", loc(game, "Fail!"));
     upper(text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
-    game->splashEnd = game->now + 1000;
+    show_splash(game, "splashmessage", 1000);
     save_career(game);
     // c_ActionAfterPairsFail: the relationships screen after 1000 ms.
     game->clicked = 3;
@@ -6731,7 +6740,7 @@ static void casino_message(SSRGame *game, const char *tag, int amount) {
     size_t n = strlen(text);
     snprintf(text + n, sizeof(text) - n, " \xE2\x98\x85%s", cash);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
-    game->splashEnd = game->now + 1500;
+    show_splash(game, "splashmessage", 1500);
 }
 
 /* --------------------------------------------------------- the roulette */
@@ -7507,4 +7516,8 @@ int ssr_game_banner(const SSRGame *game) {
 
 int ssr_game_splash(const SSRGame *game) {
     return game && game->now < game->splashEnd;
+}
+
+const char *ssr_game_splash_layout(const SSRGame *game) {
+    return game && game->splashLayout[0] ? game->splashLayout : "splashmessage";
 }
