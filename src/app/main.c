@@ -2,7 +2,8 @@
 // Start it with the path of an APK, XAPK, or IPA, or drop the file on the
 // window.
 // On iOS the app imports the first APK, XAPK, or IPA in its Documents
-// folder, where Finder and the Files app can put it.
+// folder, where Finder and the Files app can put it. On Android it imports
+// the APK of the installed New Star Soccer.
 // Set SSR_SHOT to a path to save the first frame as a PNG and quit.
 // Set SSR_PRESS to "x,y" to press that point of the screen after the first
 // frame. Set SSR_WINDOW to "WxH" for the size of the window in points.
@@ -149,6 +150,34 @@ static void import_copy(SSRApp *app, const char *archive) {
     load_game(app);
 }
 
+#ifdef SDL_PLATFORM_ANDROID
+#include <jni.h>
+
+// Imports the APK of the installed New Star Soccer. Returns 1 when the game
+// is installed.
+static int import_installed_game(SSRApp *app) {
+    JNIEnv *env = (JNIEnv *)SDL_GetAndroidJNIEnv();
+    jobject activity = (jobject)SDL_GetAndroidActivity();
+    if (!env || !activity) return 0;
+    jclass type = (*env)->GetObjectClass(env, activity);
+    jmethodID method = (*env)->GetStaticMethodID(env, type, "installedGamePath", "()Ljava/lang/String;");
+    jstring path = method ? (jstring)(*env)->CallStaticObjectMethod(env, type, method) : NULL;
+    int found = 0;
+    if (path) {
+        const char *text = (*env)->GetStringUTFChars(env, path, NULL);
+        if (text) {
+            import_copy(app, text);
+            found = 1;
+            (*env)->ReleaseStringUTFChars(env, path, text);
+        }
+        (*env)->DeleteLocalRef(env, path);
+    }
+    (*env)->DeleteLocalRef(env, type);
+    (*env)->DeleteLocalRef(env, activity);
+    return found;
+}
+#endif
+
 #ifdef SDL_PLATFORM_IOS
 // Imports the first copy of the game in the Documents folder. Returns 1
 // when there was one.
@@ -230,6 +259,11 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
 #ifdef SDL_PLATFORM_IOS
     else {
         import_from_documents(app);
+    }
+#endif
+#ifdef SDL_PLATFORM_ANDROID
+    else if (!import_installed_game(app)) {
+        SDL_snprintf(app->message, sizeof(app->message), "Install New Star Soccer from Google Play first.");
     }
 #endif
     return SDL_APP_CONTINUE;
