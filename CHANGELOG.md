@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.21.0 (2026-10-27)
+
+- The fans care more about a derby or a rivalry match: the change of
+  their relation is half as big again.
+- Momentum: from the hour, the team that is behind pushes forward, so a
+  comeback is possible.
+
 ## 0.20.0 (2026-10-27)
 
 - A new career can continue the world of the last career (Options,
