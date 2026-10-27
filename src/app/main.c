@@ -878,6 +878,16 @@ static float ticker_measure(void *context, const char *text) {
 
 // The ticker of the game (bb_soccer_tickers.InitialiseTickers): the welcome
 // texts. The texts of the career come with the parts that they tell of.
+static int ticker_priority(void *context, int kind, int *count) {
+    SSRApp *app = context;
+    return ssr_game_ticker_priority(app->game, kind, count);
+}
+
+static void ticker_text(void *context, int kind, int *count, char *text, size_t capacity) {
+    SSRApp *app = context;
+    ssr_game_ticker_text(app->game, kind, count, text, capacity);
+}
+
 static void load_ticker(SSRApp *app) {
     ssr_scene_free(app->tickerScene);
     app->tickerScene = NULL;
@@ -886,11 +896,14 @@ static void load_ticker(SSRApp *app) {
     SSRUiFiles files = {read_screen_file, app};
     app->tickerScreen = ssr_ui_parse("ticker.uis", &files);
     app->ticker = ssr_ticker_create(ticker_measure, app);
+    ssr_ticker_set_kinds(app->ticker, ticker_priority, ticker_text);
     for (int i = 1; i <= 6; i++) {
         char tag[32];
         SDL_snprintf(tag, sizeof(tag), "TICKER_NEWPLAYER_%d", i);
         ssr_ticker_add(app->ticker, translate(app, tag), 0);
     }
+    // The tickers of the career follow the welcome texts.
+    for (int kind = 1; kind < SSR_TICKER_KINDS; kind++) ssr_ticker_add_kind(app->ticker, kind);
     ssr_tweaks_set_number(app->tweaks, "Shell", "Ticker", 1);
 }
 
