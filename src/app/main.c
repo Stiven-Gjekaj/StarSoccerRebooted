@@ -53,6 +53,8 @@ typedef struct {
     SSRGfx *gfx;
     SSRWorld *world;
     SSRText *text;
+    // The language of the text (SSRSettings.language).
+    int textLanguage;
     SSRTweaks *tweaks;
     // The logic of the screens, and the screen that it showed last.
     SSRGame *game;
@@ -254,6 +256,9 @@ static void follow_overlay(SSRApp *app) {
                  sizeof(app->modalName));
 }
 
+static void load_language(SSRApp *app);
+static void load_ticker(SSRApp *app);
+
 static void follow_game(SSRApp *app) {
     if (!app->game) return;
     const char *sound;
@@ -261,6 +266,12 @@ static void follow_game(SSRApp *app) {
     if (ssr_game_take_settings_change(app->game)) {
         if (!ssr_game_save_settings(app->game, app->settingsPath)) SDL_Log("The settings were not saved.");
         apply_settings(app);
+        if (ssr_game_settings(app->game)->language != app->textLanguage) {
+            // c_TScreen_Language.SetLanguage: the screens open again with the
+            // new text.
+            load_language(app);
+            load_ticker(app);
+        }
     }
     follow_overlay(app);
     int version = ssr_game_screen_version(app->game);
@@ -876,6 +887,44 @@ static void load_ticker(SSRApp *app) {
     ssr_tweaks_set_number(app->tweaks, "Shell", "Ticker", 1);
 }
 
+// c_TLocale.SetUp: the text of the language of the settings. A language
+// with no file takes the English text.
+static void load_language(SSRApp *app) {
+    const SSRSettings *settings = ssr_game_settings(app->game);
+    int language = settings && settings->language >= 0 ? settings->language : 0;
+    ssr_text_free(app->text);
+    char path[2300];
+    SDL_snprintf(path, sizeof(path), "%s/MyData/Languages/%s.txt", app->gameDirectory, ssr_text_language_code(language));
+    app->text = ssr_text_load(path);
+    if (!app->text) {
+        SDL_Log("The import has no %s.", path);
+        SDL_snprintf(path, sizeof(path), "%s/MyData/Languages/en.txt", app->gameDirectory);
+        app->text = ssr_text_load(path);
+    }
+    ssr_text_rebrand(app->text);
+    app->textLanguage = language;
+}
+
+// GSSetLanguageFromDevice: the first language of the device that the table
+// of the import knows. Returns 1 when the game has a language then.
+static int language_from_device(SSRApp *app) {
+    char path[2300];
+    SDL_snprintf(path, sizeof(path), "%s/MyData/Languages/DeviceLanguageCodes.txt", app->gameDirectory);
+    char resolved[2300];
+    char *table = ssr_fs_resolve(path, resolved, sizeof(resolved)) ? SDL_LoadFile(resolved, NULL) : NULL;
+    if (!table) return 0;
+    int count = 0, found = -1, metres = 0;
+    SDL_Locale **locales = SDL_GetPreferredLocales(&count);
+    for (int i = 0; locales && i < count && found < 0; i++) {
+        found = ssr_text_device_language(table, locales[i]->language, locales[i]->country, &metres);
+    }
+    SDL_free(locales);
+    SDL_free(table);
+    if (found < 0) return 0;
+    ssr_game_set_language(app->game, found, metres);
+    return 1;
+}
+
 static void load_game(SSRApp *app) {
     free_overlay(app);
     free_backdrop(app);
@@ -893,11 +942,6 @@ static void load_game(SSRApp *app) {
     // The tweaks start with the values of the game.
     SDL_snprintf(path, sizeof(path), "%s/Tweaks/TweakValues.txt", app->gameDirectory);
     if (ssr_tweaks_load(app->tweaks, path) < 0) SDL_Log("The import has no Tweaks/TweakValues.txt.");
-    ssr_text_free(app->text);
-    app->text = NULL;
-    SDL_snprintf(path, sizeof(path), "%s/MyData/Languages/en.txt", app->gameDirectory);
-    app->text = ssr_text_load(path);
-    ssr_text_rebrand(app->text);
     ssr_game_free(app->game);
     app->game = ssr_game_create(app->tweaks);
     ssr_game_set_data(app->game, app->world, translate, app, app->saveDirectory);
@@ -915,11 +959,25 @@ static void load_game(SSRApp *app) {
     const char *seed = SDL_getenv("SSR_SEED");
     ssr_game_set_seed(app->game, seed && *seed ? SDL_atoi(seed) : (int)SDL_GetTicks());
     ssr_game_load_settings(app->game, app->settingsPath);
+    int chosen = ssr_game_settings(app->game)->language >= 0 || language_from_device(app);
+    if (ssr_game_take_settings_change(app->game) && !ssr_game_save_settings(app->game, app->settingsPath)) {
+        SDL_Log("The settings were not saved.");
+    }
+    // SSR_LANGUAGE sets the language for a test run, for example "6". The
+    // settings file keeps its language.
+    const char *language = SDL_getenv("SSR_LANGUAGE");
+    if (language && *language) {
+        ssr_game_set_language(app->game, SDL_atoi(language), ssr_game_settings(app->game)->distance);
+        ssr_game_take_settings_change(app->game);
+        chosen = 1;
+    }
+    load_language(app);
     apply_settings(app);
+    if (!chosen) ssr_game_choose_language(app->game);
     app->gameScreen = ssr_game_screen_version(app->game);
     load_ticker(app);
     const char *screen = SDL_getenv("SSR_SCREEN");
-    open_screen(app, screen && *screen ? screen : "MainMenu.uis");
+    open_screen(app, screen && *screen ? screen : chosen ? "MainMenu.uis" : "language.uis");
 }
 
 static void import_copy(SSRApp *app, const char *archive) {
