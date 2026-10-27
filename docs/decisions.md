@@ -158,9 +158,23 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 - **Until the season of 0.6, the Play button of the game menu starts a
   match against the next club of the league.** The home and the away
   match change in turn. Reason: the fixtures come with the season.
-- **The intercept and the dribble chances end at once with a success.**
-  Reason: their games are not in the remake yet. The commentary then goes
-  on as in the game, with the chance that follows a won ball.
+- **The remake has no intercept game (chance type 6).** Version 4.32 sets
+  `m_dodribbling` to 1 for each career, so the match gives a dribble
+  (type 11) in its place, and type 6 never starts.
+- **After a match, the date goes on by one day, and the rest days are 14.**
+  The game moves the date to the next day with a fixture, and counts the
+  rest days to the next fixture. Reason: the fixtures come with the season
+  in 0.6. With no next fixture, the game also gives 14 rest days.
+- **The work rate does not change the relations after a match.** The game
+  reads `m_workratetally` for it, but 4.32 never adds to the tally, so
+  `GetOverallWorkRate` is always 0.
+- **The match stats skip the interview, the news, the records, the star
+  man screen, and the star shower.** Reason: these screens and effects come
+  in later parts. The rating, the relation changes, and the star rating are
+  as in the game.
+- **`AnimateProgress` moves the value of a bar but draws no highlight, no
+  overlay, and no burst.** Reason: these are gadgets of the game that the
+  remake does not make yet. The bar has the same length at each frame.
 - **A penalty plays on the middle pitch.** The game reads `Rand(3)` for the
   side of each chance, but the penalty pitch has its goal in the middle.
 - **The scene draws a CloneTweak colour into each item.** The game draws

@@ -100,13 +100,15 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       and the banner of the result
 - [ ] The render of a `Sheet:` into a surface (`Surf:`). The remake draws
       its children each frame in its place, which gives the same picture.
-- [ ] The intercept game (type 6) and the dribble game (type 11). Until then
-      the player wins the ball or gets past at once.
+- [x] The dribble game (type 11). The intercept game (type 6) never starts
+      in 4.32.
 - [ ] The replays of a goal (`WatchReplay`), the ball trail, and the
       make-run arrows of the team-mates
 - [ ] Extra time and the penalty shoot-out of a cup match
-- [ ] Before and after the match (`Prematch`, `MatchReview`, `MatchStats`,
-      `Ratings`)
+- [x] After the match: the match stats (`MatchStats`) with the rating, the
+      relation changes, and the star rating, and the weekly update
+      (`MatchReview`) with the energy and the pay
+- [ ] The ratings screen (`Ratings`) and the interview after a match
 - [x] Energy drinks and boosts (`ChooseBoost`): the five kinds of can, the
       skill and the relation boosts, and the bolts
 - [ ] The five trials of a new career (they need the chance view)
