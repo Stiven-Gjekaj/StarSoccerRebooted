@@ -9,10 +9,10 @@ It uses C99 and SDL3.
 
 ## Status
 
-The app imports the assets from your copy. It reads the 2025 data of the
-game, its text, its sounds, its fonts, and its image atlases. It draws the
-main menu of the game from the layout files of your copy, and the buttons
-play their sounds. The career and the match are not there yet.
+The app runs on macOS, iOS, and Android. It imports the assets from your
+copy and runs the screens of the game from the layout files of your copy,
+with their animations: the main menu, the options, and the about screen
+work. The career and the match are not there yet.
 
 ## You need a copy of New Star Soccer
 
@@ -22,7 +22,8 @@ on Google Play and on the App Store.
 
 The app accepts these files:
 
-- an APK, for example from `adb pull` on your Android phone
+- an APK, for example from `adb pull` on your Android phone. On Android
+  the app imports the game that is installed on the phone.
 - an XAPK, which holds the APK
 - an IPA that you decrypted from your own install
 
@@ -30,11 +31,16 @@ The reference version is the Android release 4.32.
 
 ## Build
 
-You need CMake and SDL3. On macOS:
+You need CMake. The build gets SDL3 3.4.18 and builds it from its source.
+On macOS:
 
-    brew install cmake sdl3
+    brew install cmake
     cmake -S . -B build
     cmake --build build
+
+For Android, open `android/` in Android Studio, or run
+`./gradlew assembleDebug` in it. For iOS, make an Xcode project with
+`cmake -S . -B build/ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS`.
 
 ## Run
 
@@ -51,11 +57,14 @@ To save the first frame as a PNG and quit:
 
     SSR_SHOT=frame.png "./build/Star Soccer Rebooted.app/Contents/MacOS/Star Soccer Rebooted"
 
+Add `SSR_SHOT_MS=3000` to save the frame 3 seconds later, when the screen
+has moved in.
+
 To show another screen of the game, give its layout file:
 
     SSR_SCREEN=options.uis "./build/Star Soccer Rebooted.app/Contents/MacOS/Star Soccer Rebooted"
 
-To press a point of the screen after the first frame:
+To press a point of the screen 1.5 seconds after the first frame:
 
     SSR_PRESS=500,540 "./build/Star Soccer Rebooted.app/Contents/MacOS/Star Soccer Rebooted"
 
