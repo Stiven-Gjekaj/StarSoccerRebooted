@@ -46,6 +46,7 @@ add_library(ssr_core STATIC
     src/core/ssr_spine.c
     src/core/ssr_random.c
     src/core/ssr_game.c
+    src/core/ssr_career.c
 )
 target_include_directories(ssr_core PUBLIC src/core)
 target_include_directories(ssr_core PRIVATE src/third_party)
@@ -127,5 +128,6 @@ ssr_add_test(test_fs)
 ssr_add_test(test_spine)
 ssr_add_test(test_random)
 ssr_add_test(test_game)
+ssr_add_test(test_career)
 # The font test skips its layout checks when the system has no TTF font.
 set_tests_properties(test_font PROPERTIES SKIP_RETURN_CODE 77)
