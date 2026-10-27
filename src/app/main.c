@@ -17,7 +17,8 @@
 // as the presses go.
 // Set SSR_AUTOMATCH to 1 to press Play each time that the match waits, to 2
 // to also go on from the match stats, or to 3 to open the ratings from
-// them, or to 4 to press Ok on each message box (the trials). Each of them
+// them, or to 4 to press Ok on each message box (the trials), or to 5 to go
+// on to the match review. Each of them
 // also watches the replay of a goal. Set SSR_SHOT_SCREEN
 // to a screen name to save the frame SSR_SHOT_MS after that screen opens,
 // or SSR_SHOT_REPLAY to save it 1.5 s after the first replay starts.
@@ -1338,7 +1339,9 @@ static void auto_chance(SSRApp *app) {
 // SSR_AUTOMATCH presses the Play button of the match when the match waits
 // (Match.MatchState 1, 2, or 3), and with 2 the Continue button of the match
 // stats 3 s after it shows. With 3 it opens the ratings from the match stats
-// one time. The presses come 1.5 s apart.
+// one time. With 5 it goes on as with 2, then on from the results of the
+// day and the league table, to the match review. The presses come 1.5 s
+// apart.
 static void auto_match(SSRApp *app) {
     const char *setting = SDL_getenv("SSR_AUTOMATCH");
     if (!setting || !*setting) return;
@@ -1355,7 +1358,7 @@ static void auto_match(SSRApp *app) {
         message = "message.btn_Ok";
     } else if (strcmp(screen, "match") == 0 && state >= 1 && state <= 3) {
         message = "match.btn_Play";
-    } else if (strcmp(screen, "matchstats") == 0 && SDL_atoi(setting) == 2 &&
+    } else if (strcmp(screen, "matchstats") == 0 && (SDL_atoi(setting) == 2 || SDL_atoi(setting) == 5) &&
                ssr_tweaks_number(app->tweaks, "MatchStats", "StatStage") >= 10) {
         if (!statsReady) statsReady = now;
         if (now - statsReady >= 3000) message = "matchstats.btn_Play";
@@ -1363,6 +1366,11 @@ static void auto_match(SSRApp *app) {
                ssr_tweaks_number(app->tweaks, "MatchStats", "StatStage") >= 10) {
         ratingsOpened = 1;
         message = "skills.btn_Ratings";
+    } else if (strcmp(screen, "leaguefixtures") == 0 && SDL_atoi(setting) == 5 &&
+               ssr_tweaks_number(app->tweaks, "Menu", "LeagueFixturesResults") == 1) {
+        message = "leaguefixtures.btn_Play";
+    } else if (strcmp(screen, "league") == 0 && SDL_atoi(setting) == 5) {
+        message = "league.btn_Continue";
     }
     if (!message) return;
     last = now;
