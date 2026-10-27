@@ -245,7 +245,7 @@ struct SSRGame {
         char layout[40];
         char text[160];
         int start, finish, id;
-    } alerts[8];
+    } alerts[32];
     int alertCount, alertIds;
 
     // The relationships screen (c_TScreen_Relationships): the national
@@ -1127,6 +1127,22 @@ static void call_trial_done(SSRGame *game) {
     ssr_tweaks_set_number(game->tweaks, "Pitch", "TrialsLogo", 0);
     ssr_tweaks_set_number(game->tweaks, "Menu", "TrialCompleteIncrement", 1);
     message(game, "message", "", 0, 1, "StartCareer");
+}
+
+static void award(SSRGame *game, int id);
+
+// GSPlayerUtility.UpdateRelationship: the relation changes, then a club
+// relation, the sponsors, the partner, or the happiness at 100 unlocks its
+// award.
+static void update_relation(SSRGame *game, SSRRelation relation, float change) {
+    SSRCareer *c = &game->career;
+    ssr_career_update_relation(c, relation, change);
+    if (ssr_career_relation(c, SSR_RELATION_BOSS) >= 100) award(game, 44);
+    if (ssr_career_relation(c, SSR_RELATION_TEAM) >= 100) award(game, 45);
+    if (ssr_career_relation(c, SSR_RELATION_FANS) >= 100) award(game, 46);
+    if (ssr_career_relation(c, SSR_RELATION_SPONSORS) >= 100) award(game, 47);
+    if (c->relationPartner >= 100) award(game, 48);
+    if (ssr_career_happiness(c) >= 100) award(game, 49);
 }
 
 static void save_career(SSRGame *game) {
@@ -2468,7 +2484,7 @@ static void match_recovery(SSRGame *game) {
     if (game->caughtGambling > 0) game->caughtGambling--;
     c->spentTime = 0;
     int n = ssr_career_count_sponsors(c);
-    if (n > 0) ssr_career_update_relation(c, SSR_RELATION_SPONSORS, (float)n * -0.65f);
+    if (n > 0) update_relation(game, SSR_RELATION_SPONSORS, (float)n * -0.65f);
     if (game->horsesLoaded) ssr_horses_recover(&game->horses, &game->random);
     // TShopItem.UpdateLife: the products wear.
     ssr_shop_wear(&game->random, c->items, c->vehicles, c->properties);
@@ -4276,8 +4292,8 @@ static void choose_dilemma(SSRGame *game, int item) {
     SSRCareer *c = &game->career;
     int chosen = game->dilemmaRelation[item], other = game->dilemmaRelation[1 - item];
     if (chosen == 3) c->lastSpendTimePartner = (float)c->sdate;
-    ssr_career_update_relation(c, (SSRRelation)chosen, 5.0f);
-    ssr_career_update_relation(c, (SSRRelation)other, DILEMMA_DECAY);
+    update_relation(game, (SSRRelation)chosen, 5.0f);
+    update_relation(game, (SSRRelation)other, DILEMMA_DECAY);
     game->dilemmaChoice = game->dilemmaImage[item];
     relation_tweaks(game, 0);
     add_op(game, SSR_OP_SUB, item == 0 ? "TopHook" : "BottomHook", "Selected", NULL, 1);
@@ -4486,15 +4502,15 @@ static void message_relations(SSRGame *game, int state) {
     const char *call = game->messageCall;
     if (strcmp(call, "DoRelationshipRequest") == 0) {
         if (state == 1) {
-            ssr_career_update_relation(c, (SSRRelation)game->messageData, 5.0f);
+            update_relation(game, (SSRRelation)game->messageData, 5.0f);
             set_energy(game, c->energy - 25);
         } else {
-            ssr_career_update_relation(c, (SSRRelation)game->messageData, -10.0f);
+            update_relation(game, (SSRRelation)game->messageData, -10.0f);
         }
     } else if (strcmp(call, "VehicleBorrowedTeam") == 0) {
-        ssr_career_update_relation(c, SSR_RELATION_TEAM, state == 1 ? 5.0f : -15.0f);
+        update_relation(game, SSR_RELATION_TEAM, state == 1 ? 5.0f : -15.0f);
     } else if (strcmp(call, "VehicleBorrowedGirl") == 0) {
-        ssr_career_update_relation(c, SSR_RELATION_PARTNER, state == 1 ? 5.0f : -15.0f);
+        update_relation(game, SSR_RELATION_PARTNER, state == 1 ? 5.0f : -15.0f);
     }
     relation_tweaks(game, 0);
     player_tweaks(game);
@@ -4549,22 +4565,22 @@ static int news_partner_unhappy(SSRGame *game) {
     SSRCareer *c = &game->career;
     if (c->relationPartner <= 0 || (float)c->sdate <= c->lastSpendTimePartner + 35) return 0;
     if (c->relationPartner < 31) {
-        ssr_career_update_relation(c, SSR_RELATION_PARTNER, -5);
+        update_relation(game, SSR_RELATION_PARTNER, -5);
         if (c->relationTeam > c->relationBoss && c->relationTeam > c->relationFans) {
             do_news(game, "CMESSAGE_GIRLFRIENDRAMPAGETEAM", my_club_tla(game), NULL);
             webpage_to(game, "relationships", 0);
-            ssr_career_update_relation(c, SSR_RELATION_TEAM, -c->relationTeam / 2.0f);
+            update_relation(game, SSR_RELATION_TEAM, -c->relationTeam / 2.0f);
         } else if (c->relationFans > c->relationBoss && c->relationFans > c->relationTeam) {
             do_news(game, "CMESSAGE_GIRLFRIENDRAMPAGEFANS", my_club_tla(game), NULL);
             webpage_to(game, "relationships", 0);
-            ssr_career_update_relation(c, SSR_RELATION_FANS, -c->relationFans / 2.0f);
+            update_relation(game, SSR_RELATION_FANS, -c->relationFans / 2.0f);
         } else {
             do_news(game, "CMESSAGE_GIRLFRIENDRAMPAGEBOSS", my_club_tla(game), NULL);
             webpage_to(game, "relationships", 0);
-            ssr_career_update_relation(c, SSR_RELATION_BOSS, -c->relationBoss / 2.0f);
+            update_relation(game, SSR_RELATION_BOSS, -c->relationBoss / 2.0f);
         }
     } else {
-        ssr_career_update_relation(c, SSR_RELATION_PARTNER, -10);
+        update_relation(game, SSR_RELATION_PARTNER, -10);
         relation_tweaks(game, 0);
         message_bar(game, partner_screen(game), loc(game, "CMESSAGE_LONGTIMEGIRLFRIEND"), "DoRelationScreen");
     }
@@ -4620,7 +4636,7 @@ static int news_get_partner(SSRGame *game) {
         char text[512];
         snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_GIRLFRIENDNOTIMPRESSED"));
         if (ssr_rand(&game->random, 2) == 1) {
-            ssr_career_update_relation(c, SSR_RELATION_TEAM, -5);
+            update_relation(game, SSR_RELATION_TEAM, -5);
             relation_tweaks(game, 0);
             size_t n = strlen(text);
             snprintf(text + n, sizeof(text) - n, " %s", loc(game, "CMESSAGE_TEAMMATESRIBBING"));
@@ -4642,6 +4658,7 @@ static void call_meet_partner(SSRGame *game) {
     }
     c->relationPartner = 60;
     c->lastSpendTimePartner = (float)c->sdate;
+    award(game, 43);
     relationships_screen(game, 0, 0);
 }
 
@@ -4654,8 +4671,8 @@ static int news_partner_scandal(SSRGame *game) {
     char tag[48];
     snprintf(tag, sizeof(tag), "CNEWS_GIRLSCANDAL%s%d", high ? "HIGH" : "LOW", k);
     float d = high ? -20.0f : -10.0f;
-    ssr_career_update_relation(c, SSR_RELATION_BOSS, d);
-    ssr_career_update_relation(c, SSR_RELATION_BOSS_INT, d);
+    update_relation(game, SSR_RELATION_BOSS, d);
+    update_relation(game, SSR_RELATION_BOSS_INT, d);
     do_news(game, tag, my_club_tla(game), NULL);
     webpage_to(game, "relationships", 0);
     return 1;
@@ -4783,7 +4800,7 @@ static void vehicle_returned(SSRGame *game, int partner) {
     int q = ssr_rand(&game->random, 4);
     float d = q == 1 ? -10.0f : yes ? 5.0f : -15.0f;
     SSRRelation r = partner ? SSR_RELATION_PARTNER : SSR_RELATION_TEAM;
-    ssr_career_update_relation(c, r, d);
+    update_relation(game, r, d);
     relationships_screen(game, partner, 0);
     if (!(yes && q == 1)) return;
     int *v = &c->vehicles[game->messageData - 1];
@@ -4992,7 +5009,7 @@ static int news_sponsorship(SSRGame *game) {
             replace_all(text, sizeof(text), "$sponsor", name);
             c->sponsors[i] = 0;
             if (ssr_career_count_sponsors(c) == 0) c->relationSponsors = 0;
-            else ssr_career_update_relation(c, SSR_RELATION_SPONSORS, 30);
+            else update_relation(game, SSR_RELATION_SPONSORS, 30);
             game_menu(game);
             message(game, "messagesponsor", text, 0, 1, NULL);
             return 1;
@@ -5031,7 +5048,7 @@ static void call_sponsorship_offer(SSRGame *game) {
     SSRCareer *c = &game->career;
     if (game->returnState != 1) return;
     if (c->relationSponsors == 0) c->relationSponsors = 50;
-    else ssr_career_update_relation(c, SSR_RELATION_SPONSORS, 25);
+    else update_relation(game, SSR_RELATION_SPONSORS, 25);
     int i = game->messageData;
     if (i >= 0 && i < 10) c->sponsors[i] = i / 2 + 1;
     relationships_screen(game, 0, 0);
@@ -5225,9 +5242,9 @@ static void interview_ok(SSRGame *game) {
         float a = fabsf((float)game->after.boss), b = fabsf((float)game->after.team), f = fabsf((float)game->after.fans);
         SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, game->fixtureComp) : NULL;
         int national = comp && comp->data->level == 1;
-        ssr_career_update_relation(c, national ? SSR_RELATION_BOSS_INT : SSR_RELATION_BOSS, -a);
-        ssr_career_update_relation(c, national ? SSR_RELATION_TEAM_INT : SSR_RELATION_TEAM, -b);
-        ssr_career_update_relation(c, national ? SSR_RELATION_FANS_INT : SSR_RELATION_FANS, -f);
+        update_relation(game, national ? SSR_RELATION_BOSS_INT : SSR_RELATION_BOSS, -a);
+        update_relation(game, national ? SSR_RELATION_TEAM_INT : SSR_RELATION_TEAM, -b);
+        update_relation(game, national ? SSR_RELATION_FANS_INT : SSR_RELATION_FANS, -f);
         c->starRating = ssr_star_rating_add(c->starRating, (int)-a);
         c->starRating = ssr_star_rating_add(c->starRating, (int)-b);
         c->starRating = ssr_star_rating_add(c->starRating, (int)-f);
@@ -5646,10 +5663,10 @@ static void shop_close_lifestyle(SSRGame *game) {
     game->modal[0] = 0;
     ssr_tweaks_set_number(game->tweaks, "Menu", "ItemInfoHelpIncrement", 0);
     if (c->teamShopping == 0) {
-        ssr_career_update_relation(c, SSR_RELATION_TEAM, -5);
+        update_relation(game, SSR_RELATION_TEAM, -5);
     } else if (c->teamShopping > 0) {
         int gain = c->teamShopping * 2;
-        ssr_career_update_relation(c, SSR_RELATION_TEAM, (float)(gain < 1 ? 1 : gain > 5 ? 5 : gain));
+        update_relation(game, SSR_RELATION_TEAM, (float)(gain < 1 ? 1 : gain > 5 ? 5 : gain));
     }
     c->teamShopping = -1;
     relationships_screen(game, 0, 0);
@@ -6282,7 +6299,7 @@ static void contract_screen(SSRGame *game, int animate) {
 // A message of the boss that ends the talk before it starts.
 static void no_talk(SSRGame *game, const char *tag, float boss) {
     relationships_screen(game, 1, 0);
-    ssr_career_update_relation(&game->career, SSR_RELATION_BOSS, boss);
+    update_relation(game, SSR_RELATION_BOSS, boss);
     relation_tweaks(game, 0);
     message_bar(game, "messageboss", loc(game, tag), "NegotiationsCancelled");
 }
@@ -6680,10 +6697,10 @@ static int check_transfer_window(SSRGame *game) {
             size_t n = strlen(text);
             if (c->relationTeam < 60) {
                 snprintf(text + n, sizeof(text) - n, " %s", loc(game, "CMESSAGE_TRANSFERSBOOST"));
-                ssr_career_update_relation(c, SSR_RELATION_TEAM, (100 - c->relationTeam) * 0.2f);
+                update_relation(game, SSR_RELATION_TEAM, (100 - c->relationTeam) * 0.2f);
             } else {
                 snprintf(text + n, sizeof(text) - n, " %s", loc(game, "CMESSAGE_TRANSFERSDRAIN"));
-                ssr_career_update_relation(c, SSR_RELATION_TEAM, -c->relationTeam * 0.1f);
+                update_relation(game, SSR_RELATION_TEAM, -c->relationTeam * 0.1f);
             }
             relation_tweaks(game, 0);
             message_bar(game, "messageteam", text, "DoRelationScreen");
@@ -7065,7 +7082,7 @@ static void pairs_success(SSRGame *game, int imgId) {
     upper(game, text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
     show_splash(game, "splashmessage", 4000);
-    ssr_career_update_relation(&game->career, BAR_RELATIONS[r], 5.0f);
+    update_relation(game, BAR_RELATIONS[r], 5.0f);
     relation_tweaks(game, 0);
     char tag[32];
     snprintf(tag, sizeof(tag), "%s%d", TAGS[r], imgId);
@@ -7238,10 +7255,10 @@ static void casino_back(SSRGame *game) {
     int count = game->teammatesBetCount;
     if (count == 0) {
         game->teammatesCasino = 0;
-        ssr_career_update_relation(c, SSR_RELATION_TEAM, -10);
+        update_relation(game, SSR_RELATION_TEAM, -10);
     } else if (count > 0) {
         int gain = (int)((float)count * 0.5f);
-        ssr_career_update_relation(c, SSR_RELATION_TEAM, (float)(gain < 1 ? 1 : gain > 5 ? 5 : gain));
+        update_relation(game, SSR_RELATION_TEAM, (float)(gain < 1 ? 1 : gain > 5 ? 5 : gain));
     }
     set_teammates_bet_count(game, -1);
     // The bets cost energy, and an alert tells how much.
@@ -8288,11 +8305,11 @@ static int news_gambling(SSRGame *game) {
     if (game->teammatesCasino > 0 && c->sdate > game->teammatesCasino && ssr_rand(&game->random, 4) == 1) {
         game->teammatesCasino = 0;
         relationships_screen(game, 1, 0);
-        ssr_career_update_relation(c, SSR_RELATION_BOSS, -(ssr_career_relation(c, SSR_RELATION_BOSS) * 0.2f));
-        ssr_career_update_relation(c, SSR_RELATION_TEAM, -(ssr_career_relation(c, SSR_RELATION_TEAM) * 0.05f));
-        ssr_career_update_relation(c, SSR_RELATION_BOSS_INT,
+        update_relation(game, SSR_RELATION_BOSS, -(ssr_career_relation(c, SSR_RELATION_BOSS) * 0.2f));
+        update_relation(game, SSR_RELATION_TEAM, -(ssr_career_relation(c, SSR_RELATION_TEAM) * 0.05f));
+        update_relation(game, SSR_RELATION_BOSS_INT,
                                    -(ssr_career_relation(c, SSR_RELATION_BOSS_INT) * 0.2f));
-        ssr_career_update_relation(c, SSR_RELATION_TEAM_INT,
+        update_relation(game, SSR_RELATION_TEAM_INT,
                                    -(ssr_career_relation(c, SSR_RELATION_TEAM_INT) * 0.05f));
         relation_tweaks(game, 0);
         message_bar(game, "messageboss", loc(game, "CMESSAGE_TEAMMATESCASINOBOSS"), "DoRelationScreen");
@@ -8311,13 +8328,13 @@ static int news_gambling(SSRGame *game) {
     // The partner hears of it, or the boss and the fans read it. [I: the
     // remake has no Twitter text.]
     if (ssr_rand(&game->random, 2) == 1 && c->relationPartner > 0) {
-        ssr_career_update_relation(c, SSR_RELATION_PARTNER, -c->relationPartner * 0.4f);
+        update_relation(game, SSR_RELATION_PARTNER, -c->relationPartner * 0.4f);
         do_news(game, "CNEWS_GAMBLINGADDICTGIRL", NULL, NULL);
     } else {
         static const SSRRelation HIT[4] = {SSR_RELATION_BOSS, SSR_RELATION_FANS, SSR_RELATION_BOSS_INT,
                                            SSR_RELATION_FANS_INT};
         for (int i = 0; i < 4; i++) {
-            ssr_career_update_relation(c, HIT[i], -(ssr_career_relation(c, HIT[i]) * 0.4f));
+            update_relation(game, HIT[i], -(ssr_career_relation(c, HIT[i]) * 0.4f));
         }
         do_news(game, "CNEWS_GAMBLINGADDICTBOSS", my_club_tla(game), NULL);
     }
@@ -8330,7 +8347,7 @@ static int news_gambling(SSRGame *game) {
 static void call_teammates_casino(SSRGame *game) {
     SSRCareer *c = &game->career;
     if (game->returnState != 1) {
-        ssr_career_update_relation(c, SSR_RELATION_TEAM, -5);
+        update_relation(game, SSR_RELATION_TEAM, -5);
         relationships_screen(game, 0, 0);
         return;
     }
@@ -8343,7 +8360,7 @@ static void call_teammates_casino(SSRGame *game) {
 static void call_teammates_shopping(SSRGame *game) {
     SSRCareer *c = &game->career;
     if (game->returnState != 1) {
-        ssr_career_update_relation(c, SSR_RELATION_TEAM, -5);
+        update_relation(game, SSR_RELATION_TEAM, -5);
         relationships_screen(game, 0, 0);
         return;
     }

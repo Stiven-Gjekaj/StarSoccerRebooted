@@ -1059,6 +1059,10 @@ static void choose_a_dilemma(SSRGame *game, const char *path) {
     SSRUiOp drop;
     while (ssr_game_take_op(game, &drop)) {
     }
+    // The club relations and the sponsors at 96: the card of the choice
+    // goes to 100 and unlocks its award (UpdateRelationship).
+    SSRCareer *live = (SSRCareer *)c;
+    live->relationBoss = live->relationTeam = live->relationFans = live->relationSponsors = 96;
     ssr_game_message(game, "debug.dilemma");
     CHECK(strcmp(ssr_game_screen(game), "dilemma") == 0 && ssr_game_splash(game));
     SSRUiOp ops[64];
@@ -1080,6 +1084,11 @@ static void choose_a_dilemma(SSRGame *game, const char *path) {
     ssr_game_message(game, "dilemma.btn_relationship1");
     CHECK(dilemma_relation(c, top) == (a + 5 > 100 ? 100 : a + 5));
     CHECK(dilemma_relation(c, bottom) == (b - 10 < 1 ? 1 : b - 10));
+    static const char *const CARDS[4] = {"DilemmaBoss", "DilemmaTeam", "DilemmaFans", "DilemmaSponsor"};
+    for (int k = 0; k < 4; k++) {
+        if (strstr(top, CARDS[k])) CHECK(c->awards[44 + k] > 0);
+        else CHECK(c->awards[44 + k] == 0);
+    }
     count = take_ops(game, ops, 64);
     CHECK(has_op(ops, count, SSR_OP_SUB, "TopHook", NULL) && has_op(ops, count, SSR_OP_SUB, "BottomHook", NULL));
     // A second click does nothing.
@@ -1450,6 +1459,9 @@ static void play_roulette(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     // The stake is 10 bux.
     for (int i = 0; i < 4; i++) ssr_game_message(game, "casino.btn_StakeUp");
     CHECK(ssr_tweaks_number(tweaks, "Casino", "Stake") == 10);
+    // A tap ends each alert of the awards before, one at a time.
+    for (int i = 0; i < 40 && ssr_game_alert(game, NULL); i++) ssr_game_message(game, "message.dismiss");
+    CHECK(ssr_game_alert(game, NULL) == NULL);
     int bank = 500;
     for (int spin = 1; spin <= 3; spin++) {
         ssr_game_message(game, "roulette.btn_Red");
