@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.26.0 (2026-10-27)
+
+- A custom career: after the nation, the screen "Your start" chooses the
+  age at the start (16 to 32) and the least value of each skill (up to
+  70). The challenge starts go to a 1.x release.
+- Data packs give only the rows and the columns that they change.
+- Data packs can hold the real players and the managers of the clubs
+  (`world/Players.txt`), and the crests of the clubs
+  (`crests/<club id>.png`). The crest fills the ring of the badge of the
+  match, in the perspective of the ring.
+- The first community pack: the season 2025/26 for the four English
+  leagues, with the names, the kits, the squads of the Premier League and
+  the Championship, and original crests (`community/season-2025-26`).
+- The name plates and the score bar of the match have clean plates, with
+  the names in the middle and no black outline.
+- The app has a new icon.
+
 ## 0.25.0 (2026-10-27)
 
 - The score plates take the colours of the kit that each team wears. Two
