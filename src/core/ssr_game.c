@@ -1049,6 +1049,8 @@ static void call_boots_expired(SSRGame *game);
 static void call_dump_partner(SSRGame *game);
 static void call_retirement(SSRGame *game);
 static void call_caught_gambling(SSRGame *game);
+static void call_teammates_casino(SSRGame *game);
+static void call_teammates_shopping(SSRGame *game);
 
 static void run_call(SSRGame *game, const char *name) {
     static const struct {
@@ -1067,6 +1069,8 @@ static void run_call(SSRGame *game, const char *name) {
         {"SeasonEndTransfer", call_season_end_transfer},
         {"Retirement", call_retirement},
         {"CaughtGambling", call_caught_gambling},
+        {"TeamMatesCasino", call_teammates_casino},
+        {"TeamMatesShopping", call_teammates_shopping},
         {"PlayToDate", call_play_to_date},
         {"SetUpFixture", call_set_up_fixture},
         {"DebutTired", call_debut_tired},
@@ -2677,6 +2681,7 @@ static void league_home(SSRGame *game) {
 // fixtures of the next round.
 static int play_news(SSRGame *game, const SSRFixture *next);
 static int check_transfer_window(SSRGame *game);
+static int news_gambling(SSRGame *game);
 
 static void retirement_screen(SSRGame *game);
 
@@ -4505,8 +4510,7 @@ static int random_news(SSRGame *game, const SSRFixture *next) {
 // GSPlayerPlay: the news of the week comes before the match.
 static int play_news(SSRGame *game, const SSRFixture *next) {
     SSRCareer *c = &game->career;
-    // [I: the gambling (h) comes with the casino. The Facebook box (b) is
-    // not in the remake.]
+    // [I: the Facebook box (b) is not in the remake.]
     if (news_old_pro_boots(game)) {
         c->newsDone = 1;
         return 1;
@@ -4518,8 +4522,8 @@ static int play_news(SSRGame *game, const SSRFixture *next) {
         message(game, "message", loc(game, "CMESSAGE_LOSESKILLS"), 0, 1, NULL);
         return 1;
     }
-    if (check_transfer_window(game) || news_captaincy(game, next) || news_sponsorship(game) || news_get_dumped(game) ||
-        news_partner_unhappy(game) || news_item_expiry(game)) {
+    if (check_transfer_window(game) || news_captaincy(game, next) || news_sponsorship(game) || news_gambling(game) ||
+        news_get_dumped(game) || news_partner_unhappy(game) || news_item_expiry(game)) {
         c->newsDone = 1;
         return 1;
     }
@@ -6810,6 +6814,78 @@ static void slots_tick(SSRGame *game) {
 static void slots_quit(SSRGame *game) {
     if (game->slotsSpinning) return;
     casino_screen(game);
+}
+
+// GSCheckNewsGambling: the boss hears of a trip with the team mates, the
+// team mates ask the player out, or the news tells of a gambling addict.
+static int news_gambling(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->sdate > game->teammatesCasino + 14) game->teammatesCasino = 0;
+    if (game->teammatesCasino > 0 && c->sdate > game->teammatesCasino && ssr_rand(&game->random, 4) == 1) {
+        game->teammatesCasino = 0;
+        relationships_screen(game, 1, 0);
+        ssr_career_update_relation(c, SSR_RELATION_BOSS, -(ssr_career_relation(c, SSR_RELATION_BOSS) * 0.2f));
+        ssr_career_update_relation(c, SSR_RELATION_TEAM, -(ssr_career_relation(c, SSR_RELATION_TEAM) * 0.05f));
+        ssr_career_update_relation(c, SSR_RELATION_BOSS_INT,
+                                   -(ssr_career_relation(c, SSR_RELATION_BOSS_INT) * 0.2f));
+        ssr_career_update_relation(c, SSR_RELATION_TEAM_INT,
+                                   -(ssr_career_relation(c, SSR_RELATION_TEAM_INT) * 0.05f));
+        relation_tweaks(game, 0);
+        message_bar(game, "messageboss", loc(game, "CMESSAGE_TEAMMATESCASINOBOSS"), "DoRelationScreen");
+        return 1;
+    }
+    if (game->teammatesCasino == 0 && c->gambling == 0 && ssr_career_week(c) % 4 == 0 &&
+        ssr_rand(&game->random, 2) == 1) {
+        if (ssr_rand(&game->random, 2) == 1) {
+            message(game, "messageteam", loc(game, "CMESSAGE_TEAMMATESCASINO"), 1, 1, "TeamMatesCasino");
+        } else {
+            message(game, "messageteam", loc(game, "CMESSAGE_TEAMMATESSHOPPING"), 1, 1, "TeamMatesShopping");
+        }
+        return 1;
+    }
+    if (c->gambling <= 35) return 0;
+    // The partner hears of it, or the boss and the fans read it. [I: the
+    // remake has no Twitter text.]
+    if (ssr_rand(&game->random, 2) == 1 && c->relationPartner > 0) {
+        ssr_career_update_relation(c, SSR_RELATION_PARTNER, -c->relationPartner * 0.4f);
+        do_news(game, "CNEWS_GAMBLINGADDICTGIRL", NULL, NULL);
+    } else {
+        static const SSRRelation HIT[4] = {SSR_RELATION_BOSS, SSR_RELATION_FANS, SSR_RELATION_BOSS_INT,
+                                           SSR_RELATION_FANS_INT};
+        for (int i = 0; i < 4; i++) {
+            ssr_career_update_relation(c, HIT[i], -(ssr_career_relation(c, HIT[i]) * 0.4f));
+        }
+        do_news(game, "CNEWS_GAMBLINGADDICTBOSS", my_club_tla(game), NULL);
+    }
+    webpage_to(game, "relationships", 0);
+    c->gambling = 0;
+    return 1;
+}
+
+// The call "TeamMatesCasino": Yes goes to the casino with the team mates.
+static void call_teammates_casino(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (game->returnState != 1) {
+        ssr_career_update_relation(c, SSR_RELATION_TEAM, -5);
+        relationships_screen(game, 0, 0);
+        return;
+    }
+    game->teammatesCasino = c->sdate;
+    set_teammates_bet_count(game, 0);
+    casino_screen(game);
+}
+
+// The call "TeamMatesShopping": Yes opens the shop of the items.
+static void call_teammates_shopping(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (game->returnState != 1) {
+        ssr_career_update_relation(c, SSR_RELATION_TEAM, -5);
+        relationships_screen(game, 0, 0);
+        return;
+    }
+    c->teamShopping = 0;
+    relationships_screen(game, 0, 0);
+    lifestyle_shop(game, 1);
 }
 
 // c_TScreen_GameMenu.ButtonQuit: the first retired career unlocks the

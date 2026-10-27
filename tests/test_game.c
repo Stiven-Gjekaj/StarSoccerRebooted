@@ -996,6 +996,42 @@ static void go_to_the_casino(SSRGame *game, SSRTweaks *tweaks, const char *path)
     ssr_game_message(game, "casino.btn_Back");
     ssr_game_message(game, "relationships.btn_Home");
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+
+    // A player under 18 who gambles can be caught: 1 bet in 20.
+    c = *ssr_game_career(game);
+    CHECK(ssr_career_age(&c) < 18);
+    c.bank = 1000;
+    c.gambling = 30;
+    c.relationBoss = 80;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    now = ssr_game_career(game);
+    ssr_game_message(game, "gamemenu.btn_Life");
+    ssr_game_message(game, "relationships.btn_Casino");
+    ssr_game_message(game, "casino.btn_Slots");
+    int caught = 0, gambling = 0;
+    for (int spin = 0; spin < 300 && !caught; spin++) {
+        gambling = now->gambling;
+        bank = now->bank;
+        ssr_game_message(game, "slots.btn_Play");
+        caught = strcmp(ssr_game_screen(game), "message") == 0;
+        for (int f = 0; f < 4 * 60 && !caught && ssr_tweaks_number(tweaks, "Menu", "HomeButtonDisabled") == 1; f++) {
+            ssr_game_update(game, 1);
+        }
+    }
+    CHECK(caught && strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_GAMBLINGTOOYOUNG") == 0);
+    // The bet is not taken.
+    CHECK(now->bank == bank && now->gambling == gambling);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "webpagenews") == 0);
+    CHECK(now->gambling == gambling / 2 && fabsf(now->relationBoss - 80 * 0.75f) < 1e-4f);
+    ssr_game_message(game, "webpage.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "relationships") == 0);
+    ssr_game_message(game, "relationships.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
 static void go_shopping(SSRGame *game, SSRTweaks *tweaks, const char *path) {
@@ -1173,6 +1209,80 @@ static SSRCareer *news_week(SSRGame *game, const char *path, SSRCareer *c) {
     ssr_game_update(game, 60);
     for (int i = 0; i < 4 && strcmp(ssr_game_screen(game), "gamemenu") != 0; i++) ssr_game_message(game, "message.btn_Cancel");
     return (SSRCareer *)ssr_game_career(game);
+}
+
+// The gambling news: a gambling addict, then the team mates ask the
+// player to the casino.
+static void gambling_news(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.gambling = 40;
+    c.relationPartner = 0;
+    c.relationBoss = c.relationFans = 50;
+    c.lastTransferDate = c.sdate;
+    c.seasonApps = 1;
+    c.oldProBoots = 1;
+    const SSRCareer *now = NULL;
+    for (int i = 0; i < 6; i++) {
+        SSRCareer week = c;
+        now = news_week(game, path, &week);
+        ssr_game_message(game, "gamemenu.btn_Play");
+        if (strcmp(ssr_game_screen(game), "webpagenews") == 0) break;
+        for (int k = 0; k < 4 && strcmp(ssr_game_screen(game), "gamemenu") != 0; k++) {
+            ssr_game_message(game, "message.btn_Ok");
+        }
+    }
+    CHECK(strcmp(ssr_game_screen(game), "webpagenews") == 0);
+    SSRUiOp ops[64];
+    int count = take_ops(game, ops, 64);
+    CHECK(has_op(ops, count, SSR_OP_TEXT, "MessageText", "CNEWS_GAMBLINGADDICTBOSS"));
+    CHECK(now->gambling == 0 && fabsf(now->relationBoss - 30) < 1e-4f && fabsf(now->relationFans - 30) < 1e-4f);
+    ssr_game_message(game, "webpage.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "relationships") == 0);
+    ssr_game_message(game, "relationships.btn_Home");
+
+    // The team mates ask in a week that 4 divides, with no gambling.
+    c = *ssr_game_career(game);
+    c.gambling = 0;
+    c.sdate += (4 - ssr_career_week(&c) % 4) % 4 * 7;
+    c.lastTransferDate = c.sdate;
+    c.seasonApps = 1;
+    c.relationTeam = 50;
+    int asked = 0;
+    for (int i = 0; i < 40 && !asked; i++) {
+        SSRCareer week = c;
+        now = news_week(game, path, &week);
+        ssr_game_message(game, "gamemenu.btn_Play");
+        const char *body = ssr_tweaks_get(tweaks, "Menu", "MessageBody");
+        asked = strcmp(ssr_game_screen(game), "messageteam") == 0 && strcmp(body, "CMESSAGE_TEAMMATESCASINO") == 0;
+        if (asked) break;
+        // No to the shopping costs 5 team.
+        if (strcmp(ssr_game_screen(game), "messageteam") == 0) {
+            CHECK(strcmp(body, "CMESSAGE_TEAMMATESSHOPPING") == 0);
+            ssr_game_message(game, "message.btn_Cancel");
+            CHECK(strcmp(ssr_game_screen(game), "relationships") == 0 && fabsf(now->relationTeam - 45) < 1e-4f);
+            ssr_game_message(game, "relationships.btn_Home");
+        }
+        for (int k = 0; k < 4 && strcmp(ssr_game_screen(game), "gamemenu") != 0; k++) {
+            ssr_game_message(game, "message.btn_Ok");
+        }
+    }
+    CHECK(asked);
+    // Yes: the casino with the team mates. One bet gives the team 1.
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "casino") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Casino", "TeammatesBetCount") == 0);
+    ssr_game_message(game, "casino.btn_Slots");
+    ssr_game_message(game, "slots.btn_Play");
+    CHECK(ssr_tweaks_number(tweaks, "Casino", "TeammatesBetCount") == 1);
+    for (int f = 0; f < 4 * 60 && ssr_tweaks_number(tweaks, "Menu", "HomeButtonDisabled") == 1; f++) {
+        ssr_game_update(game, 1);
+    }
+    ssr_game_message(game, "slots.btn_Quit");
+    ssr_game_message(game, "casino.btn_Back");
+    CHECK(strcmp(ssr_game_screen(game), "relationships") == 0 && fabsf(now->relationTeam - 51) < 1e-4f);
+    CHECK(ssr_tweaks_number(tweaks, "Casino", "TeammatesBetCount") == -1);
+    ssr_game_message(game, "relationships.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
 // The news before a match: the old boots of an ex pro, then a sponsor.
@@ -1503,6 +1613,7 @@ static void test_starts_a_new_career(void) {
     // The weeks had news: tips, and a dilemma or other news.
     CHECK(newsSeen > 0 && ssr_game_career(game)->tipCount > 0);
     CHECK(interviews >= 2 && interviewsWon >= 1);
+    gambling_news(game, tweaks, path);
     // The player retires at the end of the next season.
     retireNow = 1;
     for (int i = 0; i < 24 && retireNow == 1; i++) play_a_match(game, tweaks);
