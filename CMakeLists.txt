@@ -37,6 +37,8 @@ add_library(ssr_core STATIC
     src/core/ssr_text.c
     src/core/ssr_font.c
     src/core/ssr_diff.c
+    src/core/ssr_fixdata.c
+    src/core/ssr_season.c
     src/core/ssr_expr.c
     src/core/ssr_ui.c
     src/core/ssr_atlas.c
@@ -134,6 +136,7 @@ ssr_add_test(test_world)
 ssr_add_test(test_text)
 ssr_add_test(test_font)
 ssr_add_test(test_diff)
+ssr_add_test(test_season)
 ssr_add_test(test_expr)
 ssr_add_test(test_ui)
 ssr_add_test(test_atlas)
