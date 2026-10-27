@@ -454,6 +454,47 @@ static void test_converges_after_a_delay_and_on_press(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// A dilemma: the code puts a copy of a template in a hook, then shows the
+// frame and changes the name inside it.
+static void test_copies_a_template_into_a_hook(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "Rect:(0,0,0,0) ref:BeachCard\n"
+             "{\n"
+             "\tDraw:(DilemmaBeach,0,0,10,10)\n"
+             "\tDraw:(ButtonFrame,0,0,10,10) $HIDE ref:Selected\n"
+             "\tText:(GIRLFRIEND,0,0,10,10) ref:BarName\n"
+             "} Template\n"
+             "Rect:(100,50,10,10) ref:TopHook\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(!find_image(scene, "DilemmaBeach"));
+    CHECK(ssr_scene_set_hook(scene, "TopHook", "BeachCard") == 1);
+    CHECK(ssr_scene_set_hook(scene, "TopHook", "NoCard") == 0);
+    ssr_scene_update(scene, &env, 16);
+    const SSRSceneItem *image = find_image(scene, "DilemmaBeach");
+    CHECK(image && near(image->x, 100) && near(image->y, 50) && !find_image(scene, "ButtonFrame"));
+    ssr_scene_sub(scene, "TopHook", "Selected", NULL, 1);
+    ssr_scene_sub(scene, "TopHook", "BarName", "GIRLFRIEND (ENG)", 1);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "ButtonFrame") != NULL);
+    int named = 0;
+    for (int i = 0; i < ssr_scene_count(scene); i++) {
+        const SSRSceneItem *item = ssr_scene_item(scene, i);
+        if (item->kind == SSR_ITEM_TEXT && strcmp(item->text, "GIRLFRIEND (ENG)") == 0) named = 1;
+    }
+    CHECK(named);
+    // A second copy takes the place of the first.
+    CHECK(ssr_scene_set_hook(scene, "TopHook", "BeachCard") == 1);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(!find_image(scene, "ButtonFrame"));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // A card of the pairs game: the code chooses the face, and plays the flip
 // forward to the back or back to the face.
 static void test_plays_an_animation_from_a_frame(void) {
@@ -1440,6 +1481,7 @@ int main(void) {
     test_runs_expressions();
     test_plays_an_animation();
     test_plays_an_animation_from_a_frame();
+    test_copies_a_template_into_a_hook();
     test_mixes_colours_and_orders_layers();
     test_emits_particles();
     test_definitions_do_not_draw();

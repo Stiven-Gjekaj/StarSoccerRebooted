@@ -3775,6 +3775,25 @@ static void change_sub(Gel *g, const char *ref, const char *text, int visible) {
     for (int i = 0; i < g->childCount; i++) change_sub(g->children[i], ref, text, visible);
 }
 
+int ssr_scene_set_hook(SSRScene *scene, const char *hook, const char *template_) {
+    Gel *g = scene && hook ? find_ref_first(scene, hook) : NULL;
+    Gel *model = scene && template_ ? find_ref_first(scene, template_) : NULL;
+    if (!g || !model) return 0;
+    Gel *entry = clone_gel(model);
+    if (!entry) return 0;
+    for (int i = 0; i < g->childCount; i++) free_gel(g->children[i]);
+    g->childCount = 0;
+    entry->x = entry->y = 0;
+    entry->hidden = 0;
+    add_child(g, entry);
+    return 1;
+}
+
+void ssr_scene_sub(SSRScene *scene, const char *ref, const char *sub, const char *text, int visible) {
+    Gel *g = scene && ref ? find_ref_first(scene, ref) : NULL;
+    if (g && sub) change_sub(g, sub, text, visible);
+}
+
 void ssr_scene_list_text(SSRScene *scene, const char *list, int element, const char *text) {
     Gel *entry = last_entry(scene, list);
     if (!entry || !text) return;

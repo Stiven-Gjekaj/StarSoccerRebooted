@@ -223,6 +223,15 @@ void ssr_scene_list_start(SSRScene *scene, const char *list, float y);
 // text with the ref takes the text when it is not NULL.
 void ssr_scene_list_sub(SSRScene *scene, const char *list, const char *ref, const char *text, int visible);
 
+// The first element with the ref hook gets a copy of the template in the
+// place of its children, at its origin (c_GGadget.Clone into a hook).
+// Returns 1 when both are there.
+int ssr_scene_set_hook(SSRScene *scene, const char *hook, const char *template_);
+// The elements with the ref sub inside the first element with the ref show
+// when visible is 1, and a text among them takes the text when it is not
+// NULL.
+void ssr_scene_sub(SSRScene *scene, const char *ref, const char *sub, const char *text, int visible);
+
 // The AnimInstance elements with the ref play at the speed, and jump to the
 // end of their animation when toEnd is 1 (c_GelAnimInstance).
 void ssr_scene_anim(SSRScene *scene, const char *ref, float speed, int toEnd);
