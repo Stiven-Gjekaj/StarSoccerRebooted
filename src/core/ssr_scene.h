@@ -166,6 +166,10 @@ int ssr_scene_set_text(SSRScene *scene, const char *ref, const char *text);
 // elements.
 int ssr_scene_set_visible(SSRScene *scene, const char *ref, int visible);
 
+// Gives the colour "RRGGBBAA" to each element with the ref
+// (c_GGadget.SetColour). Returns the number of elements.
+int ssr_scene_set_colour(SSRScene *scene, const char *ref, const char *colour);
+
 // The lists that the code fills (c_ACombo). list is the ref of the element
 // that holds the entries. An entry is a copy of the template with the ref
 // template_: it goes below the entry before it, shows the text, and its

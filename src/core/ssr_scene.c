@@ -3300,6 +3300,19 @@ int ssr_scene_set_visible(SSRScene *scene, const char *ref, int visible) {
     return count;
 }
 
+int ssr_scene_set_colour(SSRScene *scene, const char *ref, const char *colour) {
+    if (!scene || !ref || !colour) return 0;
+    char text[24];
+    snprintf(text, sizeof(text), "#%s", colour[0] == '#' ? colour + 1 : colour);
+    int count = 0;
+    for (int i = 0; i < scene->refCount; i++) {
+        if (strcmp(scene->refs[i]->ref, ref) != 0) continue;
+        scene->refs[i]->hasColour = parse_colour(text, &scene->refs[i]->colour);
+        count++;
+    }
+    return count;
+}
+
 void ssr_scene_list_clear(SSRScene *scene, const char *list) {
     Gel *g = scene && list ? find_ref_first(scene, list) : NULL;
     if (!g) return;

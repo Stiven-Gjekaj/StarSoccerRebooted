@@ -720,9 +720,11 @@ static void test_fills_lists_and_changes_elements(void) {
     CHECK(ssr_scene_list_add(scene, "NationCombo", "NationTemplate", "WALES", 63));
     CHECK(ssr_scene_set_text(scene, "NationText", "England") == 1);
     CHECK(ssr_scene_set_visible(scene, "PlayButton", 1) == 1);
+    CHECK(ssr_scene_set_colour(scene, "PlayButton", "FFFFFF55") == 1);
     CHECK(!ssr_scene_list_add(scene, "NoList", "NationTemplate", "X", 1));
     ssr_scene_update(scene, &env, 0);
     CHECK(find_text(scene, "England") && find_image(scene, "PlayBall"));
+    CHECK(find_image(scene, "PlayBall")->colour == 0xFFFFFF55);
     const SSRSceneItem *wales = find_text(scene, "WALES");
     CHECK(wales && near(wales->x, 110) && near(wales->y, 300));
     CHECK(find_text(scene, "ENGLAND") && near(find_text(scene, "ENGLAND")->y, 200));
