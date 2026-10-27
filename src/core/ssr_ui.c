@@ -250,11 +250,14 @@ static void close_block(Parser *p, int modifierBlock) {
 // can hold () and [] pairs. The line can end before the last ')'.
 static int read_args(const char **cursor, char ***args) {
     const char *p = *cursor;
-    int depth = 0, count = 0;
+    int depth = 0, count = 0, quoted = 0;
     char **list = NULL;
     const char *start = p;
     for (;; p++) {
         char c = *p;
+        // A bracket or a comma in quotes is a part of the text.
+        if (c == '"') quoted = !quoted;
+        if (quoted && c) continue;
         int end = c == 0 || (c == ')' && depth == 0);
         if (end || (c == ',' && depth == 0)) {
             const char *a = start, *b = p;
@@ -478,8 +481,13 @@ static void parse_statement(Parser *p, const char *line) {
         const char *start = line;
         argCount = read_args(&line, &args);
         const char *end = start;
-        int depth = 0;
-        while (*end && !(*end == ')' && depth == 0)) {
+        int depth = 0, quoted = 0;
+        while (*end && !(*end == ')' && depth == 0 && !quoted)) {
+            if (*end == '"') quoted = !quoted;
+            if (quoted) {
+                end++;
+                continue;
+            }
             if (*end == '(' || *end == '[') depth++;
             if ((*end == ')' || *end == ']') && depth > 0) depth--;
             end++;

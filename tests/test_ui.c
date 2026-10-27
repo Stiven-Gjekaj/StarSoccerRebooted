@@ -193,7 +193,23 @@ static void test_pushes_and_pops_the_parent(void) {
     ssr_ui_free(tree);
 }
 
+static void test_keeps_quoted_text_whole(void) {
+    const MemoryFile files[] = {
+        {"q.uis", "Group:(0,0)\n\tset(gel.text,\"(\"::fmt(%c,X)::\", \"::\")\") ref:Q\n"},
+        {NULL, NULL},
+    };
+    SSRUiTree *tree = parse(files, "q.uis");
+    const SSRUiNode *group = child(ssr_ui_root(tree), 0);
+    const SSRUiNode *set = group && group->modifierCount ? group->modifiers[0] : NULL;
+    CHECK(is(set, "set") && set->argCount == 2);
+    CHECK(set && strcmp(set->args[1], "\"(\"::fmt(%c,X)::\", \"::\")\"") == 0);
+    CHECK(set && strcmp(set->raw, "gel.text,\"(\"::fmt(%c,X)::\", \"::\")\"") == 0);
+    CHECK(set && set->ref && strcmp(set->ref, "Q") == 0);
+    ssr_ui_free(tree);
+}
+
 int main(void) {
+    test_keeps_quoted_text_whole();
     test_pushes_and_pops_the_parent();
     test_reads_elements_modifiers_and_blocks();
     test_expands_imports_macros_and_constants();
