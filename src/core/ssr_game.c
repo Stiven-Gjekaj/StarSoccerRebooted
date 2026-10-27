@@ -250,6 +250,7 @@ static void save_slot_screen(SSRGame *game) {
 static void game_menu(SSRGame *game);
 static void choose_club(SSRGame *game);
 static void star_transition(SSRGame *game, const char *after);
+static void player_tweaks(SSRGame *game);
 
 static void open_slot(SSRGame *game, int slot) {
     game->slot = slot;
@@ -257,6 +258,7 @@ static void open_slot(SSRGame *game, int slot) {
     slot_path(game, slot, path, sizeof(path));
     if (game->slotExists[slot] && ssr_career_load(&game->career, path)) {
         // LoadCareer: the star transition, then the game menu.
+        player_tweaks(game);
         star_transition(game, "gamemenu");
         return;
     }
@@ -620,6 +622,7 @@ static void call_start_career(SSRGame *game) {
     replace_all(c->headline, sizeof(c->headline), "$playername", c->fullName);
     replace_all(c->headline, sizeof(c->headline), "$lastname", c->shortName);
     save_career(game);
+    player_tweaks(game);
     // The news page shows the headline once (c_TScreen_WebPage).
     snprintf(game->news, sizeof(game->news), "%s", c->headline);
     c->headline[0] = 0;

@@ -182,6 +182,8 @@ static void test_starts_a_new_career(void) {
     ssr_game_message(game, "message.btn_Ok");
     CHECK(strcmp(ssr_game_screen(game), "startransition") == 0);
     CHECK(career->technique[0] == 1 && career->power[0] == 1);
+    // The header of the news page shows the player already.
+    CHECK(ssr_tweaks_number(tweaks, "Player", "Age") == 16 && ssr_tweaks_number(tweaks, "Player", "Bux") == 15);
     ssr_game_update(game, 30);
     CHECK(strcmp(ssr_game_screen(game), "startransition") == 0);
     ssr_game_update(game, 30);
