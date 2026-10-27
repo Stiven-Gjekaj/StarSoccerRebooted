@@ -9,6 +9,8 @@
 typedef struct {
     char text[256];
     int priority;
+    // The kind of the item, or 0 for a fixed text, and its requests.
+    int kind, count;
     int active;
     // The copy of the template on the tape, and its width.
     int spawn;
@@ -19,6 +21,8 @@ typedef struct {
 
 struct SSRTicker {
     SSRTickerMeasure measure;
+    SSRTickerPriority priority;
+    SSRTickerText text;
     void *context;
     Item items[MAX_ITEMS];
     int count;
@@ -46,19 +50,37 @@ void ssr_ticker_add(SSRTicker *ticker, const char *text, int priority) {
     item->priority = priority;
 }
 
+void ssr_ticker_set_kinds(SSRTicker *ticker, SSRTickerPriority priority, SSRTickerText text) {
+    if (!ticker) return;
+    ticker->priority = priority;
+    ticker->text = text;
+}
+
+void ssr_ticker_add_kind(SSRTicker *ticker, int kind) {
+    if (!ticker || ticker->count >= MAX_ITEMS || kind < 1) return;
+    Item *item = &ticker->items[ticker->count++];
+    memset(item, 0, sizeof(*item));
+    item->kind = kind;
+}
+
 // c_TickerManager.Spawn: the text with the highest priority that is not on
-// the tape. Of equal texts, the first one goes.
+// the tape. Of equal texts, the first one goes. The game asks each item of
+// a kind for its priority each time.
 static int spawn(SSRTicker *ticker, SSRScene *scene, float x) {
     int best = -1, bestPriority = -1;
     for (int i = 0; i < ticker->count; i++) {
-        const Item *item = &ticker->items[i];
-        if (!item->active && item->priority > bestPriority) {
+        Item *item = &ticker->items[i];
+        if (item->active) continue;
+        int priority = item->priority;
+        if (item->kind) priority = ticker->priority ? ticker->priority(ticker->context, item->kind, &item->count) : -1;
+        if (priority > bestPriority) {
             best = i;
-            bestPriority = item->priority;
+            bestPriority = priority;
         }
     }
     if (best < 0) return 0;
     Item *item = &ticker->items[best];
+    if (item->kind && ticker->text) ticker->text(ticker->context, item->kind, &item->count, item->text, sizeof(item->text));
     // The text is 100 wider than its words (c_Ticker.Activate).
     item->width = (ticker->measure ? ticker->measure(ticker->context, item->text) : 0) + 100;
     const char *template_ = ticker->nextTemplate == 0 ? "Ticker1" : "Ticker2";

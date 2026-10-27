@@ -5,6 +5,8 @@
 #ifndef SSR_TICKER_H
 #define SSR_TICKER_H
 
+#include <stddef.h>
+
 #include "ssr_scene.h"
 
 typedef struct SSRTicker SSRTicker;
@@ -14,6 +16,22 @@ typedef float (*SSRTickerMeasure)(void *context, const char *text);
 
 SSRTicker *ssr_ticker_create(SSRTickerMeasure measure, void *context);
 void ssr_ticker_free(SSRTicker *ticker);
+
+// The priority of an item of a kind when the ticker picks the next text
+// (c_Ticker.Priority). -1 does not show. The function can change *count,
+// the requests since the item last showed (m_showRequests).
+typedef int (*SSRTickerPriority)(void *context, int kind, int *count);
+// The text of the item of a kind that shows (c_Ticker.Activate). A function
+// that leaves the text keeps the last text of the item.
+typedef void (*SSRTickerText)(void *context, int kind, int *count, char *text, size_t capacity);
+
+// The functions of the items of a kind. Their context is the context of
+// the ticker.
+void ssr_ticker_set_kinds(SSRTicker *ticker, SSRTickerPriority priority, SSRTickerText text);
+
+// Adds an item of a kind (from 1). Its priority and its text come from the
+// functions of the kinds.
+void ssr_ticker_add_kind(SSRTicker *ticker, int kind);
 
 // Adds a text that the ticker can show. A higher priority shows first. The
 // welcome texts of the game have the priority 0 (c_Ticker_Dummy).

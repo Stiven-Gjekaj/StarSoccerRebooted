@@ -83,7 +83,54 @@ static void test_runs_the_texts_along_the_tape(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static int asked[3];
+
+// Kind 1 is never shown. Kind 2 counts its requests. Kind 3 keeps its
+// text after the first time.
+static int priority(void *context, int kind, int *count) {
+    (void)context;
+    asked[kind - 1]++;
+    if (kind == 1) return -1;
+    return ++*count;
+}
+
+static void text(void *context, int kind, int *count, char *out, size_t capacity) {
+    (void)context;
+    *count = 0;
+    if (kind == 3 && out[0]) return;
+    snprintf(out, capacity, "Kind %d", kind);
+}
+
+// The items of a kind ask the game for their priority and their text.
+static void test_asks_the_kinds(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("ticker.uis", &files);
+    SSRSceneEnv env = {.left = 0, .top = 0, .width = 640, .height = 960, .tweaks = tweaks};
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    SSRTicker *ticker = ssr_ticker_create(measure, NULL);
+    ssr_ticker_set_kinds(ticker, priority, text);
+    ssr_ticker_add(ticker, "Welcome", 0);
+    ssr_ticker_add_kind(ticker, 1);
+    ssr_ticker_add_kind(ticker, 2);
+    ssr_ticker_add_kind(ticker, 3);
+    ssr_ticker_start(ticker, scene);
+    ssr_scene_update(scene, &env, 0);
+    // Kind 2 and kind 3 both give 1, over the welcome text: kind 2 is
+    // first in the list.
+    CHECK(find(scene, "Kind 2") && !find(scene, "Welcome") && asked[0] == 1);
+    ssr_ticker_update(ticker, scene);
+    ssr_scene_update(scene, &env, 0);
+    // Then kind 3, which asked two times.
+    CHECK(find(scene, "Kind 3") && asked[2] == 2 && asked[1] == 1);
+    ssr_ticker_free(ticker);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_asks_the_kinds();
     test_runs_the_texts_along_the_tape();
     return TEST_RESULT();
 }
