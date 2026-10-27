@@ -285,7 +285,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 - [x] Other players with careers: age, skill, form, transfers, injuries,
       and retirement (`ssr_people`). Each club that plays gets a squad.
-- [ ] Clubs with squads, managers, finances, and histories
+- [x] Clubs with squads, managers, finances, and histories: the squad
+      screen shows the manager, the titles, and the budget of the club
 - [x] Rival players: players of the same age who start with the player
       and follow their own careers. The squad screen and the ticker show
       them.
@@ -296,8 +297,9 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] Managers with styles (balanced, youth, attacking). The managers of
       the bottom clubs can go at the end of a season. A new manager of the
       club of the player starts the boss relation again at 50.
-- [ ] A new manager who changes the role of the player or brings the
-      player to a new club
+- [x] A new manager who changes the role of the player or brings the
+      player to a new club: an attacking boss plays the player as a
+      striker, and a sacked boss can call the player to the new club
 - [x] New young players each season, so the world stays full after the
       real players retire
 
@@ -348,8 +350,10 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       career match is always dry; only the training has weather.
 - [x] Snow in the winter far from the equator, and the worn pitch of a
       small club in the winter
-- [ ] Fair ratings and real scores. Players of the original complained
-      about harsh ratings and very high scores.
+- [x] Fair ratings and real scores. Players of the original complained
+      about harsh ratings and very high scores. The World screen chooses
+      the real ones (a rating starts at 6, and 2.7 goals in a match) or
+      the classic ones of 4.32 (3.2 goals in a match).
 
 ### Off the pitch
 
@@ -370,7 +374,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       and the Bux
 - [x] Many careers in one world: Options, World can make the next new
       career continue the world of the last career
-- [ ] The next player can play against the last one
+- [x] The next player can play against the last one: a player of the
+      last career who did not retire plays on in the continued world
 
 ## The database
 
