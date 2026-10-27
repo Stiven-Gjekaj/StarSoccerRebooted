@@ -1253,6 +1253,27 @@ static void test_player_shadows(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The scene lists each modifier that it does not know, once.
+static void test_lists_unknown_modifiers(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "Draw:(A,0,0,10,10)\n"
+             "\tFrobnicate(1)\n"
+             "\tScale(2,2)\n"
+             "Draw:(B,0,0,10,10)\n"
+             "\tFrobnicate(2)\n"
+             "\tWobble()\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    CHECK(ssr_scene_unknown_count(scene) == 2);
+    CHECK(strcmp(ssr_scene_unknown(scene, 0), "Frobnicate") == 0 && strcmp(ssr_scene_unknown(scene, 1), "Wobble") == 0);
+    CHECK(ssr_scene_unknown(scene, 2) == NULL);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
     test_draws_embedded_content();
     test_scrolls_a_list_by_a_swipe();
@@ -1281,5 +1302,6 @@ int main(void) {
     test_progress_bars();
     test_table_rows();
     test_player_shadows();
+    test_lists_unknown_modifiers();
     return TEST_RESULT();
 }

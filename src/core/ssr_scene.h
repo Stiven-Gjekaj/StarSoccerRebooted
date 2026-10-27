@@ -122,6 +122,11 @@ SSRScene *ssr_scene_open(const SSRUiTree *tree, const SSRSceneEnv *env);
 // list of items. The first update gives 0.
 void ssr_scene_update(SSRScene *scene, const SSRSceneEnv *env, int ms);
 
+// The modifiers of the layout that the scene does not know: it skips them.
+// Each name comes once.
+int ssr_scene_unknown_count(const SSRScene *scene);
+const char *ssr_scene_unknown(const SSRScene *scene, int index);
+
 // The touch of the player, in the units of the layouts. Press() sees it in
 // the next update.
 void ssr_scene_touch(SSRScene *scene, int down, float x, float y);

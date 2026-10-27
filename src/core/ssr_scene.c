@@ -239,6 +239,9 @@ typedef struct {
 } SortKey;
 
 struct SSRScene {
+    // The names of the modifiers that the scene does not know, once each.
+    const char *unknown[64];
+    int unknownCount;
     SSRSceneItem *items;
     SortKey *keys;
     int count;
@@ -1233,6 +1236,14 @@ static void raw_arg(const SSRUiNode *m, int i, char *out, size_t capacity) {
     snprintf(out, capacity, "%.*s", (int)strcspn(at, ","), at);
 }
 
+// Keeps the name of a modifier that the scene does not know, once.
+static void note_unknown(SSRScene *s, const char *name) {
+    for (int i = 0; i < s->unknownCount; i++) {
+        if (strcmp(s->unknown[i], name) == 0) return;
+    }
+    if (s->unknownCount < 64) s->unknown[s->unknownCount++] = keep(s, name);
+}
+
 static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
     const char *n = m->name;
     Doodad *d = NULL;
@@ -1672,6 +1683,8 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
     } else if (is(n, "EmitSize")) {
         d = new_doodad(D_EMIT_SIZE, NULL);
         if (d) d->v[0] = m->argCount > 0;
+    } else {
+        note_unknown(s, n);
     }
     return d;
 }
@@ -3341,6 +3354,14 @@ void ssr_scene_touch(SSRScene *scene, int down, float x, float y) {
 
 int ssr_scene_time(const SSRScene *scene) {
     return scene ? scene->gameMS : 0;
+}
+
+int ssr_scene_unknown_count(const SSRScene *scene) {
+    return scene ? scene->unknownCount : 0;
+}
+
+const char *ssr_scene_unknown(const SSRScene *scene, int index) {
+    return scene && index >= 0 && index < scene->unknownCount ? scene->unknown[index] : NULL;
 }
 
 void ssr_scene_free(SSRScene *scene) {
