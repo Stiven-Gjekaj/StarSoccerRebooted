@@ -60,8 +60,8 @@ typedef struct {
     Uint64 tickerFrame;
     // A chance of the player: the pitch under the screen, the tap ball over
     // it, and the copies of the players and of the ball on the screen.
-    SSRUiTree *pitchScreen, *tapScreen, *bannerScreen;
-    SSRScene *pitchScene, *tapScene, *bannerScene;
+    SSRUiTree *pitchScreen, *tapScreen, *bannerScreen, *stadiumScreen, *stadiumStaticScreen;
+    SSRScene *pitchScene, *tapScene, *bannerScene, *stadiumScene, *stadiumStaticScene;
     char pitchName[64];
     SSRScene *viewScene;
     int playerCopies[SSR_PLAYERS_MAX];
@@ -198,8 +198,12 @@ static void free_chance_view(SSRApp *app) {
     ssr_ui_free(app->tapScreen);
     ssr_scene_free(app->bannerScene);
     ssr_ui_free(app->bannerScreen);
-    app->pitchScene = app->tapScene = app->bannerScene = NULL;
-    app->pitchScreen = app->tapScreen = app->bannerScreen = NULL;
+    ssr_scene_free(app->stadiumScene);
+    ssr_ui_free(app->stadiumScreen);
+    ssr_scene_free(app->stadiumStaticScene);
+    ssr_ui_free(app->stadiumStaticScreen);
+    app->pitchScene = app->tapScene = app->bannerScene = app->stadiumScene = app->stadiumStaticScene = NULL;
+    app->pitchScreen = app->tapScreen = app->bannerScreen = app->stadiumScreen = app->stadiumStaticScreen = NULL;
     app->pitchName[0] = 0;
     app->viewScene = NULL;
 }
@@ -284,7 +288,18 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         app->pitchScene = open_layer(app, name, &app->pitchScreen, env);
         SDL_snprintf(app->pitchName, sizeof(app->pitchName), "%s", name);
     }
-    if (!app->tapScene) app->tapScene = open_layer(app, "tapball.uis", &app->tapScreen, env);
+    if (!app->tapScene) {
+        // The tap ball shows in front of the stadium of the home team
+        // (c_MatchTapBallChance): "Stadium" + size + "AM", and its Static
+        // part under it.
+        const SSRMatch *match = ssr_game_match(app->game);
+        char stadium[64];
+        SDL_snprintf(stadium, sizeof(stadium), "Stadium%dAMStatic.uis", match ? match->stadiumSize : 0);
+        app->stadiumStaticScene = open_layer(app, stadium, &app->stadiumStaticScreen, env);
+        SDL_snprintf(stadium, sizeof(stadium), "Stadium%dAM.uis", match ? match->stadiumSize : 0);
+        app->stadiumScene = open_layer(app, stadium, &app->stadiumScreen, env);
+        app->tapScene = open_layer(app, "tapball.uis", &app->tapScreen, env);
+    }
     if (app->viewScene != app->scene) {
         // A new screen: the copies of the players and of the ball.
         app->viewScene = app->scene;
@@ -337,6 +352,8 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         const SSRTapBall *tap = &chance->tap;
         ssr_scene_place(app->tapScene, "TapBall", tap->x, tap->y, tap->depth);
         ssr_scene_update(app->tapScene, env, ms);
+        ssr_scene_update(app->stadiumStaticScene, env, ms);
+        ssr_scene_update(app->stadiumScene, env, ms);
     }
 }
 
@@ -670,7 +687,7 @@ static SSRSceneEnv scene_env(SSRApp *app) {
 static void auto_chance(SSRApp *app) {
     const char *setting = SDL_getenv("SSR_AUTOCHANCE");
     const SSRChance *chance = ssr_game_chance(app->game);
-    static Uint64 start = 0;
+    static Uint64 start = 0, tapStart = 0;
     float dx = 0, dy = 0;
     if (!setting || SDL_sscanf(setting, "%f,%f", &dx, &dy) != 2 || !chance) {
         start = 0;
@@ -679,6 +696,7 @@ static void auto_chance(SSRApp *app) {
     Uint64 now = SDL_GetTicks();
     if (!start) start = now;
     Uint64 t = now - start;
+    if (chance->state != SSR_CHANCE_TAP) tapStart = 0;
     if (chance->state == SSR_CHANCE_AIM) {
         if (t < 200) {
             ssr_game_touch(app->game, 1, chance->ball.x, chance->ball.y);
@@ -689,7 +707,9 @@ static void auto_chance(SSRApp *app) {
         }
     } else if (chance->state == SSR_CHANCE_TAP) {
         const SSRTapBall *tap = &chance->tap;
-        int near = tap->x > 200 && tap->x < 440;
+        // The tap waits 1.5 s, so that a frame can show the tap ball.
+        if (!tapStart) tapStart = now;
+        int near = tap->x > 200 && tap->x < 440 && now - tapStart > 1500;
         ssr_game_touch(app->game, near && (t / 100) % 2 == 0, tap->x, tap->y);
     } else {
         ssr_game_touch(app->game, 0, 0, 0);
@@ -728,10 +748,16 @@ SDL_AppResult SDL_AppIterate(void *state) {
         }
         update_chance_view(app, &env, ms);
         ssr_gfx_set_tweaks(app->gfx, app->tweaks);
-        if (app->pitchScene) ssr_gfx_draw_scene(app->gfx, app->pitchScene);
-        ssr_gfx_draw_scene(app->gfx, app->scene);
         const SSRChance *chance = ssr_game_chance(app->game);
-        if (app->tapScene && chance && chance->state == SSR_CHANCE_TAP) ssr_gfx_draw_scene(app->gfx, app->tapScene);
+        if (app->tapScene && chance && chance->state == SSR_CHANCE_TAP) {
+            // The tap ball takes the whole screen: the stadium, then the ball.
+            if (app->stadiumStaticScene) ssr_gfx_draw_scene(app->gfx, app->stadiumStaticScene);
+            if (app->stadiumScene) ssr_gfx_draw_scene(app->gfx, app->stadiumScene);
+            ssr_gfx_draw_scene(app->gfx, app->tapScene);
+        } else {
+            if (app->pitchScene) ssr_gfx_draw_scene(app->gfx, app->pitchScene);
+            ssr_gfx_draw_scene(app->gfx, app->scene);
+        }
         if (app->bannerScene) ssr_gfx_draw_scene(app->gfx, app->bannerScene);
         draw_ticker(app, &env);
     }
