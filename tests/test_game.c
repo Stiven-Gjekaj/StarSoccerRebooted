@@ -86,7 +86,7 @@ static int has_op(const SSRUiOp *ops, int count, SSRUiOpKind kind, const char *r
 // player, and the end.
 static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     SSRUiOp ops[64];
-    int apps = ssr_game_career(game)->apps;
+    int apps = ssr_game_career(game)->apps, bank = ssr_game_career(game)->bank;
     ssr_game_message(game, "gamemenu.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "match") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 1);
@@ -149,6 +149,10 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     // The commentary scrolled to its last rows.
     CHECK(ssr_tweaks_number(tweaks, "Menu", "CommentaryWindowScroll") < -400);
     CHECK(chances >= 2 && ssr_game_career(game)->apps == apps + 1);
+    // The match pays the wage and the bonuses.
+    const SSRCareer *c = ssr_game_career(game);
+    CHECK(c->bank == bank + (int)ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal"));
+    CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal") >= c->wage);
 }
 
 static void test_starts_a_new_career(void) {

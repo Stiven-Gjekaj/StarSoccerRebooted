@@ -870,6 +870,15 @@ static void end_match(SSRGame *game) {
     c->assists += m->assists;
     c->passes += m->passes;
     c->energy = m->energy;
+    // The pay of the match (c_TScreen_MatchReview): the wage and the bonuses
+    // [I: the sponsors and the agent come later].
+    int goals = m->goals * c->goalBonus, assists = m->assists * c->assistBonus;
+    int total = c->wage + goals + assists;
+    c->bank += total;
+    ssr_tweaks_set_number(game->tweaks, "MatchReview", "EarningsWage", c->wage);
+    ssr_tweaks_set_number(game->tweaks, "MatchReview", "EarningsBonusGoals", goals);
+    ssr_tweaks_set_number(game->tweaks, "MatchReview", "EarningsBonusAssists", assists);
+    ssr_tweaks_set_number(game->tweaks, "MatchReview", "EarningsTotal", total);
     free(game->match);
     game->match = NULL;
     save_career(game);
