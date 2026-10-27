@@ -243,6 +243,12 @@ int ssr_scene_entry_var(SSRScene *scene, const char *list, const char *ref, cons
 // group,name (c_ProgressBar.SetSourceTweakValue).
 int ssr_scene_entry_bar(SSRScene *scene, const char *list, const char *ref, const char *group, const char *name);
 
+// The ProgressBar and AnimateProgress modifiers with the ref follow the
+// tweak group,name (c_ProgressBar.SetSourceTweakValue,
+// c_AnimateProgress.SetTweakValue). A max above 0 is the new top of the
+// bar (m_maxInput, m_max). Returns the number of modifiers that changed.
+int ssr_scene_bar_source(SSRScene *scene, const char *ref, const char *group, const char *name, float max);
+
 // The first element with the ref hook gets a copy of the template in the
 // place of its children, at its origin (c_GGadget.Clone into a hook). An
 // empty template clears the hook. Returns 1 when both are there.

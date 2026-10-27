@@ -805,6 +805,13 @@ static void apply_op(SSRApp *app, SSRScene *s, const SSRUiOp *o) {
     case SSR_OP_ELEMENT_COLOUR:
         ssr_scene_set_element_colour(s, op.ref, op.id, op.text);
         break;
+    case SSR_OP_BAR_SOURCE: {
+        char *sep = SDL_strchr(op.text, ',');
+        if (!sep) break;
+        *sep = 0;
+        ssr_scene_bar_source(s, op.ref, op.text, sep + 1, (float)op.id);
+        break;
+    }
     case SSR_OP_CONVERGE_X:
         ssr_scene_converge_x(s, op.ref, (float)SDL_atof(op.text));
         break;

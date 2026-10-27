@@ -79,6 +79,9 @@ typedef enum {
     SSR_OP_GEL,
     // The ConvergeTo of the first element ref goes to the x in text.
     SSR_OP_CONVERGE_X,
+    // The bars with the ref follow the tweak "Group,Name" in text. id is
+    // the top of the bar, or 0 to keep it.
+    SSR_OP_BAR_SOURCE,
 } SSRUiOpKind;
 
 typedef struct {

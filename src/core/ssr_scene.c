@@ -3912,6 +3912,39 @@ int ssr_scene_entry_bar(SSRScene *scene, const char *list, const char *ref, cons
     return 0;
 }
 
+// The ProgressBar and AnimateProgress doodads with the ref in the chain d
+// follow the tweak. Returns the number that changed.
+static int bar_source_in(SSRScene *scene, Doodad *d, const char *ref, const char *group, const char *name, float max) {
+    int count = 0;
+    for (; d; d = d->next) {
+        if (d->ref && strcmp(d->ref, ref) == 0 && (d->kind == D_PROGRESS_BAR || d->kind == D_ANIMATE_PROGRESS)) {
+            d->text[0] = keep(scene, group);
+            d->text[1] = keep(scene, name);
+            // The max of a bar is v[1], and of an animation v[3].
+            if (max > 0) d->v[d->kind == D_PROGRESS_BAR ? 1 : 3] = max;
+            count++;
+        }
+        count += bar_source_in(scene, d->chain, ref, group, name, max);
+        count += bar_source_in(scene, d->other, ref, group, name, max);
+    }
+    return count;
+}
+
+int ssr_scene_bar_source(SSRScene *scene, const char *ref, const char *group, const char *name, float max) {
+    if (!scene || !ref || !group || !name) return 0;
+    int count = 0;
+    Gel *stack[256];
+    int depth = 0;
+    if (scene->root) stack[depth++] = scene->root;
+    for (int i = 0; i < scene->detachedCount && depth < 256; i++) stack[depth++] = scene->detached[i];
+    while (depth > 0) {
+        Gel *at = stack[--depth];
+        count += bar_source_in(scene, at->doodads, ref, group, name, max);
+        for (int i = 0; i < at->childCount && depth < 256; i++) stack[depth++] = at->children[i];
+    }
+    return count;
+}
+
 static int copy_into(SSRScene *scene, const char *hook, const char *template_, int keepPlace) {
     Gel *g = scene && hook ? find_ref_first(scene, hook) : NULL;
     // No template clears the hook.

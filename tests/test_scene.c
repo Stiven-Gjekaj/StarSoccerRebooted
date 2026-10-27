@@ -1514,6 +1514,33 @@ static void test_progress_bars(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The code points the bars with a ref at another tweak and a new top
+// (SetSourceTweakValue), as the skill bar of a message does.
+static void test_points_a_bar_at_another_tweak(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "P", "Boss", 100);
+    ssr_tweaks_set_number(tweaks, "P", "Boss_Displayed", 100);
+    ssr_tweaks_set_number(tweaks, "P", "Pace", 30);
+    layout = "Draw:(Bar,0,0,200,20)\n"
+             "\tAnimateProgress(P,Boss,H,O,B,20,200,0,0,0,0,100) ref:BarAP\n"
+             "\tProgressBar(P,Boss_Displayed,0,100,20) ref:BarPB\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(fabsf(find_image(scene, "Bar")->w - 200) < 0.01f);
+    CHECK(ssr_scene_bar_source(scene, "BarPB", "P", "Pace", 60) == 1);
+    CHECK(ssr_scene_bar_source(scene, "BarAP", "P", "Pace", 60) == 1);
+    CHECK(ssr_scene_bar_source(scene, "NoBar", "P", "Pace", 60) == 0);
+    ssr_scene_update(scene, &env, 16);
+    // 20 + (200 - 20) * 30 / 60 = 110.
+    CHECK(fabsf(find_image(scene, "Bar")->w - 110) < 0.01f);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // The rows of a table: the list starts at a y, each row gets its texts
 // by number, a row that is not the last changes, and a click sends the
 // param of the row.
@@ -1749,6 +1776,7 @@ int main(void) {
     test_shows_items_by_tweak();
     test_text_areas_layers_and_clips();
     test_progress_bars();
+    test_points_a_bar_at_another_tweak();
     test_table_rows();
     test_player_shadows();
     test_lists_unknown_modifiers();
