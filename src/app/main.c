@@ -792,6 +792,9 @@ static void apply_op(SSRApp *app, SSRScene *s, const SSRUiOp *o) {
     case SSR_OP_ELEMENT_COLOUR:
         ssr_scene_set_element_colour(s, op.ref, op.id, op.text);
         break;
+    case SSR_OP_CONVERGE_X:
+        ssr_scene_converge_x(s, op.ref, (float)SDL_atof(op.text));
+        break;
     case SSR_OP_GEL:
         ssr_scene_spawn_set(s, 0, op.ref, (SSRGelProperty)op.id, (float)SDL_atof(op.text));
         break;

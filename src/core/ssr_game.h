@@ -77,6 +77,8 @@ typedef enum {
     // The property id (SSRGelProperty) of the first element ref takes the
     // number in text.
     SSR_OP_GEL,
+    // The ConvergeTo of the first element ref goes to the x in text.
+    SSR_OP_CONVERGE_X,
 } SSRUiOpKind;
 
 typedef struct {
