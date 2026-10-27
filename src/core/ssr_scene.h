@@ -191,6 +191,15 @@ int ssr_scene_list_add(SSRScene *scene, const char *list, const char *template_,
 // "RRGGBBAA" (c_GGadget.SetElementColour). The elements are the gels with
 // the ref of the entry, in the order of the file. 0 is the entry.
 void ssr_scene_list_colour(SSRScene *scene, const char *list, int element, const char *colour);
+// The last entry of the list: the element with the number takes the text
+// (c_GGadget.SetElementText). The numbers are those of ssr_scene_list_colour.
+void ssr_scene_list_text(SSRScene *scene, const char *list, int element, const char *text);
+// The clicks of the last entry send their message with the param after a
+// space, for example "league.row_team 7" (c_GGadget param).
+void ssr_scene_list_param(SSRScene *scene, const char *list, int param);
+// The next entry of the list goes at the y.
+void ssr_scene_list_start(SSRScene *scene, const char *list, float y);
+// In the calls on the last entry, "list@n" names the entry n, from 0.
 // The last entry of the list: each gel with the ref shows or hides, and a
 // text with the ref takes the text when it is not NULL.
 void ssr_scene_list_sub(SSRScene *scene, const char *list, const char *ref, const char *text, int visible);

@@ -3594,10 +3594,18 @@ void ssr_scene_spawn_clone(SSRScene *scene, int id, const char *ref, const char 
     }
 }
 
-// The last entry that the code added to the list, or NULL.
+// The last entry that the code added to the list, or NULL. "list@n" is
+// the entry n, from 0.
 static Gel *last_entry(const SSRScene *scene, const char *list) {
-    Gel *g = scene && list ? find_ref_first(scene, list) : NULL;
-    return g && g->childCount > 0 ? g->children[g->childCount - 1] : NULL;
+    if (!scene || !list) return NULL;
+    const char *at = strchr(list, '@');
+    char name[64];
+    snprintf(name, sizeof(name), "%.*s", at ? (int)(at - list) : (int)strlen(list), list);
+    Gel *g = find_ref_first(scene, name);
+    if (!g || g->childCount == 0) return NULL;
+    if (!at) return g->children[g->childCount - 1];
+    int n = atoi(at + 1);
+    return n >= 0 && n < g->childCount ? g->children[n] : NULL;
 }
 
 // The element with the number in the entry: the gels with the ref of the
@@ -3632,6 +3640,35 @@ static void change_sub(Gel *g, const char *ref, const char *text, int visible) {
         if (text && g->kind == GEL_TEXT) set_shown(g, text);
     }
     for (int i = 0; i < g->childCount; i++) change_sub(g->children[i], ref, text, visible);
+}
+
+void ssr_scene_list_text(SSRScene *scene, const char *list, int element, const char *text) {
+    Gel *entry = last_entry(scene, list);
+    if (!entry || !text) return;
+    int index = element;
+    Gel *g = nth_element(entry, entry->ref, &index);
+    if (g) set_shown(g, text);
+}
+
+// Each click in g sends the message with the param after a space.
+static void set_param(SSRScene *scene, Gel *g, int param) {
+    if (g->click && *g->click) {
+        char base[128], text[160];
+        snprintf(base, sizeof(base), "%.*s", (int)strcspn(g->click, " "), g->click);
+        snprintf(text, sizeof(text), "%s %d", base, param);
+        g->click = keep(scene, text);
+    }
+    for (int i = 0; i < g->childCount; i++) set_param(scene, g->children[i], param);
+}
+
+void ssr_scene_list_param(SSRScene *scene, const char *list, int param) {
+    Gel *entry = last_entry(scene, list);
+    if (entry) set_param(scene, entry, param);
+}
+
+void ssr_scene_list_start(SSRScene *scene, const char *list, float y) {
+    Gel *g = scene && list ? find_ref_first(scene, list) : NULL;
+    if (g) g->listY = y;
 }
 
 void ssr_scene_list_sub(SSRScene *scene, const char *list, const char *ref, const char *text, int visible) {

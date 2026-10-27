@@ -1175,6 +1175,48 @@ static void test_progress_bars(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The rows of a table: the list starts at a y, each row gets its texts
+// by number, a row that is not the last changes, and a click sends the
+// param of the row.
+static void test_table_rows(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "Rect:(0,0,600,52) ref:Entry\n"
+             "\tClick(league.row_team)\n"
+             "{\n"
+             "\tText:(Pos,0,0,50,52) ref:Entry\n"
+             "\tText:(Team,50,0,300,52) ref:Entry\n"
+             "\tDraw:(Glow,0,0,600,52) $HIDE ref:Highlight\n"
+             "} Template\n"
+             "Rect:(0,0,0,0) ref:TeamList\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_list_clear(scene, "TeamList");
+    ssr_scene_list_start(scene, "TeamList", 52);
+    const char *teams[2] = {"BIG", "MID"};
+    for (int i = 0; i < 2; i++) {
+        CHECK(ssr_scene_list_add(scene, "TeamList", "Entry", NULL, 0));
+        char pos[8];
+        snprintf(pos, sizeof(pos), "%d", i + 1);
+        ssr_scene_list_text(scene, "TeamList", 1, pos);
+        ssr_scene_list_text(scene, "TeamList", 2, teams[i]);
+        ssr_scene_list_param(scene, "TeamList", i + 1);
+    }
+    // The first row lights up after the second is in.
+    ssr_scene_list_sub(scene, "TeamList@0", "Highlight", NULL, 1);
+    ssr_scene_update(scene, &env, 0);
+    const SSRSceneItem *mid = find_text(scene, "MID"), *big = find_text(scene, "BIG");
+    CHECK(big && mid && near(big->y, 52) && near(mid->y, 104) && find_text(scene, "2"));
+    const SSRSceneItem *glow = find_image(scene, "Glow");
+    CHECK(glow && near(glow->y, 52));
+    const SSRSceneItem *row = ssr_scene_hit_item(scene, 300, 120);
+    CHECK(row && strcmp(ssr_scene_click(scene, &env, row), "league.row_team 2") == 0);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
     test_draws_embedded_content();
     test_scrolls_a_list_by_a_swipe();
@@ -1201,5 +1243,6 @@ int main(void) {
     test_shows_items_by_tweak();
     test_text_areas_layers_and_clips();
     test_progress_bars();
+    test_table_rows();
     return TEST_RESULT();
 }
