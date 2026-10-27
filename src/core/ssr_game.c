@@ -6606,6 +6606,26 @@ static int start_interview(SSRGame *game) {
 }
 
 // c_TScreen_Interview.ButtonOk: back to the match stats.
+// The press of the remake: the answers of the interview make the headline
+// of the next day. Good words before a derby or a rivalry match also make
+// the rivalry grow, because the other club hears them.
+static void press(SSRGame *game, int good) {
+    SSRCareer *c = &game->career;
+    char text[256];
+    snprintf(text, sizeof(text), "%s", loc(game, good ? "SSR_PressGood" : "SSR_PressBad"));
+    replace_all(text, sizeof(text), "$name", c->shortName);
+    alert(game, "bottommessagemoment", text, 4000);
+    if (!good || !game->season || !game->world) return;
+    SSRFixture *f = ssr_season_find(game->season, game->fixtureComp, game->fixtureDate, game->fixtureHome,
+                                    game->fixtureAway);
+    SSRSeasonComp *comp = ssr_season_comp(game->season, game->fixtureComp);
+    if (!f || !comp || comp->data->level != 0) return;
+    int a = ssr_fixture_home_team(game->season, f), b = ssr_fixture_away_team(game->season, f);
+    if (ssr_world_is_derby(game->world, a, b) || ssr_honours_rivalry(&game->honours, a, b) >= SSR_RIVALRY_POINTS) {
+        ssr_honours_add_rivalry(&game->honours, a, b, 1);
+    }
+}
+
 static void interview_ok(SSRGame *game) {
     SSRCareer *c = &game->career;
     set_screen(game, "matchstats");
@@ -6629,6 +6649,7 @@ static void interview_ok(SSRGame *game) {
         ssr_tweaks_set_number(game->tweaks, "Menu", "ZeroRelChange", 1);
         skill_tweaks(game);
     }
+    press(game, !game->interviewFail);
     star_tweaks(game);
     ssr_tweaks_set_number(game->tweaks, "MatchStats", "StatStage", game->statStage);
 }

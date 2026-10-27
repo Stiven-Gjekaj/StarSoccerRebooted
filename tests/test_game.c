@@ -519,6 +519,17 @@ static void give_an_interview(SSRGame *game, SSRTweaks *tweaks) {
     }
     for (int f = 0; f < 400 && strcmp(ssr_game_screen(game), "interview") == 0; f++) ssr_game_update(game, 1);
     CHECK(strcmp(ssr_game_screen(game), "matchstats") == 0);
+    // The press writes of the answers: the headline is an alert.
+    const char *want = fault ? "SSR_PRESSBAD" : "SSR_PRESSGOOD";
+    int pressSeen = 0;
+    for (int k = 0; k < 16 && !pressSeen; k++) {
+        int id = 0;
+        const char *layout = ssr_game_alert(game, &id);
+        if (!layout) break;
+        pressSeen = strcmp(ssr_tweaks_get(tweaks, "Menu", "BottomQuickMessage"), want) == 0;
+        if (!pressSeen) ssr_game_message(game, "message.dismiss");
+    }
+    CHECK(pressSeen);
     if (!fault) {
         interviewsWon++;
         CHECK(c->interviewSkill == skill + 1 && c->starRating == stars + 10);
