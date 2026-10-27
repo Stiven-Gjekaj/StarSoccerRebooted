@@ -181,6 +181,30 @@ static void test_plays_a_season(void) {
     ssr_season_free(s);
 }
 
+// The goals in a match of other teams: the real scores of the remake give
+// fewer goals than 4.32, near 2.7 in a match.
+static float goals_per_match(int real) {
+    int goals = 0, matches = 0;
+    for (int k = 0; k < 40; k++) {
+        SSRRandom random = {SSR_RANDOM_START + k * 7};
+        SSRSeason *s = new_season(&random);
+        s->realScores = real;
+        ssr_season_play_to(s, ssr_date_make(1, 1, 2));
+        SSRSeasonComp *one = ssr_season_comp(s, 10);
+        for (int i = 0; i < one->fixtureCount; i++) {
+            goals += one->fixtures[i].score1 + one->fixtures[i].score2;
+            matches++;
+        }
+        ssr_season_free(s);
+    }
+    return matches ? (float)goals / (float)matches : 0;
+}
+
+static void test_plays_real_scores(void) {
+    float classic = goals_per_match(0), real = goals_per_match(1);
+    CHECK(classic > 3.0f && real > 2.4f && real < 3.0f && real < classic);
+}
+
 static void test_saves_and_loads(void) {
     SSRRandom random = {SSR_RANDOM_START};
     SSRSeason *s = new_season(&random);
@@ -253,6 +277,7 @@ int main(void) {
     test_dates();
     test_sets_up_the_leagues_and_the_cup();
     test_plays_a_season();
+    test_plays_real_scores();
     test_saves_and_loads();
     test_counts_the_match_of_the_player();
     return TEST_RESULT();

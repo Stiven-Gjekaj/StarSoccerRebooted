@@ -1005,6 +1005,17 @@ int ssr_fixture_loser(SSRSeason *s, const SSRFixture *f) {
 // goals are rare.
 static int random_goal(SSRSeason *s) {
     static const int WEIGHTS[11] = {1536, 1536, 1536, 1536, 256, 32, 8, 4, 2, 1, 1};
+    // [I: the real scores: of 1000 teams in a match, 260 score no goal, 350
+    // one, 240 two, 110 three, 30 four, and 10 five.]
+    static const int REAL[6] = {260, 350, 240, 110, 30, 10};
+    if (s->realScores) {
+        int r = (int)rnd2(s, 1, 1000);
+        for (int i = 0; i < 6; i++) {
+            if (REAL[i] >= r) return i;
+            r -= REAL[i];
+        }
+        return 0;
+    }
     int r = (int)rnd2(s, 1, 6448);
     for (int i = 0; i < 11; i++) {
         if (WEIGHTS[i] > r) return i;

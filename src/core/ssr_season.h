@@ -151,6 +151,10 @@ typedef struct SSRSeason {
     // calls nothing.
     void (*played)(void *context, struct SSRSeason *season, const SSRSeasonComp *comp, const SSRFixture *fixture);
     void *playedContext;
+    // 1 for the real scores of the remake: the goals of a team in a match
+    // of other teams follow the counts of real matches (2.7 goals in a
+    // match). 0 is the scores of 4.32 (3.2 goals in a match).
+    int realScores;
 } SSRSeason;
 
 // Makes the season of a new career: all the clubs of the data set are
