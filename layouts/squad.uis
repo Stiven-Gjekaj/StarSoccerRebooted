@@ -241,6 +241,21 @@ PushOrigin:(480,@n)
 		ShowIf(Squad,CanPosition,1)
 PopOrigin
 
+// The editor: the next kit of the club.
+PushOrigin:(480,@n)
+	M_NavButton:(0,0,SSR_Kit,,)
+	{
+		Draw:(SSRShirt,27,22,96,96)
+	}
+		Delay(0.2)
+		ConvergeFrom(640,0)
+		Click(squad.btn_Kit)
+		<
+			PlaySnd(UISelect)
+		>
+		ShowIf(Squad,CanKit,1)
+PopOrigin
+
 // The facts of the club: the manager, the titles, and the budget.
 PushOrigin:(13,@n-96)
 	Rect:(0,0,614,80)

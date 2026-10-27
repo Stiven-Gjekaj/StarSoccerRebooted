@@ -919,10 +919,25 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         ssr_game_key(game, SSR_KEY_ENTER);
         CHECK(!ssr_game_wants_text(game) && strcmp(ssr_game_text(game, "GS_SquadTitle"), edited) == 0);
         CHECK(edited[strlen(edited) - 1] == 'X');
+        // The editor: the club wears the next kit of the editor. The kits
+        // go round.
+        CHECK(ssr_tweaks_number(tweaks, "Squad", "CanKit") == 1);
+        for (int i = 0; i < 12; i++) ssr_game_message(game, "squad.btn_Kit");
         ssr_game_message(game, "squad.btn_Mode");
         rows = take_ops(game, ops, 256);
         for (int i = 0; i < rows; i++) scorers += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "PlayerList") == 0;
         CHECK(scorers >= 1 && scorers <= 20 && strcmp(ssr_tweaks_get(tweaks, "Squad", "Title"), "PRM") == 0);
+        CHECK(ssr_tweaks_number(tweaks, "Squad", "CanKit") == 0);
+        // The editor: the list of the scorers names the league.
+        ssr_game_message(game, "squad.inp_Name");
+        CHECK(ssr_game_wants_text(game) && strcmp(ssr_game_text(game, "GS_SquadTitle"), "PRM") == 0);
+        ssr_game_type(game, "X");
+        ssr_game_key(game, SSR_KEY_ENTER);
+        CHECK(strcmp(ssr_game_text(game, "GS_SquadTitle"), "PRMX") == 0);
+        ssr_game_message(game, "squad.inp_Name");
+        ssr_game_key(game, SSR_KEY_BACKSPACE);
+        ssr_game_key(game, SSR_KEY_ENTER);
+        CHECK(strcmp(ssr_tweaks_get(tweaks, "Squad", "Title"), "PRM") == 0);
         // The third list: the player and the three rivals.
         ssr_game_message(game, "squad.btn_Mode");
         rows = take_ops(game, ops, 256);
