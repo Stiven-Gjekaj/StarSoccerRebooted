@@ -36,6 +36,8 @@ struct SSRGame {
     // function that runs when it closes.
     char messageReturn[64];
     char messageCall[64];
+    // The number that goes with the call (c_TScreen_Message intdata).
+    int messageData;
     int returnState;
 
     // The career that plays now, and the slot that it uses.
@@ -77,6 +79,12 @@ struct SSRGame {
     // comes back after a chance (m_commentaryCache).
     SSRMatchLine commentary[256];
     int commentaryCount;
+
+    // The boost screen (c_TScreen_ChooseBoost): 1 skills or 2 relations, a
+    // relation pass after the skill pass, the bolts of each pass, and the
+    // rows that the player can still choose.
+    int boostType, boostBoth, bolt1, bolt2;
+    int boostOn[5];
 };
 
 typedef void (*Handler)(SSRGame *game);
@@ -647,6 +655,8 @@ static void call_start_career(SSRGame *game) {
     star_transition(game, "webpagenews");
 }
 
+static void call_drink(SSRGame *game);
+
 static void run_call(SSRGame *game, const char *name) {
     static const struct {
         const char *name;
@@ -655,6 +665,7 @@ static void run_call(SSRGame *game, const char *name) {
         {"DeleteCareer", call_delete_career},
         {"TrialDone", call_trial_done},
         {"StartCareer", call_start_career},
+        {"DrinkNRG", call_drink},
     };
     for (size_t i = 0; i < sizeof(CALLS) / sizeof(CALLS[0]); i++) {
         if (strcmp(CALLS[i].name, name) == 0) {
@@ -1028,6 +1039,228 @@ static void match_tick(SSRGame *game) {
     if (event == SSR_MATCH_EVENT_HALF_TIME || event == SSR_MATCH_EVENT_FULL_TIME) match_state(game);
 }
 
+/* ------------------------------------------------------------ drinks */
+
+// GetNextAvailableNRG: the first kind of can that the player has, or -1.
+static int next_can(const SSRCareer *c) {
+    for (int i = 0; i < 5; i++) {
+        if (c->nrg[i] > 0) return i;
+    }
+    return -1;
+}
+
+static int *skill_levels(SSRCareer *c, int row) {
+    int *rows[5] = {c->pace, c->power, c->technique, c->vision, c->setPieces};
+    return rows[row];
+}
+
+static float *relation(SSRCareer *c, int row) {
+    float *rows[3] = {&c->relationBoss, &c->relationTeam, &c->relationFans};
+    return row < 3 ? rows[row] : NULL;
+}
+
+// The skills and the relations that the boost screen shows.
+static void skill_tweaks(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    static const char *SKILLS[5] = {"Pace", "Power", "Technique", "Vision", "SetPieces"};
+    for (int i = 0; i < 5; i++) {
+        ssr_tweaks_set_number(game->tweaks, "Player", SKILLS[i], ssr_career_skill(skill_levels(c, i)) + 0.5);
+    }
+    ssr_tweaks_set_number(game->tweaks, "Player", "BossRelationship", c->relationBoss);
+    ssr_tweaks_set_number(game->tweaks, "Player", "TeamRelationship", c->relationTeam);
+    ssr_tweaks_set_number(game->tweaks, "Player", "FansRelationship", c->relationFans);
+    ssr_tweaks_set_number(game->tweaks, "Player", "GirlfriendRelationship", 0);
+    ssr_tweaks_set_number(game->tweaks, "Player", "SponsorsRelationship", 0);
+}
+
+static void disable_row(SSRGame *game, int row) {
+    static const char *SKILL[5] = {"SkillButton1", "SkillButton2", "SkillButton3", "SkillButton4", "SkillButton5"};
+    static const char *REL[5] = {"RelButton1", "RelButton2", "RelButton3", "RelButton4", "RelButton5"};
+    game->boostOn[row] = 0;
+    add_op(game, SSR_OP_COLOUR, game->boostType == 2 ? REL[row] : SKILL[row], NULL, "ffffff55", 0);
+}
+
+// UpdateProgressBars: a full row cannot take more. The player has no
+// girlfriend and no sponsors yet [I]. Ok shows when no row is left.
+static void boost_rows(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    for (int i = 0; i < 5; i++) {
+        float percent;
+        if (game->boostType == 2) {
+            percent = i < 3 ? *relation(c, i) : 0;
+            if (i >= 3 && game->boostOn[i]) disable_row(game, i);
+        } else {
+            // In float, 60 * 1.6666666 is 100 (c_TScreen_ChooseBoost).
+            percent = (float)ssr_career_skill(skill_levels(c, i)) * 1.6666666f;
+            if (percent > 100) percent = 100;
+        }
+        if (percent == 100.0f && game->boostOn[i]) disable_row(game, i);
+    }
+    int left = 0;
+    for (int i = 0; i < 5; i++) left += game->boostOn[i];
+    if (left == 0) add_op(game, SSR_OP_SHOW, "PlayButton", NULL, NULL, 0);
+    skill_tweaks(game);
+}
+
+static void boost_screen(SSRGame *game, int type, int both, int bolt1, int bolt2) {
+    game->boostType = type;
+    game->boostBoth = both;
+    game->bolt1 = bolt1;
+    game->bolt2 = bolt2;
+    for (int i = 0; i < 5; i++) game->boostOn[i] = 1;
+    set_screen(game, "chooseboost");
+    add_op(game, type == 2 ? SSR_OP_SHOW : SSR_OP_HIDE, "Relationships", NULL, NULL, 0);
+    add_op(game, type == 2 ? SSR_OP_HIDE : SSR_OP_SHOW, "Skills", NULL, NULL, 0);
+    add_op(game, SSR_OP_HIDE, "PlayButton", NULL, NULL, 0);
+    add_op(game, SSR_OP_TEXT, "HintText", NULL, loc(game, type == 2 ? "Choose Relationship Boost" : "Choose Skill Boost"),
+           0);
+    boost_rows(game);
+}
+
+static void back_from_drink(SSRGame *game) {
+    if (game->match) {
+        // c_TScreen_Match.Restore: the match screen with its commentary.
+        set_screen(game, "match");
+        for (int i = 0; i < game->commentaryCount; i++) show_line(game, &game->commentary[i]);
+        scroll_commentary(game);
+        add_op(game, SSR_OP_ANIM, "NameBar", NULL, "1", 1);
+        match_state(game);
+        match_tweaks(game);
+    } else {
+        game_menu(game);
+    }
+}
+
+static void set_energy(SSRGame *game, float energy) {
+    game->career.energy = energy;
+    if (game->match) game->match->energy = energy;
+}
+
+// c_TPlayer.p_DrinkNRG: the can goes, then its effect.
+static void drink(SSRGame *game, int can) {
+    SSRCareer *c = &game->career;
+    if (can < 0 || can > 4 || c->nrg[can] < 1) return;
+    c->nrg[can]--;
+    save_career(game);
+    switch (can) {
+    case 0:
+        set_energy(game, 100);
+        back_from_drink(game);
+        break;
+    case 1:
+        boost_screen(game, 1, 0, 0, 0);
+        break;
+    case 2:
+        boost_screen(game, 2, 0, 0, 0);
+        break;
+    case 3:
+        boost_screen(game, 1, 1, 0, 0);
+        break;
+    default:
+        boost_screen(game, 1, 1, 3, 3);
+        break;
+    }
+}
+
+static void call_drink(SSRGame *game) {
+    if (game->returnState == 1) drink(game, game->messageData);
+}
+
+// The Drink NRG button of the game menu (c_TScreen_GameMenu).
+static void drink_button(SSRGame *game) {
+    int can = next_can(&game->career);
+    if (can < 0) return;
+    if (game->career.energy >= 100) {
+        message(game, "messagedefault", loc(game, "CMESSAGE_ENERGYFULL"), 0, 1, NULL);
+    } else if (game->career.energy > 75) {
+        game->messageData = can;
+        message(game, "message", loc(game, "CMESSAGE_DRINKNRGCHECK"), 1, 1, "DrinkNRG");
+    } else {
+        drink(game, can);
+    }
+}
+
+// The NRG button of a match drinks the next can at once [I: the game
+// opens the shop on that can].
+static void match_drink(SSRGame *game) {
+    const SSRMatch *m = game->match;
+    if (!m || m->minute >= 120 || m->state == SSR_MATCH_FULL_TIME || !ssr_match_on_pitch(m)) return;
+    int can = next_can(&game->career);
+    if (can < 0 || m->energy >= 100) return;
+    drink(game, can);
+}
+
+// ChooseBoost(k): a skill gets stars, or a relation gets points.
+static void choose_boost(SSRGame *game, int row) {
+    if (!game->boostOn[row]) return;
+    SSRCareer *c = &game->career;
+    if (game->boostType == 1) {
+        int *levels = skill_levels(c, row);
+        int stars = game->bolt1 > 0 ? 3 : 1;
+        for (int e = 0; e < 20 && stars > 0; e++) {
+            while (stars > 0 && levels[e] < 3) {
+                levels[e]++;
+                stars--;
+            }
+        }
+        if (game->bolt1 > 0) {
+            disable_row(game, row);
+            if (--game->bolt1 == 0) {
+                for (int i = 0; i < 5; i++) disable_row(game, i);
+            }
+        } else {
+            for (int i = 0; i < 5; i++) disable_row(game, i);
+        }
+    } else {
+        float *r = relation(c, row);
+        float amount = game->bolt2 > 0 ? 9.0f : 3.0f;
+        if (r) {
+            *r += amount;
+            if (*r < 1) *r = 1;
+            if (*r > 100) *r = 100;
+        }
+        if (game->bolt2 > 0) {
+            disable_row(game, row);
+            if (--game->bolt2 == 0) {
+                for (int i = 0; i < 5; i++) disable_row(game, i);
+            }
+        } else {
+            for (int i = 0; i < 5; i++) disable_row(game, i);
+        }
+    }
+    boost_rows(game);
+}
+
+static void boost1(SSRGame *game) {
+    choose_boost(game, 0);
+}
+
+static void boost2(SSRGame *game) {
+    choose_boost(game, 1);
+}
+
+static void boost3(SSRGame *game) {
+    choose_boost(game, 2);
+}
+
+static void boost4(SSRGame *game) {
+    choose_boost(game, 3);
+}
+
+static void boost5(SSRGame *game) {
+    choose_boost(game, 4);
+}
+
+static void boost_ok(SSRGame *game) {
+    if (game->boostBoth) {
+        boost_screen(game, 2, 0, game->bolt1, game->bolt2);
+        return;
+    }
+    set_energy(game, 100);
+    save_career(game);
+    back_from_drink(game);
+}
+
 static void quit_career(SSRGame *game) {
     save_career(game);
     ssr_tweaks_set_number(game->tweaks, "Menu", "CanSavePlayer", 0);
@@ -1070,6 +1303,14 @@ static const Route ROUTES[] = {
     {"match.btn_WorkRate", match_work_rate},
     {"match.btn_Focus", match_focus},
     {"match.btn_MaximiseCommentary", maximise_commentary},
+    {"match.btn_NRG", match_drink},
+    {"gamemenu.btn_DrinkNRG", drink_button},
+    {"chooseboost.btn_1", boost1},
+    {"chooseboost.btn_2", boost2},
+    {"chooseboost.btn_3", boost3},
+    {"chooseboost.btn_4", boost4},
+    {"chooseboost.btn_5", boost5},
+    {"chooseboost.btn_Ok", boost_ok},
 };
 
 /* -------------------------------------------------------------- the API */

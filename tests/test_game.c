@@ -157,6 +157,48 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal") >= c->wage);
 }
 
+// Drinks the next can after a match: a question when the energy is above
+// 75, then the boost screen of a skill can, and full energy at the end.
+static void drink_a_can(SSRGame *game, SSRTweaks *tweaks) {
+    const SSRCareer *c = ssr_game_career(game);
+    CHECK(c->energy < 100);
+    int cans = 0;
+    for (int i = 0; i < 5; i++) cans += c->nrg[i];
+    int skills = c->nrg[0] == 0 && c->nrg[1] > 0;
+    int pace = c->pace[0];
+    float energy = c->energy;
+    ssr_game_message(game, "gamemenu.btn_DrinkNRG");
+    if (energy > 75) {
+        CHECK(strcmp(ssr_game_screen(game), "message") == 0);
+        ssr_game_message(game, "message.btn_Ok");
+    }
+    int after = 0;
+    for (int i = 0; i < 5; i++) after += c->nrg[i];
+    CHECK(after == cans - 1);
+    if (skills) {
+        CHECK(strcmp(ssr_game_screen(game), "chooseboost") == 0);
+        ssr_game_message(game, "chooseboost.btn_1");
+        // One star goes to the first drill of Pace.
+        CHECK(c->pace[0] == pace + 1);
+        CHECK(ssr_tweaks_number(tweaks, "Player", "Pace") >= 1);
+        // A second choice does nothing: one can, one star.
+        int power = ssr_career_skill(c->power);
+        ssr_game_message(game, "chooseboost.btn_2");
+        CHECK(ssr_career_skill(c->power) == power);
+        ssr_game_message(game, "chooseboost.btn_Ok");
+    }
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && c->energy == 100);
+    // Full energy: a message, and no can goes.
+    ssr_game_message(game, "gamemenu.btn_DrinkNRG");
+    int full = 0;
+    for (int i = 0; i < 5; i++) full += c->nrg[i];
+    CHECK(full == after);
+    if (after > 0) {
+        CHECK(strcmp(ssr_game_screen(game), "messagedefault") == 0);
+        ssr_game_message(game, "message.btn_Ok");
+    }
+}
+
 static void test_starts_a_new_career(void) {
     SSRContinent continents[1] = {{6, "Europe", "EUR", "UEFA", "UEFA", 1}};
     SSRNation nations[2] = {0};
@@ -281,7 +323,12 @@ static void test_starts_a_new_career(void) {
     ssr_game_message(game, "saveslot.btn_Slot0");
     ssr_game_update(game, 60);
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+    // The first can gives energy. After a second match, the next can is a
+    // skill boost.
     play_a_match(game, tweaks);
+    drink_a_can(game, tweaks);
+    play_a_match(game, tweaks);
+    drink_a_can(game, tweaks);
     ssr_game_message(game, "gamemenu.btn_Quit");
 
     // Delete: Cancel keeps it, Ok deletes it.

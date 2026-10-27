@@ -37,6 +37,8 @@ typedef enum {
     // The AnimInstance elements ref play at the speed in text, and jump to
     // their end when id is 1.
     SSR_OP_ANIM,
+    // The elements ref take the colour in text.
+    SSR_OP_COLOUR,
 } SSRUiOpKind;
 
 typedef struct {
