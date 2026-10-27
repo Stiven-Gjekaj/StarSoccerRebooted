@@ -350,8 +350,23 @@ static void replace_all(char *text, size_t capacity, const char *from, const cha
     snprintf(text, capacity, "%s", out);
 }
 
-static void upper(char *text) {
+// bb_various.MyToUpper: the text in capitals in English. The other
+// languages keep their text.
+static void upper(const SSRGame *game, char *text) {
+    if (game->settings.language > 0) return;
     for (; *text; text++) *text = (char)toupper((unsigned char)*text);
+}
+
+static void show_splash(SSRGame *game, const char *layout, int ms);
+
+// A banner (TQuickMessage.InitBanner): the text goes to the tweak
+// QuickMessage with MyToUpper, and the layout "splashmessage" shows it.
+static void quick_message(SSRGame *game, const char *text, int ms) {
+    char banner[256];
+    snprintf(banner, sizeof(banner), "%s", text);
+    upper(game, banner);
+    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", banner);
+    show_splash(game, "splashmessage", ms);
 }
 
 /* -------------------------------------------------------------- settings */
@@ -755,7 +770,7 @@ static void combo_continent(SSRGame *game) {
         if (n->continent != continent) continue;
         char name[128];
         snprintf(name, sizeof(name), "%s", n->name);
-        upper(name);
+        upper(game, name);
         add_op(game, SSR_OP_LIST_ADD, "NationCombo", "NationTemplate", name, n->id);
     }
     game->canPlay = 0;
@@ -783,7 +798,7 @@ static void choose_nation(SSRGame *game) {
         if (!continent_has_nations(world, c->id)) continue;
         char name[128];
         snprintf(name, sizeof(name), "%s", c->name);
-        upper(name);
+        upper(game, name);
         add_op(game, SSR_OP_LIST_ADD, "ContinentCombo", "ContinentTemplate", name, c->id);
     }
     int count = sorted_nations(world);
@@ -792,7 +807,7 @@ static void choose_nation(SSRGame *game) {
         if (!nation_has_league(world, n->id)) continue;
         char name[128];
         snprintf(name, sizeof(name), "%s", n->name);
-        upper(name);
+        upper(game, name);
         add_op(game, SSR_OP_LIST_ADD, "LeagueCombo", "LeagueTemplate", name, n->id);
     }
     // The default nation of the language (GetDefaultNation): the tag
@@ -1035,7 +1050,7 @@ static void trial_tick(SSRGame *game) {
             // TQuickMessage "splashmessage": the text in capitals.
             char text[64];
             snprintf(text, sizeof(text), "%s", loc(game, t->message));
-            for (char *p = text; *p; p++) *p = (char)toupper((unsigned char)*p);
+            upper(game, text);
             ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
             show_splash(game, "splashmessage", t->messageEnd - game->now);
         } else {
@@ -2825,7 +2840,7 @@ static void season_review(SSRGame *game) {
         snprintf(text, sizeof(text), "%s %s", loc(game, "position_Finished"), place);
     }
     // TQuickMessage "splashmessage" for 1500 ms.
-    for (char *p = text; *p; p++) *p = (char)toupper((unsigned char)*p);
+    upper(game, text);
     ssr_tweaks_set(t, "Menu", "QuickMessage", text);
     show_splash(game, "splashmessage", 1500);
     // c_AScreen_SeasonReview.Init.
@@ -3927,7 +3942,7 @@ static void dilemma_screen(SSRGame *game) {
     game->dilemmaEnd = 0;
     char text[64];
     snprintf(text, sizeof(text), "%s", loc(game, "Dilemma!"));
-    upper(text);
+    upper(game, text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
     show_splash(game, "splashmessage", 2000);
 }
@@ -4137,7 +4152,7 @@ static int news_item_expiry(SSRGame *game) {
             snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_ITEMEXPIRED"));
             char name[64];
             snprintf(name, sizeof(name), "%s", loc(game, item->uid));
-            upper(name);
+            upper(game, name);
             replace_all(text, sizeof(text), "$item", name);
         } else if (*v > 1000 && *v <= 10000) {
             *v += 10000;
@@ -4532,7 +4547,7 @@ static int news_sponsorship(SSRGame *game) {
             if (c->sponsors[i] <= 0) continue;
             snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_SPONSORCANCEL"));
             snprintf(name, sizeof(name), "%s", sponsor_name(game, i));
-            upper(name);
+            upper(game, name);
             replace_all(text, sizeof(text), "$sponsor", name);
             c->sponsors[i] = 0;
             if (ssr_career_count_sponsors(c) == 0) c->relationSponsors = 0;
@@ -4558,7 +4573,7 @@ static int news_sponsorship(SSRGame *game) {
         if (!(c->sponsors[i] == 0 && level > i && rating > 50)) continue;
         snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_SPONSOROFFERMOBILE"));
         snprintf(name, sizeof(name), "%s", sponsor_name(game, i));
-        upper(name);
+        upper(game, name);
         replace_all(text, sizeof(text), "$sponsor", name);
         char cash[32];
         shop_price(cash, sizeof(cash), i / 2 + 1);
@@ -4683,7 +4698,7 @@ static void interview_screen(SSRGame *game) {
     set_screen(game, "interview");
     char text[64];
     snprintf(text, sizeof(text), "%s", loc(game, "Interview!"));
-    upper(text);
+    upper(game, text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
     show_splash(game, "splashmessage", 1500);
     if (c->interviewSkill < 3) c->interviewSkill = 3;
@@ -4788,7 +4803,7 @@ static void interview_ok(SSRGame *game) {
 static void interview_end(SSRGame *game, int success) {
     char text[64];
     snprintf(text, sizeof(text), "%s", loc(game, success ? "Success!" : "Fail!"));
-    upper(text);
+    upper(game, text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
     show_splash(game, "splashmessage", 1000);
     if (success) game->career.interviewSkill++;
@@ -5098,8 +5113,7 @@ static void not_enough_cash(SSRGame *game, int shortBy) {
     ssr_tweaks_set_number(game->tweaks, "Menu", "ItemInfoHelpIncrement", 0);
     if (shortBy <= 0) return;
     ssr_tweaks_set_number(game->tweaks, "Menu", "BuxShort", shortBy);
-    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "CMESSAGE_NOTENOUGHCASHSHORT"));
-    show_splash(game, "splashmessage", 1500);
+    quick_message(game, loc(game, "CMESSAGE_NOTENOUGHCASHSHORT"), 1500);
 }
 
 // UpdateBank: the bank does not go under 0.
@@ -5133,8 +5147,7 @@ static void repair_check(SSRGame *game, const SSRShopItem *item);
 static void shop_buy(SSRGame *game) {
     SSRCareer *c = &game->career;
     if (c->retired) {
-        ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "Retired"));
-        show_splash(game, "splashmessage", 1500);
+        quick_message(game, loc(game, "Retired"), 1500);
         return;
     }
     const SSRShopItem *item = shop_product(ssr_tweaks_get(game->tweaks, "Menu", "ItemString"));
@@ -5215,7 +5228,7 @@ static void repair_check(SSRGame *game, const SSRShopItem *item) {
     shop_price(price, sizeof(price), (int)repair_price(c, item));
     replace_all(text, sizeof(text), "$price", price);
     snprintf(name, sizeof(name), "%s", loc(game, item->uid));
-    upper(name);
+    upper(game, name);
     replace_all(text, sizeof(text), "$item", name);
     ssr_tweaks_set(game->tweaks, "Products", "RepairItemString", text);
     ssr_tweaks_set(game->tweaks, "Products", "RepairTypeString", loc(game, NAMES[item->lifeType]));
@@ -5686,8 +5699,7 @@ static void shop_drink(SSRGame *game) {
     SSRCareer *c = &game->career;
     if (c->nrg[can] < 1) return;
     if (c->energy >= 100) {
-        ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "CMESSAGE_ENERGYFULL"));
-        show_splash(game, "splashmessage", 1500);
+        quick_message(game, loc(game, "CMESSAGE_ENERGYFULL"), 1500);
         return;
     }
     shop_close(game);
@@ -6007,7 +6019,7 @@ static void negotiate_screen(SSRGame *game) {
     set_screen(game, "negotiate");
     char text[64];
     snprintf(text, sizeof(text), "%s", loc(game, "Negotiate!"));
-    upper(text);
+    upper(game, text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
     show_splash(game, "splashmessage", 1500);
     game->negotiateAccepted = 0;
@@ -6103,7 +6115,7 @@ static void negotiate_tick(SSRGame *game) {
             if (rel) *rel -= ssr_rand2(&game->random, 10, 20);
             negotiate_instructions(game);
             snprintf(text, sizeof(text), "%s", loc(game, "Fail!"));
-            upper(text);
+            upper(game, text);
             ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
             show_splash(game, "splashmessage", 1000);
             game->proceedAt = game->now + 1000;
@@ -6118,7 +6130,7 @@ static void negotiate_tick(SSRGame *game) {
             add_op(game, SSR_OP_SHOW, "SigAnimContainer", NULL, NULL, 0);
             add_op(game, SSR_OP_SHOW, "StampAnimContainer", NULL, NULL, 0);
             snprintf(text, sizeof(text), "%s", loc(game, "Success!"));
-            upper(text);
+            upper(game, text);
             ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
             show_splash(game, "splashmessage", 1000);
             game->proceedAt = game->now + 3000;
@@ -6528,8 +6540,7 @@ static void start_pairs(SSRGame *game, int relation) {
     // The game seeds its random numbers from the clock here.
     game->random.seed = game->now;
     game->turn = 0;
-    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "Find a pair!"));
-    show_splash(game, "splashmessage", 1500);
+    quick_message(game, loc(game, "Find a pair!"), 1500);
     // AScreen_Pairs.Init: each card shows its face.
     char ref[16];
     for (int k = 0; k < 16; k++) {
@@ -6582,7 +6593,7 @@ static void pairs_success(SSRGame *game, int imgId) {
     play_sound(game, "CSuccess");
     char text[64];
     snprintf(text, sizeof(text), "%s", loc(game, "Success!"));
-    upper(text);
+    upper(game, text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
     show_splash(game, "splashmessage", 4000);
     ssr_career_update_relation(&game->career, BAR_RELATIONS[r], 5.0f);
@@ -6599,7 +6610,7 @@ static void pairs_fail(SSRGame *game) {
     play_sound(game, "CError");
     char text[64];
     snprintf(text, sizeof(text), "%s", loc(game, "Fail!"));
-    upper(text);
+    upper(game, text);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
     show_splash(game, "splashmessage", 1000);
     save_career(game);
@@ -6831,7 +6842,7 @@ static int casino_bet(SSRGame *game, int amount, int weight) {
 static void casino_message(SSRGame *game, const char *tag, int amount) {
     char text[128], cash[24];
     snprintf(text, sizeof(text), "%s", loc(game, tag));
-    for (char *p = text; *p; p++) *p = (char)toupper((unsigned char)*p);
+    upper(game, text);
     number_with_commas(amount, cash, sizeof(cash));
     size_t n = strlen(text);
     snprintf(text + n, sizeof(text) - n, " \xE2\x98\x85%s", cash);
@@ -7193,8 +7204,7 @@ static void race_result(SSRGame *game) {
             char position[32];
             snprintf(position, sizeof(position), "position_%d", place);
             snprintf(text, sizeof(text), "%s %s", loc(game, "Finished"), loc(game, position));
-            ssr_tweaks_set(t, "Menu", "QuickMessage", text);
-            show_splash(game, "splashmessage", 1500);
+            quick_message(game, text, 1500);
         }
     }
     if (win > 0) {
@@ -7386,7 +7396,7 @@ static void blackjack_context(SSRGame *game, int show) {
 static void blackjack_banner(SSRGame *game, const char *tag) {
     char text[128];
     snprintf(text, sizeof(text), "%s", loc(game, tag));
-    for (char *p = text; *p; p++) *p = (char)toupper((unsigned char)*p);
+    upper(game, text);
     if (strcmp(tag, "bet_YouWon") == 0) {
         char cash[24];
         number_with_commas(game->bet * 2, cash, sizeof(cash));

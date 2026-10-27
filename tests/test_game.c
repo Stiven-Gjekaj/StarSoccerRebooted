@@ -887,6 +887,8 @@ static void spend_time(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     }
     ssr_game_message(game, "relationships.btn_Boss");
     CHECK(strcmp(ssr_game_screen(game), "pairs") == 0 && c->energy == 65 && c->spentTime == 1);
+    // The banner is in capitals in English (TQuickMessage.InitBanner).
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "QuickMessage"), "FIND A PAIR!") == 0);
     CHECK(card_faces(game, faces) == 16);
     // The cards turn and move before the player can click.
     ssr_game_message(game, "pairs.btn_0");
@@ -909,7 +911,11 @@ static void spend_time(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Player", "BossRelationship_Title"), "BOSS_CAPS_SPACEAFTER 55") == 0);
 
     // A lost game: two misses, then the screen comes back with no change.
+    // In German the banner keeps its text.
+    ssr_game_set_language(game, 6, 0);
     ssr_game_message(game, "relationships.btn_Team");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "QuickMessage"), "Find a pair!") == 0);
+    ssr_game_set_language(game, 0, 0);
     float team = c->relationTeam;
     CHECK(card_faces(game, faces) == 16 && c->spentTime == 2 && c->energy == 30);
     ssr_game_update(game, 60 * 4);
