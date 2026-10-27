@@ -1798,6 +1798,48 @@ static void test_rolls_a_digit(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static int grass_size(void *context, const char *name, const char *file, float *w, float *h) {
+    (void)context;
+    (void)file;
+    if (strcmp(name, "Title_Grass01") != 0) return 0;
+    *w = 40;
+    *h = 20;
+    return 1;
+}
+
+// set(gel.slotcol.RGBA(slot), colour) gives a slot of a Spine gel its
+// colour. With no mix the colour of the layout takes the place of the
+// colour of the animation (c_EX_Gel_SlotColour, c_GelSpine).
+static void test_colours_a_spine_slot(void) {
+    unsigned char data[4096];
+    size_t size = ssr_spine_writer_build(data);
+    testSpine = ssr_spine_parse(data, size);
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    layout = "Spine:(Test,300,400,,Sway,Loop)\n"
+             "\tset(gel.slotcol.RGBA(Leaf),#00FF00FF)\n"
+             "Spine:(Test,300,600,,Sway,Loop)\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    env.spine = spine_file;
+    env.image_size = grass_size;
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    int green = 0, white = 0;
+    for (int i = 0; i < ssr_scene_count(scene); i++) {
+        const SSRSceneItem *item = ssr_scene_item(scene, i);
+        if (!item->image || strcmp(item->image, "Title_Grass01") != 0) continue;
+        if (item->colour == 0x00FF00FFu) green++;
+        if (item->colour == 0xFFFFFFFFu) white++;
+    }
+    CHECK(green == 1 && white == 1);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+    ssr_spine_free(testSpine);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -2188,6 +2230,7 @@ int main(void) {
     test_styles_the_shadow_of_a_text();
     test_joins_tweaks_in_a_text();
     test_rolls_a_digit();
+    test_colours_a_spine_slot();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();

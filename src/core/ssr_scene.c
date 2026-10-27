@@ -145,6 +145,12 @@ struct Doodad {
     int exCount;
 };
 
+// The colour of a slot of a Spine gel, by the name of the slot.
+typedef struct {
+    const char *slot;
+    Colour colour;
+} SlotColour;
+
 typedef struct Gel Gel;
 struct Gel {
     GelKind kind;
@@ -187,6 +193,10 @@ struct Gel {
     float padding;
     // GEL_TEXT: the line spacing of a TextBox, 1 for the height of the font.
     float lineSpacing;
+    // GEL_SPINE: the colours that set(gel.slotcol(slot), ...) gives the
+    // slots (c_SpineSlot.m_mixCol).
+    SlotColour *slotColours;
+    int slotColourCount;
     // GEL_TEXT: the shadow of the text (the first c_StyleElement), with its
     // offset in units of the font. hasShadowColour is 0 when the shadow
     // takes the colours of the text.
@@ -705,6 +715,7 @@ static void free_gel(Gel *g) {
     free(g->frames);
     for (int i = 0; i < g->varCount; i++) free(g->vars[i]);
     free(g->vars);
+    free(g->slotColours);
     free(g);
 }
 
@@ -784,6 +795,15 @@ static Gel *clone_tree(const Gel *g) {
     if (g->shown) {
         copy->shown = malloc(strlen(g->shown) + 1);
         if (copy->shown) strcpy(copy->shown, g->shown);
+    }
+    copy->slotColours = NULL;
+    copy->slotColourCount = 0;
+    if (g->slotColourCount) {
+        copy->slotColours = malloc((size_t)g->slotColourCount * sizeof(SlotColour));
+        if (copy->slotColours) {
+            memcpy(copy->slotColours, g->slotColours, (size_t)g->slotColourCount * sizeof(SlotColour));
+            copy->slotColourCount = g->slotColourCount;
+        }
     }
     if (g->frameCount) {
         copy->frames = malloc((size_t)g->frameCount * sizeof(char *));
@@ -1181,17 +1201,41 @@ static SSRExColour ex_get_colour(void *context, void *gel) {
     return (SSRExColour){c.r, c.g, c.b, c.a, c.mr, c.mg, c.mb, c.ma};
 }
 
+// The colour of the slot of a Spine gel, white with no mix at the start.
+static Colour *slot_colour(SSRScene *s, Gel *g, const char *slot) {
+    for (int i = 0; i < g->slotColourCount; i++) {
+        if (strcmp(g->slotColours[i].slot, slot) == 0) return &g->slotColours[i].colour;
+    }
+    SlotColour *more = realloc(g->slotColours, (size_t)(g->slotColourCount + 1) * sizeof(SlotColour));
+    if (!more) return NULL;
+    g->slotColours = more;
+    SlotColour *added = &more[g->slotColourCount++];
+    added->slot = keep(s, slot);
+    added->colour = (Colour){255, 255, 255, 1, 0, 0, 0, 0};
+    return &added->colour;
+}
+
 static void ex_set_colour(void *context, void *gel, SSRGelProperty property, const char *slot, SSRExColour c,
                           int mask) {
-    (void)context;
-    (void)slot;
-    (void)mask;
+    SSRScene *s = context;
     Gel *g = gel;
-    // The colours of the slots of a Spine gel and of the text shadow are
-    // not in the remake yet.
+    Colour to = {c.r, c.g, c.b, c.a, c.mr, c.mg, c.mb, c.ma};
+    if (property == SSR_GEL_SLOTCOL) {
+        // c_EX_Gel_SlotColour: the mask picks the channels that change, in
+        // the order r, g, b, a, then the four mixes.
+        if (g->kind != GEL_SPINE || !slot) return;
+        Colour *at = slot_colour(s, g, slot);
+        if (!at) return;
+        float *own = &at->r;
+        const float *from = &to.r;
+        for (int i = 0; i < 8; i++) {
+            if (mask & (1 << i)) own[i] = from[i];
+        }
+        return;
+    }
     if (property != SSR_GEL_COLOUR) return;
     g->hasColour = 1;
-    g->colour = (Colour){c.r, c.g, c.b, c.a, c.mr, c.mg, c.mb, c.ma};
+    g->colour = to;
 }
 
 // shell(Name) is the screen of the shell. The app reads the tweak Shell,Name.
@@ -3142,6 +3186,16 @@ static void draw_spine(SSRScene *s, const Gel *g, const Frame *f) {
         item->x = item->corners[0];
         item->y = item->corners[1];
         Colour c = {d->r * 255, d->g * 255, d->b * 255, d->a, 1, 1, 1, 1};
+        // A slot colour of the layout mixes with the colour of the slot
+        // (c_GelSpine.OnCalculateWorldColor).
+        for (int k = 0; k < g->slotColourCount && d->slot; k++) {
+            const Colour *m = &g->slotColours[k].colour;
+            if (strcmp(g->slotColours[k].slot, d->slot) != 0) continue;
+            c.r = lerp(m->r, d->r * m->r, m->mr);
+            c.g = lerp(m->g, d->g * m->g, m->mg);
+            c.b = lerp(m->b, d->b * m->b, m->mb);
+            c.a = lerp(m->a, d->a * m->a, m->ma);
+        }
         item->colour = colour_rgba(colour_mix(c, f->colour));
     }
 }
