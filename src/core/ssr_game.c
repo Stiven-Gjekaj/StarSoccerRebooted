@@ -20,6 +20,26 @@
 // England, the nation that the English game chooses first.
 #define DEFAULT_NATION 62
 
+// A colour of the game: r, g, b from 0 to 255 (c_GColour).
+typedef struct {
+    float r, g, b;
+} Rgb;
+
+// A team of a match: a club or a nation (c_TBase_Team).
+typedef struct {
+    int id;
+    const char *tla;
+    int strength;
+    const SSRKit *home, *away;
+    // c_TClub.LoadClub and c_TNation: the two badge colours and the style.
+    Rgb badge1, badge2;
+    int badgeStyle;
+    // The style of the home shirt (m_kitstylehome), and 1 when the team
+    // plays in its away kit (m_awaykit).
+    int kitStyle;
+    int awayKit;
+} Team;
+
 struct SSRGame {
     SSRTweaks *tweaks;
     SSRSettings settings;
@@ -53,6 +73,10 @@ struct SSRGame {
     // The fixture of the match that plays now: its competition, date, and
     // sides. A fixture has no fixed place in its list.
     int fixtureComp, fixtureDate, fixtureHome, fixtureAway;
+    // The two teams of the match, for the kits (c_TMatch.m_team1, m_team2),
+    // and the kit choice of the kit button.
+    Team homeTeam, awayTeam;
+    int kitNum;
     // c_TScreen_League.m_flagContinueButton: the table shows Continue.
     int leagueContinue;
     // c_TPlayer.lastmatchclub >= 0: the match review waits.
@@ -1005,11 +1029,6 @@ static void kit_tweaks(SSRGame *game, const char *team, const SSRKit *kit) {
     }
 }
 
-// A colour of the game: r, g, b from 0 to 255 (c_GColour).
-typedef struct {
-    float r, g, b;
-} Rgb;
-
 static Rgb rgb(SSRColor c) {
     Rgb x = {(float)((c >> 16) & 0xFF), (float)((c >> 8) & 0xFF), (float)(c & 0xFF)};
     return x;
@@ -1033,17 +1052,6 @@ static void set_colour_tweak(SSRGame *game, const char *name, Rgb c, float alpha
     ssr_tweaks_set_kind(game->tweaks, "MatchColours", name, value, SSR_TWEAK_COLOUR);
 }
 
-// A team of a match: a club or a nation (c_TBase_Team).
-typedef struct {
-    int id;
-    const char *tla;
-    int strength;
-    const SSRKit *home, *away;
-    // c_TClub.LoadClub and c_TNation: the two badge colours and the style.
-    Rgb badge1, badge2;
-    int badgeStyle;
-} Team;
-
 static int team_of(SSRGame *game, int level, int id, int strength, Team *team) {
     memset(team, 0, sizeof(*team));
     team->id = id;
@@ -1057,6 +1065,7 @@ static int team_of(SSRGame *game, int level, int id, int strength, Team *team) {
         team->away = &n->away;
         team->badge1 = rgb(n->home.shirt1);
         team->badge2 = rgb(n->away.shirt1);
+        team->kitStyle = n->homeKitType;
         return 1;
     }
     const SSRClub *c = ssr_world_club(game->world, id);
@@ -1064,6 +1073,7 @@ static int team_of(SSRGame *game, int level, int id, int strength, Team *team) {
     team->tla = c->tla;
     team->home = &c->home;
     team->away = &c->away;
+    team->kitStyle = c->homeStyle;
     team->badge1 = rgb(c->home.shirt1);
     team->badge2 = rgb(c->home.shirt2);
     // A badge of one colour takes the colour of the away shirt.
@@ -1124,6 +1134,55 @@ static void team_plates(SSRGame *game, const Team *home, const Team *away, const
     }
 }
 
+// A shirt colour of a team in its kit now; black shows as dark grey
+// (c_TBase_Team.GetShirtColour1 and 2).
+static SSRColor shirt_colour(const Team *t, int second) {
+    const SSRKit *kit = t->awayKit ? t->away : t->home;
+    // The away kit of the game has one shirt colour.
+    SSRColor c = second && !t->awayKit ? kit->shirt2 : kit->shirt1;
+    return (c & 0xFFFFFF) == 0 ? 0x333333 : c;
+}
+
+static void strip_tweak(SSRGame *game, const char *name, SSRColor c) {
+    char value[16];
+    snprintf(value, sizeof(value), "%06XFF", (unsigned)(c & 0xFFFFFF));
+    ssr_tweaks_set_kind(game->tweaks, "TeamStrip", name, value, SSR_TWEAK_COLOUR);
+}
+
+// c_AScreen_Match.m_UpdateKits: the kits of the kit button and the match.
+// A team in its away kit keeps the style of the kit before.
+static void update_kits(SSRGame *game) {
+    const Team *teams[2] = {&game->homeTeam, &game->awayTeam};
+    const char *sides[2] = {"Home", "Away"};
+    char name[48];
+    for (int i = 0; i < 2; i++) {
+        snprintf(name, sizeof(name), "%sKitColour", sides[i]);
+        strip_tweak(game, name, shirt_colour(teams[i], 0));
+        snprintf(name, sizeof(name), "%sStripesColour", sides[i]);
+        strip_tweak(game, name, shirt_colour(teams[i], 1));
+        if (teams[i]->awayKit) continue;
+        int style = teams[i]->kitStyle == 2 ? 1 : teams[i]->kitStyle == 8 ? 2 : teams[i]->kitStyle == 10 ? 3 : 0;
+        snprintf(name, sizeof(name), "%sKitStyle", sides[i]);
+        if (style) ssr_tweaks_set_number(game->tweaks, "TeamStrip", name, style);
+    }
+    int homeIsMine = game->match && game->match->setup.myTeam == 1;
+    const Team *mine = homeIsMine ? &game->homeTeam : &game->awayTeam;
+    const Team *other = homeIsMine ? &game->awayTeam : &game->homeTeam;
+    kit_tweaks(game, "MyTeam", mine->awayKit ? mine->away : mine->home);
+    kit_tweaks(game, "OppTeam", other->awayKit ? other->away : other->home);
+}
+
+// leaguefixtures.btn_Kits: the kits go round (home, away) = (0, 0),
+// (0, 1), (1, 1), (1, 0).
+static void kits_button(SSRGame *game) {
+    if (!game->match) return;
+    static const int KITS[4][2] = {{0, 0}, {0, 1}, {1, 1}, {1, 0}};
+    game->kitNum = (game->kitNum + 1) % 4;
+    game->homeTeam.awayKit = KITS[game->kitNum][0];
+    game->awayTeam.awayKit = KITS[game->kitNum][1];
+    update_kits(game);
+}
+
 // c_TMatch.SetUpFixture: the match of the next fixture of the player.
 static void start_match(SSRGame *game) {
     season_in(game);
@@ -1174,9 +1233,16 @@ static void start_match(SSRGame *game) {
     SSRTweaks *t = game->tweaks;
     // c_TScreen_LeagueFixtures.m_ButtonKits(true): the away team plays in
     // its away kit when the shirts of the two teams are the same.
-    const SSRKit *awayKit = home.home->shirt1 == away.home->shirt1 ? away.away : away.home;
-    kit_tweaks(game, "MyTeam", homeIsMine ? home.home : awayKit);
-    kit_tweaks(game, "OppTeam", homeIsMine ? awayKit : home.home);
+    game->kitNum = 0;
+    home.awayKit = 0;
+    away.awayKit = 0;
+    if (home.home->shirt1 == away.home->shirt1) {
+        away.awayKit = 1;
+        game->kitNum = 1;
+    }
+    game->homeTeam = home;
+    game->awayTeam = away;
+    update_kits(game);
     team_plates(game, &home, &away, homeIsMine ? &home : &away);
     ssr_tweaks_set(t, "Match", "HomeName", s.homeName);
     ssr_tweaks_set(t, "Match", "AwayName", s.awayName);
@@ -2622,6 +2688,7 @@ static const Route ROUTES[] = {
     {"seasonreview.btn_Play", player_of_the_year},
     {"playeroftheyear.btn_Play", poty_play},
     {"match.btn_Play", match_play},
+    {"leaguefixtures.btn_Kits", kits_button},
     {"match.btn_Time", match_speed},
     {"match.btn_WorkRate", match_work_rate},
     {"match.btn_Focus", match_focus},
