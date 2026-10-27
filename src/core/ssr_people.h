@@ -159,6 +159,17 @@ void ssr_people_pass_days(SSRPeople *people, int days);
 // number.
 int ssr_people_top_scorers(SSRPeople *people, const int *clubs, int clubCount, SSRPerson **out, int max);
 
+// Moves the years of the world back by shift: the births, the
+// retirements, the managers, and the year of the world. A new career that
+// continues an old world starts in year 1. A retirement stays a
+// retirement: a year of 0 or less becomes a year under 0.
+void ssr_people_rebase(SSRPeople *people, int shift);
+
+// Adds a retired player with the counts of a career, as the legend of an
+// old career in the world. Returns the player, or NULL.
+SSRPerson *ssr_people_add_legend(SSRPeople *people, const char *first, const char *last, int nation, int born,
+                                 int retired, int apps, int goals, int assists);
+
 // Keeps the people in a text file, one player a line. Returns 1 on
 // success.
 int ssr_people_save(const SSRPeople *people, const char *path);

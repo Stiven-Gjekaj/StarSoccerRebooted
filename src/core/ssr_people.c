@@ -562,6 +562,39 @@ int ssr_people_top_scorers(SSRPeople *people, const int *clubs, int clubCount, S
     return n;
 }
 
+void ssr_people_rebase(SSRPeople *people, int shift) {
+    if (!people || shift == 0) return;
+    for (int i = 0; i < people->count; i++) {
+        SSRPerson *p = &people->list[i];
+        p->born -= shift;
+        if (p->retired) {
+            p->retired -= shift;
+            if (p->retired == 0) p->retired = -1;
+        }
+    }
+    for (int i = 0; i < people->managerCount; i++) {
+        people->managers[i].born -= shift;
+        people->managers[i].since -= shift;
+    }
+    people->year -= shift;
+}
+
+SSRPerson *ssr_people_add_legend(SSRPeople *people, const char *first, const char *last, int nation, int born,
+                                 int retired, int apps, int goals, int assists) {
+    SSRPerson *p = people ? add_person(people) : NULL;
+    if (!p) return NULL;
+    snprintf(p->first, sizeof(p->first), "%s", first ? first : "");
+    snprintf(p->last, sizeof(p->last), "%s", last ? last : "");
+    p->nation = nation;
+    p->born = born;
+    p->retired = retired ? retired : -1;
+    p->position = SSR_POS_ATTACKER;
+    p->apps = apps;
+    p->goals = goals;
+    p->assists = assists;
+    return p;
+}
+
 /* ------------------------------------------------------------- the file */
 
 #define FILE_TAG "ssrpeople"

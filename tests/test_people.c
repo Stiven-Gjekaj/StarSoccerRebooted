@@ -197,6 +197,29 @@ static void test_makes_rivals(void) {
     ssr_world_free(world);
 }
 
+// A new career in an old world: the years move back, and the old player
+// stays as a legend.
+static void test_continues_an_old_world(void) {
+    SSRWorld *world = small_world();
+    SSRNames *names = ssr_names_parse(NAMES);
+    SSRPeople *people = ssr_people_create(5);
+    ssr_people_make_squad(people, world, names, 10, 20);
+    int born = people->list[0].born;
+    people->list[1].retired = 12;
+    people->list[2].retired = 19;
+    SSRPerson *legend = ssr_people_add_legend(people, "Old", "Star", 1, -15, 20, 400, 250, 90);
+    CHECK(legend && legend->retired == 20 && legend->goals == 250);
+    ssr_people_rebase(people, 19);
+    CHECK(people->year == 1 && people->list[0].born == born - 19);
+    CHECK(people->list[1].retired == -7 && people->list[2].retired == -1);
+    CHECK(ssr_people_manager(people, 10)->since == 1);
+    // The legend is not in a squad, and the hall of fame counts the goals.
+    CHECK(ssr_people_squad(people, 10, NULL, 0) == SSR_SQUAD_SIZE - 2);
+    ssr_people_free(people);
+    ssr_names_free(names);
+    ssr_world_free(world);
+}
+
 // The file keeps all players and the stream of the numbers.
 static void test_keeps_the_people(void) {
     SSRWorld *world = small_world();
@@ -232,6 +255,7 @@ int main(void) {
     test_runs_the_seasons();
     test_runs_the_managers();
     test_makes_rivals();
+    test_continues_an_old_world();
     test_keeps_the_people();
     return TEST_RESULT();
 }
