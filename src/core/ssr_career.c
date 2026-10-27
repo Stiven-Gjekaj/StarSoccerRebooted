@@ -40,6 +40,7 @@ void ssr_career_create(SSRCareer *c, const char *first, const char *last, int ge
     c->bank = 15;
     c->relationBoss = c->relationTeam = c->relationFans = 75;
     c->debut = 1;
+    c->lastSpendTimeFriends = c->lastSpendTimePartner = 28;
     c->energy = 100;
     c->nrg[0] = c->nrg[1] = c->nrg[2] = 1;
     for (int i = 0; i < 10; i++) c->ratings[i] = 5;
@@ -180,6 +181,57 @@ static void write_floats(FILE *file, const char *name, const float *values, int 
     fputc('\n', file);
 }
 
+static float *relation_field(SSRCareer *c, SSRRelation relation) {
+    switch (relation) {
+    case SSR_RELATION_BOSS: return &c->relationBoss;
+    case SSR_RELATION_TEAM: return &c->relationTeam;
+    case SSR_RELATION_FANS: return &c->relationFans;
+    case SSR_RELATION_PARTNER: return &c->relationPartner;
+    case SSR_RELATION_SPONSORS: return &c->relationSponsors;
+    case SSR_RELATION_FRIENDS: return &c->relationFriends;
+    case SSR_RELATION_BOSS_INT: return &c->relationBossInt;
+    case SSR_RELATION_TEAM_INT: return &c->relationTeamInt;
+    case SSR_RELATION_FANS_INT: return &c->relationFansInt;
+    }
+    return NULL;
+}
+
+void ssr_career_update_relation(SSRCareer *c, SSRRelation relation, float change) {
+    float *field = c ? relation_field(c, relation) : NULL;
+    if (!field) return;
+    float v = *field + change;
+    *field = v < 1 ? 1 : v > 100 ? 100 : v;
+}
+
+float ssr_career_relation(const SSRCareer *c, SSRRelation relation) {
+    const float *field = c ? relation_field((SSRCareer *)c, relation) : NULL;
+    return field ? *field : 0;
+}
+
+int ssr_career_count_sponsors(const SSRCareer *c) {
+    int n = 0;
+    for (int i = 0; i < 10; i++) n += c->sponsors[i] > 0;
+    return n;
+}
+
+float ssr_career_happiness(const SSRCareer *c) {
+    // GetEffectiveRelation casts each relation to int, but not the partner.
+    float sum = (float)((int)c->relationBoss + (int)c->relationTeam + (int)c->relationFans);
+    sum += c->relationPartner * 2;
+    sum += (float)(int)c->relationSponsors;
+    return sum / 6.0f;
+}
+
+float ssr_career_lifestyle(const SSRCareer *c) {
+    int n = 0;
+    for (int k = 0; k < SSR_CAREER_ITEMS; k++) {
+        n += c->items[k] > 0;
+        n += c->vehicles[k] > 0;
+        n += c->properties[k] > 0;
+    }
+    return 100.0f / SSR_CAREER_SHOP_PRODUCTS * (float)n;
+}
+
 void ssr_career_add_form(int *form, int rating) {
     if (!form) return;
     for (int i = 0; i < 4; i++) form[i] = form[i + 1];
@@ -218,6 +270,15 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
             c->relationFans);
     fprintf(file, "relationbossint=%g\nrelationteamint=%g\nrelationfansint=%g\n", c->relationBossInt,
             c->relationTeamInt, c->relationFansInt);
+    fprintf(file, "relationgirlfriend=%g\nrelationsponsors=%g\nrelationfriends=%g\n", c->relationPartner,
+            c->relationSponsors, c->relationFriends);
+    fprintf(file, "lastspendtimefriends=%g\nlastspendtimegirlfriend=%g\n", c->lastSpendTimeFriends,
+            c->lastSpendTimePartner);
+    fprintf(file, "spenttime=%d\n", c->spentTime);
+    write_ints(file, "sponsors", c->sponsors, 10);
+    write_ints(file, "items", c->items, SSR_CAREER_ITEMS);
+    write_ints(file, "vehicles", c->vehicles, SSR_CAREER_ITEMS);
+    write_ints(file, "properties", c->properties, SSR_CAREER_ITEMS);
     fprintf(file, "debut=%d\nintnotpickedmsg=%d\n", c->debut, c->intNotPickedMessage);
     write_ints(file, "technique", c->technique, SSR_CAREER_SKILL_LEVELS);
     write_ints(file, "pace", c->pace, SSR_CAREER_SKILL_LEVELS);
@@ -312,6 +373,16 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "relationbossint") == 0) c->relationBossInt = real;
         else if (strcmp(key, "relationteamint") == 0) c->relationTeamInt = real;
         else if (strcmp(key, "relationfansint") == 0) c->relationFansInt = real;
+        else if (strcmp(key, "relationgirlfriend") == 0) c->relationPartner = real;
+        else if (strcmp(key, "relationsponsors") == 0) c->relationSponsors = real;
+        else if (strcmp(key, "relationfriends") == 0) c->relationFriends = real;
+        else if (strcmp(key, "lastspendtimefriends") == 0) c->lastSpendTimeFriends = real;
+        else if (strcmp(key, "lastspendtimegirlfriend") == 0) c->lastSpendTimePartner = real;
+        else if (strcmp(key, "spenttime") == 0) c->spentTime = number;
+        else if (strcmp(key, "sponsors") == 0) read_ints(value, c->sponsors, 10);
+        else if (strcmp(key, "items") == 0) read_ints(value, c->items, SSR_CAREER_ITEMS);
+        else if (strcmp(key, "vehicles") == 0) read_ints(value, c->vehicles, SSR_CAREER_ITEMS);
+        else if (strcmp(key, "properties") == 0) read_ints(value, c->properties, SSR_CAREER_ITEMS);
         else if (strcmp(key, "debut") == 0) c->debut = number;
         else if (strcmp(key, "intnotpickedmsg") == 0) c->intNotPickedMessage = number;
         else if (strcmp(key, "technique") == 0) read_ints(value, c->technique, SSR_CAREER_SKILL_LEVELS);

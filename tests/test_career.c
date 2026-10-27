@@ -54,6 +54,13 @@ static void test_saves_and_loads_a_career(void) {
     c.debut = 0;
     c.intNotPickedMessage = 400;
     c.wonMajorAward = 1;
+    c.relationPartner = 40.5f;
+    c.relationSponsors = 22;
+    c.spentTime = 2;
+    c.sponsors[3] = 9;
+    c.items[0] = 120;
+    c.vehicles[19] = 10500;
+    c.properties[4] = 1;
     snprintf(c.headline, sizeof(c.headline), "Line one\nA \\ two");
     char path[1200];
     snprintf(path, sizeof(path), "%s/slot0.txt", ssr_test_directory("career_save"));
@@ -72,6 +79,10 @@ static void test_saves_and_loads_a_career(void) {
     CHECK(back.potyAwards == 2 && back.wonMajorAward == 1);
     CHECK(back.relationBossInt == 60 && back.relationFansInt == 12.5f && back.debut == 0);
     CHECK(back.intNotPickedMessage == 400);
+    CHECK(back.relationPartner == 40.5f && back.relationSponsors == 22 && back.spentTime == 2);
+    CHECK(back.lastSpendTimePartner == 28 && back.lastSpendTimeFriends == 28);
+    CHECK(back.sponsors[3] == 9 && back.sponsors[0] == 0);
+    CHECK(back.items[0] == 120 && back.vehicles[19] == 10500 && back.properties[4] == 1);
     // The new season starts the counts again.
     back.energy = 20;
     back.relationBoss = 50;
@@ -147,7 +158,41 @@ static void test_names_the_player_type(void) {
     CHECK(ssr_career_player_type_index("playerdesc_NoRating") == -1);
 }
 
+static void test_changes_the_relations(void) {
+    SSRCareer c;
+    ssr_career_create(&c, "A", "B", 0, 0, 62, 1, 1, 1);
+    // A new career has no partner and no sponsors.
+    CHECK(c.relationPartner == 0 && c.relationSponsors == 0 && ssr_career_count_sponsors(&c) == 0);
+    ssr_career_update_relation(&c, SSR_RELATION_BOSS, 40);
+    CHECK(c.relationBoss == 100);
+    ssr_career_update_relation(&c, SSR_RELATION_FANS_INT, -5);
+    CHECK(c.relationFansInt == 1);
+    // A change to no partner still gives the minimum.
+    ssr_career_update_relation(&c, SSR_RELATION_PARTNER, 0);
+    CHECK(ssr_career_relation(&c, SSR_RELATION_PARTNER) == 1);
+    CHECK(ssr_career_relation(&c, (SSRRelation)9) == 0);
+    c.sponsors[0] = 5;
+    c.sponsors[7] = 1;
+    CHECK(ssr_career_count_sponsors(&c) == 2);
+    // The club relations and the sponsors count as whole numbers. The
+    // partner counts two times, with its fraction.
+    c.relationBoss = 60.9f;
+    c.relationTeam = 30.5f;
+    c.relationFans = 10.2f;
+    c.relationPartner = 20.25f;
+    c.relationSponsors = 6.9f;
+    CHECK(fabsf(ssr_career_happiness(&c) - (60 + 30 + 10 + 40.5f + 6) / 6.0f) < 1e-5f);
+    // Each owned product is a sixtieth of the lifestyle, also when it is
+    // broken.
+    CHECK(ssr_career_lifestyle(&c) == 0);
+    c.items[1] = 1;
+    c.vehicles[0] = 10200;
+    c.properties[19] = 3;
+    CHECK(fabsf(ssr_career_lifestyle(&c) - 5.0f) < 1e-5f);
+}
+
 int main(void) {
+    test_changes_the_relations();
     test_names_the_player_type();
     test_updates_a_rating();
     test_sums_a_skill();

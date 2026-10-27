@@ -10,6 +10,24 @@
 // The length of a name: the game takes 11 letters from the keyboard.
 #define SSR_CAREER_NAME 32
 #define SSR_CAREER_SKILL_LEVELS 100
+// The places of the lifestyle items, the vehicles, and the properties.
+// The game uses the first 20.
+#define SSR_CAREER_ITEMS 50
+// The lifestyle shop sells 60 products (c_TShopItem.CountAllItems).
+#define SSR_CAREER_SHOP_PRODUCTS 60
+
+// The relations of UpdateRelationship and GetRelationship.
+typedef enum {
+    SSR_RELATION_BOSS,
+    SSR_RELATION_TEAM,
+    SSR_RELATION_FANS,
+    SSR_RELATION_PARTNER,
+    SSR_RELATION_SPONSORS,
+    SSR_RELATION_FRIENDS,
+    SSR_RELATION_BOSS_INT,
+    SSR_RELATION_TEAM_INT,
+    SSR_RELATION_FANS_INT,
+} SSRRelation;
 
 typedef struct {
     // The day of the career: (year - 1) * 364 + (week - 1) * 7 + day
@@ -36,6 +54,18 @@ typedef struct {
     // The relations with the boss, the team, and the fans of the nation.
     // They start at 0, so a young player is not picked for the nation.
     float relationBossInt, relationTeamInt, relationFansInt;
+    // The relation with the partner (0 is no partner), the sponsors, and
+    // the friends (no screen uses the friends in 4.32).
+    float relationPartner, relationSponsors, relationFriends;
+    // The days of the last time with the friends and with the partner.
+    float lastSpendTimeFriends, lastSpendTimePartner;
+    // The relationship activities since the last match.
+    int spentTime;
+    // The income of each sponsor. 0 is no sponsor.
+    int sponsors[10];
+    // The lifestyle products: 0 is not owned. A value above 0 is the wear
+    // of the product, and above 10000 the product is broken.
+    int items[SSR_CAREER_ITEMS], vehicles[SSR_CAREER_ITEMS], properties[SSR_CAREER_ITEMS];
     // 1 before the first match of the career (c_TPlayer.m_debut).
     int debut;
     // The day of the last message of the nation that did not pick the
@@ -110,6 +140,24 @@ int ssr_career_week(const SSRCareer *career);
 // c_TPlayer.AddForm and AddInternationalForm: the newest rating goes in at
 // the end.
 void ssr_career_add_form(int *form, int rating);
+
+// GSPlayerUtility.UpdateRelationship: the relation changes by the amount
+// and stays from 1 to 100.
+void ssr_career_update_relation(SSRCareer *career, SSRRelation relation, float change);
+
+// c_TPlayer.GetRelationship: the value of the relation, or 0.
+float ssr_career_relation(const SSRCareer *career, SSRRelation relation);
+
+// c_TPlayer.CountSponsors: the number of sponsors.
+int ssr_career_count_sponsors(const SSRCareer *career);
+
+// c_TPlayer.GetHappiness: the club relations, the partner two times, and
+// the sponsors, divided by 6.
+float ssr_career_happiness(const SSRCareer *career);
+
+// c_TPlayer.GetLifestyle: the part of the 60 products of the shop that the
+// player owns, from 0 to 100. A broken product counts.
+float ssr_career_lifestyle(const SSRCareer *career);
 
 // c_TPlayer.ResetSeasonStats: the counts of the season start again.
 void ssr_career_reset_season(SSRCareer *career);
