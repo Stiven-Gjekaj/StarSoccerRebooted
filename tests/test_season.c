@@ -148,6 +148,12 @@ static void test_plays_a_season(void) {
     CHECK(ssr_season_club(s, down, 0)->league == 20 && ssr_season_club(s, up, 0)->league == 10);
     // A cup with no place after it is a final: its winner is in the news.
     CHECK(cup->fixtures[0].result == 1 && s->hasWinnerNews && strcmp(s->winnerCompetition, "CUP") == 0);
+    // The winner of the final won it, and the loser did not.
+    const SSRFixture *final = &cup->fixtures[cup->fixtureCount - 1];
+    int winner = ssr_season_row(s, &cup->pools[final->group > 0 ? final->group - 1 : 0], ssr_fixture_winner(s, final))->teamId;
+    int loser = ssr_season_row(s, &cup->pools[final->group > 0 ? final->group - 1 : 0], ssr_fixture_loser(s, final))->teamId;
+    CHECK(ssr_season_won_final(s, cup, final, winner) && !ssr_season_won_final(s, cup, final, loser));
+    CHECK(!ssr_season_won_final(s, one, &one->fixtures[0], winner));
     // The new season builds the tables from the new leagues.
     ssr_season_new_season(s);
     CHECK(one->pools[0].count == 4 && one->fixtureCount == 12 && one->fixtures[0].result == 0);
