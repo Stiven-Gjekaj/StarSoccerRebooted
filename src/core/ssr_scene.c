@@ -1832,6 +1832,12 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
     } else if (is(n, "EmitSize")) {
         d = new_doodad(D_EMIT_SIZE, NULL);
         if (d) d->v[0] = m->argCount > 0;
+    } else if (is(n, "SetMessage")) {
+        // SetMessage(screen) names the layout of the next message
+        // (c_SetMessageScreen). The save slots are its only user, and the
+        // delete button of a slot then sets the layout "message" again
+        // (c_TScreen_SaveSlot.ButtonDeleteSlot0). The code of the remake
+        // names the layout of each message, so the modifier has no effect.
     } else {
         note_unknown(s, n);
     }
