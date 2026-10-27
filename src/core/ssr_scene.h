@@ -56,6 +56,11 @@ typedef struct {
     float focal;
     // 0xRRGGBBAA.
     uint32_t colour;
+    // The alpha at the far edge of the image, as a part of the alpha of the
+    // colour. The edge at the y0 of the image keeps the full alpha. 0 when
+    // the alpha does not fade. A shadow of c_RenderShadow fades, and it
+    // draws the image with no cels.
+    float fade;
     SSRBlend blend;
     // SSR_ITEM_TEXT: the font size (0 to 3) and the alignment: 'L', 'C', or
     // 'R', and 'T', 'M', or 'B'.

@@ -82,6 +82,7 @@ typedef enum {
     D_READOUT,
     D_STRING_READOUT,
     D_PROGRESS_BAR,
+    D_SHADOW,
     D_ANIMATE_PROGRESS,
     D_PROVIDER,
     D_SELECTOR,
@@ -1363,6 +1364,12 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         d->v[0] = (float)number(s, m, 5, 0);
         d->v[1] = 1.8347578e11f;
         d->v[2] = is(n, "ZeroSignedReadoutLoc") ? 2 : strncmp(n, "Signed", 6) == 0 ? 1 : 0;
+    } else if (is(n, "Shadow")) {
+        // c_RenderShadow: four handles (x, y) in pixels of the image, for
+        // the shadows in turn.
+        d = new_doodad(D_SHADOW, m);
+        if (!d) return NULL;
+        for (int i = 0; i < 8; i++) d->v[i] = (float)number(s, m, i, 0);
     } else if (is(n, "ProgressBar")) {
         // c_ProgressBar: the width of the element follows a tweak, from the
         // empty size at min to the width of the element at max. A total
@@ -2741,8 +2748,48 @@ static void draw_spine(SSRScene *s, const Gel *g, const Frame *f) {
     }
 }
 
+// c_RenderShadow.Update: copies of the image in the shadow colour, each
+// turned by its angle about the place of the gel, with the handle of its
+// turn. They take no scale and no turn of the parents, and they sort before
+// the other items of the layer (depth -1000).
+static void draw_shadows(SSRScene *s, const Gel *g, const Frame *f, const char *image, const Doodad *d) {
+    static const float ANGLE[8] = {25, -25, 155, 205, 27, -27, 157, 207};
+    static const float FLIP[8] = {1, 1, -1, -1, 1, 1, -1, -1};
+    SSRTweaks *t = s->env->tweaks;
+    int count = (int)ssr_tweaks_number(t, "CelColours", "ShadowCount");
+    float step = (float)ssr_tweaks_number(t, "CelColours", "ShadowStep");
+    float fade = (float)ssr_tweaks_number(t, "CelColours", "ShadowFade");
+    Colour colour;
+    char text[24];
+    snprintf(text, sizeof(text), "#%s", ssr_tweaks_get(t, "CelColours", "Shadow"));
+    if (!parse_colour(text, &colour) || step <= 0) return;
+    float px, py;
+    mat_apply(f->m, 0, 0, &px, &py);
+    for (float k = (float)ssr_tweaks_number(t, "CelColours", "ShadowFirst"); (int)k < count; k = (float)(int)k + step) {
+        int i = (int)k;
+        if (i < 0 || i > 7) break;
+        SSRSceneItem *item = add_item(s, SSR_ITEM_IMAGE, NULL, f->layer, -1000);
+        if (!item) return;
+        item->image = image;
+        item->pivotX = px;
+        item->pivotY = py;
+        item->x = px - d->v[(i & 3) * 2];
+        item->y = py - d->v[(i & 3) * 2 + 1];
+        item->w = g->w * FLIP[i];
+        item->h = g->h;
+        item->angle = ANGLE[i];
+        item->colour = colour_rgba(colour);
+        item->fade = fade;
+        // c_GImage.Render2 draws the image alone, with no cels.
+        item->cels = NULL;
+    }
+}
+
 static void draw_image(SSRScene *s, const Gel *g, const Frame *f, const char *image) {
     if (!image || !image[0]) return;
+    for (const Doodad *d = g->doodads; d; d = d->next) {
+        if (d->kind == D_SHADOW) draw_shadows(s, g, f, image, d);
+    }
     int columns = g->tiled ? g->columns : 1, rows = g->tiled ? g->rows : 1;
     // A Tile with no Copies() draws nothing, as in the game.
     for (int row = 0; row < rows; row++) {

@@ -1217,6 +1217,40 @@ static void test_table_rows(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// A player frame with Shadow(): the shadows are copies in the shadow
+// colour, turned about the place of the image, and they draw first.
+static void test_player_shadows(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set(tweaks, "CelColours", "Shadow", "00000030");
+    ssr_tweaks_set_number(tweaks, "CelColours", "ShadowCount", 8);
+    ssr_tweaks_set_number(tweaks, "CelColours", "ShadowStep", 1);
+    ssr_tweaks_set_number(tweaks, "CelColours", "ShadowFade", 0.5);
+    ssr_tweaks_set_number(tweaks, "CelColours", "ShadowFirst", 0);
+    layout = "SortedLayer:(Minigame,3)\n"
+             "Draw:(Man,300,400,200,200)\n"
+             "\tHandle(100,100)\n"
+             "\tShadow(110,105,85,105,-90,148,-110,148)\n"
+             "\tLayer(Minigame)\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(ssr_scene_count(scene) == 9);
+    for (int i = 0; i < 8 && i < ssr_scene_count(scene); i++) {
+        const SSRSceneItem *s = ssr_scene_item(scene, i);
+        CHECK(s->colour == 0x00000030 && near(s->fade, 0.5f) && !s->cels);
+        CHECK(near(s->pivotX, 300) && near(s->pivotY, 400));
+    }
+    const SSRSceneItem *third = ssr_scene_item(scene, 2), *man = ssr_scene_item(scene, 8);
+    // The third shadow: 155 degrees, flipped, with the handle (-90, 148).
+    CHECK(near(third->angle, 155) && near(third->w, -200) && near(third->x, 390) && near(third->y, 252));
+    CHECK(man->fade == 0 && man->colour == 0xFFFFFFFF);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
     test_draws_embedded_content();
     test_scrolls_a_list_by_a_swipe();
@@ -1244,5 +1278,6 @@ int main(void) {
     test_text_areas_layers_and_clips();
     test_progress_bars();
     test_table_rows();
+    test_player_shadows();
     return TEST_RESULT();
 }
