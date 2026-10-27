@@ -1308,6 +1308,13 @@ static void player_tweaks(SSRGame *game) {
     const SSRCareer *c = &game->career;
     SSRTweaks *t = game->tweaks;
     char text[64];
+    // The awards that the achievements screen shows as unlocked.
+    for (int id = 1; id < SSR_CAREER_AWARDS; id++) {
+        snprintf(text, sizeof(text), "%d", id);
+        if (c->awards[id] > 0 || ssr_tweaks_kind(t, "Achievements", text) != SSR_TWEAK_NONE) {
+            ssr_tweaks_set_number(t, "Achievements", text, c->awards[id] > 0);
+        }
+    }
     ssr_tweaks_set_number(t, "Player", "Gender", c->gender);
     ssr_tweaks_set_number(t, "Player", "Bux", c->bank);
     ssr_tweaks_set_number(t, "Player", "StarBux", c->bank);
@@ -3177,7 +3184,7 @@ static void retirement_score(SSRGame *game, int score) {
 }
 
 // c_TScreen_Retirement.SetUpScreen: the stats of the career and the New
-// Star Soccer score. [I: the achievements are not in the remake yet.]
+// Star Soccer score.
 static void retirement_screen(SSRGame *game) {
     SSRCareer *c = &game->career;
     set_screen(game, "retirement");
@@ -3188,7 +3195,7 @@ static void retirement_screen(SSRGame *game) {
     if (goals > 0) goals /= apps;
     if (assists > 0) assists /= apps;
     float average = c->apps > 0 ? c->totalRating / c->apps : 0;
-    int star = ssr_career_star_level(c), medals = 0, achievements = 0;
+    int star = ssr_career_star_level(c), medals = 0, achievements = ssr_career_award_count(c);
     float bonus = 0, history = 0, historyGoals = 0, historyAssists = 0, historyStarMan = 0;
     // The medals: a league title, a trophy with a medal, or a final that
     // was won. A medal before the year 25 and a medal of the nation give a
@@ -3904,6 +3911,38 @@ static void relationships(SSRGame *game) {
 
 /* ---------------------------------------------------- the achievements */
 
+// c_TPlayer.CheckAchievement: a locked award unlocks, with an alert and a
+// sound. An award gives nothing else.
+static void award(SSRGame *game, int id) {
+    if (!ssr_career_unlock_award(&game->career, id)) return;
+    char tag[48];
+    snprintf(tag, sizeof(tag), "%d", id);
+    ssr_tweaks_set_number(game->tweaks, "Achievements", tag, 1);
+    snprintf(tag, sizeof(tag), "CACHIEVEMENTMOBILE_%d", id);
+    alert(game, "bottommessageachievement", loc(game, tag), 4000);
+    play_sound(game, "CAchievement");
+}
+
+// c_ASection_Awards.SetUp: the share of the awards with a text that the
+// player has.
+static void award_share(SSRGame *game) {
+    const SSRCareer *c = &game->career;
+    int all = 0, done = 0;
+    for (int id = 1; id < SSR_CAREER_AWARDS; id++) {
+        char tag[48];
+        snprintf(tag, sizeof(tag), "CACHIEVEMENTMOBILE_%d", id);
+        const char *text = loc(game, tag);
+        if (strcmp(text, tag) == 0 || strchr(text, '@')) continue;
+        all++;
+        done += c->awards[id] > 0;
+    }
+    int share = all > 0 ? done * 100 / all : 0;
+    char text[128];
+    ssr_tweaks_set_number(game->tweaks, "Player", "AchievementsComplete", share);
+    snprintf(text, sizeof(text), "%s%d%%", loc(game, "ACHIEVEMENTS_CAPS_SPACEAFTER"), share);
+    ssr_tweaks_set(game->tweaks, "Player", "AchievementsCompleteString", text);
+}
+
 // Player.GetStringForm: the ratings of the last matches, the oldest first,
 // with "-" between them.
 static void form_string(const int *form, int apps, char *out, size_t capacity) {
@@ -3964,12 +4003,7 @@ static void achievements_screen(SSRGame *game) {
     set_screen(game, "achievements");
     update_player_stats(game);
     ssr_tweaks_set_number(game->tweaks, "Menu", "ShowGamecenter", 0);
-    // c_ASection_Awards: the share of the awards that the player has.
-    // [I: the awards are not in the remake yet, so the share is 0.]
-    char text[128];
-    ssr_tweaks_set_number(game->tweaks, "Player", "AchievementsComplete", 0);
-    snprintf(text, sizeof(text), "%s0%%", loc(game, "ACHIEVEMENTS_CAPS_SPACEAFTER"));
-    ssr_tweaks_set(game->tweaks, "Player", "AchievementsCompleteString", text);
+    award_share(game);
     // c_ASection_Trophies: the newest first.
     add_op(game, SSR_OP_LIST_CLEAR, "TrophyHook", NULL, NULL, 0);
     if (c->trophyCount == 0) add_op(game, SSR_OP_LIST_ADD, "TrophyHook", "NoRecords", "", 0);
@@ -7629,6 +7663,9 @@ static void race_result(SSRGame *game) {
             quick_message(game, text, 1500);
         }
     }
+    // Awards: the first prize of the own horse, and a bet that won.
+    if (own >= 0 && win > 0 && win == ssr_horses_prize(1)) award(game, 65);
+    if (own < 0 && win > 0) award(game, 63);
     if (win > 0) {
         update_bank(game, win);
         save_career(game);
@@ -7689,6 +7726,7 @@ static void stable_buy(SSRGame *game) {
     save_career(game);
     ssr_tweaks_set_number(game->tweaks, "Menu", "StableTabPos", 0);
     ssr_tweaks_set_number(game->tweaks, "Menu", "StableScroll", 0);
+    award(game, 64);
     horse_tweaks(game, 1);
 }
 
@@ -7846,7 +7884,10 @@ static void blackjack_result(SSRGame *game, int result) {
     }
     if (result == 2) play_sound(game, "CError");
     if (back > 0) update_bank(game, back);
-    if (result == 1) save_career(game);
+    if (result == 1) {
+        save_career(game);
+        award(game, 33);
+    }
     check_stake(game);
     if (result == 1) show_ticker_tape(game);
     ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", result == 1 ? 1 : result == 0 ? 0 : -1);
@@ -8098,6 +8139,7 @@ static void roulette_result(SSRGame *game) {
         update_bank(game, win);
         save_career(game);
         casino_message(game, "bet_YouWon", win);
+        award(game, 31);
         show_ticker_tape(game);
     } else {
         play_sound(game, "CError");
@@ -8179,6 +8221,7 @@ static void slots_play(SSRGame *game) {
 // TScreen_Slots.DoPrize.
 static void slots_prize(SSRGame *game) {
     int win = ssr_slots_prize(game->reels, game->bet);
+    if (win > 0) award(game, 32);
     play_sound(game, win > 0 ? "SlotsYouWin" : "SlotsYouLose");
     if (win > 0) {
         play_sound(game, "CCashIn");

@@ -355,7 +355,7 @@ static void retire(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     score = (int)(score + hs / h * 200.0f + 1.0f);
     score = (int)(score * (c->totalRating / c->apps + 1.0f) * 200.0f);
     score = (int)(score + medals * 250.0f);
-    score += c->potyAwards * 250 + (c->starRating / 100 + 1) * 200;
+    score += c->potyAwards * 250 + ssr_career_award_count(c) * 200 + (c->starRating / 100 + 1) * 200;
     float bars = skills / 100.0f + 1.0f + ssr_career_happiness(c) / 100.0f + ssr_career_lifestyle(c) / 100.0f;
     score = (int)(score * bars) * 10;
     char text[32];
@@ -1343,7 +1343,11 @@ static void go_to_the_casino(SSRGame *game, SSRTweaks *tweaks, const char *path)
             heard++;
         }
         CHECK(heard >= 5 && strcmp(sounds[0], "SlotsPlay") == 0 && strcmp(sounds[3], "SlotsItemLock") == 0);
-        CHECK(strcmp(sounds[4], outcome == 1 ? "SlotsYouWin" : "SlotsYouLose") == 0);
+        // The first win unlocks the award of the slots, with its sound first
+        // (CheckAchievement comes before the sound of the win).
+        int after = sounds[4] && strcmp(sounds[4], "CAchievement") == 0 ? 5 : 4;
+        CHECK(after == 4 || (outcome == 1 && now->awards[32] > 0));
+        CHECK(sounds[after] && strcmp(sounds[after], outcome == 1 ? "SlotsYouWin" : "SlotsYouLose") == 0);
         int win = (int)ssr_tweaks_number(tweaks, "Casino", "Winnings");
         CHECK(outcome == 1 ? win == 15 || win == 35 : win == 0);
         if (win > 0) {
@@ -1548,6 +1552,13 @@ static void play_blackjack(SSRGame *game, SSRTweaks *tweaks, const char *path) {
         // Only a win plays the cash sound. A tie gives the bet back quietly.
         CHECK(cashIn == (outcome == 1));
         CHECK((tape == 2) == (outcome == 1));
+        // The first win unlocks the award of blackjack, with an alert.
+        if (outcome == 1 && outcomes[2] == 0) {
+            CHECK(now->awards[33] > 0 && ssr_tweaks_number(tweaks, "Achievements", "33") == 1);
+            const char *layout = ssr_game_alert(game, NULL);
+            CHECK(layout && strcmp(layout, "bottommessageachievement") == 0);
+            ssr_game_message(game, "message.dismiss");
+        }
         outcomes[(int)outcome + 1]++;
         bank = bank - 10 + winnings;
         CHECK(now->bank == bank);
