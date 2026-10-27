@@ -16,6 +16,8 @@ static const SSRFontSlot DEFAULT_FONTS[SSR_FONT_COUNT] = {
 };
 
 #define MAX_TEXTURES 512
+// The screens that the remake can attach at once.
+#define MAX_HOOKS 16
 #define MAX_QUADS 1024
 
 typedef struct {
@@ -54,7 +56,7 @@ struct SSRGfx {
     struct {
         char ref[48];
         const SSRScene *scene;
-    } hooks[4];
+    } hooks[MAX_HOOKS];
     int hasOuter;
     SDL_Rect outer;
     // The names of the art of the remake (art/<name>.png).
@@ -688,11 +690,11 @@ void ssr_gfx_set_offset(SSRGfx *gfx, float x, float y) {
 
 void ssr_gfx_attach(SSRGfx *gfx, const char *ref, const SSRScene *scene) {
     if (!gfx || !ref) return;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < MAX_HOOKS; i++) {
         if (!scene && gfx->hooks[i].scene && SDL_strcmp(gfx->hooks[i].ref, ref) == 0) gfx->hooks[i].scene = NULL;
     }
     if (!scene) return;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < MAX_HOOKS; i++) {
         if (gfx->hooks[i].scene) continue;
         SDL_strlcpy(gfx->hooks[i].ref, ref, sizeof(gfx->hooks[i].ref));
         gfx->hooks[i].scene = scene;
@@ -735,7 +737,7 @@ void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene) {
         const SSRSceneItem *item = ssr_scene_item(scene, i);
         if (item->kind == SSR_ITEM_AREA) {
             // The scenes of the hook draw in the order that they came.
-            for (int h = 0; item->ref && h < 4; h++) {
+            for (int h = 0; item->ref && h < MAX_HOOKS; h++) {
                 const SSRScene *sub = gfx->hooks[h].scene;
                 if (!sub || sub == scene || SDL_strcmp(gfx->hooks[h].ref, item->ref) != 0) continue;
                 draw_hook(gfx, item, sub);
