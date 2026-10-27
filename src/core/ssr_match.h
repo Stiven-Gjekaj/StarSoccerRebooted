@@ -16,6 +16,10 @@ typedef enum {
     // A chance of the player runs. ssr_match_chance_done ends it.
     SSR_MATCH_PLAYER_CHANCE = 2,
     SSR_MATCH_FULL_TIME = 5,
+    // The match ends with a penalty shoot-out: the break before it, and the
+    // kicks.
+    SSR_MATCH_PENALTIES = 7,
+    SSR_MATCH_SHOOTOUT = 8,
     // The texts of a chance, one stage at a time.
     SSR_MATCH_STAGES = 6,
     SSR_MATCH_HALF_TIME = 9,
@@ -54,6 +58,12 @@ typedef struct {
     int subTime;
     // 1 when the player likes to dribble.
     int dribbling;
+    // The type of the fixture (SSR_FIXTURE_*). A cup tie with extra time
+    // (3) or a second leg (5) can go on after 90 minutes. A second leg has
+    // the score of the first leg: home is the home team of the first leg,
+    // the away team now.
+    int matchType;
+    int firstLegHome, firstLegAway;
 } SSRMatchSetup;
 
 // One row of the commentary.
@@ -103,6 +113,10 @@ typedef struct {
     // The size of the stadium of the home team, from 0 to 4, and the place
     // of the player in a penalty shoot-out.
     int stadiumSize, penaltyTaker;
+    // The penalties of each team in a shoot-out, and the number of the kick
+    // (c_TMatch.m_penshootoutnumber).
+    int pens[3];
+    int shootoutNumber;
 } SSRMatch;
 
 // Makes the match before the kick-off: the minutes of the chances of the
@@ -110,8 +124,9 @@ typedef struct {
 void ssr_match_start(SSRMatch *match, const SSRMatchSetup *setup, const char *(*localise)(void *, const char *),
                      void *context, SSRRandom *random);
 
-// The Play button: the kick-off, the second half, or the end. Returns 1
-// when the match is over and the screen can go.
+// The Play button: the kick-off, the second half, extra time, the
+// shoot-out, or the end. Returns 1 when the match is over and the screen
+// can go.
 int ssr_match_play(SSRMatch *match, int now);
 
 // One frame. Returns what the screen must do.

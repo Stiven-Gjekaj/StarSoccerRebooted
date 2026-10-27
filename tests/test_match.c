@@ -94,6 +94,45 @@ static void test_plays_a_match(void) {
     CHECK(ssr_match_play(&m, 0) == 1);
 }
 
+static void test_a_cup_tie_goes_to_extra_time_and_penalties(void) {
+    int extra = 0, shootouts = 0;
+    for (int seed = 1; seed < 400 && shootouts < 2; seed++) {
+        SSRMatch m;
+        SSRRandom random = {seed};
+        SSRMatchSetup s = setup_for();
+        s.matchType = 3;
+        s.awayStrength = 60;
+        ssr_match_start(&m, &s, localise, NULL, &random);
+        Seen seen;
+        play(&m, &random, SSR_RESULT_MISSED, &seen);
+        CHECK(m.state == SSR_MATCH_FULL_TIME);
+        if (m.minute == 90) {
+            // Over at 90 minutes only with a winner.
+            CHECK(m.score[1] != m.score[2]);
+            continue;
+        }
+        extra++;
+        CHECK(m.minute == 120 && m.half == 5);
+        if (m.score[1] != m.score[2]) {
+            CHECK(m.shootoutNumber == 0);
+            continue;
+        }
+        // Level after 120 minutes: five kicks each at least, and a winner.
+        shootouts++;
+        CHECK(m.shootoutNumber >= 6 && m.pens[1] != m.pens[2]);
+        CHECK(strstr(seen.last, "CMATCHTEXT_PENRESULT") != NULL);
+    }
+    CHECK(extra > 0 && shootouts > 0);
+    // A league match ends at 90 minutes, also with a draw.
+    SSRMatch m;
+    SSRRandom random = {7};
+    SSRMatchSetup s = setup_for();
+    ssr_match_start(&m, &s, localise, NULL, &random);
+    Seen seen;
+    play(&m, &random, SSR_RESULT_MISSED, &seen);
+    CHECK(m.minute == 90);
+}
+
 static void test_counts_the_goals_of_the_player(void) {
     SSRMatch m;
     SSRRandom random = {99};
@@ -165,6 +204,7 @@ int main(void) {
     test_the_captain_draws_runs();
     test_a_dribble_leads_to_an_attack();
     test_plays_a_match();
+    test_a_cup_tie_goes_to_extra_time_and_penalties();
     test_counts_the_goals_of_the_player();
     test_a_tired_player_comes_off();
     return TEST_RESULT();

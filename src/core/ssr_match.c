@@ -139,6 +139,8 @@ void ssr_match_start(SSRMatch *m, const SSRMatchSetup *setup, const char *(*loca
     m->workRateTextTime = ssr_rand2(random, 5, 30);
 }
 
+static void next_kick(SSRMatch *m);
+
 int ssr_match_play(SSRMatch *m, int now) {
     switch (m->state) {
     case SSR_MATCH_PREMATCH:
@@ -147,10 +149,44 @@ int ssr_match_play(SSRMatch *m, int now) {
         m->matchTick = now;
         if (m->minute == 0) say(m, 0, "Kick Off", 0, 0);
         return 0;
+    case SSR_MATCH_PENALTIES:
+        // DoShootOut: the first kick steps up.
+        m->state = SSR_MATCH_SHOOTOUT;
+        m->shootoutNumber = 0;
+        m->pens[1] = m->pens[2] = 0;
+        m->matchTick = now;
+        next_kick(m);
+        return 0;
     case SSR_MATCH_FULL_TIME:
         return 1;
     default:
         return 0;
+    }
+}
+
+// c_TMatch.CheckShootOutComplete: five kicks each, then sudden death.
+static int shootout_complete(const SSRMatch *m) {
+    int n = m->shootoutNumber, a = m->pens[1], b = m->pens[2];
+    switch (n) {
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+        return 0;
+    case 6:
+        return a - b > 2 || b - a > 2;
+    case 7:
+        return a - b > 2 || b - a > 1;
+    case 8:
+        return a - b > 1 || b - a > 1;
+    case 9:
+        return a - b > 1 || b - a > 0;
+    case 10:
+        return a != b;
+    default:
+        return n % 2 == 0 && a != b;
     }
 }
 
@@ -336,8 +372,53 @@ static void create_chance(SSRMatch *m, int forPlayer, SSRRandom *random) {
 
 /* ------------------------------------------------------------ clock */
 
+// c_TMatch.MatchOver: 1 when the match ends after the half that ends now.
+// A league match ends at 90 minutes; a tie can need extra time, then
+// penalties.
+static int match_over(const SSRMatch *m) {
+    const SSRMatchSetup *s = &m->setup;
+    if (s->matchType == 3) return m->score[1] != m->score[2];
+    if (s->matchType == 5) {
+        int home = s->firstLegAway + m->score[1], away = s->firstLegHome + m->score[2];
+        if (home != away) return 1;
+        return 2 * s->firstLegAway + m->score[1] != 2 * m->score[2] + s->firstLegHome;
+    }
+    return 1;
+}
+
 static void half_ends(SSRMatch *m) {
     char text[96];
+    if (m->half == 3) {
+        // The half time of extra time: the game shows no break.
+        m->minute = 105;
+        m->half = 4;
+        m->energy += 2;
+        snprintf(text, sizeof(text), "%s %d - %d", text_of(m, "Half Time"), m->score[1], m->score[2]);
+        add_line(m, 1, text, 0, 0);
+        return;
+    }
+    if (m->half == 4) {
+        m->minute = 120;
+        m->half = 5;
+        if (match_over(m)) {
+            snprintf(text, sizeof(text), "%s %d - %d", text_of(m, "Full Time"), m->score[1], m->score[2]);
+            add_line(m, 1, text, 0, 0);
+            m->state = SSR_MATCH_FULL_TIME;
+        } else {
+            add_line(m, 1, text_of(m, "Penalties"), 0, 0);
+            m->state = SSR_MATCH_PENALTIES;
+        }
+        return;
+    }
+    if (m->half == 2 && !match_over(m)) {
+        m->minute = 90;
+        m->half = 3;
+        snprintf(text, sizeof(text), "%s %d - %d", text_of(m, "Extra Time"), m->score[1], m->score[2]);
+        add_line(m, 1, text, 0, 0);
+        m->state = SSR_MATCH_HALF_TIME;
+        m->energy += 3;
+        return;
+    }
     if (m->half == 1) {
         m->windDirection += 180;
         m->minute = 45;
@@ -378,7 +459,8 @@ static void next_minute(SSRMatch *m, int now, SSRRandom *random) {
     m->minute++;
     m->matchTick = now;
     use_energy(m);
-    if ((m->half == 1 && m->minute > 45) || (m->half == 2 && m->minute > 90)) {
+    if ((m->half == 1 && m->minute > 45) || (m->half == 2 && m->minute > 90) || (m->half == 3 && m->minute > 105) ||
+        (m->half == 4 && m->minute > 120)) {
         half_ends(m);
         return;
     }
@@ -512,11 +594,68 @@ static SSRMatchEvent run_stage(SSRMatch *m, int now, SSRRandom *random) {
     return SSR_MATCH_EVENT_NONE;
 }
 
+// c_TMatch.DoShootOut: the result when the shoot-out is over, else the
+// next kick, one team then the other.
+static void next_kick(SSRMatch *m) {
+    if (shootout_complete(m)) {
+        char text[256];
+        snprintf(text, sizeof(text), "%s", text_of(m, "CMATCHTEXT_PENRESULT"));
+        const char *winner = m->pens[1] > m->pens[2] ? m->setup.homeName : m->setup.awayName;
+        replace(text, sizeof(text), "$clubname", winner ? winner : "");
+        add_line(m, 0, text, m->pens[1] > m->pens[2] ? 1 : 2, 1);
+        m->state = SSR_MATCH_FULL_TIME;
+        return;
+    }
+    m->shootoutNumber++;
+    m->attacking = m->shootoutNumber % 2 == 0 ? 2 : 1;
+    m->stage = 6;
+}
+
+// c_TMatch.UpdatePenalties: a team steps up, then scores or misses. The
+// player takes one of the kicks of the team.
+static SSRMatchEvent shootout_step(SSRMatch *m, int now, SSRRandom *random) {
+    switch (m->stage) {
+    case 6: {
+        int n = m->shootoutNumber;
+        if (ssr_match_on_pitch(m) && m->attacking == m->setup.myTeam &&
+            (n == m->penaltyTaker || n == m->penaltyTaker + 1)) {
+            m->stage = 8;
+            say(m, 0, "CMATCHTEXT_PENALTYSTEPUPPLAYER", m->attacking, 0);
+        } else {
+            m->stage = 7;
+            say(m, 0, "CMATCHTEXT_PENALTYSTEPUP", m->attacking, 0);
+        }
+        break;
+    }
+    case 7:
+        if (ssr_rand(random, 4) == 1) {
+            say_numbered(m, 0, "CMATCHTEXT_PENALTYMISS", fresh(random, 5, &m->lastPenaltyMiss), m->attacking, 0);
+        } else {
+            m->pens[m->attacking]++;
+            say_numbered(m, 0, "CMATCHTEXT_PENALTYGOAL", fresh(random, 5, &m->lastPenaltyGoal), m->attacking, 1);
+        }
+        m->matchTick = now + 5 * m->textSpeed;
+        next_kick(m);
+        if (m->state == SSR_MATCH_FULL_TIME) return SSR_MATCH_EVENT_FULL_TIME;
+        break;
+    case 8:
+        m->chanceType = 4;
+        m->state = SSR_MATCH_PLAYER_CHANCE;
+        return SSR_MATCH_EVENT_CHANCE;
+    }
+    return SSR_MATCH_EVENT_NONE;
+}
+
 SSRMatchEvent ssr_match_update(SSRMatch *m, int now, SSRRandom *random) {
+    if (m->state == SSR_MATCH_SHOOTOUT) {
+        if (now <= m->matchTick + m->textSpeed * 2) return SSR_MATCH_EVENT_NONE;
+        m->matchTick = now;
+        return shootout_step(m, now, random);
+    }
     if (m->state == SSR_MATCH_CLOCK) {
         if (now <= m->matchTick + m->textSpeed / 2) return SSR_MATCH_EVENT_NONE;
         next_minute(m, now, random);
-        if (m->state == SSR_MATCH_HALF_TIME) return SSR_MATCH_EVENT_HALF_TIME;
+        if (m->state == SSR_MATCH_HALF_TIME || m->state == SSR_MATCH_PENALTIES) return SSR_MATCH_EVENT_HALF_TIME;
         if (m->state == SSR_MATCH_FULL_TIME) return SSR_MATCH_EVENT_FULL_TIME;
         if (m->state == SSR_MATCH_STAGES) m->matchTick = now;
         return SSR_MATCH_EVENT_NONE;
@@ -621,6 +760,19 @@ static int rating_of(const SSRChance *c) {
 }
 
 void ssr_match_chance_done(SSRMatch *m, const SSRChance *c, int now, SSRRandom *random) {
+    if (m->shootoutNumber > 0) {
+        // A kick of the shoot-out counts only in the shoot-out.
+        m->state = SSR_MATCH_SHOOTOUT;
+        if (c->result == SSR_RESULT_GOAL) {
+            m->pens[m->setup.myTeam]++;
+            say_numbered(m, 0, "CMATCHTEXT_PENALTYGOAL", fresh(random, 5, &m->lastPenaltyGoal), m->setup.myTeam, 1);
+        } else {
+            say_numbered(m, 0, "CMATCHTEXT_PENALTYMISS", fresh(random, 5, &m->lastPenaltyMiss), m->setup.myTeam, 0);
+        }
+        m->matchTick = now + 5 * m->textSpeed;
+        next_kick(m);
+        return;
+    }
     m->state = SSR_MATCH_CLOCK;
     m->stage = 0;
     m->shotsOnTarget += c->shotsOnTarget;
