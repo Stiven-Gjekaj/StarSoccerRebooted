@@ -79,6 +79,24 @@ static void test_refuses_a_set_with_a_missing_file(void) {
     CHECK(ssr_world_load(directory) == NULL);
 }
 
+// A data pack changes the clubs. The other files come from the data set.
+static void test_reads_a_pack_over_the_data_set(void) {
+    char set[1024];
+    snprintf(set, sizeof(set), "%s", write_set("packbase"));
+    const char *pack = ssr_test_directory("packover");
+    write_text(pack, "Clubs.txt",
+               "id\tshortname\ttla\tstrength\tstadiumlongitude\tstadiumlatitude\thomestyle\t"
+               "homekitshirtcol1\thomekitshirtcol2\thomekitshortscol\tawaykitshirtcol1\tawaykitshortscol\t"
+               "nationid\tleagueid\tcontinentalcompid\tbteamof\r\n"
+               "810\tHarbour Town\tHARBOUR\t80\t0\t50\t1\t#00F\t#00F\t#FFF\t#FFF\t#000\t62\t2270\t0\t0\r\n");
+    SSRWorld *world = ssr_world_load_pack(set, pack);
+    CHECK(world != NULL);
+    if (!world) return;
+    CHECK(world->clubCount == 1 && strcmp(ssr_world_club(world, 810)->name, "Harbour Town") == 0);
+    CHECK(world->nationCount == 1 && world->competitionCount == 1);
+    ssr_world_free(world);
+}
+
 static void test_parses_colours(void) {
     CHECK(ssr_color_parse("#FFF", 1) == 0xFFFFFF);
     CHECK(ssr_color_parse("#f80", 1) == 0xFF8800);
@@ -123,5 +141,6 @@ int main(void) {
     test_loads_a_data_set();
     test_refuses_a_set_with_a_missing_file();
     test_parses_colours();
+    test_reads_a_pack_over_the_data_set();
     return TEST_RESULT();
 }

@@ -48,8 +48,14 @@ static const char *keep(SSRWorld *world, const char *text) {
     return copy;
 }
 
-static SSRTsv *open_table(const char *directory, const char *name) {
+// A file of the pack takes the place of the file of the data set.
+static SSRTsv *open_table(const char *directory, const char *pack, const char *name) {
     char path[4096];
+    if (pack) {
+        snprintf(path, sizeof(path), "%s/%s", pack, name);
+        SSRTsv *table = ssr_tsv_load(path);
+        if (table) return table;
+    }
     snprintf(path, sizeof(path), "%s/%s", directory, name);
     return ssr_tsv_load(path);
 }
@@ -156,9 +162,9 @@ static void read_promotion(const Reader *r, void *record) {
 
 // Reads each row of the file into a new array of records. The file must
 // have the key column. Returns 0 on failure.
-static int read_all(SSRWorld *world, const char *directory, const char *file, const char *key, size_t size,
-                    void (*read)(const Reader *, void *), void **out, int *count) {
-    SSRTsv *table = open_table(directory, file);
+static int read_all(SSRWorld *world, const char *directory, const char *pack, const char *file, const char *key,
+                    size_t size, void (*read)(const Reader *, void *), void **out, int *count) {
+    SSRTsv *table = open_table(directory, pack, file);
     if (!table || ssr_tsv_column(table, key) < 0) {
         ssr_tsv_free(table);
         return 0;
@@ -185,19 +191,23 @@ static int read_all(SSRWorld *world, const char *directory, const char *file, co
 }
 
 SSRWorld *ssr_world_load(const char *directory) {
+    return ssr_world_load_pack(directory, NULL);
+}
+
+SSRWorld *ssr_world_load_pack(const char *directory, const char *pack) {
     SSRWorld *world = calloc(1, sizeof(SSRWorld));
     if (!world) return NULL;
-    int ok = read_all(world, directory, "Continents.txt", "id", sizeof(SSRContinent),
+    int ok = read_all(world, directory, pack, "Continents.txt", "id", sizeof(SSRContinent),
                       read_continent, (void **)&world->continents,
                       &world->continentCount) &&
-             read_all(world, directory, "Nations.txt", "id", sizeof(SSRNation),
+             read_all(world, directory, pack, "Nations.txt", "id", sizeof(SSRNation),
                       read_nation, (void **)&world->nations, &world->nationCount) &&
-             read_all(world, directory, "Clubs.txt", "id", sizeof(SSRClub),
+             read_all(world, directory, pack, "Clubs.txt", "id", sizeof(SSRClub),
                       read_club, (void **)&world->clubs, &world->clubCount) &&
-             read_all(world, directory, "Competitions.txt", "id", sizeof(SSRCompetition),
+             read_all(world, directory, pack, "Competitions.txt", "id", sizeof(SSRCompetition),
                       read_competition, (void **)&world->competitions,
                       &world->competitionCount) &&
-             read_all(world, directory, "PromotionPlaces.txt", "parentid", sizeof(SSRPromotion),
+             read_all(world, directory, pack, "PromotionPlaces.txt", "parentid", sizeof(SSRPromotion),
                       read_promotion, (void **)&world->promotions,
                       &world->promotionCount);
     if (!ok) {

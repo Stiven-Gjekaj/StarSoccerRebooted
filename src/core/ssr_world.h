@@ -110,6 +110,10 @@ typedef struct {
 // Reads the data set in the directory. Returns NULL when a file is missing
 // or a file has no id column.
 SSRWorld *ssr_world_load(const char *directory);
+// Reads the data set with a data pack over it. Each file of the pack
+// directory, for example "Clubs.txt", takes the place of the file of the
+// data set. pack can be NULL.
+SSRWorld *ssr_world_load_pack(const char *directory, const char *pack);
 void ssr_world_free(SSRWorld *world);
 
 // The record with the id, or NULL.
