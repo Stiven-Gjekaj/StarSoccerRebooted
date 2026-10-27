@@ -2563,6 +2563,14 @@ static void test_starts_a_new_career(void) {
         honourRows += honourOps[i].kind == SSR_OP_LIST_ADD && strcmp(honourOps[i].ref, "HonourList") == 0;
     }
     CHECK(honourRows >= 2);
+    // The timeline of the career: the first club, the debut, and more.
+    ssr_game_message(game, "honours.btn_Mode");
+    honourCount = take_ops(game, honourOps, 256);
+    int momentRows = 0;
+    for (int i = 0; i < honourCount; i++) {
+        momentRows += honourOps[i].kind == SSR_OP_LIST_ADD && strcmp(honourOps[i].ref, "HonourList") == 0;
+    }
+    CHECK(momentRows >= 3 && momentRows == ssr_game_career(game)->momentCount);
     ssr_game_message(game, "honours.btn_Back");
     CHECK(strcmp(ssr_game_screen(game), "squad") == 0);
     ssr_game_message(game, "squad.btn_Back");

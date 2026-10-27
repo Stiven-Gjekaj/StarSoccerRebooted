@@ -132,3 +132,21 @@ PushOrigin:(12,@n)
 			PlaySnd(UISelect)
 		>
 PopOrigin
+
+// The honours of the world, or the timeline of the career.
+PushOrigin:(168,@n)
+	M_NavButton:(0,0,,,)
+	{
+		Draw:(IStats,27,22,96,)
+		Text:(Career,0,104,146,60,C,C)
+			FontSize(1)
+			FontScale(0.45,0.45)
+			StringReadout(Honours,ModeText)
+	}
+		Delay(0.1)
+		ConvergeFrom(-640,0)
+		Click(honours.btn_Mode)
+		<
+			PlaySnd(UISelect)
+		>
+PopOrigin

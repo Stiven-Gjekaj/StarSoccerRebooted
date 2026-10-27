@@ -114,6 +114,8 @@ struct SSRGame {
     // The squad screen: the club, and the list: 0 the squad, 1 the top
     // scorers of the league, 2 the player and the rivals.
     int squadClub, squadMode;
+    // The honours screen: 0 the world, 1 the timeline of the career.
+    int honoursMode;
     int fixturesTeam, fixturesLevel;
     // c_TScreen_League.m_flagContinueButton: the table shows Continue.
     int leagueContinue;
@@ -1349,6 +1351,7 @@ static void save_career(SSRGame *game) {
 }
 
 static void webpage(SSRGame *game);
+static void signed_moment(SSRGame *game);
 
 // StartCareer: the first skills, the first save, and the news.
 static void call_start_career(SSRGame *game) {
@@ -1360,6 +1363,7 @@ static void call_start_career(SSRGame *game) {
     skip_to_first_match(game);
     c->worldSeed = 0;
     people_start(game);
+    signed_moment(game);
     ssr_honours_clear(&game->honours);
     const SSRClub *club = game->world ? ssr_world_club(game->world, c->clubId) : NULL;
     snprintf(c->headline, sizeof(c->headline), "%s", loc(game, "CNEWS_FIRSTCONTRACTMOBILE"));
@@ -2014,6 +2018,20 @@ static void after_star_rating(SSRGame *game) {
     star_tweaks(game);
 }
 
+// A moment goes into the timeline of the career.
+static void moment(SSRGame *game, const char *text) {
+    ssr_career_add_moment(&game->career, game->career.sdate, text);
+}
+
+// The moment of a new club.
+static void signed_moment(SSRGame *game) {
+    const SSRClub *club = game->world ? ssr_world_club(game->world, game->career.clubId) : NULL;
+    char text[256];
+    snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentSigned"));
+    replace_all(text, sizeof(text), "$club", club ? club->name : "");
+    moment(game, text);
+}
+
 // The moments of a career after a match of the club: the debut, the first
 // goal, and the matches and the goals of a milestone. Each opens an alert.
 static void career_moments(SSRGame *game, int goalsBefore) {
@@ -2026,14 +2044,19 @@ static void career_moments(SSRGame *game, int goalsBefore) {
         snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentDebut"));
         replace_all(text, sizeof(text), "$club", club ? club->name : "");
         alert(game, "bottommessagemoment", text, 4000);
+        moment(game, text);
     }
-    if (goalsBefore == 0 && c->goals > 0) alert(game, "bottommessagemoment", loc(game, "SSR_MomentFirstGoal"), 4000);
+    if (goalsBefore == 0 && c->goals > 0) {
+        alert(game, "bottommessagemoment", loc(game, "SSR_MomentFirstGoal"), 4000);
+        moment(game, loc(game, "SSR_MomentFirstGoal"));
+    }
     for (size_t i = 0; i < sizeof(APPS) / sizeof(APPS[0]); i++) {
         if (c->apps != APPS[i]) continue;
         snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentApps"));
         snprintf(number, sizeof(number), "%d", APPS[i]);
         replace_all(text, sizeof(text), "$num", number);
         alert(game, "bottommessagemoment", text, 4000);
+        moment(game, text);
     }
     for (size_t i = 0; i < sizeof(GOALS) / sizeof(GOALS[0]); i++) {
         if (goalsBefore >= GOALS[i] || c->goals < GOALS[i]) continue;
@@ -2041,6 +2064,7 @@ static void career_moments(SSRGame *game, int goalsBefore) {
         snprintf(number, sizeof(number), "%d", GOALS[i]);
         replace_all(text, sizeof(text), "$num", number);
         alert(game, "bottommessagemoment", text, 4000);
+        moment(game, text);
     }
 }
 
@@ -3357,14 +3381,29 @@ static void squad_mode(SSRGame *game) {
 
 // squad.btn_Honours: the champions and the top scorers, the newest
 // season first. A title of the club of the player shows its highlight.
-static void honours_screen(SSRGame *game) {
-    set_screen(game, "honours");
+static void honours_fill(SSRGame *game) {
     SSRTweaks *t = game->tweaks;
-    ssr_tweaks_set(t, "Honours", "Title", loc(game, "SSR_Honours"));
-    ssr_tweaks_set(t, "Honours", "Column", loc(game, "Season"));
+    int career = game->honoursMode == 1;
+    ssr_tweaks_set(t, "Honours", "Title", loc(game, career ? "Career" : "SSR_Honours"));
+    ssr_tweaks_set(t, "Honours", "Column", loc(game, career ? "Week" : "Season"));
+    ssr_tweaks_set(t, "Honours", "ModeText", loc(game, career ? "World" : "Career"));
     ssr_tweaks_set_number(t, "Honours", "Scroll", 0);
     add_op(game, SSR_OP_LIST_CLEAR, "HonourList", NULL, NULL, 0);
     add_op(game, SSR_OP_LIST_START, "HonourList", NULL, NULL, 82);
+    if (career) {
+        // The timeline: the newest moment first.
+        const SSRCareer *c = &game->career;
+        for (int i = c->momentCount - 1; i >= 0; i--) {
+            const SSRMoment *m = &c->moments[i];
+            char when[128];
+            snprintf(when, sizeof(when), "%s %d, %s %d", loc(game, "Year"), ssr_date_year(m->sdate), loc(game, "Week"),
+                     ssr_date_week(m->sdate));
+            add_op(game, SSR_OP_LIST_ADD, "HonourList", "HonourEntry", "", 0);
+            add_op(game, SSR_OP_LIST_TEXT, "HonourList", NULL, m->text, 1);
+            add_op(game, SSR_OP_LIST_TEXT, "HonourList", NULL, when, 2);
+        }
+        return;
+    }
     for (int i = game->honours.count - 1; i >= 0; i--) {
         const SSRHonour *h = &game->honours.list[i];
         char title[256], scorer[256], number[16];
@@ -3386,6 +3425,19 @@ static void honours_screen(SSRGame *game) {
         add_op(game, SSR_OP_LIST_TEXT, "HonourList", NULL, scorer, 2);
         if (h->club == game->career.clubId) add_op(game, SSR_OP_LIST_SUB, "HonourList", "Highlight", NULL, 1);
     }
+}
+
+// squad.btn_Honours: the champions and the top scorers, the newest
+// season first. A title of the club of the player shows its highlight.
+static void honours_screen(SSRGame *game) {
+    set_screen(game, "honours");
+    game->honoursMode = 0;
+    honours_fill(game);
+}
+
+static void honours_mode(SSRGame *game) {
+    game->honoursMode = !game->honoursMode;
+    honours_fill(game);
 }
 
 static void honours_back(SSRGame *game) {
@@ -3480,6 +3532,11 @@ static void season_awards(SSRGame *game, SSRSeasonComp *comp, SSRSeasonClub *clu
     if (club->league < comp->data->id && comp->data->type != 4) award(game, 17);
     if (position == 1 && club->league >= comp->data->id && comp->data->type != 4) {
         award(game, 16);
+        char text[256];
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentTitle"));
+        replace_all(text, sizeof(text), "$league", comp->data->tla);
+        replace_all(text, sizeof(text), "$club", club->data->name);
+        moment(game, text);
         if (c->captain == 1 || c->captain == 3) award(game, 82);
         if (ssr_career_history_apps(c, club->data->tla) + c->seasonApps == c->apps) award(game, 123);
     }
@@ -3649,6 +3706,10 @@ static int award_poty(SSRGame *game, int type) {
         const SSRSeasonClub *mine = ssr_season_club(s, c->clubId, 0);
         const char *team = type == 1 ? (mine ? mine->data->tla : "") : comp ? comp->data->tla : "";
         ssr_career_add_trophy(c, ssr_career_year(c) - 1, team, loc(game, TAGS[kind]), 6 + kind);
+        char text[256];
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentAward"));
+        replace_all(text, sizeof(text), "$award", loc(game, TAGS[kind]));
+        moment(game, text);
         // m_ach: the club 69, the young 68, the division 70 (and 71 in the
         // top division), the world 72. Three world awards give 114.
         award(game, type == 1 ? 69 : type == 2 ? 68 : type == 3 ? 70 : 72);
@@ -7042,6 +7103,7 @@ static void sign_contract(SSRGame *game) {
         game->messageData = old;
         message(game, "message", text, 0, 1, "SignForNewClub");
         award(game, 34);
+        signed_moment(game);
     }
     save_career(game);
     relation_tweaks(game, 1);
@@ -7575,6 +7637,7 @@ static void call_confirm_transfer(SSRGame *game) {
     new_season(game);
     // NewSeasonSetUp4 after a transfer: the award of a transfer.
     award(game, 34);
+    signed_moment(game);
 }
 
 static void call_new_season(SSRGame *game) {
@@ -9210,6 +9273,7 @@ static const Route ROUTES[] = {
     {"squad.btn_Back", squad_back},
     {"squad.btn_Honours", honours_screen},
     {"honours.btn_Back", honours_back},
+    {"honours.btn_Mode", honours_mode},
     {"league.row_team", league_row},
     {"league.cmb_League", league_combo},
     {"seasonreview.btn_League", season_review_league},
