@@ -1799,6 +1799,12 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     c.bootId = 0;
     c.nrg[0] = 0;
     c.energy = 60;
+    // Pace at 60 and power at 59: a save unlocks the award of pace only.
+    memset(c.pace, 0, sizeof(c.pace));
+    memset(c.power, 0, sizeof(c.power));
+    c.pace[0] = 60;
+    c.power[0] = 59;
+    memset(c.awards, 0, sizeof(c.awards));
     ssr_game_message(game, "gamemenu.btn_Quit");
     CHECK(ssr_career_save(&c, path));
     ssr_game_message(game, "mainmenu.btn_Career");
@@ -1820,6 +1826,7 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     ssr_game_message(game, "shopoverlay.buy");
     CHECK(now->bank == 170 && now->agent[0] == 51 && ssr_career_agent(now) == 1);
     CHECK(now->awards[73] > 0 && now->awards[74] == 0);
+    CHECK(now->awards[37] > 0 && now->awards[38] == 0 && now->awards[42] == 0);
     CHECK(strcmp(ssr_game_screen(game), "messageagent") == 0 && ssr_game_overlay(game)[0] == 0);
     ssr_game_message(game, "message.btn_Ok");
     CHECK(strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0);

@@ -1145,7 +1145,22 @@ static void update_relation(SSRGame *game, SSRRelation relation, float change) {
     if (ssr_career_happiness(c) >= 100) award(game, 49);
 }
 
+// c_TPlayer.CheckSkillAchievements, at each save: a skill at 60 with no
+// boost of the boots, and all five.
+static void skill_awards(SSRGame *game) {
+    const SSRCareer *c = &game->career;
+    int skills[5] = {ssr_career_skill(c->pace), ssr_career_skill(c->power), ssr_career_skill(c->technique),
+                     ssr_career_skill(c->vision), ssr_career_skill(c->setPieces)};
+    int all = 1;
+    for (int i = 0; i < 5; i++) {
+        if (skills[i] >= 60) award(game, 37 + i);
+        else all = 0;
+    }
+    if (all) award(game, 42);
+}
+
 static void save_career(SSRGame *game) {
+    skill_awards(game);
     if (game->horsesLoaded) ssr_horses_owned_text(&game->horses, game->career.horses, sizeof(game->career.horses));
     if (!game->saveDirectory[0]) return;
     char path[2200];
