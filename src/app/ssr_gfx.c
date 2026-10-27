@@ -247,15 +247,21 @@ static SDL_Texture *own_art(SSRGfx *gfx, const char *name) {
     return cached_texture(gfx, key, path, 1);
 }
 
-// The size of the image of a crest: the shape of a shield, so that the
-// crest fills the box of the shield that it replaces.
-#define CREST_W 256
-#define CREST_H 348
+// The image of a crest has the shape of the box of a shield, so that the
+// crest goes on the face of the shield. FACE_X and FACE_Y are the middle of
+// the round face as a part of the box, and FACE_RX and FACE_RY its radii.
+#define CREST_W 210
+#define CREST_H 285
+#define FACE_X 0.5f
+#define FACE_Y 0.5f
+#define FACE_RX 0.4f
+#define FACE_RY 0.3f
 
 // The crest of a club in the pack: "Crest_<id>", or "CrestM_<id>" for the
-// flipped crest of a flipped shield. The image of crests/<id>.png goes in
-// a circle with a white ring, in the middle of an image of the shape of a
-// shield. Returns NULL when the image is not a crest or is not there.
+// flipped crest of a flipped shield. The image of crests/<id>.png goes on
+// the round face of the shield as on a dome: the middle of the crest comes
+// near, its edge bends away, and the light falls from the top. Returns NULL
+// when the image is not a crest or is not there.
 static SDL_Texture *crest_texture(SSRGfx *gfx, const char *name) {
     int flip = SDL_strncmp(name, "CrestM_", 7) == 0;
     if (!flip && SDL_strncmp(name, "Crest_", 6) != 0) return NULL;
@@ -269,25 +275,32 @@ static SDL_Texture *crest_texture(SSRGfx *gfx, const char *name) {
     SDL_Texture *texture = NULL;
     unsigned char *pixels = load_own_image(path, &source) ? SDL_calloc(CREST_W * CREST_H, 4) : NULL;
     if (pixels) {
-        const float cx = CREST_W / 2.0f, cy = CREST_H / 2.0f, outer = CREST_W / 2.0f - 4, inner = outer - 9;
-        // The source covers the inner circle.
-        float scale = (float)(source.width < source.height ? source.width : source.height) / (2 * inner);
+        const float cx = FACE_X * CREST_W, cy = FACE_Y * CREST_H, rx = FACE_RX * CREST_W, ry = FACE_RY * CREST_H;
+        const float side = (float)(source.width < source.height ? source.width : source.height);
         for (int y = 0; y < CREST_H; y++) {
             for (int x = 0; x < CREST_W; x++) {
-                float dx = x + 0.5f - cx, dy = y + 0.5f - cy, d = SDL_sqrtf(dx * dx + dy * dy);
-                float ring = SDL_clamp(outer - d + 0.5f, 0.0f, 1.0f);
-                if (ring <= 0) continue;
-                float in = SDL_clamp(inner - d + 0.5f, 0.0f, 1.0f);
-                int sx = (int)(source.width / 2.0f + (flip ? -dx : dx) * scale);
-                int sy = (int)(source.height / 2.0f + dy * scale);
+                unsigned char *to = pixels + ((size_t)y * CREST_W + x) * 4;
+                // u and v go from -1 to 1 across the face.
+                float u = (x + 0.5f - cx) / rx, v = (y + 0.5f - cy) / ry, r = SDL_sqrtf(u * u + v * v);
+                // The edge of the face is soft over about one pixel.
+                float edge = SDL_clamp((1 - r) * rx + 0.5f, 0.0f, 1.0f);
+                if (edge <= 0) continue;
+                // On a dome, the point at r on the screen is at the angle
+                // asin(r) from the front, so the crest bends at the edge.
+                float bend = r > 0 ? SDL_asinf(SDL_min(r, 1.0f)) / (SDL_PI_F / 2) / r : 1;
+                float su = u * bend, sv = v * bend;
+                int sx = (int)(source.width / 2.0f + (flip ? -su : su) * side / 2);
+                int sy = (int)(source.height / 2.0f + sv * side / 2);
                 sx = SDL_clamp(sx, 0, source.width - 1);
                 sy = SDL_clamp(sy, 0, source.height - 1);
                 const unsigned char *from = source.pixels + ((size_t)sy * source.width + sx) * 4;
-                // The crest lies on white, inside the white ring.
-                float a = from[3] / 255.0f * in;
-                unsigned char *to = pixels + ((size_t)y * CREST_W + x) * 4;
-                for (int c = 0; c < 3; c++) to[c] = (unsigned char)(from[c] * a + 255 * (1 - a) + 0.5f);
-                to[3] = (unsigned char)(ring * 255 + 0.5f);
+                // The crest lies on white. The light falls from the top left
+                // onto the dome.
+                float nz = SDL_sqrtf(SDL_max(0.0f, 1 - r * r));
+                float light = SDL_clamp(0.72f + 0.28f * (0.8f * nz - 0.35f * v - 0.2f * u), 0.0f, 1.0f);
+                float a = from[3] / 255.0f;
+                for (int c = 0; c < 3; c++) to[c] = (unsigned char)((from[c] * a + 255 * (1 - a)) * light + 0.5f);
+                to[3] = (unsigned char)(edge * 255 + 0.5f);
             }
         }
         texture = texture_from_pixels(gfx->renderer, CREST_W, CREST_H, pixels);

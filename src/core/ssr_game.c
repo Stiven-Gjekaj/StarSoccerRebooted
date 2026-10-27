@@ -1829,9 +1829,10 @@ static void set_colour_tweak(SSRGame *game, const char *name, Rgb c, float alpha
 }
 
 // The crest of a club in the chosen pack (crests/<id>.png) takes the place
-// of the shield of the team in the badge slot (1 or 2). The frame of the
-// shield gets the image of the crest, and the parts of the shield go. A
-// shield of slot 1 is a flipped image, so it gets the flipped crest.
+// of the face of the shield of the team in the badge slot (1 or 2). The
+// designs of the face go, and the face is white, so that the crest keeps
+// its colours. A shield of slot 1 is a flipped image, so it gets the
+// flipped crest.
 static void team_crest(SSRGame *game, int slot, int level, int id) {
     char path[4096], name[48], image[48];
     int has = 0;
@@ -1843,13 +1844,17 @@ static void team_crest(SSRGame *game, int slot, int level, int id) {
     }
     snprintf(name, sizeof(name), "HasCrest%d", slot);
     ssr_tweaks_set_number(game->tweaks, "MatchColours", name, has);
-    snprintf(name, sizeof(name), "ShieldFrame%d", slot);
+    snprintf(name, sizeof(name), "Crest%d", slot);
     if (has) {
         snprintf(image, sizeof(image), "%s%d", slot == 1 ? "CrestM_" : "Crest_", id);
     } else {
-        snprintf(image, sizeof(image), "MapShieldFrameAll");
+        snprintf(image, sizeof(image), "MapShieldColourGrey");
     }
     ssr_tweaks_set(game->tweaks, "MatchColours", name, image);
+    if (has) {
+        snprintf(name, sizeof(name), "Badge%dCol1", slot);
+        set_colour_tweak(game, name, rgb(0xFFFFFF), 1);
+    }
 }
 
 static int team_of(SSRGame *game, int level, int id, int strength, Team *team) {
