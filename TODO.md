@@ -306,9 +306,10 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [ ] The testimonial match
 - [x] Derbies from the distance between stadiums (under 30 km), in the
       ticker
-- [ ] Rivalries that grow from cup finals, title races, and transfers
-- [ ] Comebacks and form: a club in a bad run, a player who returns from
-      an injury
+- [x] Rivalries that grow from title races and transfers, in the ticker
+- [ ] Rivalries that grow from cup finals
+- [x] Form: a club in a run of wins or defeats, in the ticker
+- [ ] Comebacks: a player who returns from an injury
 
 ### History
 
@@ -332,8 +333,9 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 ### Off the pitch
 
-- [ ] Rest and fitness: an injury has a recovery. The player can choose
-      to play with pain, at a risk.
+- [x] Rest and fitness: a match can injure the player, who misses the
+      matches until the injury heals
+- [ ] The player can choose to play with pain, at a risk
 - [ ] Contract drama: release clauses, loans, a club that refuses to sell
 - [ ] Business and charity, with effects on fame and on the world
 
