@@ -169,21 +169,24 @@ static SSRSceneEnv scene_env(SSRApp *app);
 
 /* ------------------------------------------------------- the chance */
 
-// The pitch of a chance (c_MatchChance): "Pitch_" + Pen, A, or M, and the
-// side [I: the side letters of the pitches].
+// The pitch of a chance (c_MatchChance.p_GetChanceScreenName): "Pitch_",
+// Pen, A, or M, the side letter, "_AM", and "_Rev" for a mirror. Side 0 is
+// "a", side 1 is "b", and side 2 is "a" in a mirror. A corner or a wing
+// cross is "c", in a mirror at an odd minute.
 static void pitch_name(const SSRChance *chance, char *out, size_t capacity) {
     int type = chance->info.chanceType, side = chance->info.pitchSide;
     if (type == 4) {
         SDL_snprintf(out, capacity, "Pitch_Pen_AM.uis");
-    } else if (type == 1 || type == 9) {
-        if (side == 2) {
-            SDL_snprintf(out, capacity, "Pitch_Ma_AM_Rev.uis");
-        } else {
-            SDL_snprintf(out, capacity, "Pitch_%s_AM.uis", side == 0 ? "Ma" : "Mb");
-        }
-    } else {
-        SDL_snprintf(out, capacity, "Pitch_%s_AM.uis", side == 0 ? "Aa" : side == 2 ? "Ac" : "Ab");
+        return;
     }
+    const char *kind = type == 1 || type == 9 ? "M" : "A";
+    char letter = side == 1 ? 'b' : 'a';
+    int mirror = side == 2;
+    if (type == 7 || type == 8) {
+        letter = 'c';
+        mirror = chance->info.minute % 2 == 1;
+    }
+    SDL_snprintf(out, capacity, "Pitch_%s%c_AM%s.uis", kind, letter, mirror ? "_Rev" : "");
 }
 
 static void free_chance_view(SSRApp *app) {
@@ -203,21 +206,25 @@ static SSRScene *open_layer(SSRApp *app, const char *name, SSRUiTree **tree, SSR
     return *tree ? ssr_scene_open(*tree, env) : NULL;
 }
 
-// The animation of a player: the kind, and one of 8 headings.
+// The animation of a player: the kind, and one of 8 headings
+// (c_AMatchPlayer.SetDirToAngle).
 static void player_anim(const SSRMatchPlayer *p, char *out, size_t capacity) {
-    static const char *HEADINGS[] = {"E", "SE", "S", "SW", "W", "NW", "N", "NE"};
-    float a = p->direction;
-    if (p->anim == SSR_ANIM_STAND || p->inWall) {
-        static const float FACING[] = {0, 90, 180, 270};
-        a = FACING[p->facing & 3];
-    }
+    int a = (int)p->direction;
     while (a < 0) a += 360;
-    int heading = ((int)((a + 22.5f) / 45)) % 8;
+    a %= 360;
+    const char *heading = a > 338 || a < 23 ? "E"
+                          : a < 67          ? "SE"
+                          : a < 112         ? "S"
+                          : a < 157         ? "SW"
+                          : a < 202         ? "W"
+                          : a < 247         ? "NW"
+                          : a < 292         ? "N"
+                                            : "NE";
     const char *kind = p->type == SSR_PLAYER_KEEPER ? (p->anim == SSR_ANIM_STAND ? "KStand" : "KRun")
                        : p->inWall                  ? "FWallStand"
                        : p->anim == SSR_ANIM_RUN    ? "FRun"
                                                     : "FStand";
-    SDL_snprintf(out, capacity, "%s%s", kind, HEADINGS[heading]);
+    SDL_snprintf(out, capacity, "%s%s", kind, heading);
 }
 
 static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
@@ -265,7 +272,8 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         const SSRMatchPlayer *p = &chance->players.list[i];
         char anim[32];
         player_anim(p, anim, sizeof(anim));
-        ssr_scene_spawn_place(app->scene, app->playerCopies[i], NULL, p->x, p->y - p->z);
+        // The game adds z to y here (c_AMatchPlayer.p_Update).
+        ssr_scene_spawn_place(app->scene, app->playerCopies[i], NULL, p->x, p->y + p->z);
         ssr_scene_spawn_anim(app->scene, app->playerCopies[i], "PlayerAnim", anim);
     }
     ssr_scene_spawn_place(app->scene, app->ballCopy, NULL, chance->ball.x, chance->ball.y);
