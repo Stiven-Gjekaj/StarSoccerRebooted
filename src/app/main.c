@@ -625,30 +625,35 @@ static SSRSceneEnv scene_env(SSRApp *app) {
 }
 
 // SSR_AUTOCHANCE="dx,dy" plays each chance of the player for a test: it
-// drags from the ball by (dx, dy), and taps the tap ball at its centre when
-// the ball is near the middle of the screen.
+// touches the ball, drags by (dx, dy), lets go, and taps the tap ball at its
+// centre when the ball is near the middle of the screen. Each step takes
+// some milliseconds, so that the ticks of the game see it.
 static void auto_chance(SSRApp *app) {
     const char *setting = SDL_getenv("SSR_AUTOCHANCE");
     const SSRChance *chance = ssr_game_chance(app->game);
-    static int step = 0;
+    static Uint64 start = 0;
     float dx = 0, dy = 0;
     if (!setting || SDL_sscanf(setting, "%f,%f", &dx, &dy) != 2 || !chance) {
-        step = 0;
+        start = 0;
         return;
     }
+    Uint64 now = SDL_GetTicks();
+    if (!start) start = now;
+    Uint64 t = now - start;
     if (chance->state == SSR_CHANCE_AIM) {
-        if (step == 0) ssr_game_touch(app->game, 1, chance->ball.x, chance->ball.y);
-        if (step > 0 && step < 20) ssr_game_touch(app->game, 1, chance->ball.x + dx, chance->ball.y + dy);
-        if (step >= 20) ssr_game_touch(app->game, 0, chance->ball.x + dx, chance->ball.y + dy);
-        step++;
+        if (t < 200) {
+            ssr_game_touch(app->game, 1, chance->ball.x, chance->ball.y);
+        } else if (t < 600) {
+            ssr_game_touch(app->game, 1, chance->ball.x + dx, chance->ball.y + dy);
+        } else {
+            ssr_game_touch(app->game, 0, chance->ball.x + dx, chance->ball.y + dy);
+        }
     } else if (chance->state == SSR_CHANCE_TAP) {
         const SSRTapBall *tap = &chance->tap;
         int near = tap->x > 200 && tap->x < 440;
-        ssr_game_touch(app->game, near && step % 2 == 0, tap->x, tap->y);
-        step++;
+        ssr_game_touch(app->game, near && (t / 100) % 2 == 0, tap->x, tap->y);
     } else {
         ssr_game_touch(app->game, 0, 0, 0);
-        step = 0;
     }
 }
 
