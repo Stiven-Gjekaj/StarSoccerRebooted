@@ -535,6 +535,7 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     if (!texture && !image) return;
     SDL_BlendMode mode = SDL_BLENDMODE_BLEND;
     if (item->blend == SSR_BLEND_ADD) mode = SDL_BLENDMODE_ADD;
+    if (item->blend == SSR_BLEND_COPY) mode = SDL_BLENDMODE_NONE;
     // Gloss() adds the image times the colour under it (DST_COLOR, ONE).
     // The game premultiplies the alpha, so the image and its colour carry
     // it.
