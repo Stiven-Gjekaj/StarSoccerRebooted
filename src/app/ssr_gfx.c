@@ -390,8 +390,8 @@ static void draw_line(SSRGfx *gfx, FontSlot *slot, const char *text, float x, fl
 
 #define MAX_LINES 32
 
-// Cuts the text into lines at '\n', and at spaces when a line is wider
-// than width. Each line goes into lines as a new buffer of the text.
+// Cuts the text into lines at '\n' and at '|', the line break of the texts
+// of the game, and at spaces when a line is wider than width. Each line goes into lines as a new buffer of the text.
 static int wrap_lines(FontSlot *slot, const char *text, float width, char lines[MAX_LINES][256]) {
     int count = 0;
     const char *p = text;
@@ -400,7 +400,7 @@ static int wrap_lines(FontSlot *slot, const char *text, float width, char lines[
         size_t used = 0;
         const char *lastBreak = NULL;
         size_t lastBreakUsed = 0;
-        while (*p && *p != '\n' && used + 1 < sizeof(line)) {
+        while (*p && *p != '\n' && *p != '|' && used + 1 < sizeof(line)) {
             line[used++] = *p;
             line[used] = 0;
             if (*p == ' ') {
@@ -414,7 +414,7 @@ static int wrap_lines(FontSlot *slot, const char *text, float width, char lines[
             }
             p++;
         }
-        if (*p == '\n') p++;
+        if (*p == '\n' || *p == '|') p++;
         SDL_strlcpy(lines[count++], line, 256);
     }
     return count;
