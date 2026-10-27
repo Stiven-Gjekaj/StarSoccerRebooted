@@ -257,6 +257,48 @@ static void test_counts_the_posts_and_the_late_goals(void) {
     CHECK(m.lastMinuteWinner == 0);
 }
 
+// The goals of the home team in the last half hour, over many matches,
+// from a score of 0 to the away goals at the hour.
+static int late_home_goals(int awayGoals) {
+    int goals = 0;
+    for (int seed = 1; seed <= 300; seed++) {
+        SSRMatch m;
+        SSRRandom random = {seed};
+        SSRMatchSetup s = setup_for();
+        s.homeStrength = s.awayStrength = 50;
+        ssr_match_start(&m, &s, localise, NULL, &random);
+        int now = 0;
+        ssr_match_play(&m, now);
+        m.minute = 60;
+        m.half = 2;
+        m.score[2] = awayGoals;
+        for (int frame = 0; frame < 200000 && m.state != SSR_MATCH_FULL_TIME; frame++) {
+            now += 16;
+            SSRMatchEvent event = ssr_match_update(&m, now, &random);
+            if (event == SSR_MATCH_EVENT_CHANCE) {
+                SSRChance chance;
+                memset(&chance, 0, sizeof(chance));
+                chance.result = SSR_RESULT_MISSED;
+                chance.info.chanceType = m.chanceType;
+                ssr_match_chance_done(&m, &chance, now, &random);
+            }
+            if (event == SSR_MATCH_EVENT_HALF_TIME) ssr_match_play(&m, now);
+            SSRMatchLine line;
+            while (ssr_match_take_line(&m, &line)) {
+            }
+        }
+        goals += m.score[1];
+    }
+    return goals;
+}
+
+// Momentum: a team two goals behind at the hour scores more in the last
+// half hour than a team at a level score.
+static void test_a_team_behind_pushes(void) {
+    int level = late_home_goals(0), behind = late_home_goals(2);
+    CHECK(behind > level * 11 / 10);
+}
+
 static void test_the_captain_draws_runs(void) {
     SSRMatch m;
     SSRRandom random = {11};
@@ -279,6 +321,7 @@ int main(void) {
     test_a_dribble_leads_to_an_attack();
     test_keeps_the_furthest_goal_and_pass();
     test_counts_the_posts_and_the_late_goals();
+    test_a_team_behind_pushes();
     test_plays_a_match();
     test_a_cup_tie_goes_to_extra_time_and_penalties();
     test_counts_the_goals_of_the_player();
