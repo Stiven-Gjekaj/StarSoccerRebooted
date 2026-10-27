@@ -574,6 +574,10 @@ static void test_copies_a_template_into_a_hook(void) {
     CHECK(ssr_scene_set_hook(scene, "TopHook", "BeachCard") == 1);
     ssr_scene_update(scene, &env, 16);
     CHECK(!find_image(scene, "ButtonFrame"));
+    // No template clears the hook.
+    CHECK(ssr_scene_set_hook(scene, "TopHook", "") == 1);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(!find_image(scene, "DilemmaBeach"));
     ssr_scene_free(scene);
     ssr_ui_free(tree);
     ssr_tweaks_free(tweaks);

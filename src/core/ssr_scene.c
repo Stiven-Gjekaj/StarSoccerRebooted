@@ -3873,6 +3873,12 @@ int ssr_scene_entry_bar(SSRScene *scene, const char *list, const char *ref, cons
 
 int ssr_scene_set_hook(SSRScene *scene, const char *hook, const char *template_) {
     Gel *g = scene && hook ? find_ref_first(scene, hook) : NULL;
+    // No template clears the hook.
+    if (g && (!template_ || !template_[0])) {
+        for (int i = 0; i < g->childCount; i++) free_gel(g->children[i]);
+        g->childCount = 0;
+        return 1;
+    }
     Gel *model = scene && template_ ? find_ref_first(scene, template_) : NULL;
     if (!g || !model) return 0;
     Gel *entry = clone_gel(model);
