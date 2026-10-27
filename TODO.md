@@ -330,7 +330,10 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       the pressure
 - [x] Momentum: from the hour, the team that is behind pushes, so a
       comeback from 2-0 is possible
-- [ ] Weather and the pitch change how the ball moves
+- [x] Weather: some matches are in the rain (more often far from the
+      equator), and the ball rolls further on the wet pitch. In 4.32 a
+      career match is always dry; only the training has weather.
+- [ ] Snow, and the pitch of each club
 - [ ] Fair ratings and real scores. Players of the original complained
       about harsh ratings and very high scores.
 
