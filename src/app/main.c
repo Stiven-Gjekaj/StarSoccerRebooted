@@ -300,7 +300,7 @@ static void update_ball_view(SSRApp *app, const SSRChance *chance) {
     ssr_scene_spawn_place(app->scene, id, NULL, b->x, b->y);
     ssr_scene_spawn_place(app->scene, id, "BallHook", 0, -b->z);
     ssr_scene_spawn_set(app->scene, id, "BallHook", SSR_GEL_SCALE,
-                        (1 + b->z / 100) * (chance->info.chanceType == 11 ? 1.5f : 1));
+                        (1 + b->z / 100) * (chance->info.chanceType == 11 || chance->info.training == 8 ? 1.5f : 1));
     // GetVelDir: a heading near an axis, or a diagonal.
     float c = SDL_cosf(b->direction * SDL_PI_F / 180), s = SDL_sinf(b->direction * SDL_PI_F / 180);
     const char *roll;
