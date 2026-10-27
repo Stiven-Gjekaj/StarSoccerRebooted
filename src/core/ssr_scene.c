@@ -97,6 +97,8 @@ typedef enum {
     D_SLOT,
     D_READOUT_CONCAT,
     D_MECH_DIGIT,
+    D_FUNC,
+    D_CALL,
     D_SHOW_SHELL,
     D_SWIPE_PANEL,
     D_EMIT_PLACER,
@@ -1716,6 +1718,22 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         d->v[2] = is(n, "DoIf");
         int innerShow = 0;
         d->chain = make_doodads(s, g, (const SSRUiNode *const *)m->children, m->childCount, &innerShow);
+    } else if (is(n, "func")) {
+        // func(Name) < block >: the block runs only when call() names it
+        // (c_Func). It does not run in the frames of its gel.
+        d = new_doodad(D_FUNC, m);
+        if (!d) return NULL;
+        d->flags = 0;
+        d->text[0] = keep(s, arg(m, 0));
+        int innerShow = 0;
+        d->chain = make_doodads(s, g, (const SSRUiNode *const *)m->children, m->childCount, &innerShow);
+    } else if (is(n, "call")) {
+        // call(ref,Name): the block of func(Name) of the gel with the ref
+        // runs on that gel (c_Call).
+        d = new_doodad(D_CALL, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
     } else if (is(n, "if")) {
         d = new_doodad(D_IF, m);
         if (!d) return NULL;
@@ -2763,6 +2781,18 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         snprintf(text, sizeof(text), "%.*s%s%.*s", prefixLength, d->text[2], sign ? number : number + 1, suffixLength,
                  suffix);
         set_shown(g, text);
+        break;
+    }
+    case D_FUNC:
+        pump(s, g, d->chain);
+        break;
+    case D_CALL: {
+        Gel *target = find_ref_first(s, d->text[0]);
+        for (Doodad *f = target ? target->doodads : NULL; f; f = f->next) {
+            if (f->kind != D_FUNC || strcmp(f->text[0], d->text[1]) != 0) continue;
+            update(s, target, f);
+            break;
+        }
         break;
     }
     case D_MECH_DIGIT: {

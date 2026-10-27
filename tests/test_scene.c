@@ -1854,6 +1854,41 @@ static void test_colours_the_shadow_of_a_text(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// func(Name) keeps a block that runs only when call(ref,Name) names it, on
+// the gel with the ref (c_Func, c_Call).
+static void test_calls_a_function_of_a_gel(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Menu", "Go", 0);
+    SSRUiTree *tree;
+    layout = "Rect:(0,0,100,100) ref:Panel\n"
+             "\tfunc(Dismiss)\n"
+             "\t<\n"
+             "\t\tset(gel.vis,0)\n"
+             "\t>\n"
+             "{\n"
+             "\tDraw:(Inside,0,0,10,10)\n"
+             "}\n"
+             "Rect:(0,0,0,0)\n"
+             "\tif(twk(Menu,Go)=1)\n"
+             "\t<\n"
+             "\t\t.call(Panel,Dismiss)\n"
+             "\t>\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    for (int i = 0; i < 3; i++) ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "Inside"));
+    ssr_tweaks_set_number(tweaks, "Menu", "Go", 1);
+    ssr_scene_update(scene, &env, 16);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(!find_image(scene, "Inside"));
+    CHECK(ssr_scene_unknown_count(scene) == 0);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -2246,6 +2281,7 @@ int main(void) {
     test_rolls_a_digit();
     test_colours_a_spine_slot();
     test_colours_the_shadow_of_a_text();
+    test_calls_a_function_of_a_gel();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
