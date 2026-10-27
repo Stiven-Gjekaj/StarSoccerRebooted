@@ -10,6 +10,7 @@
 typedef struct {
     char *key;
     char *value;
+    SSRTweakKind kind;
     // A Range: tweak keeps its ends.
     int range;
     double min, max;
@@ -90,7 +91,26 @@ void ssr_tweaks_free(SSRTweaks *tweaks) {
     free(tweaks);
 }
 
+static void set_value(SSRTweaks *tweaks, const char *group, const char *name, const char *value, SSRTweakKind kind);
+
 void ssr_tweaks_set(SSRTweaks *tweaks, const char *group, const char *name, const char *value) {
+    set_value(tweaks, group, name, value, SSR_TWEAK_STRING);
+}
+
+void ssr_tweaks_set_kind(SSRTweaks *tweaks, const char *group, const char *name, const char *value,
+                         SSRTweakKind kind) {
+    set_value(tweaks, group, name, value, kind);
+    Entry *entry = find(tweaks, group, name);
+    if (entry) entry->kind = kind;
+}
+
+SSRTweakKind ssr_tweaks_kind(const SSRTweaks *tweaks, const char *group, const char *name) {
+    Entry *entry = find(tweaks, group, name);
+    return entry ? entry->kind : SSR_TWEAK_NONE;
+}
+
+// A new tweak takes the kind. A tweak that is there keeps its kind.
+static void set_value(SSRTweaks *tweaks, const char *group, const char *name, const char *value, SSRTweakKind kind) {
     if (!tweaks || !group || !name) return;
     char *copy = malloc(strlen(value ? value : "") + 1);
     if (!copy) return;
@@ -117,6 +137,7 @@ void ssr_tweaks_set(SSRTweaks *tweaks, const char *group, const char *name, cons
         return;
     }
     memset(&tweaks->entries[tweaks->count], 0, sizeof(Entry));
+    tweaks->entries[tweaks->count].kind = kind;
     tweaks->entries[tweaks->count].key = key;
     tweaks->entries[tweaks->count].value = copy;
     tweaks->count++;
@@ -141,7 +162,7 @@ void ssr_tweaks_set(SSRTweaks *tweaks, const char *group, const char *name, cons
 void ssr_tweaks_set_number(SSRTweaks *tweaks, const char *group, const char *name, double value) {
     char text[64];
     snprintf(text, sizeof(text), "%.10g", value);
-    ssr_tweaks_set(tweaks, group, name, text);
+    set_value(tweaks, group, name, text, SSR_TWEAK_FLOAT);
 }
 
 const char *ssr_tweaks_get(const SSRTweaks *tweaks, const char *group, const char *name) {
@@ -213,6 +234,8 @@ int ssr_tweaks_load(SSRTweaks *tweaks, const char *path) {
             if (n < 3) continue;
             double value = strtod(parts[2], NULL), scale = n >= 4 ? strtod(parts[3], NULL) : 1;
             ssr_tweaks_set_number(tweaks, group, parts[0], value * scale);
+            Entry *entry = find(tweaks, group, parts[0]);
+            if (entry) entry->kind = SSR_TWEAK_FLOAT;
             count++;
         } else if (strncmp(p, "Range:(", 7) == 0) {
             int n = split_args(p, parts, 16);
@@ -222,6 +245,7 @@ int ssr_tweaks_load(SSRTweaks *tweaks, const char *path) {
             ssr_tweaks_set_number(tweaks, group, parts[0], min);
             Entry *entry = find(tweaks, group, parts[0]);
             if (entry) {
+                entry->kind = SSR_TWEAK_RANGE;
                 entry->range = 1;
                 entry->min = min;
                 entry->max = max;
@@ -230,7 +254,8 @@ int ssr_tweaks_load(SSRTweaks *tweaks, const char *path) {
         } else if (strncmp(p, "Colour:(", 8) == 0 || strncmp(p, "String:(", 8) == 0) {
             int n = split_args(p, parts, 16);
             if (n < 1) continue;
-            ssr_tweaks_set(tweaks, group, parts[0], n >= 3 ? parts[2] : "");
+            ssr_tweaks_set_kind(tweaks, group, parts[0], n >= 3 ? parts[2] : "",
+                                p[0] == 'C' ? SSR_TWEAK_COLOUR : SSR_TWEAK_STRING);
             count++;
         }
     }

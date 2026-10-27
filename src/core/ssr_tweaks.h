@@ -8,6 +8,16 @@
 
 typedef struct SSRTweaks SSRTweaks;
 
+// The kind of a tweak, as TweakValues.txt declares it. A tweak that the
+// code makes takes the kind of its first value.
+typedef enum {
+    SSR_TWEAK_NONE,
+    SSR_TWEAK_FLOAT,
+    SSR_TWEAK_STRING,
+    SSR_TWEAK_COLOUR,
+    SSR_TWEAK_RANGE,
+} SSRTweakKind;
+
 SSRTweaks *ssr_tweaks_create(void);
 
 // Reads the start values of the game from Tweaks/TweakValues.txt: Float:
@@ -28,6 +38,12 @@ double ssr_tweaks_number(const SSRTweaks *tweaks, const char *group, const char 
 
 // The value as a colour 0xRRGGBBAA. It reads "RRGGBBAA", "#RRGGBBAA", and
 // "#RRGGBB". Another value gives fallback.
+SSRTweakKind ssr_tweaks_kind(const SSRTweaks *tweaks, const char *group, const char *name);
+
+// Sets the value and the kind of the tweak.
+void ssr_tweaks_set_kind(SSRTweaks *tweaks, const char *group, const char *name, const char *value,
+                         SSRTweakKind kind);
+
 // The ends of a Range:(Name,Label,min,max,scale) tweak, each times the
 // scale. Returns 0 when the tweak is not a range.
 int ssr_tweaks_range(const SSRTweaks *tweaks, const char *group, const char *name, double *min, double *max);

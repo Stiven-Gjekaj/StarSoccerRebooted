@@ -62,6 +62,16 @@ static void test_loads_the_start_values(void) {
     double min = 0, max = 0;
     CHECK(ssr_tweaks_range(tweaks, "Crowd", "Rate", &min, &max) && fabs(min - 2) < 1e-9 && fabs(max - 3) < 1e-9);
     CHECK(!ssr_tweaks_range(tweaks, "Crowd", "Active", &min, &max));
+    CHECK(ssr_tweaks_kind(tweaks, "Crowd", "Active") == SSR_TWEAK_FLOAT);
+    CHECK(ssr_tweaks_kind(tweaks, "Crowd", "TrouserCol0") == SSR_TWEAK_COLOUR);
+    CHECK(ssr_tweaks_kind(tweaks, "Crowd", "Cohort") == SSR_TWEAK_STRING);
+    CHECK(ssr_tweaks_kind(tweaks, "Crowd", "Rate") == SSR_TWEAK_RANGE);
+    CHECK(ssr_tweaks_kind(tweaks, "Crowd", "Missing") == SSR_TWEAK_NONE);
+    ssr_tweaks_set_number(tweaks, "Code", "Count", 1);
+    ssr_tweaks_set(tweaks, "Code", "Count", "2");
+    CHECK(ssr_tweaks_kind(tweaks, "Code", "Count") == SSR_TWEAK_FLOAT);
+    ssr_tweaks_set(tweaks, "Code", "Text", "a");
+    CHECK(ssr_tweaks_kind(tweaks, "Code", "Text") == SSR_TWEAK_STRING);
     CHECK(ssr_tweaks_number(tweaks, "Crowd", "Active") == 1);
     CHECK(ssr_tweaks_number(tweaks, "Crowd", "HatLikelihood") > 0.2999 &&
           ssr_tweaks_number(tweaks, "Crowd", "HatLikelihood") < 0.3001);
