@@ -123,6 +123,8 @@ void ssr_game_set_data(SSRGame *game, const SSRWorld *world, SSRLocalise localis
 
 // The seed of the random numbers. The game takes the clock when it picks
 // the first club, so the app gives the time.
+// The text of "MyData/Horse.txt": the names of the race horses.
+void ssr_game_set_horse_names(SSRGame *game, const char *text);
 void ssr_game_set_seed(SSRGame *game, int seed);
 
 // The career that plays now.

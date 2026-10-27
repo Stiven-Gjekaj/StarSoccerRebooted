@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "ssr_game.h"
@@ -1162,6 +1163,130 @@ static void play_blackjack(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
+// Runs a race to the result screen. Returns the number of updates.
+static int run_race(SSRGame *game) {
+    CHECK(strcmp(ssr_game_screen(game), "horserace") == 0);
+    int ticks = 0;
+    while (strcmp(ssr_game_screen(game), "horserace") == 0 && ticks < 2000) {
+        ssr_game_update(game, 1);
+        ticks++;
+    }
+    CHECK(strcmp(ssr_game_screen(game), "racingresults") == 0);
+    return ticks;
+}
+
+// The races: a bet on a horse, then a horse of the player from the market,
+// one more star for it, its race for a prize, and its sale.
+static void go_to_the_races(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.bank = 5000;
+    c.energy = 100;
+    c.gambling = 0;
+    c.properties[4] = 1;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    const SSRCareer *now = ssr_game_career(game);
+    ssr_game_message(game, "gamemenu.btn_Life");
+    ssr_game_message(game, "relationships.btn_Casino");
+    ssr_game_message(game, "casino.btn_Racing");
+    CHECK(strcmp(ssr_game_screen(game), "racing") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "HorseRacing", "SelectedHorse") == 0);
+    CHECK(strncmp(ssr_tweaks_get(tweaks, "HorseRacing", "Horse1Name"), "Horse ", 6) == 0);
+    // Race with no horse: a message, then a new field.
+    ssr_game_message(game, "racing.btn_Race");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_SELECTHORSE") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "racing") == 0 && now->bank == 5000);
+    // A bet of 10 on the second card.
+    for (int i = 0; i < 4; i++) ssr_game_message(game, "casino.btn_StakeUp");
+    const char *odds = ssr_tweaks_get(tweaks, "HorseRacing", "Horse2Odds");
+    int k = atoi(odds);
+    char text[32];
+    snprintf(text, sizeof(text), "%d", k * 10);
+    CHECK(k >= 2 && k <= 12 && strcmp(ssr_tweaks_get(tweaks, "HorseRacing", "Horse2Return"), text) == 0);
+    ssr_tweaks_set_number(tweaks, "HorseRacing", "SelectedHorse", 2);
+    ssr_game_message(game, "racing.btn_Race");
+    CHECK(now->bank == 4990 && now->gambling == 3);
+    // The race ends at frame 1350 of the track: about 7 seconds.
+    int ticks = run_race(game);
+    CHECK(ticks >= 425 && ticks <= 432);
+    int seen[7] = {0};
+    for (int n = 1; n <= 6; n++) {
+        snprintf(text, sizeof(text), "Horse%dPlace", n);
+        int place = (int)ssr_tweaks_number(tweaks, "HorseRacing", text);
+        CHECK(place >= 1 && place <= 6);
+        seen[place]++;
+    }
+    for (int p = 1; p <= 6; p++) CHECK(seen[p] == 1);
+    int mine = (int)ssr_tweaks_number(tweaks, "HorseRacing", "Horse2Place");
+    CHECK(ssr_tweaks_number(tweaks, "HorseRacing", "SelectedHorseResult") == mine);
+    CHECK(now->bank == (mine == 1 ? 4990 + 10 * k : 4990));
+    int bank = now->bank;
+    // The market: buy the first horse for sale.
+    ssr_game_message(game, "racingresults.btn_Stable");
+    CHECK(strcmp(ssr_game_screen(game), "mystable") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Stable_Owned", "Count") == 0);
+    int forSale = (int)ssr_tweaks_number(tweaks, "Stable_ForSale", "Count");
+    CHECK(forSale > 0);
+    int strength = (int)ssr_tweaks_number(tweaks, "Stable_ForSale", "0_Strength");
+    const int prices[6] = {0, 100, 250, 500, 1000, 2500};
+    char horse[48];
+    snprintf(horse, sizeof(horse), "%s", ssr_tweaks_get(tweaks, "Stable_ForSale", "0_Name"));
+    ssr_game_message(game, "horsesforsale.btn_Buy");
+    CHECK(now->bank == bank - prices[strength]);
+    bank = now->bank;
+    CHECK(ssr_tweaks_number(tweaks, "Stable_Owned", "Count") == 1);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Stable_Owned", "0_Name"), horse) == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Stable_ForSale", "Count") == forSale - 1);
+    CHECK(strchr(now->horses, ':') != NULL);
+    // One more star, for the cost of the training.
+    if (strength < 5) {
+        const int costs[5] = {0, 150, 250, 500, 1500};
+        ssr_game_message(game, "mystable.btn_Train");
+        CHECK(strcmp(ssr_game_screen(game), "message") == 0);
+        ssr_game_message(game, "message.btn_Ok");
+        CHECK(now->bank == bank - costs[strength] && ssr_tweaks_number(tweaks, "Stable_Owned", "0_Strength") == strength + 1);
+        strength++;
+        bank = now->bank;
+    }
+    // The race of the own horse: no stake, a prize for the first three.
+    ssr_game_message(game, "mystable.btn_Race");
+    CHECK(now->bank == bank && now->gambling == 3);
+    run_race(game);
+    int place = 0;
+    for (int n = 1; n <= 6; n++) {
+        if (ssr_tweaks_number(tweaks, "HorseRacing", "SelectedHorse") != n) continue;
+        snprintf(text, sizeof(text), "Horse%dPlace", n);
+        place = (int)ssr_tweaks_number(tweaks, "HorseRacing", text);
+    }
+    const int prizes[7] = {0, 100, 50, 25, 0, 0, 0};
+    CHECK(place >= 1 && now->bank == bank + prizes[place]);
+    bank = now->bank;
+    // Next goes back to the stable after the own race. Sell for half.
+    ssr_game_message(game, "racingresults.btn_Next");
+    CHECK(strcmp(ssr_game_screen(game), "mystable") == 0);
+    ssr_game_message(game, "mystable.btn_SellHorse");
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(now->bank == bank + prices[strength] / 2 && ssr_tweaks_number(tweaks, "Stable_Owned", "Count") == 0);
+    ssr_game_message(game, "mystable.btn_Quit");
+    CHECK(strcmp(ssr_game_screen(game), "racing") == 0);
+    ssr_game_message(game, "racing.btn_Quit");
+    ssr_game_message(game, "casino.btn_Back");
+    ssr_game_message(game, "relationships.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+    // The tests after this one have no stable.
+    c = *ssr_game_career(game);
+    c.properties[4] = 0;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+}
+
 static void go_shopping(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     SSRCareer c = *ssr_game_career(game);
     c.bank = 40;
@@ -1608,6 +1733,11 @@ static void test_starts_a_new_career(void) {
     careerPath = path;
     SSRGame *game = ssr_game_create(tweaks);
     ssr_game_set_data(game, &world, localise, NULL, directory);
+    // The names of 210 race horses, after a header line.
+    static char horses[4096];
+    size_t used = (size_t)snprintf(horses, sizeof(horses), "Header\r\n");
+    for (int i = 1; i <= 210; i++) used += (size_t)snprintf(horses + used, sizeof(horses) - used, "Horse %03d\r\n", i);
+    ssr_game_set_horse_names(game, horses);
     SSRUiOp ops[64];
 
     ssr_game_message(game, "mainmenu.btn_Career");
@@ -1731,6 +1861,7 @@ static void test_starts_a_new_career(void) {
     go_to_the_casino(game, tweaks, path);
     play_roulette(game, tweaks, path);
     play_blackjack(game, tweaks, path);
+    go_to_the_races(game, tweaks, path);
     go_shopping(game, tweaks, path);
     hire_and_kit_out(game, tweaks, path);
     get_old_boots_and_a_sponsor(game, tweaks, path);

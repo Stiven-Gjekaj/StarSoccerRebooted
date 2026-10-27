@@ -14,6 +14,7 @@
 #include "ssr_contract.h"
 #include "ssr_ex.h"
 #include "ssr_fs.h"
+#include "ssr_horses.h"
 #include "ssr_match.h"
 #include "ssr_random.h"
 #include "ssr_season.h"
@@ -132,6 +133,22 @@ struct SSRGame {
     // off while a card slides.
     SSRBlackjack blackjack;
     int playerCardsDealt, dealerCardsDealt, blackjackHitOff;
+    // The race horses and the text of their names. The stable: the horse
+    // ids of the cards. The race: the frame of the track, 1 when the places
+    // are final, 1 in the race of the own horse, the places of the horses
+    // and the badges on the screen, the runner of the player, and the
+    // commentary.
+    SSRHorses horses;
+    char *horseNames;
+    int horsesLoaded;
+    int ownedHorses[SSR_STABLE_SLOTS], saleHorses[SSR_STABLE_SLOTS];
+    float raceFrame;
+    int standingsReady, ownRace;
+    float horseX[SSR_RUNNERS], horseY[SSR_RUNNERS];
+    int badgePlace[SSR_RUNNERS];
+    int myHorse, commentaryNext, commentaryPrev;
+    // The bux of a stable message.
+    int messageCash;
     int slot;
     int slotExists[SSR_CAREER_SLOTS];
 
@@ -520,6 +537,7 @@ static void player_tweaks(SSRGame *game);
 static void reset_progress(SSRGame *game);
 static void rating_tweaks(SSRGame *game);
 static void casino_new_player(SSRGame *game);
+static void horses_for_career(SSRGame *game);
 
 static void open_slot(SSRGame *game, int slot) {
     game->slot = slot;
@@ -527,6 +545,7 @@ static void open_slot(SSRGame *game, int slot) {
     slot_path(game, slot, path, sizeof(path));
     if (game->slotExists[slot] && ssr_career_load(&game->career, path)) {
         casino_new_player(game);
+        horses_for_career(game);
         new_season_state(game);
         season_path(game, slot, path, sizeof(path));
         if (game->season && !ssr_season_load(game->season, path)) {
@@ -873,6 +892,7 @@ static void nation_ok(SSRGame *game) {
     ssr_career_create(&game->career, game->firstName, game->lastName, game->gender, game->hardMode, league, wage,
                       goalBonus, assistBonus);
     casino_new_player(game);
+    horses_for_career(game);
     game->career.nationId = chosen(game, "ChosenDesiredNation");
     // LoadDataAndStartTrial: the game chooses the club.
     const SSRClub *club = first_club(game, league);
@@ -1001,6 +1021,7 @@ static void call_trial_done(SSRGame *game) {
 }
 
 static void save_career(SSRGame *game) {
+    if (game->horsesLoaded) ssr_horses_owned_text(&game->horses, game->career.horses, sizeof(game->career.horses));
     if (!game->saveDirectory[0]) return;
     char path[2200];
     slot_path(game, game->slot, path, sizeof(path));
@@ -1069,6 +1090,9 @@ static void call_retirement(SSRGame *game);
 static void call_caught_gambling(SSRGame *game);
 static void call_teammates_casino(SSRGame *game);
 static void call_teammates_shopping(SSRGame *game);
+static void call_racing_return(SSRGame *game);
+static void call_train_horse(SSRGame *game);
+static void call_sell_horse(SSRGame *game);
 
 static void run_call(SSRGame *game, const char *name) {
     static const struct {
@@ -1089,6 +1113,9 @@ static void run_call(SSRGame *game, const char *name) {
         {"CaughtGambling", call_caught_gambling},
         {"TeamMatesCasino", call_teammates_casino},
         {"TeamMatesShopping", call_teammates_shopping},
+        {"TScreen_Racing.Return", call_racing_return},
+        {"TrainHorse", call_train_horse},
+        {"SellHorse", call_sell_horse},
         {"PlayToDate", call_play_to_date},
         {"SetUpFixture", call_set_up_fixture},
         {"DebutTired", call_debut_tired},
@@ -2277,6 +2304,7 @@ static void match_recovery(SSRGame *game) {
     c->spentTime = 0;
     int n = ssr_career_count_sponsors(c);
     if (n > 0) ssr_career_update_relation(c, SSR_RELATION_SPONSORS, (float)n * -0.65f);
+    if (game->horsesLoaded) ssr_horses_recover(&game->horses, &game->random);
     // TShopItem.UpdateLife: the products wear.
     ssr_shop_wear(&game->random, c->items, c->vehicles, c->properties);
 }
@@ -2879,6 +2907,12 @@ static void new_season(SSRGame *game) {
     game->seasonEndMode = 0;
     season_in(game);
     ssr_season_new_season(game->season);
+    // A new market of horses for the year. [I: the year of the date at this
+    // call.]
+    const SSRCareer *c = &game->career;
+    if (game->horsesLoaded) {
+        ssr_horses_reset_for_sale(&game->horses, ssr_career_year(c) + (int)strlen(c->fullName) + c->clubNationId);
+    }
     ssr_tweaks_set_number(t, "Menu", "DisableQuitButton", 0);
     skip_to_first_match(game);
     ssr_tweaks_set_number(t, "Menu", "CanSavePlayer", 1);
@@ -6640,16 +6674,21 @@ static void check_stake(SSRGame *game) {
     update_title_panel(game);
 }
 
+static void runners_table(SSRGame *game);
+
+// The stake buttons; the cards of the racing screen show the new returns.
 static void stake_up(SSRGame *game) {
     if (game->stakeUpOff) return;
     if (game->stakeLevel < SSR_CASINO_STAKE_LEVELS) game->stakeLevel++;
     update_title_panel(game);
+    if (strcmp(game->screen, "racing") == 0) runners_table(game);
 }
 
 static void stake_down(SSRGame *game) {
     if (game->stakeDownOff) return;
     if (game->stakeLevel > 1) game->stakeLevel--;
     update_title_panel(game);
+    if (strcmp(game->screen, "racing") == 0) runners_table(game);
 }
 
 // c_TScreen_Casino.SetUpScreen.
@@ -6747,6 +6786,503 @@ static void casino_message(SSRGame *game, const char *tag, int amount) {
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
     // A win shows in the layout with the bux.
     show_splash(game, strcmp(tag, "bet_YouWon") == 0 ? "splashmessagebux" : "splashmessage", 1500);
+}
+
+/* ----------------------------------------------------------- the horses */
+
+// The bux as a text: "★1,250" (GetStringCash with the star).
+static void cash_star(int value, char *out, size_t capacity) {
+    char number[24];
+    number_with_commas(value, number, sizeof(number));
+    snprintf(out, capacity, "\xE2\x98\x85%s", number);
+}
+
+// THorse.LoadData and LoadHorsesOwned for a new or a loaded career, then
+// the market of the year. [I: the remake keeps its career numbers; the
+// game seeds them from the clock here.]
+static void horses_for_career(SSRGame *game) {
+    const SSRCareer *c = &game->career;
+    game->horsesLoaded = 0;
+    if (!game->horseNames) return;
+    ssr_horses_load(&game->horses, game->horseNames);
+    ssr_horses_load_owned(&game->horses, c->horses);
+    ssr_horses_reset_for_sale(&game->horses, ssr_career_year(c) + (int)strlen(c->fullName) + c->clubNationId);
+    game->horsesLoaded = 1;
+}
+
+// UpdateHorseTweaks: the cards of the stable and of the market, in id
+// order. With select, the first card of each is selected.
+static void horse_tweaks(SSRGame *game, int select) {
+    SSRTweaks *t = game->tweaks;
+    SSRHorses *h = &game->horses;
+    ssr_horses_sort_by_id(h);
+    int owned = 0, sale = 0;
+    char name[48], text[32];
+    for (int k = 0; k < h->count; k++) {
+        const SSRHorse *horse = &h->horses[h->list[k]];
+        const char *group = horse->owned ? "Stable_Owned" : "Stable_ForSale";
+        int *n = horse->owned ? &owned : &sale;
+        if ((!horse->owned && !horse->forsale) || *n >= SSR_STABLE_SLOTS) continue;
+        (horse->owned ? game->ownedHorses : game->saleHorses)[*n] = horse->id;
+        snprintf(name, sizeof(name), "%d_Name", *n);
+        ssr_tweaks_set(t, group, name, horse->name);
+        snprintf(name, sizeof(name), "%d_Colour", *n);
+        snprintf(text, sizeof(text), "%.8s", horse->colour);
+        ssr_tweaks_set(t, group, name, text);
+        snprintf(name, sizeof(name), "%d_Strength", *n);
+        ssr_tweaks_set_number(t, group, name, horse->strength);
+        snprintf(name, sizeof(name), "%d_Price", *n);
+        int price = ssr_horses_price(horse->strength);
+        number_with_commas(horse->owned ? (int)((float)price * 0.5f) : price, text, sizeof(text));
+        ssr_tweaks_set(t, group, name, text);
+        if (horse->owned) {
+            snprintf(name, sizeof(name), "%d_Energy", *n);
+            ssr_tweaks_set_number(t, group, name, horse->energy);
+        }
+        (*n)++;
+    }
+    for (int k = owned; k < SSR_STABLE_SLOTS; k++) game->ownedHorses[k] = 0;
+    for (int k = sale; k < SSR_STABLE_SLOTS; k++) game->saleHorses[k] = 0;
+    for (int g = 0; g < 2; g++) {
+        const char *group = g ? "Stable_ForSale" : "Stable_Owned";
+        for (int k = g ? sale : owned; k < SSR_STABLE_SLOTS; k++) {
+            snprintf(name, sizeof(name), "%d_Name", k);
+            ssr_tweaks_set(t, group, name, "NONE");
+            snprintf(name, sizeof(name), "%d_Colour", k);
+            ssr_tweaks_set(t, group, name, "FFFFFFFF");
+            snprintf(name, sizeof(name), "%d_Strength", k);
+            ssr_tweaks_set_number(t, group, name, g ? 0 : 1);
+            snprintf(name, sizeof(name), "%d_Price", k);
+            ssr_tweaks_set(t, group, name, "1");
+        }
+    }
+    ssr_tweaks_set_number(t, "Stable_ForSale", "Count", sale);
+    ssr_tweaks_set_number(t, "Stable_Owned", "Count", owned);
+    if (select) {
+        ssr_tweaks_set(t, "Stable_ForSale", "SelectedItem", "0");
+        ssr_tweaks_set(t, "Stable_Owned", "SelectedItem", "0");
+    }
+}
+
+// The horse of the selected card of a list, or NULL.
+static SSRHorse *selected_horse(SSRGame *game, int forSale) {
+    const char *item = ssr_tweaks_get(game->tweaks, forSale ? "Stable_ForSale" : "Stable_Owned", "SelectedItem");
+    int k = item ? atoi(item) : 0;
+    if (k < 0 || k >= SSR_STABLE_SLOTS) return NULL;
+    return ssr_horses_by_id(&game->horses, (forSale ? game->saleHorses : game->ownedHorses)[k]);
+}
+
+// MyStable.SetUpScreen.
+static void stable_screen(SSRGame *game) {
+    set_screen(game, "mystable");
+    horse_tweaks(game, 1);
+}
+
+static void racing_screen(SSRGame *game);
+
+// The call "TScreen_Racing.Return": a new field of runners.
+static void call_racing_return(SSRGame *game) {
+    racing_screen(game);
+}
+
+// Racing.ButtonStable: the stable needs the property Stable.
+static void racing_stable(SSRGame *game) {
+    if (game->career.properties[4] == 0) {
+        message(game, "message", loc(game, "CMESSAGE_NOSTABLEMOBILE"), 0, 1, "TScreen_Racing.Return");
+        return;
+    }
+    stable_screen(game);
+}
+
+// Racing.SetUpRunnersTable: the cards of the six runners.
+static void runners_table(SSRGame *game) {
+    SSRHorses *h = &game->horses;
+    SSRTweaks *t = game->tweaks;
+    int y[SSR_RUNNERS], maxOdds = 0, minOdds = 99;
+    ssr_horses_card_order(h, y);
+    char name[48], text[32];
+    for (int i = 0; i < h->runnerCount; i++) {
+        const SSRHorse *r = &h->horses[h->runners[i]];
+        int n = i + 1;
+        for (int s = 1; s <= 5; s++) {
+            snprintf(name, sizeof(name), "Horse%dStar%dRating", n, s);
+            add_op(game, s <= r->strength ? SSR_OP_SHOW : SSR_OP_HIDE, name, NULL, NULL, 0);
+        }
+        snprintf(name, sizeof(name), "Horse%d", n);
+        add_op(game, SSR_OP_GEL, name, NULL, "12", SSR_GEL_X);
+        snprintf(text, sizeof(text), "%d", y[i]);
+        add_op(game, SSR_OP_GEL, name, NULL, text, SSR_GEL_Y);
+        snprintf(name, sizeof(name), "Horse%dName", n);
+        ssr_tweaks_set(t, "HorseRacing", name, r->name);
+        snprintf(name, sizeof(name), "Horse%dReturn", n);
+        number_with_commas(r->odds * game->bet, text, sizeof(text));
+        ssr_tweaks_set(t, "HorseRacing", name, text);
+        snprintf(name, sizeof(name), "Horse%dOdds", n);
+        snprintf(text, sizeof(text), "%d/1", r->odds);
+        ssr_tweaks_set(t, "HorseRacing", name, text);
+        snprintf(name, sizeof(name), "Horse%dColour", n);
+        snprintf(text, sizeof(text), "%.8s", r->colour);
+        ssr_tweaks_set(t, "HorseRacing", name, text);
+        if (r->odds > maxOdds) maxOdds = r->odds;
+        if (r->odds < minOdds) minOdds = r->odds;
+    }
+    for (int i = 0; i < h->runnerCount; i++) {
+        const SSRHorse *r = &h->horses[h->runners[i]];
+        snprintf(name, sizeof(name), "Horse%dLongShot", i + 1);
+        add_op(game, r->odds >= maxOdds ? SSR_OP_SHOW : SSR_OP_HIDE, name, NULL, NULL, 0);
+        snprintf(name, sizeof(name), "Horse%dFavourite", i + 1);
+        add_op(game, r->odds <= minOdds ? SSR_OP_SHOW : SSR_OP_HIDE, name, NULL, NULL, 0);
+    }
+}
+
+// Racing.SetUpRace: a new field, and no horse is selected.
+static void setup_race(SSRGame *game) {
+    ssr_tweaks_set_number(game->tweaks, "HorseRacing", "SelectedHorse", 0);
+    ssr_horses_select_runners(&game->horses, -1, &game->casinoRandom);
+    runners_table(game);
+}
+
+// casino.btn_Racing: Racing.SetUpScreen. The numbers take a new seed from
+// the clock. Each visit makes a new field.
+static void racing_screen(SSRGame *game) {
+    ssr_tweaks_set_number(game->tweaks, "HorseRacing", "SelectedHorse", 1);
+    game->casinoRandom.seed = game->now;
+    set_screen(game, "racing");
+    ssr_tweaks_set_number(game->tweaks, "Menu", "HomeButtonDisabled", 0);
+    if (game->horses.runnerCount == 0) setup_race(game);
+    update_title_panel(game);
+    setup_race(game);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", 0);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", 0);
+}
+
+// The places of the horses on the screen at the start (RacingMiniGame).
+static const float HORSE_START[SSR_RUNNERS][2] = {{350, 60}, {282, 120}, {214, 180},
+                                                  {146, 240}, {82, 300},  {15, 360}};
+
+// TRacing.SetUp: the race screen. The track animation runs at 3.15 frames
+// in each update.
+static void race_setup(SSRGame *game, int own) {
+    SSRHorses *h = &game->horses;
+    set_screen(game, "horserace");
+    game->raceFrame = 0;
+    game->standingsReady = 0;
+    game->ownRace = own;
+    ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", 0);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", 0);
+    game->myHorse = -1;
+    for (int i = 0; i < h->runnerCount; i++) {
+        const SSRHorse *r = &h->horses[h->runners[i]];
+        if (r->owned || r->betamount) game->myHorse = i;
+        game->horseX[i] = HORSE_START[i][0];
+        game->horseY[i] = HORSE_START[i][1];
+        game->badgePlace[i] = -1;
+        char name[32];
+        snprintf(name, sizeof(name), "Horse%dPlace", i + 1);
+        ssr_tweaks_set_number(game->tweaks, "HorseRacing", name, 0);
+    }
+    // HorseRaceCommentaryEngine.New.
+    add_op(game, SSR_OP_TEXT, "CommentaryText", NULL, loc(game, "HORSERACING_01"), 0);
+    game->commentaryNext = game->now + 1650;
+    game->commentaryPrev = -1;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "HomeButtonDisabled", 1);
+    add_op(game, SSR_OP_ANIM_PLAY, "RacetrackAnimInst", NULL, "3.15", 0);
+}
+
+// racing.btn_Race: the bet on the selected horse, then the race.
+static void racing_race(SSRGame *game) {
+    int n = (int)ssr_tweaks_number(game->tweaks, "HorseRacing", "SelectedHorse");
+    if (n < 1 || n > game->horses.runnerCount) {
+        message(game, "message", loc(game, "CMESSAGE_SELECTHORSE"), 0, 1, "TScreen_Racing.Return");
+        return;
+    }
+    if (!casino_bet(game, game->bet, 3)) return;
+    game->horses.horses[game->horses.runners[n - 1]].betamount = game->bet;
+    race_setup(game, 0);
+}
+
+// HorseRaceCommentaryEngine.Update: a line each 1650 ms for the horse of
+// the player.
+static void race_commentary(SSRGame *game) {
+    static const char *const DOWN3[7] = {NULL, NULL, NULL, "07", "07", "17", "17"};
+    static const char *const DOWN2[7] = {NULL, NULL, NULL, "16", "06", "15", "06"};
+    static const char *const DOWN1[7] = {NULL, NULL, "16", "09", "09", "09", "03"};
+    static const char *const SAME[7] = {NULL, "19", "13", "14", "14", "20", "08"};
+    static const char *const UP1[7] = {NULL, "02", "10", "04", "04", "04", "04"};
+    static const char *const UP2[7] = {NULL, "02", "10", "11", "11", NULL, NULL};
+    static const char *const UP3[7] = {NULL, "02", "10", "20", NULL, NULL, NULL};
+    if (game->myHorse < 0 || game->commentaryNext > game->now) return;
+    const SSRHorse *r = &game->horses.horses[game->horses.runners[game->myHorse]];
+    int cur = r->currentPosition < 0 ? 0 : r->currentPosition > 6 ? 6 : r->currentPosition;
+    const char *line = NULL;
+    if (r->raceposition > 0) {
+        line = cur == 1 ? "05" : "22";
+    } else {
+        int d = game->commentaryPrev - cur;
+        if (d <= -3 && d >= -5) line = DOWN3[cur];
+        else if (d == -2) line = DOWN2[cur];
+        else if (d == -1) line = DOWN1[cur];
+        else if (d == 0) line = SAME[cur];
+        else if (d == 1) line = UP1[cur];
+        else if (d == 2) line = UP2[cur];
+        else if (d >= 3 && d <= 5) line = UP3[cur];
+    }
+    if (line) {
+        char tag[32], text[256], num[16];
+        snprintf(tag, sizeof(tag), "HORSERACING_%s", line);
+        snprintf(text, sizeof(text), "%s", loc(game, tag));
+        snprintf(num, sizeof(num), "%d", (int)ssr_tweaks_number(game->tweaks, "HorseRacing", "SelectedHorse"));
+        replace_all(text, sizeof(text), "$num", num);
+        add_op(game, SSR_OP_TEXT, "CommentaryText", NULL, text, 0);
+    }
+    game->commentaryPrev = cur;
+    game->commentaryNext = game->now + 1650;
+}
+
+static void race_result(SSRGame *game);
+
+// TRacing.Update: the horses run, the camera follows the leader, and the
+// places become final at frame 1200. The race ends at frame 1350.
+static void race_tick(SSRGame *game) {
+    SSRHorses *h = &game->horses;
+    float moves[SSR_RUNNERS] = {0};
+    ssr_horses_race_step(h, &game->casinoRandom, moves);
+    float lead = 0;
+    for (int i = 0; i < h->runnerCount; i++) {
+        game->horseX[i] += moves[i] * 0.66f;
+        game->horseY[i] += 0.2f * (moves[i] * 0.66f);
+    }
+    for (int i = 0; i < h->runnerCount; i++) {
+        if (game->horseX[i] > 350 && game->horseX[i] - 350 > lead) lead = game->horseX[i] - 350;
+    }
+    if (lead > 0) {
+        for (int i = 0; i < h->runnerCount; i++) {
+            game->horseX[i] -= lead;
+            game->horseY[i] += 0.2f * -lead;
+        }
+    }
+    char name[32], value[32];
+    for (int i = 0; i < h->runnerCount; i++) {
+        snprintf(name, sizeof(name), "Horse%d", i + 1);
+        snprintf(value, sizeof(value), "%.3f", game->horseX[i]);
+        add_op(game, SSR_OP_GEL, name, NULL, value, SSR_GEL_X);
+        snprintf(value, sizeof(value), "%.3f", game->horseY[i]);
+        add_op(game, SSR_OP_GEL, name, NULL, value, SSR_GEL_Y);
+    }
+    int frozen = game->raceFrame >= 1200;
+    if (game->raceFrame >= 1350) {
+        race_result(game);
+        return;
+    }
+    int freeze = frozen && !game->standingsReady;
+    ssr_horses_race_places(h, freeze);
+    if (!frozen || freeze) {
+        for (int i = 0; i < h->runnerCount; i++) {
+            snprintf(name, sizeof(name), "Horse%dPlace", i + 1);
+            ssr_tweaks_set_number(game->tweaks, "HorseRacing", name, h->horses[h->runners[i]].currentPosition);
+        }
+    }
+    if (freeze) game->standingsReady = 1;
+    // The badges under the track go to their places, the leader on the
+    // right.
+    for (int i = 0; i < h->runnerCount; i++) {
+        const SSRHorse *r = &h->horses[h->runners[i]];
+        if (r->raceposition != 0 && game->badgePlace[i] >= 0) continue;
+        if (r->currentPosition == game->badgePlace[i]) continue;
+        game->badgePlace[i] = r->currentPosition;
+        snprintf(name, sizeof(name), "Horse%dBadge", i + 1);
+        snprintf(value, sizeof(value), "%d", (6 - r->currentPosition) * 85 + 5);
+        add_op(game, SSR_OP_CONVERGE_X, name, NULL, value, 0);
+    }
+    race_commentary(game);
+    game->raceFrame += 3.15f;
+}
+
+// TRacing.EndRace and RacingResult.SetUpScreen: the betting slip, and the
+// money. A bet pays the stake times the odds; the own horse pays 100, 50,
+// or 25.
+static void race_result(SSRGame *game) {
+    SSRHorses *h = &game->horses;
+    SSRTweaks *t = game->tweaks;
+    set_screen(game, "racingresults");
+    char name[32], text[128];
+    int own = -1, win = 0, myPlace = 0;
+    for (int i = 0; i < h->runnerCount; i++) {
+        const SSRHorse *r = &h->horses[h->runners[i]];
+        snprintf(name, sizeof(name), "Horse%dPlace", i + 1);
+        ssr_tweaks_set_number(t, "HorseRacing", name, r->raceposition);
+    }
+    for (int p = 1; p <= h->runnerCount; p++) {
+        for (int i = 0; i < h->runnerCount; i++) {
+            const SSRHorse *r = &h->horses[h->runners[i]];
+            if (r->raceposition != p) continue;
+            if (r->betamount > 0) {
+                if (p == 1) win = r->betamount * r->odds;
+                myPlace = p;
+            } else if (r->owned) {
+                myPlace = p;
+                own = i;
+            }
+            snprintf(name, sizeof(name), "Place%dHorse", p);
+            ssr_tweaks_set(t, "HorseRacing", name, r->name);
+        }
+    }
+    if (own >= 0) {
+        int place = h->horses[h->runners[own]].raceposition;
+        win = ssr_horses_prize(place);
+        if (win == 0) {
+            char position[32];
+            snprintf(position, sizeof(position), "position_%d", place);
+            snprintf(text, sizeof(text), "%s %s", loc(game, "Finished"), loc(game, position));
+            ssr_tweaks_set(t, "Menu", "QuickMessage", text);
+            show_splash(game, "splashmessage", 1500);
+        }
+    }
+    if (win > 0) {
+        update_bank(game, win);
+        save_career(game);
+        ssr_tweaks_set_number(t, "HorseRacing", "Winnings", win);
+        snprintf(text, sizeof(text), "%d", win);
+        ssr_tweaks_set(t, "HorseRacing", "WinningsStr", text);
+        ssr_tweaks_set_number(t, "Casino", "CasinoOutcome", 1);
+        ssr_tweaks_set_number(t, "Casino", "Winnings", win);
+        casino_message(game, "bet_YouWon", win);
+    } else {
+        ssr_tweaks_set_number(t, "HorseRacing", "Winnings", 0);
+        if (own < 0) {
+            ssr_tweaks_set_number(t, "Casino", "CasinoOutcome", -1);
+            ssr_tweaks_set_number(t, "Casino", "Winnings", 0);
+            casino_message(game, "bet_YouLost", game->bet);
+            show_splash(game, "splashmessagebux", 1500);
+        }
+    }
+    ssr_tweaks_set_number(t, "HorseRacing", "SelectedHorseResult", myPlace);
+    snprintf(name, sizeof(name), "horse_placed_%d", myPlace);
+    add_op(game, SSR_OP_TEXT, "HintText", NULL, loc(game, name), 0);
+    check_stake(game);
+}
+
+// racingresults.btn_Next: after the own race the stable, else a new field.
+static void results_next(SSRGame *game) {
+    if (game->ownRace) racing_stable(game);
+    else racing_screen(game);
+}
+
+// racing.btn_Quit: back to the casino.
+static void racing_quit(SSRGame *game) {
+    casino_screen(game);
+}
+
+// horsesforsale.btn_Buy: the stable holds 50 horses.
+static void stable_buy(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (ssr_horses_count_owned(&game->horses) > 49) {
+        message(game, "message", loc(game, "CMESSAGE_OWN_TOO_MANY_HORSES"), 0, 1, NULL);
+        return;
+    }
+    SSRHorse *h = selected_horse(game, 1);
+    if (!h) return;
+    int price = ssr_horses_price(h->strength);
+    if (c->bank < price) {
+        not_enough_cash(game, price - c->bank);
+        return;
+    }
+    update_bank(game, -price);
+    h->owned = 1;
+    h->forsale = 0;
+    save_career(game);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "StableTabPos", 0);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "StableScroll", 0);
+    horse_tweaks(game, 1);
+}
+
+// The text of a stable message with the bux in "$cash".
+static void stable_ask(SSRGame *game, const char *tag, int cash, int horse, const char *call) {
+    char text[512], amount[24];
+    snprintf(text, sizeof(text), "%s", loc(game, tag));
+    cash_star(cash, amount, sizeof(amount));
+    replace_all(text, sizeof(text), "$cash", amount);
+    game->messageData = horse;
+    game->messageCash = cash;
+    message(game, "message", text, 1, 1, call);
+}
+
+// mystable.btn_Train: one more star for the cost.
+static void stable_train(SSRGame *game) {
+    SSRHorse *h = selected_horse(game, 0);
+    if (ssr_horses_count_owned(&game->horses) == 0 || !h) {
+        message(game, "message", loc(game, "CMESSAGE_NO_HORSE_AVAILABLE"), 0, 1, NULL);
+        return;
+    }
+    int cost = ssr_horses_train_cost(h->strength);
+    if (cost == 0) {
+        message(game, "message", loc(game, "CMESSAGE_HORSE_FULLY_TRAINED"), 0, 1, NULL);
+        return;
+    }
+    stable_ask(game, "CMESSAGE_TRAINHORSE", cost, h->id, "TrainHorse");
+}
+
+// The call "TrainHorse".
+static void call_train_horse(SSRGame *game) {
+    if (game->returnState != 1) return;
+    SSRCareer *c = &game->career;
+    int cost = game->messageCash;
+    if (c->bank < cost) {
+        stable_screen(game);
+        not_enough_cash(game, cost - c->bank);
+        return;
+    }
+    SSRHorse *h = ssr_horses_by_id(&game->horses, game->messageData);
+    if (!h) return;
+    h->strength++;
+    update_bank(game, -cost);
+    save_career(game);
+    stable_screen(game);
+    horse_tweaks(game, 0);
+}
+
+// mystable.btn_SellHorse: half of the price.
+static void stable_sell(SSRGame *game) {
+    SSRHorse *h = selected_horse(game, 0);
+    if (ssr_horses_count_owned(&game->horses) == 0 || !h) {
+        message(game, "message", loc(game, "CMESSAGE_NO_HORSE_AVAILABLE_SELL"), 0, 1, NULL);
+        return;
+    }
+    stable_ask(game, "CMESSAGE_SELLHORSE", (int)((float)ssr_horses_price(h->strength) * 0.5f), h->id, "SellHorse");
+}
+
+// The call "SellHorse": the horse leaves the market until the next year.
+static void call_sell_horse(SSRGame *game) {
+    if (game->returnState != 1) return;
+    SSRHorse *h = ssr_horses_by_id(&game->horses, game->messageData);
+    if (!h) return;
+    h->owned = h->forsale = 0;
+    update_bank(game, game->messageCash);
+    save_career(game);
+    horse_tweaks(game, 1);
+    stable_screen(game);
+}
+
+// mystable.btn_Race: the own horse races for a prize, with no stake.
+static void stable_race(SSRGame *game) {
+    SSRHorse *h = selected_horse(game, 0);
+    if (ssr_horses_count_owned(&game->horses) == 0 || !h) {
+        message(game, "message", loc(game, "CMESSAGE_NO_HORSE_AVAILABLE_RACE"), 0, 1, NULL);
+        return;
+    }
+    if (h->energy < 30) {
+        message(game, "message", loc(game, "CMESSAGE_HORSETIRED"), 0, 1, NULL);
+        return;
+    }
+    SSRHorses *horses = &game->horses;
+    ssr_horses_select_runners(horses, h->id - 1, &game->casinoRandom);
+    for (int i = 0; i < horses->runnerCount; i++) {
+        if (horses->horses[horses->runners[i]].owned) {
+            ssr_tweaks_set_number(game->tweaks, "HorseRacing", "SelectedHorse", i + 1);
+            break;
+        }
+    }
+    race_setup(game, 1);
 }
 
 /* -------------------------------------------------------- the blackjack */
@@ -7367,6 +7903,18 @@ static const Route ROUTES[] = {
     {"casino.btn_Back", casino_back},
     {"casino.btn_Home", casino_home},
     {"casino.btn_Slots", slots_screen},
+    {"casino.btn_Racing", racing_screen},
+    {"racing.btn_Quit", racing_quit},
+    {"racing.btn_Race", racing_race},
+    {"racing.btn_Stable", racing_stable},
+    {"racingresults.btn_Next", results_next},
+    {"racingresults.btn_Quit", racing_screen},
+    {"racingresults.btn_Stable", racing_stable},
+    {"mystable.btn_Quit", racing_screen},
+    {"mystable.btn_Train", stable_train},
+    {"mystable.btn_SellHorse", stable_sell},
+    {"mystable.btn_Race", stable_race},
+    {"horsesforsale.btn_Buy", stable_buy},
     {"casino.btn_BlackJack", blackjack_screen},
     {"blackjack.btn_Play", blackjack_play},
     {"blackjack.btn_Hit", blackjack_hit},
@@ -7435,6 +7983,7 @@ void ssr_game_free(SSRGame *game) {
     free(game->replay);
     free(game->training);
     ssr_season_free(game->season);
+    free(game->horseNames);
     free(game);
 }
 
@@ -7445,6 +7994,16 @@ void ssr_game_set_data(SSRGame *game, const SSRWorld *world, SSRLocalise localis
     game->localise = localise;
     game->context = context;
     snprintf(game->saveDirectory, sizeof(game->saveDirectory), "%s", saveDirectory ? saveDirectory : "");
+}
+
+void ssr_game_set_horse_names(SSRGame *game, const char *text) {
+    if (!game) return;
+    free(game->horseNames);
+    game->horseNames = NULL;
+    if (!text) return;
+    size_t n = strlen(text);
+    game->horseNames = malloc(n + 1);
+    if (game->horseNames) memcpy(game->horseNames, text, n + 1);
 }
 
 void ssr_game_set_seed(SSRGame *game, int seed) {
@@ -7607,6 +8166,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->ticks -= 1;
             game->now += 16;
             if (strcmp(game->screen, "playeroftheyear") == 0) poty_tick(game);
+        }
+    } else if (strcmp(game->screen, "horserace") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1 && strcmp(game->screen, "horserace") == 0) {
+            game->ticks -= 1;
+            game->now += 16;
+            race_tick(game);
         }
     } else if (strcmp(game->screen, "blackjack") == 0) {
         game->ticks += frames;
