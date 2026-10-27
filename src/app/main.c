@@ -59,6 +59,9 @@ typedef struct {
     // The logic of the screens, and the screen that it showed last.
     SSRGame *game;
     int gameScreen;
+    // The pointer in the units of the layouts, for the ticker.
+    float pointerX, pointerY;
+    int pointerDown;
     char settingsPath[2048];
     char saveDirectory[2048];
     int typing;
@@ -1168,6 +1171,20 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
     if (mouse && event->type == SDL_EVENT_MOUSE_MOTION && event->motion.which == SDL_TOUCH_MOUSEID) mouse = 0;
     if (mouse || finger) {
         SDL_ConvertEventToRenderCoordinates(app->renderer, event);
+        // The ticker reads the pointer in each frame (TickerManager.Update).
+        if (event->type == SDL_EVENT_MOUSE_MOTION) {
+            app->pointerX = event->motion.x + app->left;
+            app->pointerY = event->motion.y + app->top;
+            app->pointerDown = (event->motion.state & SDL_BUTTON_LMASK) != 0;
+        } else if (mouse) {
+            app->pointerX = event->button.x + app->left;
+            app->pointerY = event->button.y + app->top;
+            app->pointerDown = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+        } else {
+            app->pointerX = event->tfinger.x + app->left;
+            app->pointerY = event->tfinger.y + app->top;
+            app->pointerDown = event->type != SDL_EVENT_FINGER_UP;
+        }
         float x, y;
         int down;
         if (event->type == SDL_EVENT_MOUSE_MOTION) {
@@ -1229,6 +1246,12 @@ static void draw_ticker(SSRApp *app, const SSRSceneEnv *env) {
         ms = (int)(now - app->tickerFrame);
     }
     app->tickerFrame = now;
+    // A touch on the tape makes the texts go faster. The touch also goes to
+    // the screen under it.
+    float x, y, w, h;
+    int on = app->pointerDown && ssr_scene_ref_box(app->tickerScene, "TickerTape", &x, &y, &w, &h) &&
+             app->pointerX > x && app->pointerX < x + w && app->pointerY > y && app->pointerY < y + h;
+    ssr_tweaks_set_number(app->tweaks, "Ticker", "SpeedUp", on);
     ssr_scene_update(app->tickerScene, env, ms);
     ssr_ticker_update(app->ticker, app->tickerScene);
     ssr_gfx_draw_scene(app->gfx, app->tickerScene);
