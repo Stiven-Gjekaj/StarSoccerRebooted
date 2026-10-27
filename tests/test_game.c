@@ -912,6 +912,32 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
         CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsAgentWage") >= 1);
         CHECK(ssr_tweaks_number(tweaks, "Player", "RecoveryBoostTrainer") == 5);
     }
+    // The last match of the agent: a message, and Yes opens the shop.
+    c = *ssr_game_career(game);
+    c.agent[0] = 1;
+    c.trainer[0] = 30;
+    c.expiredBoots = 1;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    CHECK(strcmp(ssr_game_screen(game), "messageagent") == 0 && now->agent[0] == 0 && now->expiredBoots == -1);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "Agent_1") == 0);
+    ssr_game_message(game, "UpsellMsg.Close");
+    // Boots that ran out ask for a new pair.
+    c = *ssr_game_career(game);
+    c.expiredBoots = 1;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    CHECK(strcmp(ssr_game_screen(game), "message") == 0 && now->expiredBoots == -1);
+    ssr_game_message(game, "message.btn_Cancel");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && ssr_game_overlay(game)[0] == 0);
 }
 
 // Drinks the next can after a match: a question when the energy is above

@@ -988,6 +988,9 @@ static void call_buy_property(SSRGame *game);
 static void call_change_staff(SSRGame *game);
 static void call_change_boots(SSRGame *game);
 static void call_reopen_staff(SSRGame *game);
+static void call_agent_get(SSRGame *game);
+static void call_trainer_get(SSRGame *game);
+static void call_boots_expired(SSRGame *game);
 static void call_dump_partner(SSRGame *game);
 
 static void run_call(SSRGame *game, const char *name) {
@@ -1020,6 +1023,9 @@ static void run_call(SSRGame *game, const char *name) {
         {"ChangeSoftAgentOrTrainer", call_change_staff},
         {"ChangeSoftBat", call_change_boots},
         {"ReopenAgentTrainerShop", call_reopen_staff},
+        {"AgentGet", call_agent_get},
+        {"TrainerGet", call_trainer_get},
+        {"BootsExpired", call_boots_expired},
         {"DumpGirl", call_dump_partner},
     };
     for (size_t i = 0; i < sizeof(CALLS) / sizeof(CALLS[0]); i++) {
@@ -1098,6 +1104,54 @@ static void player_tweaks(SSRGame *game) {
 
 static void webpage_to(SSRGame *game, const char *next, int style);
 
+// c_TPlayer.CheckAgentAndTrainer: a message when a contract runs out.
+// Returns 1 when a message shows.
+static int check_staff(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->retired) return 0;
+    int agent = ssr_career_agent(c), trainer = ssr_career_trainer(c);
+    int agentLeft = agent ? c->agent[agent - 1] : 0, trainerLeft = trainer ? c->trainer[trainer - 1] : 0;
+    if (agentLeft == 1 && trainerLeft == 1) {
+        for (int i = 0; i < 3; i++) c->agent[i] = c->trainer[i] = 0;
+        game->messageData = agent;
+        message(game, "message", loc(game, "CMESSAGE_AGENTANDTRAINEREXPIRED"), 1, 1, "AgentGet");
+        return 1;
+    }
+    for (int i = 0; i < 3; i++) {
+        if (c->agent[i] != 1) continue;
+        c->agent[i] = 0;
+        c->expiredBoots = -1;
+        game->messageData = agent;
+        message(game, "messageagent", loc(game, "CMESSAGE_AGENTEXPIRED"), 1, 1, "AgentGet");
+        return 1;
+    }
+    for (int i = 0; i < 3; i++) {
+        if (c->trainer[i] != 1) continue;
+        c->trainer[i] = 0;
+        c->expiredBoots = -1;
+        game->messageData = trainer;
+        message(game, "messagetrainer", loc(game, "CMESSAGE_TRAINEREXPIRED"), 1, 1, "TrainerGet");
+        return 1;
+    }
+    // [I: the hint of the agent comes with the contracts, and the warning
+    // of the trainer with the loss of skills.]
+    return 0;
+}
+
+// GSBootsRenewMessage: the boots that ran out ask for a new pair.
+static int check_boots(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    const SSRBoot *boot = ssr_shop_boot(c->expiredBoots);
+    if (!boot) return 0;
+    c->expiredBoots = -1;
+    char text[512], name[64];
+    snprintf(text, sizeof(text), "%s", loc(game, "TRY_BEFORE_BOOTS"));
+    snprintf(name, sizeof(name), "Title_%s", boot->name);
+    replace_all(text, sizeof(text), "$name", loc(game, name));
+    message(game, "message", text, 1, 1, "BootsExpired");
+    return 1;
+}
+
 static void game_menu(SSRGame *game) {
     // GameMenu.SetUpScreen: a headline that is left shows first.
     if (game->career.headline[0]) {
@@ -1107,6 +1161,7 @@ static void game_menu(SSRGame *game) {
     set_screen(game, "gamemenu");
     ssr_tweaks_set_number(game->tweaks, "Menu", "TabPos", 0);
     player_tweaks(game);
+    if (!check_staff(game)) check_boots(game);
 }
 
 // GSGetPace, GetPower, and GetTechnique with the boots: the skill and the
@@ -5106,6 +5161,29 @@ static void shop_drink(SSRGame *game) {
     message(game, "message", loc(game, "CMESSAGE_DRINKNRGCHECK"), 1, 1, "DrinkNRG");
 }
 
+
+// The calls "AgentGet", "TrainerGet", and "BootsExpired": Yes opens the shop.
+static void call_agent_get(SSRGame *game) {
+    if (game->returnState != 1) return;
+    game_menu(game);
+    staff_shop(game);
+    ssr_tweaks_set(game->tweaks, "Menu", "ItemString", "Agent_1");
+    skills_selected(game);
+}
+
+static void call_trainer_get(SSRGame *game) {
+    if (game->returnState != 1) return;
+    game_menu(game);
+    staff_shop(game);
+    ssr_tweaks_set(game->tweaks, "Menu", "ItemString", "Trainer_1");
+    skills_selected(game);
+}
+
+static void call_boots_expired(SSRGame *game) {
+    if (game->returnState != 1) return;
+    game_menu(game);
+    boots_shop(game);
+}
 
 /* ------------------------------------------------------------ the pairs */
 
