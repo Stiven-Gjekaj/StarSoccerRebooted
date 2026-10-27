@@ -249,13 +249,15 @@ static SDL_Texture *own_art(SSRGfx *gfx, const char *name) {
 
 // The image of a crest has the shape of the box of a shield, so that the
 // crest goes on the face of the shield. FACE_X and FACE_Y are the middle of
-// the round face as a part of the box, and FACE_RX and FACE_RY its radii.
+// the hole in the ring of the shield (MapShieldFrameAll) as a part of the
+// box, and FACE_RX and FACE_RY its radii. The values come from a frame of
+// the match screen. The hole is a little to the side of the box.
 #define CREST_W 210
 #define CREST_H 285
-#define FACE_X 0.5f
+#define FACE_X 0.478f
 #define FACE_Y 0.5f
-#define FACE_RX 0.4f
-#define FACE_RY 0.3f
+#define FACE_RX 0.376f
+#define FACE_RY 0.29f
 
 // The crest of a club in the pack: "Crest_<id>", or "CrestM_<id>" for the
 // flipped crest of a flipped shield. The image of crests/<id>.png goes on
