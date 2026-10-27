@@ -68,6 +68,8 @@ typedef enum {
     // The ProgressBar of the part ref2 of the last entry of the list ref
     // follows a tweak. text is "Group,Name".
     SSR_OP_ENTRY_BAR,
+    // The first element ref goes to the x in id, in its parent.
+    SSR_OP_SET_X,
 } SSRUiOpKind;
 
 typedef struct {

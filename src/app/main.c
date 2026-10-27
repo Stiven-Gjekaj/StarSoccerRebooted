@@ -752,6 +752,9 @@ static void apply_op(SSRApp *app, SSRScene *s, const SSRUiOp *o) {
         else ssr_scene_entry_bar(s, op.ref, op.ref2, op.text, sep + 1);
         break;
     }
+    case SSR_OP_SET_X:
+        ssr_scene_spawn_set(s, 0, op.ref, SSR_GEL_X, (float)op.id);
+        break;
     case SSR_OP_HOOK:
         ssr_scene_set_hook(s, op.ref, op.ref2);
         break;
