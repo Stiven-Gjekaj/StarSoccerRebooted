@@ -454,6 +454,32 @@ static void test_converges_after_a_delay_and_on_press(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// Message() in the block of a click sends its message, also from a click
+// with no message of its own.
+static void test_sends_the_message_of_a_click_block(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    SSRScene *scene = build("Rect:(0,0,100,100)\n"
+                            "\tClick()\n"
+                            "\t<\n"
+                            "\t\t.:Message(shopoverlay.onItemSelected)\n"
+                            "\t>\n"
+                            "Rect:(200,0,100,100)\n"
+                            "\tClick(menu.play)\n",
+                            tweaks, &tree);
+    SSRSceneEnv env = test_env(tweaks);
+    ssr_scene_update(scene, &env, 16);
+    const SSRSceneItem *item = ssr_scene_hit_item(scene, 50, 50);
+    const char *message = item ? ssr_scene_click(scene, &env, item) : NULL;
+    CHECK(message && strcmp(message, "shopoverlay.onItemSelected") == 0);
+    item = ssr_scene_hit_item(scene, 250, 50);
+    message = item ? ssr_scene_click(scene, &env, item) : NULL;
+    CHECK(message && strcmp(message, "menu.play") == 0);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // A dilemma: the code puts a copy of a template in a hook, then shows the
 // frame and changes the name inside it.
 static void test_copies_a_template_into_a_hook(void) {
@@ -1482,6 +1508,7 @@ int main(void) {
     test_plays_an_animation();
     test_plays_an_animation_from_a_frame();
     test_copies_a_template_into_a_hook();
+    test_sends_the_message_of_a_click_block();
     test_mixes_colours_and_orders_layers();
     test_emits_particles();
     test_definitions_do_not_draw();

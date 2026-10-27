@@ -105,6 +105,9 @@ typedef enum {
     // CloneTweak(Cat,Name,Cat,Name): the second tweak takes the value of the
     // first.
     D_CLONE_TWEAK,
+    // Message(name) in the block of a click: the click sends the message
+    // (c_SendMessageDoodad).
+    D_MESSAGE,
 } DoodadKind;
 
 // The flags of a doodad, as c_Doodad has them.
@@ -265,6 +268,8 @@ struct SSRScene {
     // The sounds that PlaySnd() of a click asked for.
     const char *sounds[8];
     int soundCount;
+    // The message of a Message() in the block of the last click, or NULL.
+    const char *clickMessage;
 
     Gel *root;
     // The gels with no parent: animations, templates, and emitters.
@@ -1378,6 +1383,9 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         g->clickChain = make_doodads(s, g, (const SSRUiNode *const *)m->children, m->childCount, &innerShow);
     } else if (is(n, "PlaySnd")) {
         d = new_doodad(D_PLAY_SOUND, m);
+        if (d) d->text[0] = keep(s, arg(m, 0));
+    } else if (is(n, "Message")) {
+        d = new_doodad(D_MESSAGE, m);
         if (d) d->text[0] = keep(s, arg(m, 0));
     } else if (is(n, "Readout") || is(n, "ReadoutLoc") || is(n, "SignedReadout") || is(n, "SignedReadoutLoc") ||
                is(n, "ZeroSignedReadoutLoc")) {
@@ -2642,6 +2650,9 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
     case D_PLAY_SOUND:
         if (s->soundCount < 8) s->sounds[s->soundCount++] = d->text[0];
         break;
+    case D_MESSAGE:
+        s->clickMessage = d->text[0];
+        break;
     case D_PLAY_ANIM: {
         Gel *target = d->text[0] ? find_ref(s, d->text[0]) : s->instance;
         if (target && target->kind == GEL_ANIM) set_animation(target, d->text[1]);
@@ -3479,12 +3490,13 @@ const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y) 
 const char *ssr_scene_click(SSRScene *scene, const SSRSceneEnv *env, const SSRSceneItem *item) {
     if (!scene || !env || !item || !item->click) return NULL;
     Gel *g = (Gel *)item->owner;
+    scene->clickMessage = NULL;
     if (g) {
         scene->env = env;
         pump(scene, g, g->clickChain);
         scene->env = NULL;
     }
-    return item->click;
+    return scene->clickMessage && !item->click[0] ? scene->clickMessage : item->click;
 }
 
 const char *ssr_scene_take_sound(SSRScene *scene) {
