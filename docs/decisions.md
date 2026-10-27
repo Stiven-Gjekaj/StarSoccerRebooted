@@ -147,9 +147,6 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   example the text of `NationText` or a new entry in `NationCombo`. Reason:
   the code of the game changes its gadgets by ref in the same way
   (`c_GGadget`, `c_ACombo`).
-- **Until the match is there, the trials of a new career have no score.**
-  The skills then start at 1, as for a trial that fails. Reason: the
-  trials are matches, and the game gives no skill for a trial that fails.
 - **A reference capture of the original is good only from a fresh start.**
   The original stops the screen under a popup (the onboarding), and an
   emulator can leave the game stuck. Reason: a capture of a stuck game
@@ -175,6 +172,14 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 - **The type of the player is the type that its ratings give now.** The
   game shows the last type that a rating news named, and a news comes
   only once in 60 days for each type. Reason: the news come later.
+- **A drill of the trials runs on the chance of a match.** The game runs
+  the training engine with the same ball, tap ball, and keeper. The drill
+  adds its objects and its rules of a hit and a lost life.
+- **A cone that falls goes from the view.** The game plays the fall of the
+  cone. Reason: the fall comes with the training of the game menu.
+- **The cups move to 0.6, the interview to 0.7, and the harness to 1.0.**
+  Reason: extra time and the shoot-out need the cups, the interview needs
+  the dilemmas, and the test harness needs the full game.
 - **The replay keeps a full copy of the chance for each tick.** The game
   keeps a stack of frames for each object, and the stacks do not always
   line up. One copy of the chance keeps all parts in step, and the view

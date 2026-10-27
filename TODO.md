@@ -98,29 +98,28 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] The view of a chance: the 3D pitch (`Sheet:`), the players in their
       kits, the ball, the aim arrow, the tap ball in front of the stadium,
       and the banner of the result
-- [ ] The render of a `Sheet:` into a surface (`Surf:`). The remake draws
+- [x] The render of a `Sheet:` into a surface (`Surf:`). The remake draws
       its children each frame in its place, which gives the same picture.
 - [x] The dribble game (type 11). The intercept game (type 6) never starts
       in 4.32.
 - [x] The replays of a goal (`WatchReplay`), the ball trail, and the
       make-run arrows of the team-mates
-- [ ] Extra time and the penalty shoot-out of a cup match
 - [x] After the match: the match stats (`MatchStats`) with the rating, the
       relation changes, and the star rating, and the weekly update
       (`MatchReview`) with the energy and the pay
 - [x] The skill ratings: the change after each chance, the type of the
       player, and the ratings screen (`Ratings`)
-- [ ] The interview after a match (`Interview`)
 - [x] Energy drinks and boosts (`ChooseBoost`): the five kinds of can, the
       skill and the relation boosts, and the bolts
-- [ ] The five trials of a new career (they need the chance view)
-- [ ] A test harness that compares the rules with the original code
+- [x] The five trials of a new career: the drills of technique, set
+      pieces, power, dribbling, and vision, with their lives and hints
 
 ## 0.6 The season
 
 - [ ] Fixtures and tables (`c_TFixture`, `c_TTable`, `LeagueFixtures`,
       `ClubFixtures`, `League`)
 - [ ] Cups and continental competitions (`c_TCompetition`)
+- [ ] Extra time and the penalty shoot-out of a cup match
 - [ ] The results of the other matches (`c_TFixData`)
 - [ ] Promotion and relegation
 - [ ] The end of the season (`SeasonReview`, `PlayerOfTheYear`,
@@ -130,7 +129,8 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 ## 0.7 The life of the player
 
 - [ ] Relationships (`Relationships`)
-- [ ] Dilemmas and interviews (`Dilemma`, `Interview`)
+- [ ] Dilemmas and interviews (`Dilemma`, `Interview`), with the
+      interview after a match
 - [ ] Money, the lifestyle shop, boots, and match balls (`ShopLifestyle`,
       `BootShop`, `MatchBalls`, `BuyItem`)
 - [ ] The agent, transfers, and contract talks (`AgentDetails`,
@@ -149,6 +149,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [ ] All the content of 4.32
 - [ ] All the languages of 4.32, with the star glyph and the glyph tables
 - [ ] All the features in this file
+- [ ] A test harness that compares the rules with the original code
 
 ## Not in the remake
 
