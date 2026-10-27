@@ -137,3 +137,14 @@ body += (f'<g transform="translate({300 - tw * q / 2 + 3:.1f} 15) skewX(-14)">'
          f'<path d="{d}" fill="#3a0000" stroke="#3a0000" stroke-width="3" stroke-linejoin="round" transform="translate(1.5 2)"/>'
          f'<path d="{d}" fill="url(#gold)" stroke="#5a0a00" stroke-width="1.2" stroke-linejoin="round" paint-order="stroke"/></g>')
 save('SlotsTitlePanel.patch', body, 598, 126)
+
+
+# CardBack.patch (77 x 110): the band across the ball of the card back. The
+# patch fills the band, then puts SSR there in slanted white type.
+body = ('<linearGradient id="band" x1="0" y1="0" x2="1" y2="0">'
+        '<stop offset="0" stop-color="#98c0f1"/><stop offset="1" stop-color="#91bcf0"/></linearGradient>'
+        '<rect x="25" y="47" width="28" height="15" fill="url(#band)"/>')
+tw = natural_width('SSR', 11, track=0.06)
+d = text_path('SSR', 0, 0, tw, 11, track=0.06)
+body += f'<g transform="translate({39 - tw / 2 + 1:.1f} 49) skewX(-14)"><path d="{d}" fill="#ffffff"/></g>'
+save('CardBack.patch', body, 77, 110)
