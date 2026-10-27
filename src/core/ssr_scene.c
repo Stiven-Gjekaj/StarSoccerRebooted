@@ -1343,6 +1343,10 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         g->blend = SSR_BLEND_ADD;
     } else if (is(n, "Gloss")) {
         g->blend = SSR_BLEND_GLOSS;
+    } else if (is(n, "DownloadImage")) {
+        // c_DownloadImage: the image of a definition from the web. The
+        // definitions of 4.32 (DownloadImageDefs.uis) are all comments, so
+        // the image stays as it is.
     } else if (is(n, "Blend")) {
         // c_BlendHelper: the factors of the image and of the screen. The
         // default is ONE and INV_IMAGE_ALPHA. [I: the layouts of 4.32 use

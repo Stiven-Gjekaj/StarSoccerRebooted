@@ -72,12 +72,18 @@ static void test_places_images_with_origins_and_variables(void) {
                             "Draw:(Glint,0,0,1,1)\n"
                             "\tBlend(ONE,ZERO)\n"
                             "Draw:(Glint,0,0,1,1)\n"
-                            "\tBlend(ONE,INV_IMAGE_ALPHA)\n",
+                            "\tBlend(ONE,INV_IMAGE_ALPHA)\n"
+                            "\tDownloadImage(FPPScrollBannerNSGames)\n",
                             tweaks, &tree);
     CHECK(ssr_scene_count(scene) == 7);
     // Blend(): additive, a copy, and the default.
     CHECK(ssr_scene_item(scene, 4)->blend == SSR_BLEND_ADD && ssr_scene_item(scene, 5)->blend == SSR_BLEND_COPY);
     CHECK(ssr_scene_item(scene, 6)->blend == SSR_BLEND_ALPHA);
+    // DownloadImage keeps the image, and the scene knows it.
+    CHECK(strcmp(ssr_scene_item(scene, 6)->image, "Glint") == 0);
+    for (int i = 0; i < ssr_scene_unknown_count(scene); i++) {
+        CHECK(strcmp(ssr_scene_unknown(scene, i), "DownloadImage") != 0);
+    }
     const SSRSceneItem *sky = ssr_scene_item(scene, 0);
     CHECK(sky && strcmp(sky->image, "Title_Sky") == 0 && sky->w == 640 && sky->h == 1136);
 
