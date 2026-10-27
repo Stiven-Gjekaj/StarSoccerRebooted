@@ -153,7 +153,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] The warning of the trainer and the loss of skills with no training
 - [x] The agent, transfers, and contract talks (`AgentDetails`,
       `DesiredTransfer`, `Negotiate`)
-- [ ] The digits of the cards of the negotiate game (`MechDigit`)
+- [x] The digits of the cards of the negotiate game (`MechDigit`)
 - [x] Retirement (`Retirement`), the score, and the hard mode unlock
 - [x] The history of the seasons and the trophy log, with the medals and
       the seasons in the score of the retirement
@@ -208,12 +208,17 @@ layouts that use the modifier.
 - [x] `ScrollIndicator` (29): the bar that shows the place in a list
 - [x] `Message` (18) in the block of a click: the click sends the
       message
-- [ ] `SetMessage` (1): a message box from a layout
-- [ ] `Spawn` (5), `Slot` (1), `SortByRef` (1): copies made by a layout
-- [ ] `ReadoutConcat` (5): a readout of two values in one text
-- [ ] `FontStyle` (5), `LineSpacing` (4), `Padding` (3): text layout
-- [ ] `func` (2), `call` (2): functions of the expression language
-- [ ] `Touch` (1), `RandomTweak` (1), `ModifyTweak` (1), `MechDigit` (1)
+- [x] `SetMessage` (1): the save slots set it, and the delete button then
+      sets the layout "message" again, so it has no effect
+- [x] `Spawn` (5), `Slot` (1), `SortByRef` (1): copies made by a layout
+- [x] `ReadoutConcat` (5): a readout of two values in one text
+- [x] `FontStyle` (5), `LineSpacing` (4), `Padding` (3): text layout
+- [ ] `func` (2), `call` (2): functions of the expression language. Only
+      the alerts of the achievements and the records use them
+- [x] `RandomTweak` (1), `MechDigit` (1)
+- `Touch` (1) is a stray word in a classic tutorial, and `ModifyTweak`
+  (1) is on a debug screen of a cricket game. They are not for the
+  remake.
 
 ## The look of the remake
 
