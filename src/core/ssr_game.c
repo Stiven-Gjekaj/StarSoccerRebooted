@@ -574,7 +574,6 @@ static void packs_fill(SSRGame *game) {
     }
     ssr_tweaks_set(t, "Packs", "Title", loc(game, "SSR_World"));
     ssr_tweaks_set(t, "Packs", "SeedLabel", loc(game, "SSR_SeedLabel"));
-    ssr_tweaks_set(t, "Packs", "ChallengeLabel", loc(game, "SSR_ChallengeLabel"));
     ssr_tweaks_set(t, "Packs", "ContinueLabel", loc(game, "SSR_ContinueLabel"));
     ssr_tweaks_set_number(t, "Packs", "CanInstall", game->canInstallPacks);
     ssr_tweaks_set_number(t, "Packs", "CanRemove", game->packRow > 0);
@@ -638,12 +637,6 @@ static void seed_done(SSRGame *game) {
 static void continue_next(SSRGame *game) {
     if (game->typing == 3) seed_done(game);
     game->settings.continueWorld = !game->settings.continueWorld;
-    settings_changed(game);
-}
-
-static void challenge_next(SSRGame *game) {
-    if (game->typing == 3) seed_done(game);
-    game->settings.challenge = (game->settings.challenge + 1) % 3;
     settings_changed(game);
 }
 
@@ -1477,14 +1470,6 @@ static void call_start_career(SSRGame *game) {
     }
     skip_to_first_match(game);
     c->worldSeed = game->settings.nextWorldSeed;
-    // The challenge of the new career.
-    if (game->settings.challenge == 1) {
-        memset(c->pace, 0, sizeof(c->pace));
-        c->pace[0] = 100;
-    } else if (game->settings.challenge == 2) {
-        c->bank = 0;
-        memset(c->nrg, 0, sizeof(c->nrg));
-    }
     ssr_honours_clear(&game->honours);
     if (!(game->settings.continueWorld && continue_world(game))) people_start(game);
     signed_moment(game);
@@ -9610,7 +9595,6 @@ static const Route ROUTES[] = {
     {"packs.btn_Remove", packs_remove},
     {"packs.btn_Install", packs_install},
     {"packs.inp_Seed", seed_start},
-    {"packs.btn_Challenge", challenge_next},
     {"packs.btn_Continue", continue_next},
     {"about.btn_Ok", options},
     {"message.btn_Ok", message_ok},
@@ -9813,7 +9797,6 @@ int ssr_game_load_settings(SSRGame *game, const char *path) {
         if (strcmp(key, "hardmodeunlocked") == 0) game->settings.hardModeUnlocked = value != 0;
         if (strcmp(key, "language") == 0 && value >= -1 && value <= 12) game->settings.language = value;
         if (strcmp(key, "worldseed") == 0 && value >= 0) game->settings.nextWorldSeed = value;
-        if (strcmp(key, "challenge") == 0 && value >= 0 && value <= 2) game->settings.challenge = value;
         if (strcmp(key, "continueworld") == 0) game->settings.continueWorld = value != 0;
     }
     fclose(file);
@@ -9832,8 +9815,8 @@ int ssr_game_save_settings(const SSRGame *game, const char *path) {
                      game->settings.volume, game->settings.distance, game->settings.replays,
                      game->settings.doneLoseSkills, game->settings.hardModeUnlocked, game->settings.language) > 0;
     ok = fprintf(file, "pack=%s\n", game->settings.pack) > 0 && ok;
-    ok = fprintf(file, "worldseed=%d\nchallenge=%d\ncontinueworld=%d\n", game->settings.nextWorldSeed,
-                 game->settings.challenge, game->settings.continueWorld) > 0 && ok;
+    ok = fprintf(file, "worldseed=%d\ncontinueworld=%d\n", game->settings.nextWorldSeed,
+                 game->settings.continueWorld) > 0 && ok;
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
         remove(temp);
@@ -10430,10 +10413,6 @@ const char *ssr_game_text(SSRGame *game, const char *name) {
         return ssr_tweaks_get(game->tweaks, "Squad", "Title");
     }
     if (strcmp(name, "GS_ContinueWorld") == 0) return loc(game, game->settings.continueWorld ? "SSR_ContinueYes" : "SSR_ContinueNo");
-    if (strcmp(name, "GS_Challenge") == 0) {
-        static const char *const NAMES[3] = {"SSR_ChallengeNone", "SSR_ChallengePace", "SSR_ChallengeBroke"};
-        return loc(game, NAMES[game->settings.challenge % 3]);
-    }
     if (strcmp(name, "GS_PlayerFullName") == 0) {
         snprintf(game->shown, sizeof(game->shown), "%s", game->career.fullName);
         return game->shown;

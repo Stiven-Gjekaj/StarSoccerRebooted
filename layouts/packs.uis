@@ -1,5 +1,5 @@
-// The world: the data packs, and the seed and the challenge of the next
-// new career. A screen of the remake. The code fills the list "PackList"
+// The world: the data packs, and the seed of the world of the next new
+// career. A screen of the remake. The code fills the list "PackList"
 // from the template "PackEntry". Each row has the texts 1 and 2: the
 // name, and the author and the version. A tap on a row chooses the pack.
 
@@ -123,18 +123,18 @@ PushOrigin:(22,220)
 		ConvergeFrom(-640,0)
 PopOrigin
 
-// The seed of the world of the next new career, and its challenge. A tap
-// on the seed types a new one.
+// The seed of the world of the next new career. A tap on the seed types
+// a new one.
 PushOrigin:(13,540)
-	Rect:(0,0,300,96)
+	Rect:(0,0,614,96)
 	{
-		Draw:(GreyRecess,0,0,300,96)
-		Text:(SEED,10,2,280,40,C,,#BBDDBBFF)
+		Draw:(GreyRecess,0,0,614,96)
+		Text:(SEED,10,2,594,40,C,,#BBDDBBFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
 			StringReadout(Packs,SeedLabel)
-		Text:(00000,10,40,280,50,C,,#FFFFFFFF)
+		Text:(00000,10,40,594,50,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.55,0.55)
@@ -144,32 +144,6 @@ PushOrigin:(13,540)
 		<
 			PlaySnd(UISelect)
 		>
-PopOrigin
-PushOrigin:(327,540)
-	Rect:(0,0,300,96)
-	{
-		Draw:(ButtonShadow,8,8,300,96,,#FFFFFF80)
-		Draw:(GreenButton,0,0,300,96)
-		Draw:(Glint,0,15.5,42,,,#606060FFFFFFFFFF)
-			Handle(42,16)
-			Shine(0,280)
-			Additive()
-		Text:(CHALLENGE,10,2,280,40,C,,#FFFFFFFF)
-			Layer(AfterGloss)
-			FontSize(1)
-			FontScale(0.4,0.4)
-			StringReadout(Packs,ChallengeLabel)
-		Text:(NONE,10,40,280,50,C,,#FFFFFFFF)
-			Layer(AfterGloss)
-			FontSize(1)
-			FontScale(0.5,0.5)
-			GS_Challenge()
-	}
-		Click(packs.btn_Challenge)
-		<
-			PlaySnd(UISelect)
-		>
-		ConvergeFrom(-640,0)
 PopOrigin
 
 // The next new career starts a new world, or continues the world of the

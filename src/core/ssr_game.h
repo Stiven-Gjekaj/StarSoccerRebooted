@@ -125,10 +125,8 @@ typedef struct {
     // the world of the game.
     char pack[48];
     // The seed of the world of the next new career, or 0 for a new seed
-    // each career. The challenge of the next new career: 0 none, 1 the
-    // pace at the maximum, 2 no Bux and no NRG.
+    // each career.
     int nextWorldSeed;
-    int challenge;
     // 1 when the next new career continues the world of the last career.
     int continueWorld;
 } SSRSettings;

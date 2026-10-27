@@ -2694,12 +2694,6 @@ static void test_chooses_a_pack(void) {
     ssr_game_type(game, "45");
     ssr_game_key(game, SSR_KEY_ENTER);
     CHECK(!ssr_game_wants_text(game) && ssr_game_settings(game)->nextWorldSeed == 1245);
-    // The challenge goes round its three kinds.
-    ssr_game_message(game, "packs.btn_Challenge");
-    CHECK(ssr_game_settings(game)->challenge == 1 && strcmp(ssr_game_text(game, "GS_Challenge"), "SSR_ChallengePace") == 0);
-    ssr_game_message(game, "packs.btn_Challenge");
-    ssr_game_message(game, "packs.btn_Challenge");
-    CHECK(ssr_game_settings(game)->challenge == 0);
     ssr_game_message(game, "packs.btn_Back");
     CHECK(strcmp(ssr_game_screen(game), "options") == 0);
     ssr_game_free(game);
