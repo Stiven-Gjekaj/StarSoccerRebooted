@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.12.0 (2026-10-27)
+
+- The career unlocks the 108 awards of 4.32. Each award opens an alert at
+  the bottom of the screen and plays a sound. The achievements screen
+  shows the awards and the share of them, and the retirement score
+  counts them.
+- The alerts at the bottom of the screen wait in a queue. A tap closes
+  one, and the next one starts. A bet in the casino shows the energy that
+  it costs.
+- The career keeps its records: the furthest goal, pass, headed goal, and
+  headed pass of the season, of the career, and with the nation. A new
+  record of the career opens an alert.
+- A match counts a hat trick at the third, the sixth, and the ninth goal.
+  The career keeps its hat tricks and the form of the last five seasons.
+- A Spine animation gets the colours of the layout for its slots, and a
+  shadow of a text gets its own colour.
+- A win in the casino shows a new ticker tape each time. A tie of
+  blackjack gives the bet back with no sound.
+- The banners of quick messages show on every screen.
+- The ace of the card banners says STAR SOCCER.
+
 ## 0.11.0 (2026-10-27)
 
 - The layouts of the game work with more of their language: Spawn, Slot,
