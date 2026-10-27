@@ -108,7 +108,7 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     // The kick-off has no minute: its stopwatch hides.
     CHECK(has_op(ops, count, SSR_OP_LIST_SUB, "CommentaryTable", ""));
     int chances = 0, frames = 0;
-    while (strcmp(ssr_game_screen(game), "gamemenu") != 0 && frames < 200000) {
+    while (strcmp(ssr_game_screen(game), "matchstats") != 0 && frames < 200000) {
         frames++;
         ssr_game_update(game, 1);
         take_ops(game, ops, 64);
@@ -159,14 +159,69 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
             ssr_game_message(game, "match.btn_Play");
         }
     }
-    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && !ssr_game_match(game));
+    CHECK(strcmp(ssr_game_screen(game), "matchstats") == 0 && !ssr_game_match(game));
     // The commentary scrolled to its last rows.
     CHECK(ssr_tweaks_number(tweaks, "Menu", "CommentaryWindowScroll") < -400);
     CHECK(chances >= 2 && ssr_game_career(game)->apps == apps + 1);
-    // The match pays the wage and the bonuses.
+
+    // The match stats: the result overlay shows for 270 frames, then the
+    // stats come one at a time.
     const SSRCareer *c = ssr_game_career(game);
+    int outcome = (int)ssr_tweaks_number(tweaks, "Match", "Outcome");
+    CHECK(outcome >= 1 && outcome <= 3);
+    CHECK(ssr_tweaks_number(tweaks, "MatchStats", "Chances") == -1);
+    float boss = c->relationBoss;
+    ssr_game_update(game, 269);
+    CHECK(ssr_tweaks_number(tweaks, "Match", "Outcome") == outcome);
+    ssr_game_update(game, 2);
+    CHECK(ssr_tweaks_number(tweaks, "Match", "Outcome") == 0);
+    ssr_game_update(game, 1);
+    CHECK(ssr_tweaks_number(tweaks, "MatchStats", "StatStage") == 1);
+    CHECK(ssr_tweaks_number(tweaks, "MatchStats", "Chances") >= 2);
+    CHECK(ssr_tweaks_number(tweaks, "MatchStats", "Goals") == -1);
+    // 750 ms is 47 ticks of 16 ms.
+    ssr_game_update(game, 48);
+    CHECK(ssr_tweaks_number(tweaks, "MatchStats", "StatStage") == 2);
+    for (int i = 0; i < 2000 && ssr_tweaks_number(tweaks, "MatchStats", "StatStage") < 10; i++) {
+        ssr_game_update(game, 1);
+    }
+    float rating = ssr_tweaks_number(tweaks, "MatchStats", "MatchRating");
+    CHECK(rating >= 1 && rating <= 10);
+    int mod = (int)ssr_tweaks_number(tweaks, "RelationshipMods", "Boss");
+    CHECK(c->relationBoss == (boss + mod < 1 ? 1 : boss + mod > 100 ? 100 : boss + mod));
+    CHECK(ssr_tweaks_number(tweaks, "Player", "StarRating") == c->starRating / 100 + 1);
+
+    // The weekly update: the energy, then the pay. Continue waits for
+    // stage 14.
+    int date = c->sdate;
+    ssr_game_message(game, "matchstats.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "matchreview") == 0 && c->sdate == date + 1);
+    CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal") == -1);
+    ssr_game_update(game, 26);
+    CHECK(ssr_tweaks_number(tweaks, "Player", "Recovery") == 100 && c->energy == 100);
+    ssr_game_message(game, "matchreview.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "matchreview") == 0);
+    for (int i = 0; i < 2000 && ssr_tweaks_number(tweaks, "MatchStats", "StatStage") < 14; i++) {
+        ssr_game_update(game, 1);
+    }
+    // The match pays the wage and the bonuses.
     CHECK(c->bank == bank + (int)ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal"));
     CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal") >= c->wage);
+    ssr_game_message(game, "matchreview.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+}
+
+// Saves the career with half of the energy, and loads it again.
+static void tire(SSRGame *game, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.energy = 50;
+    // Quit saves the career, so the test writes its file after it.
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && ssr_game_career(game)->energy == 50);
 }
 
 // Drinks the next can after a match: a question when the energy is above
@@ -338,8 +393,10 @@ static void test_starts_a_new_career(void) {
     // The first can gives energy. After a second match, the next can is a
     // skill boost.
     play_a_match(game, tweaks);
+    tire(game, path);
     drink_a_can(game, tweaks);
     play_a_match(game, tweaks);
+    tire(game, path);
     drink_a_can(game, tweaks);
     ssr_game_message(game, "gamemenu.btn_Quit");
 

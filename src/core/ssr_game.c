@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ssr_aftermatch.h"
 #include "ssr_career.h"
 #include "ssr_fs.h"
 #include "ssr_match.h"
@@ -85,6 +86,18 @@ struct SSRGame {
     // rows that the player can still choose.
     int boostType, boostBoth, bolt1, bolt2;
     int boostOn[5];
+
+    // The screens after the match (c_TScreen_MatchStats and
+    // c_TScreen_MatchReview): the facts and the result of the match, the
+    // stage of the screen, the time of the last stage, the frames of the
+    // result overlay, and the star level before the match.
+    SSRAfterMatchFacts facts;
+    SSRAfterMatch after;
+    int statStage, statTime;
+    float initDelay;
+    int oldStarLevel;
+    // The energy that the rest days give, and the pay of the match.
+    int recovery, payWage, payGoals, payAssists;
 };
 
 typedef void (*Handler)(SSRGame *game);
@@ -274,6 +287,7 @@ static void save_slot_screen(SSRGame *game) {
 }
 
 static void game_menu(SSRGame *game);
+static void skill_tweaks(SSRGame *game);
 static void choose_club(SSRGame *game);
 static void star_transition(SSRGame *game, const char *after);
 static void player_tweaks(SSRGame *game);
@@ -852,7 +866,7 @@ static void start_match(SSRGame *game) {
     s.setPieces = ssr_career_skill(c->setPieces);
     s.vision = ssr_career_skill(c->vision);
     s.careerApps = c->apps;
-    s.starLevel = 1;
+    s.starLevel = ssr_career_star_level(c);
     // c_TPlayer sets m_dodribbling to 1 for each career, new or loaded.
     s.dribbling = 1;
     ssr_match_start(game->match, &s, game->localise, game->context, &game->random);
@@ -873,27 +887,287 @@ static void start_match(SSRGame *game) {
     match_state(game);
 }
 
-// The end of the match: the career keeps the stats, and the game menu
-// opens [I: the match stats and the ratings screens come later].
+// The star level and its progress, for the star bars (Player.StarRating
+// and Player.StarRatingProgress).
+static void star_tweaks(SSRGame *game) {
+    const SSRCareer *c = &game->career;
+    ssr_tweaks_set_number(game->tweaks, "Player", "StarRating", ssr_career_star_level(c));
+    ssr_tweaks_set_number(game->tweaks, "Player", "StarRatingProgress", c->starRating % 100);
+}
+
+// UpdateRelationship: a relation stays from 1 to 100.
+static void change_relation(float *relation, float change) {
+    float v = *relation + change;
+    *relation = v < 1 ? 1 : v > 100 ? 100 : v;
+}
+
+// GSMatchStatsUpdateRelationships for a club match [I: the international
+// relations come with the nations].
+static void after_relations(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    change_relation(&c->relationBoss, (float)game->after.boss);
+    change_relation(&c->relationTeam, (float)game->after.team);
+    change_relation(&c->relationFans, (float)game->after.fans);
+}
+
+// The five calls of UpdateStarRating at stage 9, in their order.
+static void after_star_rating(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int changes[5] = {game->facts.goals, game->facts.assists, game->after.boss, game->after.team, game->after.fans};
+    for (int i = 0; i < 5; i++) c->starRating = ssr_star_rating_add(c->starRating, changes[i]);
+    star_tweaks(game);
+}
+
+// The end of the match (c_TMatch.EndMatch): the career keeps the stats, and
+// the match stats screen opens (c_TScreen_MatchStats.SetUpScreen). The match
+// has no fixture yet, so it is a league match of the club [I].
 static void end_match(SSRGame *game) {
     SSRCareer *c = &game->career;
     const SSRMatch *m = game->match;
+    const SSRMatchSetup *s = &m->setup;
+    int home = s->myTeam == 1;
+    SSRAfterMatchFacts f = {0};
+    f.goals = m->goals;
+    f.assists = m->assists;
+    f.passes = m->passes;
+    f.chances = m->chances;
+    f.dribbles = m->dribbles;
+    f.shotsOnTarget = m->shotsOnTarget;
+    f.score1 = m->score[1];
+    f.score2 = m->score[2];
+    f.myScore = home ? f.score1 : f.score2;
+    f.opponentScore = home ? f.score2 : f.score1;
+    f.home = home;
+    f.homeStrength = s->homeStrength;
+    f.awayStrength = s->awayStrength;
+    f.subTime = s->subTime;
+    f.starLevel = ssr_career_star_level(c);
+    f.hardMode = c->hardMode;
+    // The game never adds to m_workratetally, so GetOverallWorkRate is
+    // always 0 in 4.32.
+    f.workRate = 0;
+    game->facts = f;
+    ssr_aftermatch_rate(&f, &game->after);
     c->apps++;
     c->goals += m->goals;
     c->assists += m->assists;
     c->passes += m->passes;
     c->energy = m->energy;
-    // The pay of the match (c_TScreen_MatchReview): the wage and the bonuses
-    // [I: the sponsors and the agent come later].
-    int goals = m->goals * c->goalBonus, assists = m->assists * c->assistBonus;
-    int total = c->wage + goals + assists;
-    c->bank += total;
-    ssr_tweaks_set_number(game->tweaks, "MatchReview", "EarningsWage", c->wage);
-    ssr_tweaks_set_number(game->tweaks, "MatchReview", "EarningsBonusGoals", goals);
-    ssr_tweaks_set_number(game->tweaks, "MatchReview", "EarningsBonusAssists", assists);
-    ssr_tweaks_set_number(game->tweaks, "MatchReview", "EarningsTotal", total);
     free(game->match);
     game->match = NULL;
+
+    SSRTweaks *t = game->tweaks;
+    set_screen(game, "matchstats");
+    // c_AScreen_MatchStats.ClearStats.
+    ssr_tweaks_set_number(t, "MatchStats", "StatStage", 0);
+    static const char *STATS[5] = {"Chances", "Goals", "Assists", "Passes", "MatchRating"};
+    for (int i = 0; i < 5; i++) ssr_tweaks_set_number(t, "MatchStats", STATS[i], -1);
+    static const char *RISES[4] = {"FansRelIncrease", "TeamRelIncrease", "BossRelIncrease", "StarRatingIncrease"};
+    for (int i = 0; i < 4; i++) ssr_tweaks_set_number(t, "MatchStats", RISES[i], -10);
+    ssr_tweaks_set_number(t, "Menu", "ZeroRelChange", 0);
+    static const char *MODS[4] = {"Boss", "Team", "Fans", "Sponsors"};
+    for (int i = 0; i < 4; i++) ssr_tweaks_set_number(t, "RelationshipMods", MODS[i], 0);
+    ssr_tweaks_set_number(t, "MatchStats", "International", 0);
+    // No competition plate until the season comes.
+    ssr_tweaks_set_number(t, "Menu", "LeagueType", 0);
+    ssr_tweaks_set(t, "Match", "LeagueName", "");
+    ssr_tweaks_set_number(t, "Match", "Outcome", game->after.outcome);
+    skill_tweaks(game);
+    star_tweaks(game);
+    game->initDelay = 270;
+    game->statStage = 0;
+    game->statTime = game->now;
+    game->oldStarLevel = ssr_career_star_level(c);
+}
+
+// One stage of the match stats screen (GSMatchStatsUpdate).
+static void stats_stage(SSRGame *game) {
+    SSRTweaks *t = game->tweaks;
+    const SSRAfterMatchFacts *f = &game->facts;
+    int stage = ++game->statStage;
+    switch (stage) {
+    case 1:
+        ssr_tweaks_set_number(t, "MatchStats", "Chances", f->chances);
+        break;
+    case 2:
+        ssr_tweaks_set_number(t, "MatchStats", "Goals", f->goals);
+        break;
+    case 3:
+        ssr_tweaks_set_number(t, "MatchStats", "Assists", f->assists);
+        break;
+    case 4:
+        ssr_tweaks_set_number(t, "MatchStats", "Passes", f->passes);
+        break;
+    case 5:
+        ssr_tweaks_set_number(t, "MatchStats", "MatchRating", game->after.rating);
+        break;
+    case 6:
+        // Stages 7 and 8 do not come.
+        ssr_tweaks_set_number(t, "RelationshipMods", "Boss", game->after.boss);
+        ssr_tweaks_set_number(t, "RelationshipMods", "Team", game->after.team);
+        ssr_tweaks_set_number(t, "RelationshipMods", "Fans", game->after.fans);
+        game->statStage = stage = 8;
+        after_relations(game);
+        skill_tweaks(game);
+        break;
+    case 9:
+        after_star_rating(game);
+        ssr_tweaks_set_number(t, "MatchStats", "StarRatingIncrease", 0);
+        break;
+    case 10:
+        // [I: the star shower and the cheer of a new level come with the
+        // particles and the sounds.]
+        game->oldStarLevel = ssr_career_star_level(&game->career);
+        break;
+    default:
+        break;
+    }
+    if (stage <= 12) ssr_tweaks_set_number(t, "MatchStats", "StatStage", stage);
+}
+
+// The energy and the pay of the weekly update (c_TScreen_MatchReview).
+static void review_stage(SSRGame *game) {
+    SSRTweaks *t = game->tweaks;
+    SSRCareer *c = &game->career;
+    int stage = ++game->statStage;
+    ssr_tweaks_set_number(t, "MatchStats", "StatStage", stage);
+    switch (stage) {
+    case 1: {
+        float e = c->energy + (float)game->recovery;
+        c->energy = e < 0 ? 0 : e > 100 ? 100 : e;
+        ssr_tweaks_set_number(t, "Player", "Recovery", game->recovery);
+        ssr_tweaks_set_number(t, "Player", "Energy", c->energy);
+        break;
+    }
+    case 2:
+        ssr_tweaks_set_number(t, "Player", "RecoveryBoostTrainer", 0);
+        break;
+    case 3:
+        ssr_tweaks_set_number(t, "Player", "RecoveryBoostProperties", 0);
+        break;
+    case 4:
+        ssr_tweaks_set_number(t, "Player", "RecoveryTotal", game->recovery > 100 ? 100 : game->recovery);
+        break;
+    case 5:
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsWage", game->payWage);
+        break;
+    case 6:
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentWage", 0);
+        break;
+    case 7:
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsBonusGoals", game->payGoals);
+        break;
+    case 8:
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentBonusGoals", 0);
+        break;
+    case 9:
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsBonusAssists", game->payAssists);
+        break;
+    case 10:
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentBonusAssists", 0);
+        break;
+    case 11:
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsSponsors", 0);
+        break;
+    case 12:
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentSponsors", 0);
+        break;
+    case 13: {
+        // GSPlayerAwardWages: the pay goes into the bank once.
+        int total = game->payWage + game->payGoals + game->payAssists;
+        c->bank += total;
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsTotal", total);
+        ssr_tweaks_set_number(t, "Player", "Bux", c->bank);
+        ssr_tweaks_set_number(t, "Player", "StarBux", c->bank);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+// The stages of the two screens come at an interval: 750 or 400 ms, or
+// 100 ms while the player touches the screen.
+static void after_tick(SSRGame *game) {
+    int stats = strcmp(game->screen, "matchstats") == 0;
+    if (stats && game->initDelay > 0) {
+        game->initDelay -= 1;
+        if (game->initDelay <= 0) ssr_tweaks_set_number(game->tweaks, "Match", "Outcome", 0);
+        return;
+    }
+    int interval = game->touch.down ? 100 : stats ? 750 : 400;
+    if (game->statStage < 20 && game->now > game->statTime + interval) {
+        game->statTime = game->now;
+        if (stats) {
+            stats_stage(game);
+        } else {
+            review_stage(game);
+        }
+    }
+}
+
+// matchstats.dismissanim: a tap ends the result overlay.
+static void stats_dismiss(SSRGame *game) {
+    game->initDelay = 0;
+    ssr_tweaks_set_number(game->tweaks, "Match", "Outcome", 0);
+}
+
+// matchstats.btn_Play: the stages that did not come run now. Then the
+// career goes to the next day (MatchRecovery and PlayToDate without a
+// season [I]), and the weekly update opens.
+static void stats_continue(SSRGame *game) {
+    if (game->statStage < 6) after_relations(game);
+    if (game->statStage < 9) after_star_rating(game);
+    SSRCareer *c = &game->career;
+    c->sdate += 1;
+    // GetRestDays gives 14 when there is no next fixture.
+    game->recovery = ssr_energy_recovery(14, ssr_career_age(c));
+    game->payWage = c->wage;
+    game->payGoals = game->facts.goals * c->goalBonus;
+    game->payAssists = game->facts.assists * c->assistBonus;
+    save_career(game);
+    set_screen(game, "matchreview");
+    SSRTweaks *t = game->tweaks;
+    ssr_tweaks_set_number(t, "Menu", "HideNRGShopTab", 1);
+    ssr_tweaks_set_number(t, "Menu", "HideBootsShopTab", 1);
+    ssr_tweaks_set_number(t, "Menu", "OwnedTrainer", 0);
+    ssr_tweaks_set_number(t, "Menu", "OwnedAgent", 0);
+    // c_AScreen_MatchReview.ClearTweakValues.
+    static const char *EARNINGS[13] = {"Wage",
+                                       "AgentWage",
+                                       "RewardedAgentWage",
+                                       "BonusGoals",
+                                       "AgentBonusGoals",
+                                       "RewardedAgentBonusGoals",
+                                       "BonusAssists",
+                                       "AgentBonusAssists",
+                                       "RewardedAgentBonusAssists",
+                                       "Sponsors",
+                                       "AgentSponsors",
+                                       "RewardedAgentSponsors",
+                                       "Total"};
+    char name[64];
+    for (int i = 0; i < 13; i++) {
+        snprintf(name, sizeof(name), "Earnings%s", EARNINGS[i]);
+        ssr_tweaks_set_number(t, "MatchReview", name, -1);
+    }
+    static const char *RECOVERY[5] = {"Recovery", "RecoveryBoostTrainer", "RecoveryRewardedBoostTrainer",
+                                      "RecoveryBoostProperties", "RecoveryTotal"};
+    for (int i = 0; i < 5; i++) ssr_tweaks_set_number(t, "Player", RECOVERY[i], -1);
+    ssr_tweaks_set_number(t, "MatchStats", "StatStage", 0);
+    ssr_tweaks_set_number(t, "MatchReview", "ShowAgentRewardAd", 0);
+    ssr_tweaks_set_number(t, "MatchReview", "ShowTrainerRewardAd", 0);
+    ssr_tweaks_set_number(t, "Player", "Energy", c->energy);
+    game->statStage = 0;
+    game->statTime = game->now;
+}
+
+// matchreview.btn_Play: the game menu, from stage 14 only, so that the
+// energy does not come two times.
+static void review_continue(SSRGame *game) {
+    if (game->statStage < 14) return;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "HideNRGShopTab", 0);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "HideBootsShopTab", 0);
     save_career(game);
     game_menu(game);
 }
@@ -1307,6 +1581,9 @@ static const Route ROUTES[] = {
     {"match.btn_Focus", match_focus},
     {"match.btn_MaximiseCommentary", maximise_commentary},
     {"match.btn_NRG", match_drink},
+    {"matchstats.dismissanim", stats_dismiss},
+    {"matchstats.btn_Play", stats_continue},
+    {"matchreview.btn_Play", review_continue},
     {"gamemenu.btn_DrinkNRG", drink_button},
     {"chooseboost.btn_1", boost1},
     {"chooseboost.btn_2", boost2},
@@ -1472,6 +1749,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->ticks -= 1;
             game->now += 16;
             match_tick(game);
+        }
+    } else if (strcmp(game->screen, "matchstats") == 0 || strcmp(game->screen, "matchreview") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1) {
+            game->ticks -= 1;
+            game->now += 16;
+            after_tick(game);
         }
     }
     if (strcmp(game->screen, "startransition") == 0) {
