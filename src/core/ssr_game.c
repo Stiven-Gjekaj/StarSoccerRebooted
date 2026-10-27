@@ -756,6 +756,24 @@ static void match_state(SSRGame *game) {
     if (game->match->state == SSR_MATCH_FULL_TIME) state = 3;
     ssr_tweaks_set_number(game->tweaks, "Match", "MatchState", state);
     ssr_tweaks_set_number(game->tweaks, "Menu", "MatchScreenFooter", state == 0 ? -1 : 0);
+    // While the clock runs, the commentary fills the screen
+    // (c_AScreen_Match.m_ButtonPlay and m_DoHalfEnd).
+    ssr_tweaks_set_number(game->tweaks, "Match", "MaximiseScreen", state == 0);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "MaximiseCommentary", state == 0);
+}
+
+// ScrollToBottom: the last row of the commentary shows. The list shows 400
+// units of its rows of 72.
+static void scroll_commentary(SSRGame *game) {
+    float lowest = 400.0f - 72.0f * (float)game->commentaryCount;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "CommentaryWindowScroll", lowest < 0 ? lowest : 0);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "CommentaryWindowScrollVel", 0);
+}
+
+static void maximise_commentary(SSRGame *game) {
+    if (game->match && game->match->state != SSR_MATCH_PREMATCH) {
+        ssr_tweaks_set_number(game->tweaks, "Menu", "MaximiseCommentary", 1);
+    }
 }
 
 static void start_match(SSRGame *game) {
@@ -852,10 +870,13 @@ static void show_line(SSRGame *game, const SSRMatchLine *line) {
 // The commentary rows go into the table of the screen.
 static void match_lines(SSRGame *game) {
     SSRMatchLine line;
+    int added = 0;
     while (ssr_match_take_line(game->match, &line)) {
         show_line(game, &line);
         if (game->commentaryCount < 256) game->commentary[game->commentaryCount++] = line;
+        added = 1;
     }
+    if (added) scroll_commentary(game);
 }
 
 static void start_chance(SSRGame *game) {
@@ -886,6 +907,7 @@ static void match_tick(SSRGame *game) {
                 game->chance = NULL;
                 set_screen(game, "match");
                 for (int i = 0; i < game->commentaryCount; i++) show_line(game, &game->commentary[i]);
+                scroll_commentary(game);
                 match_state(game);
                 match_tweaks(game);
             }
@@ -940,6 +962,7 @@ static const Route ROUTES[] = {
     {"match.btn_Time", match_speed},
     {"match.btn_WorkRate", match_work_rate},
     {"match.btn_Focus", match_focus},
+    {"match.btn_MaximiseCommentary", maximise_commentary},
 };
 
 /* -------------------------------------------------------------- the API */
