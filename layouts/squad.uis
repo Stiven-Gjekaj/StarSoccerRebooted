@@ -202,3 +202,17 @@ PushOrigin:(168,@n)
 			PlaySnd(UISelect)
 		>
 PopOrigin
+
+// The champions and the top scorers of the past seasons.
+PushOrigin:(324,@n)
+	M_NavButton:(0,0,SSR_Honours,,)
+	{
+		Draw:(ICup,30,25,90,90)
+	}
+		Delay(0.15)
+		ConvergeFrom(-640,0)
+		Click(squad.btn_Honours)
+		<
+			PlaySnd(UISelect)
+		>
+PopOrigin

@@ -11,3 +11,6 @@ SSR_Remove	Remove	Entfernen	Retirer	Quitar	Rimuovi	Remover	Remover	Kaldır	Usuń
 SSR_GameWorld	The world of the game	Die Welt des Spiels	Le monde du jeu	El mundo del juego	Il mondo del gioco	O mundo do jogo	O mundo do jogo	Oyunun dünyası	Świat gry
 SSR_PackBy	$author - version $version	$author - Version $version	$author - version $version	$author - versión $version	$author - versione $version	$author - versão $version	$author - versão $version	$author - sürüm $version	$author - wersja $version
 SSR_Rivals	Rivals	Rivalen	Rivaux	Rivales	Rivali	Rivais	Rivais	Rakipler	Rywale
+SSR_Honours	Honours	Ehrungen	Palmarès	Palmarés	Albo d'oro	Conquistas	Palmarés	Onur listesi	Zaszczyty
+SSR_HonourTitle	Season $year - $league: $club	Saison $year - $league: $club	Saison $year - $league : $club	Temporada $year - $league: $club	Stagione $year - $league: $club	Temporada $year - $league: $club	Época $year - $league: $club	Sezon $year - $league: $club	Sezon $year - $league: $club
+SSR_HonourScorer	Top scorer: $name ($club), $goals	Torschützenkönig: $name ($club), $goals	Meilleur buteur : $name ($club), $goals	Máximo goleador: $name ($club), $goals	Capocannoniere: $name ($club), $goals	Artilheiro: $name ($club), $goals	Melhor marcador: $name ($club), $goals	Gol kralı: $name ($club), $goals	Król strzelców: $name ($club), $goals

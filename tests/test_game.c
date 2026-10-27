@@ -2537,6 +2537,22 @@ static void test_starts_a_new_career(void) {
     CHECK(strstr(news, "Ann ") || strstr(news, "Bob ") || strstr(news, "Cid "));
     turns = 0;
     CHECK(ssr_game_ticker_priority(game, SSR_TICKER_WORLD_SCORER, &turns) > 0);
+    // The honours keep the champion of each past season of the league.
+    ssr_game_message(game, "gamemenu.btn_League");
+    ssr_game_message(game, "league.btn_Squad");
+    ssr_game_message(game, "squad.btn_Honours");
+    CHECK(strcmp(ssr_game_screen(game), "honours") == 0);
+    SSRUiOp honourOps[256];
+    int honourCount = take_ops(game, honourOps, 256), honourRows = 0;
+    for (int i = 0; i < honourCount; i++) {
+        honourRows += honourOps[i].kind == SSR_OP_LIST_ADD && strcmp(honourOps[i].ref, "HonourList") == 0;
+    }
+    CHECK(honourRows >= 2);
+    ssr_game_message(game, "honours.btn_Back");
+    CHECK(strcmp(ssr_game_screen(game), "squad") == 0);
+    ssr_game_message(game, "squad.btn_Back");
+    ssr_game_message(game, "league.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
     CHECK(interviews >= 2 && interviewsWon >= 1);
     // A pass of the first match is a record of the career.
     CHECK(records >= 1 && squadSeen);

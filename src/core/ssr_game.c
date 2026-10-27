@@ -15,6 +15,7 @@
 #include "ssr_contract.h"
 #include "ssr_ex.h"
 #include "ssr_fs.h"
+#include "ssr_honours.h"
 #include "ssr_horses.h"
 #include "ssr_match.h"
 #include "ssr_pack.h"
@@ -162,6 +163,8 @@ struct SSRGame {
     int peopleDate;
     // The turn of the news of the world in the ticker.
     int worldTurn;
+    // The champions and the top scorers of the past seasons.
+    SSRHonours honours;
     SSRHorses horses;
     char *horseNames;
     int horsesLoaded;
@@ -645,6 +648,10 @@ static void people_path(const SSRGame *game, int slot, char *out, size_t capacit
     snprintf(out, capacity, "%s/people%d.txt", game->saveDirectory, slot + 1);
 }
 
+static void honours_path(const SSRGame *game, int slot, char *out, size_t capacity) {
+    snprintf(out, capacity, "%s/honours%d.txt", game->saveDirectory, slot + 1);
+}
+
 // A fixture of a club league or cup counts for the players of its clubs.
 // A club with no squad gets one. The goals of the player of the user do
 // not go to the people.
@@ -809,6 +816,8 @@ static void open_slot(SSRGame *game, int slot) {
             skip_to_first_match(game);
         }
         people_load(game, slot);
+        honours_path(game, slot, path, sizeof(path));
+        ssr_honours_load(&game->honours, path);
         // LoadCareer: the star transition, then the game menu.
         player_tweaks(game);
         reset_progress(game);
@@ -858,6 +867,8 @@ static void call_delete_career(SSRGame *game) {
         season_path(game, game->slot, path, sizeof(path));
         remove(path);
         people_path(game, game->slot, path, sizeof(path));
+        remove(path);
+        honours_path(game, game->slot, path, sizeof(path));
         remove(path);
     }
     save_slot_screen(game);
@@ -1333,6 +1344,8 @@ static void save_career(SSRGame *game) {
         people_path(game, game->slot, path, sizeof(path));
         ssr_people_save(game->people, path);
     }
+    honours_path(game, game->slot, path, sizeof(path));
+    ssr_honours_save(&game->honours, path);
 }
 
 static void webpage(SSRGame *game);
@@ -1347,6 +1360,7 @@ static void call_start_career(SSRGame *game) {
     skip_to_first_match(game);
     c->worldSeed = 0;
     people_start(game);
+    ssr_honours_clear(&game->honours);
     const SSRClub *club = game->world ? ssr_world_club(game->world, c->clubId) : NULL;
     snprintf(c->headline, sizeof(c->headline), "%s", loc(game, "CNEWS_FIRSTCONTRACTMOBILE"));
     replace_all(c->headline, sizeof(c->headline), "$clubname", club ? club->name : "");
@@ -3309,6 +3323,43 @@ static void squad_mode(SSRGame *game) {
     squad_fill(game);
 }
 
+// squad.btn_Honours: the champions and the top scorers, the newest
+// season first. A title of the club of the player shows its highlight.
+static void honours_screen(SSRGame *game) {
+    set_screen(game, "honours");
+    SSRTweaks *t = game->tweaks;
+    ssr_tweaks_set(t, "Honours", "Title", loc(game, "SSR_Honours"));
+    ssr_tweaks_set_number(t, "Honours", "Scroll", 0);
+    add_op(game, SSR_OP_LIST_CLEAR, "HonourList", NULL, NULL, 0);
+    add_op(game, SSR_OP_LIST_START, "HonourList", NULL, NULL, 82);
+    for (int i = game->honours.count - 1; i >= 0; i--) {
+        const SSRHonour *h = &game->honours.list[i];
+        char title[256], scorer[256], number[16];
+        snprintf(title, sizeof(title), "%s", loc(game, "SSR_HonourTitle"));
+        snprintf(number, sizeof(number), "%d", h->year);
+        replace_all(title, sizeof(title), "$year", number);
+        replace_all(title, sizeof(title), "$league", h->league);
+        replace_all(title, sizeof(title), "$club", h->clubName);
+        scorer[0] = 0;
+        if (h->scorer[0]) {
+            snprintf(scorer, sizeof(scorer), "%s", loc(game, "SSR_HonourScorer"));
+            replace_all(scorer, sizeof(scorer), "$name", h->scorer);
+            replace_all(scorer, sizeof(scorer), "$club", h->scorerClub);
+            snprintf(number, sizeof(number), "%d", h->goals);
+            replace_all(scorer, sizeof(scorer), "$goals", number);
+        }
+        add_op(game, SSR_OP_LIST_ADD, "HonourList", "HonourEntry", "", 0);
+        add_op(game, SSR_OP_LIST_TEXT, "HonourList", NULL, title, 1);
+        add_op(game, SSR_OP_LIST_TEXT, "HonourList", NULL, scorer, 2);
+        if (h->club == game->career.clubId) add_op(game, SSR_OP_LIST_SUB, "HonourList", "Highlight", NULL, 1);
+    }
+}
+
+static void honours_back(SSRGame *game) {
+    set_screen(game, "squad");
+    squad_fill(game);
+}
+
 static void squad_back(SSRGame *game) {
     league_screen(game, game->leagueComp);
 }
@@ -3480,7 +3531,46 @@ static void season_review(SSRGame *game) {
 }
 
 // The end of the season: PlayToDate reached the new year.
+// The champion and the top scorer of each league of the season go into
+// the honours.
+static void keep_honours(SSRGame *game) {
+    SSRSeason *s = game->season;
+    if (!s || !game->world) return;
+    int year = ssr_career_year(&game->career) - 1;
+    for (int i = 0; i < s->compCount; i++) {
+        SSRSeasonComp *comp = &s->comps[i];
+        if (comp->data->level != 0 || comp->data->type != 0 || comp->poolCount == 0 || comp->pools[0].count == 0) continue;
+        SSRPool *pool = &comp->pools[0];
+        ssr_season_sort_pool(s, pool, 4);
+        SSRHonour h;
+        memset(&h, 0, sizeof(h));
+        h.year = year;
+        snprintf(h.league, sizeof(h.league), "%s", comp->data->tla);
+        h.club = s->rows[pool->rows[0]].teamId;
+        const SSRClub *club = ssr_world_club(game->world, h.club);
+        snprintf(h.clubName, sizeof(h.clubName), "%s", club ? club->name : "");
+        int clubs[64], n = 0;
+        for (int k = 0; k < pool->count && n < 64; k++) clubs[n++] = s->rows[pool->rows[k]].teamId;
+        SSRPerson *top = NULL;
+        if (game->people && ssr_people_top_scorers(game->people, clubs, n, &top, 1)) {
+            snprintf(h.scorer, sizeof(h.scorer), "%s %s", top->first, top->last);
+            const SSRClub *of = ssr_world_club(game->world, top->club);
+            snprintf(h.scorerClub, sizeof(h.scorerClub), "%s", of ? of->name : "");
+            h.goals = top->seasonGoals;
+        }
+        // The player of the user can be the top scorer.
+        if (game->career.seasonGoals > h.goals && ssr_season_actual_league(s, game->career.clubId) == comp->data->id) {
+            snprintf(h.scorer, sizeof(h.scorer), "%s", game->career.fullName);
+            const SSRClub *mine = ssr_world_club(game->world, game->career.clubId);
+            snprintf(h.scorerClub, sizeof(h.scorerClub), "%s", mine ? mine->name : "");
+            h.goals = game->career.seasonGoals;
+        }
+        ssr_honours_add(&game->honours, &h);
+    }
+}
+
 static void season_end(SSRGame *game) {
+    keep_honours(game);
     ssr_tweaks_set_number(game->tweaks, "Menu", "CanSavePlayer", 0);
     season_review(game);
 }
@@ -9085,6 +9175,8 @@ static const Route ROUTES[] = {
     {"league.btn_Squad", league_squad},
     {"squad.btn_Mode", squad_mode},
     {"squad.btn_Back", squad_back},
+    {"squad.btn_Honours", honours_screen},
+    {"honours.btn_Back", honours_back},
     {"league.row_team", league_row},
     {"league.cmb_League", league_combo},
     {"seasonreview.btn_League", season_review_league},
@@ -9181,6 +9273,7 @@ void ssr_game_free(SSRGame *game) {
     ssr_season_free(game->season);
     ssr_people_free(game->people);
     ssr_names_free(game->names);
+    ssr_honours_clear(&game->honours);
     free(game->horseNames);
     free(game);
 }
