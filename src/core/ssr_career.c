@@ -341,7 +341,8 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     write_ints(file, "power", c->power, SSR_CAREER_SKILL_LEVELS);
     write_ints(file, "nrg", c->nrg, 10);
     write_floats(file, "ratings", c->ratings, 10);
-    fprintf(file, "apps=%d\ngoals=%d\nassists=%d\npasses=%d\n", c->apps, c->goals, c->assists, c->passes);
+    fprintf(file, "apps=%d\ngoals=%d\nassists=%d\npasses=%d\nstarman=%d\n", c->apps, c->goals, c->assists, c->passes,
+            c->starMan);
     int season[7] = {c->seasonApps,      c->seasonGoals,   c->seasonAssists, c->seasonPasses,
                      c->seasonHatTricks, c->seasonStarMan, c->seasonChances};
     write_ints(file, "season", season, 7);
@@ -476,6 +477,7 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "goals") == 0) c->goals = number;
         else if (strcmp(key, "assists") == 0) c->assists = number;
         else if (strcmp(key, "passes") == 0) c->passes = number;
+        else if (strcmp(key, "starman") == 0) c->starMan = number;
         else if (strcmp(key, "season") == 0) {
             int v[7] = {0};
             read_ints(value, v, 7);

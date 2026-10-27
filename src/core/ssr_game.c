@@ -1650,6 +1650,7 @@ static void end_match(SSRGame *game) {
         c->seasonHatTricks += hatTrick;
         c->seasonChances += m->chances;
         c->seasonStarMan += game->after.starMan;
+        c->starMan += game->after.starMan;
         c->seasonTotalRating += rating;
         c->totalRating += rating;
         ssr_career_add_form(c->form, (int)rating);

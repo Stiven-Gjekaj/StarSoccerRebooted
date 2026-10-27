@@ -229,9 +229,13 @@ static void transfer_at_season_end(SSRGame *game, SSRTweaks *tweaks) {
     transfers++;
 }
 
+static int starManSum = 0;
+
 static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     const SSRCareer *c = ssr_game_career(game);
     int year = ssr_career_year(c);
+    starManSum += c->seasonStarMan;
+    CHECK(c->starMan == starManSum);
     CHECK(ssr_career_week(c) == 1 && ssr_tweaks_number(tweaks, "Menu", "DisableQuitButton") == 1);
     CHECK(strcmp(ssr_tweaks_get(tweaks, "PlayerStats", "SeasonLeague"), "PRM") == 0);
     CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "SeasonMatches") == c->seasonApps && c->seasonApps > 0);
