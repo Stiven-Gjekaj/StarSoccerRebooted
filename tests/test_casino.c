@@ -91,6 +91,18 @@ static void test_spins_the_roulette_wheel(void) {
     CHECK(roulette.wheelSize == 179 && roulette.rimSize == 228 && roulette.result == 1);
     // The spin ends 3 to 4 seconds later, on the pocket of the ball.
     CHECK(roulette_spin(&roulette, 12345) == 195 && roulette.ballNum == 22);
+    // The sounds of the ball: hits before the drop, then one drop.
+    SSRRandom sound = {12345};
+    int hits = 0, drops = 0;
+    roulette.made = 0;
+    ssr_roulette_setup(&roulette, 545);
+    ssr_roulette_spin(&roulette, &sound);
+    for (int i = 0; i < 195; i++) {
+        ssr_roulette_update(&roulette, &sound);
+        hits += roulette.hit;
+        drops += roulette.drop;
+    }
+    CHECK(hits >= 3 && drops == 1);
     CHECK(roulette.speed == 0 && roulette.stopped && roulette.result == 1);
     CHECK(roulette_spin(&roulette, 1000000) == 246 && roulette.ballNum == 8);
     CHECK(roulette_spin(&roulette, -7) == 209 && roulette.ballNum == 32);

@@ -79,6 +79,9 @@ typedef struct {
     int stopped;
     // 1 after the ball first drops into a pocket in a spin.
     int dropped;
+    // The sounds of the last update: the ball hit the pockets, and it
+    // dropped into one (RouletteBallHit and RouletteBallDrop).
+    int hit, drop;
     // 0 while a spin runs. The number of the last spin.
     int result, ballNum;
     int made;

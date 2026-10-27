@@ -119,6 +119,7 @@ static void wheel_update(SSRRoulette *r) {
 // TRouletteBall.Update5: the ball runs round the rim, falls in, bounces,
 // and then stays in a pocket.
 static void ball_update(SSRRoulette *r, SSRRandom *random) {
+    r->hit = r->drop = 0;
     r->lineRot += r->ballSpeed;
     if (r->lineRot > 360) r->lineRot -= 360;
     if (r->lineRot < 1) r->lineRot += 360;
@@ -129,10 +130,12 @@ static void ball_update(SSRRoulette *r, SSRRandom *random) {
         r->vel = r->stopped ? -0.25f : r->vel - 0.125f;
         r->dist += r->vel;
         if (r->dist <= (float)r->wheelSize * 0.5f) {
+            if (!r->dropped) r->hit = 1;
             r->vel = -(r->vel * 0.7f);
             if (r->vel <= -0.5f || r->vel >= 0.5f) {
                 r->ballSpeed = ssr_rnd2(random, -0.5f - r->speed * 1.5f, r->speed + 0.5f);
             } else {
+                if (!r->dropped) r->drop = 1;
                 r->dropped = 1;
                 r->ballSpeed = r->speed;
                 float p = r->pocket;
