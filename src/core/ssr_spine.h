@@ -32,6 +32,8 @@ typedef struct {
     // The file of the image when the atlases do not have the name, for
     // example "NewGUI/TitleScreen/Title_Grass01.png".
     const char *file;
+    // The name of the slot of the image.
+    const char *slot;
     float m[6];
     float r, g, b, a;
 } SSRSpineDraw;

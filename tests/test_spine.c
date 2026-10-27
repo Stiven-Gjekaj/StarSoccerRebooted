@@ -39,6 +39,7 @@ static void test_poses_the_animation(void) {
     CHECK(ssr_spine_pose(spine, 0, 0, 1, draws, 4) == 1);
     CHECK(strcmp(draws[0].image, "Title_Grass01") == 0);
     CHECK(strcmp(draws[0].file, "NewGUI/TitleScreen/Title_Grass01.png") == 0);
+    CHECK(draws[0].slot && strcmp(draws[0].slot, "Leaf") == 0);
     CHECK(near(draws[0].m[4], 115) && near(draws[0].m[5], 0));
     CHECK(near(draws[0].m[0], 1) && near(draws[0].m[3], 1));
     CHECK(near(draws[0].a, 1) && near(draws[0].g, 1));

@@ -598,6 +598,7 @@ int ssr_spine_pose(const SSRSpine *spine, int animation, float time, int loop, S
             SSRSpineDraw *d = &out[count];
             d->image = a->image;
             d->file = a->file;
+            d->slot = spine->slots[i].name;
             d->m[0] = b00 * aix + b01 * aiy;
             d->m[1] = b10 * aix + b11 * aiy;
             d->m[2] = b00 * ajx + b01 * ajy;
