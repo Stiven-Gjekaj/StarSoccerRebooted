@@ -155,6 +155,21 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   emulator can leave the game stuck. Reason: a capture of a stuck game
   showed a ball and clouds that did not move.
 
+- **Until the season of 0.6, the Play button of the game menu starts a
+  match against the next club of the league.** The home and the away
+  match change in turn. Reason: the fixtures come with the season.
+- **The intercept and the dribble chances end at once with a success.**
+  Reason: their games are not in the remake yet. The commentary then goes
+  on as in the game, with the chance that follows a won ball.
+- **A penalty plays on the middle pitch.** The game reads `Rand(3)` for the
+  side of each chance, but the penalty pitch has its goal in the middle.
+- **The scene draws a CloneTweak colour into each item.** The game draws
+  each gel at once, with the tweak of that moment. The remake makes all the
+  items first, so each item keeps its cel colours.
+- **Each item keeps the box of its clip.** Reason: the layers sort the items
+  after the clip, so a clip that starts and ends as items can lose its
+  items.
+
 ## Releases
 
 - Each part of the roadmap is one minor release, as in Balatro4S. A release
