@@ -1034,6 +1034,60 @@ static void go_to_the_casino(SSRGame *game, SSRTweaks *tweaks, const char *path)
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
+// Roulette: three bets on red. Back is off while the wheel turns.
+static void play_roulette(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.bank = 500;
+    c.energy = 100;
+    c.gambling = 0;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    const SSRCareer *now = ssr_game_career(game);
+    ssr_game_message(game, "gamemenu.btn_Life");
+    ssr_game_message(game, "relationships.btn_Casino");
+    ssr_game_message(game, "casino.btn_Roulette");
+    CHECK(strcmp(ssr_game_screen(game), "roulette") == 0);
+    SSRUiOp ops[256];
+    ssr_game_update(game, 1);
+    int count = take_ops(game, ops, 256);
+    CHECK(has_op(ops, count, SSR_OP_GEL, "Wheel", NULL) && has_op(ops, count, SSR_OP_GEL, "Ball", NULL));
+    // The stake is 10 bux.
+    for (int i = 0; i < 4; i++) ssr_game_message(game, "casino.btn_StakeUp");
+    CHECK(ssr_tweaks_number(tweaks, "Casino", "Stake") == 10);
+    int bank = 500;
+    for (int spin = 1; spin <= 3; spin++) {
+        ssr_game_message(game, "roulette.btn_Red");
+        CHECK(now->bank == bank - 10 && now->gambling == 2 * spin);
+        CHECK(ssr_tweaks_number(tweaks, "Menu", "HomeButtonDisabled") == 1);
+        // A second bet and Back do nothing while the wheel turns.
+        ssr_game_message(game, "roulette.btn_Black");
+        ssr_game_message(game, "roulette.btn_Quit");
+        CHECK(now->bank == bank - 10 && strcmp(ssr_game_screen(game), "roulette") == 0);
+        int frames = 0;
+        ssr_tweaks_set_number(tweaks, "Casino", "CasinoOutcome", 0);
+        while (ssr_tweaks_number(tweaks, "Casino", "CasinoOutcome") == 0 && frames < 10 * 60) {
+            ssr_game_update(game, 1);
+            frames++;
+        }
+        // A spin takes 3 to 5 seconds.
+        CHECK(frames >= 180 && frames <= 300);
+        int win = (int)ssr_tweaks_number(tweaks, "Casino", "Winnings");
+        CHECK(win == 0 || win == 20);
+        const char *text = ssr_tweaks_get(tweaks, "Menu", "QuickMessage");
+        CHECK(strncmp(text, win ? "BET_YOUWON" : "BET_YOULOST", win ? 10 : 11) == 0);
+        bank = bank - 10 + win;
+        CHECK(now->bank == bank && ssr_tweaks_number(tweaks, "Menu", "HomeButtonDisabled") == 0);
+    }
+    ssr_game_message(game, "roulette.btn_Quit");
+    CHECK(strcmp(ssr_game_screen(game), "casino") == 0);
+    ssr_game_message(game, "casino.btn_Back");
+    ssr_game_message(game, "relationships.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+}
+
 static void go_shopping(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     SSRCareer c = *ssr_game_career(game);
     c.bank = 40;
@@ -1601,6 +1655,7 @@ static void test_starts_a_new_career(void) {
     spend_time(game, tweaks, path);
     choose_a_dilemma(game, path);
     go_to_the_casino(game, tweaks, path);
+    play_roulette(game, tweaks, path);
     go_shopping(game, tweaks, path);
     hire_and_kit_out(game, tweaks, path);
     get_old_boots_and_a_sponsor(game, tweaks, path);

@@ -11,6 +11,7 @@
 #include "ssr_career.h"
 #include "ssr_casino.h"
 #include "ssr_contract.h"
+#include "ssr_ex.h"
 #include "ssr_fs.h"
 #include "ssr_match.h"
 #include "ssr_random.h"
@@ -123,6 +124,9 @@ struct SSRGame {
     SSRRandom casinoRandom;
     SSRSlotReel reels[3];
     int slotsSpinning;
+    SSRRoulette roulette;
+    SSRRouletteBet rouletteBet;
+    int rouletteSpinning;
     int slot;
     int slotExists[SSR_CAREER_SLOTS];
 
@@ -6717,16 +6721,121 @@ static int casino_bet(SSRGame *game, int amount, int weight) {
     return 1;
 }
 
-// The message of a win: "YOU WON" and the bux (TQuickMessage).
-static void casino_won(SSRGame *game, int win) {
+// The message of a result: "YOU WON" or "YOU LOST" and the bux
+// (TQuickMessage).
+static void casino_message(SSRGame *game, const char *tag, int amount) {
     char text[128], cash[24];
-    snprintf(text, sizeof(text), "%s", loc(game, "bet_YouWon"));
+    snprintf(text, sizeof(text), "%s", loc(game, tag));
     for (char *p = text; *p; p++) *p = (char)toupper((unsigned char)*p);
-    number_with_commas(win, cash, sizeof(cash));
+    number_with_commas(amount, cash, sizeof(cash));
     size_t n = strlen(text);
     snprintf(text + n, sizeof(text) - n, " \xE2\x98\x85%s", cash);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
     game->splashEnd = game->now + 1500;
+}
+
+/* --------------------------------------------------------- the roulette */
+
+// The wheel turns and the ball moves on the screen (SetElementAngle and
+// SetElementPosition). The wheel image is 83 degrees round from the pockets.
+static void roulette_place(SSRGame *game) {
+    const SSRRoulette *r = &game->roulette;
+    char value[32];
+    snprintf(value, sizeof(value), "%.4f", r->rot + 83.0f);
+    add_op(game, SSR_OP_GEL, "Wheel", NULL, value, SSR_GEL_ANGLE);
+    snprintf(value, sizeof(value), "%.4f", r->x);
+    add_op(game, SSR_OP_GEL, "Ball", NULL, value, SSR_GEL_X);
+    snprintf(value, sizeof(value), "%.4f", r->y);
+    add_op(game, SSR_OP_GEL, "Ball", NULL, value, SSR_GEL_Y);
+}
+
+// TScreen_Roulette.UpdateButtons: the bets and Back are off while the
+// wheel turns.
+static void roulette_buttons(SSRGame *game, int on) {
+    static const char *const BUTTONS[7] = {"BackButton",  "GreenButton",  "RedButton",   "BlackButton",
+                                           "Button1to12", "Button13to24", "Button25to36"};
+    for (int i = 0; i < 7; i++) add_op(game, SSR_OP_ELEMENT_COLOUR, BUTTONS[i], NULL, on ? "FFFFFFFF" : "FFFFFF55", 0);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "HomeButtonDisabled", !on);
+    game->rouletteSpinning = !on;
+}
+
+// casino.btn_Roulette: TScreen_Roulette.SetUpScreen.
+static void roulette_screen(SSRGame *game) {
+    game->casinoRandom.seed = game->now;
+    set_screen(game, "roulette");
+    add_op(game, SSR_OP_HIDE, "TickerTapeShower", NULL, NULL, 0);
+    roulette_buttons(game, 1);
+    check_stake(game);
+    ssr_roulette_setup(&game->roulette, 545);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", 0);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", 0);
+    roulette_place(game);
+}
+
+// TScreen_Roulette.ButtonBet: the bet, then the spin.
+static void roulette_bet(SSRGame *game, SSRRouletteBet bet) {
+    if (game->rouletteSpinning || !casino_bet(game, game->bet, 2)) return;
+    game->rouletteBet = bet;
+    disable_stake(game);
+    roulette_buttons(game, 0);
+    ssr_roulette_spin(&game->roulette, &game->casinoRandom);
+}
+
+static void roulette_green(SSRGame *game) {
+    roulette_bet(game, SSR_BET_GREEN);
+}
+
+static void roulette_red(SSRGame *game) {
+    roulette_bet(game, SSR_BET_RED);
+}
+
+static void roulette_black(SSRGame *game) {
+    roulette_bet(game, SSR_BET_BLACK);
+}
+
+static void roulette_seg1(SSRGame *game) {
+    roulette_bet(game, SSR_BET_1TO12);
+}
+
+static void roulette_seg2(SSRGame *game) {
+    roulette_bet(game, SSR_BET_13TO24);
+}
+
+static void roulette_seg3(SSRGame *game) {
+    roulette_bet(game, SSR_BET_25TO36);
+}
+
+// TRoulette.GetResult, then ResetGame. [I: the sounds come with the sounds
+// of the game.]
+static void roulette_result(SSRGame *game) {
+    int win = ssr_roulette_prize(game->roulette.ballNum, game->rouletteBet, game->bet);
+    if (win > 0) {
+        update_bank(game, win);
+        save_career(game);
+        casino_message(game, "bet_YouWon", win);
+        add_op(game, SSR_OP_SHOW, "TickerTapeShower", NULL, NULL, 0);
+    } else {
+        casino_message(game, "bet_YouLost", game->bet);
+    }
+    ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", win > 0 ? 1 : -1);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", win);
+    game->casinoRandom.seed = game->now;
+    roulette_buttons(game, 1);
+    check_stake(game);
+    ssr_roulette_setup(&game->roulette, 545);
+}
+
+// TRoulette.Update: the wheel and the ball move in each update, also with
+// no spin.
+static void roulette_tick(SSRGame *game) {
+    if (ssr_roulette_update(&game->roulette, &game->casinoRandom)) roulette_result(game);
+    roulette_place(game);
+}
+
+// roulette.btn_Quit: Back is off while the wheel turns.
+static void roulette_quit(SSRGame *game) {
+    if (game->rouletteSpinning) return;
+    casino_screen(game);
 }
 
 /* ----------------------------------------------------------- the slots */
@@ -6783,7 +6892,7 @@ static void slots_prize(SSRGame *game) {
     if (win > 0) {
         update_bank(game, win);
         save_career(game);
-        casino_won(game, win);
+        casino_message(game, "bet_YouWon", win);
         // ShowPrizeAnim: the title flashes, and the ticker tape falls.
         add_op(game, SSR_OP_SHOW, "TitleAnim", NULL, NULL, 0);
         add_op(game, SSR_OP_ANIM_PLAY, "TitleAnim", NULL, "1", 0);
@@ -7025,6 +7134,14 @@ static const Route ROUTES[] = {
     {"casino.btn_Back", casino_back},
     {"casino.btn_Home", casino_home},
     {"casino.btn_Slots", slots_screen},
+    {"casino.btn_Roulette", roulette_screen},
+    {"roulette.btn_Quit", roulette_quit},
+    {"roulette.btn_Green", roulette_green},
+    {"roulette.btn_Red", roulette_red},
+    {"roulette.btn_Black", roulette_black},
+    {"roulette.btn_Seg1", roulette_seg1},
+    {"roulette.btn_Seg2", roulette_seg2},
+    {"roulette.btn_Seg3", roulette_seg3},
     {"casino.btn_StakeUp", stake_up},
     {"casino.btn_StakeDown", stake_down},
     {"slots.btn_Play", slots_play},
@@ -7249,6 +7366,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->ticks -= 1;
             game->now += 16;
             if (strcmp(game->screen, "playeroftheyear") == 0) poty_tick(game);
+        }
+    } else if (strcmp(game->screen, "roulette") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1) {
+            game->ticks -= 1;
+            game->now += 16;
+            roulette_tick(game);
         }
     } else if (strcmp(game->screen, "slots") == 0) {
         game->ticks += frames;
