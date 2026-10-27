@@ -10,6 +10,7 @@
 #include "ssr_fs.h"
 #include "ssr_match.h"
 #include "ssr_random.h"
+#include "ssr_season.h"
 #include "ssr_training.h"
 
 #define MAX_OPS 512
@@ -46,6 +47,8 @@ struct SSRGame {
 
     // The career that plays now, and the slot that it uses.
     SSRCareer career;
+    // The competitions of the career.
+    SSRSeason *season;
     int slot;
     int slotExists[SSR_CAREER_SLOTS];
 
@@ -269,6 +272,40 @@ static void slot_path(const SSRGame *game, int slot, char *out, size_t capacity)
     snprintf(out, capacity, "%s/career%d.txt", game->saveDirectory, slot + 1);
 }
 
+static void season_path(const SSRGame *game, int slot, char *out, size_t capacity) {
+    snprintf(out, capacity, "%s/season%d.txt", game->saveDirectory, slot + 1);
+}
+
+// The season reads the date and the team of the player from the career,
+// and gives back the date.
+static void season_in(SSRGame *game) {
+    if (!game->season) return;
+    game->season->player.sdate = game->career.sdate;
+    game->season->player.clubId = game->career.clubId;
+    game->season->player.nationId = game->career.nationId;
+    game->season->player.careerApps = game->career.apps;
+}
+
+static void season_out(SSRGame *game) {
+    if (game->season) game->career.sdate = game->season->player.sdate;
+}
+
+// A new season state for the career: no competition is set up.
+static void new_season_state(SSRGame *game) {
+    ssr_season_free(game->season);
+    game->season = game->world ? ssr_season_create(game->world, &game->random) : NULL;
+    season_in(game);
+}
+
+// The date goes to the day before the first match of the player
+// (c_TPlayer.SkipToDate in StartCareer and NewSeasonSetUp2).
+static void skip_to_first_match(SSRGame *game) {
+    season_in(game);
+    SSRFixture *next = ssr_season_next_fixture(game->season);
+    if (next) ssr_season_skip_to(game->season, next->sdate);
+    season_out(game);
+}
+
 // The text of a date as "YY-WW" (c_TMyDate.GetString).
 static void date_text(const SSRCareer *c, char *out, size_t capacity) {
     snprintf(out, capacity, "%02d-%02d", ssr_career_year(c) % 100, ssr_career_week(c));
@@ -323,6 +360,13 @@ static void open_slot(SSRGame *game, int slot) {
     char path[2200];
     slot_path(game, slot, path, sizeof(path));
     if (game->slotExists[slot] && ssr_career_load(&game->career, path)) {
+        new_season_state(game);
+        season_path(game, slot, path, sizeof(path));
+        if (game->season && !ssr_season_load(game->season, path)) {
+            // A career from before the seasons gets its competitions now.
+            ssr_season_set_up(game->season);
+            skip_to_first_match(game);
+        }
         // LoadCareer: the star transition, then the game menu.
         player_tweaks(game);
         reset_progress(game);
@@ -368,6 +412,8 @@ static void call_delete_career(SSRGame *game) {
     if (game->returnState == 1) {
         char path[2200];
         slot_path(game, game->slot, path, sizeof(path));
+        remove(path);
+        season_path(game, game->slot, path, sizeof(path));
         remove(path);
     }
     save_slot_screen(game);
@@ -651,6 +697,9 @@ static void nation_ok(SSRGame *game) {
     const SSRClub *club = first_club(game, league);
     if (!club) return;
     game->career.clubId = club->id;
+    // SetUpCompetitionsAll comes after the choice of the club (CSPEC 7).
+    new_season_state(game);
+    ssr_season_set_up(game->season);
     // The first of the five trials.
     message(game, "messagedefault", loc(game, "CMESSAGE_TRIALMOBILE1"), 0, 1, "DoTrial1");
 }
@@ -775,6 +824,10 @@ static void save_career(SSRGame *game) {
     char path[2200];
     slot_path(game, game->slot, path, sizeof(path));
     ssr_career_save(&game->career, path);
+    if (game->season) {
+        season_path(game, game->slot, path, sizeof(path));
+        ssr_season_save(game->season, path);
+    }
 }
 
 static void webpage(SSRGame *game);
@@ -786,6 +839,7 @@ static void call_start_career(SSRGame *game) {
     for (int i = 0; i < 5; i++) {
         if (skills[i][0] == 0) skills[i][0] = 1;
     }
+    skip_to_first_match(game);
     const SSRClub *club = game->world ? ssr_world_club(game->world, c->clubId) : NULL;
     snprintf(c->headline, sizeof(c->headline), "%s", loc(game, "CNEWS_FIRSTCONTRACTMOBILE"));
     replace_all(c->headline, sizeof(c->headline), "$clubname", club ? club->name : "");
@@ -1928,6 +1982,7 @@ void ssr_game_free(SSRGame *game) {
     free(game->chance);
     free(game->replay);
     free(game->training);
+    ssr_season_free(game->season);
     free(game);
 }
 

@@ -414,7 +414,15 @@ static void test_starts_a_new_career(void) {
     competitions[0].tla = "PRM";
     competitions[0].based = 62;
     competitions[0].duration = 38;
-    competitions[0].level = 1;
+    // A national league of four clubs that meet two times, on Saturdays
+    // from week 6.
+    competitions[0].startYear = 1;
+    competitions[0].startWeek = 6;
+    competitions[0].primaryMatchday = 6;
+    competitions[0].secondaryMatchday = 99;
+    competitions[0].groups = 1;
+    competitions[0].rounds = 2;
+    competitions[0].status = 1;
     SSRClub clubs[4] = {0};
     const char *names[4] = {"Big FC", "Mid FC", "Small FC", "Tiny FC"};
     const char *tlas[4] = {"BIG", "MID", "SML", "TNY"};
@@ -503,6 +511,13 @@ static void test_starts_a_new_career(void) {
     ssr_game_message(game, "message.btn_Ok");
     CHECK(strcmp(ssr_game_screen(game), "startransition") == 0);
     CHECK(career->technique[0] == 1 && career->power[0] == 1);
+    // The date is the day before the first match: Saturday of week 6.
+    CHECK(career->sdate == 5 * 7 + 6 - 1);
+    char seasonPath[1200];
+    snprintf(seasonPath, sizeof(seasonPath), "%s/season1.txt", directory);
+    FILE *seasonFile = fopen(seasonPath, "r");
+    CHECK(seasonFile != NULL);
+    if (seasonFile) fclose(seasonFile);
     // The header of the news page shows the player already.
     CHECK(ssr_tweaks_number(tweaks, "Player", "Age") == 16 && ssr_tweaks_number(tweaks, "Player", "Bux") == 15);
     CHECK(ssr_tweaks_number(tweaks, "Player", "StarBux") == 15);
@@ -556,6 +571,9 @@ static void test_starts_a_new_career(void) {
     ssr_game_message(game, "saveslot.btn_DeleteSlot0");
     ssr_game_message(game, "message.btn_Ok");
     CHECK(ssr_tweaks_number(tweaks, "SaveSlot", "Slot0Exist") == 0);
+    seasonFile = fopen(seasonPath, "r");
+    CHECK(seasonFile == NULL);
+    if (seasonFile) fclose(seasonFile);
     ssr_game_free(game);
     ssr_tweaks_free(tweaks);
 }
