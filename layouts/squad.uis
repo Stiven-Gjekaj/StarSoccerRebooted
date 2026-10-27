@@ -240,3 +240,16 @@ PushOrigin:(480,@n)
 		>
 		ShowIf(Squad,CanPosition,1)
 PopOrigin
+
+// The facts of the club: the manager, the titles, and the budget.
+PushOrigin:(13,@n-96)
+	Rect:(0,0,614,80)
+	{
+		Text:(INFO,20,0,574,80,C,,#BBDDBBFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.38,0.38)
+			GS_ClubInfo()
+	}
+		ConvergeFrom(-640,0)
+PopOrigin

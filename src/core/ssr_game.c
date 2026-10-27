@@ -3795,6 +3795,32 @@ static void squad_fill(SSRGame *game) {
     }
 }
 
+// The budget of a club in millions: the square of the strength, and 5 for
+// each title of the club in the honours.
+int ssr_game_club_budget(const SSRGame *game, int club) {
+    const SSRClub *c = game && game->world ? ssr_world_club(game->world, club) : NULL;
+    if (!c) return 0;
+    return c->strength * c->strength * 12 / 1000 + 5 * ssr_honours_titles(&game->honours, club);
+}
+
+// The facts of the club on the squad screen: the manager, the titles, and
+// the budget. The other lists show none.
+static const char *club_info(SSRGame *game) {
+    if (game->squadMode != 0 || !game->people) return "";
+    const SSRManager *m = ssr_people_manager(game->people, game->squadClub);
+    static const char *const STYLES[SSR_STYLE_COUNT] = {"SSR_StyleBalanced", "SSR_StyleYouth", "SSR_StyleAttacking"};
+    char name[64], number[16];
+    snprintf(name, sizeof(name), "%s %s", m ? m->first : "", m ? m->last : "");
+    snprintf(game->shown, sizeof(game->shown), "%s", loc(game, "SSR_ClubInfo"));
+    replace_all(game->shown, sizeof(game->shown), "$name", name);
+    replace_all(game->shown, sizeof(game->shown), "$style", m ? loc(game, STYLES[m->style % SSR_STYLE_COUNT]) : "");
+    snprintf(number, sizeof(number), "%d", ssr_honours_titles(&game->honours, game->squadClub));
+    replace_all(game->shown, sizeof(game->shown), "$titles", number);
+    snprintf(number, sizeof(number), "%d", ssr_game_club_budget(game, game->squadClub));
+    replace_all(game->shown, sizeof(game->shown), "$budget", number);
+    return game->shown;
+}
+
 // squad.btn_Position: the player plays in the next position. The focus of
 // the next match follows it.
 static void squad_position(SSRGame *game) {
@@ -11309,6 +11335,7 @@ const char *ssr_game_text(SSRGame *game, const char *name) {
         snprintf(game->shown, sizeof(game->shown), "%d", game->settings.nextWorldSeed);
         return game->shown;
     }
+    if (strcmp(name, "GS_ClubInfo") == 0) return club_info(game);
     if (strcmp(name, "GS_SquadTitle") == 0) {
         if (game->typing == 4) return game->editText;
         return ssr_tweaks_get(game->tweaks, "Squad", "Title");

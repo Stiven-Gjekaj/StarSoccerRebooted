@@ -207,6 +207,9 @@ void ssr_game_set_horse_names(SSRGame *game, const char *text);
 // The name lists of the players of the world (data/names.txt). The game
 // keeps a copy.
 void ssr_game_set_names(SSRGame *game, const char *text);
+// The budget of the club in millions: from its strength and its titles.
+int ssr_game_club_budget(const SSRGame *game, int club);
+
 // Adds the real players of a pack (world/Players.txt) to the names. Set
 // the names first. Returns the number of players.
 int ssr_game_add_players(SSRGame *game, const char *text);

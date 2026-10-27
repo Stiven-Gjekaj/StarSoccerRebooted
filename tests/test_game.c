@@ -901,6 +901,10 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         ssr_game_message(game, "league.btn_Squad");
         CHECK(strcmp(ssr_game_screen(game), "squad") == 0);
         CHECK(strlen(ssr_tweaks_get(tweaks, "Squad", "Title")) > 0);
+        // The facts of the club, and its budget from its strength and its
+        // titles.
+        CHECK(strcmp(ssr_game_text(game, "GS_ClubInfo"), "SSR_ClubInfo") == 0);
+        CHECK(ssr_game_club_budget(game, ssr_game_career(game)->clubId) > 0 && ssr_game_club_budget(game, 99999) == 0);
         rows = take_ops(game, ops, 256);
         int players = 0, scorers = 0;
         for (int i = 0; i < rows; i++) players += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "PlayerList") == 0;
