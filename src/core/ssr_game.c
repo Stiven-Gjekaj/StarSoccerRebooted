@@ -981,6 +981,7 @@ static void call_vehicle_team(SSRGame *game);
 static void call_vehicle_partner(SSRGame *game);
 static void call_tip(SSRGame *game);
 static void call_expired_item(SSRGame *game);
+static void call_buy_property(SSRGame *game);
 static void call_dump_partner(SSRGame *game);
 
 static void run_call(SSRGame *game, const char *name) {
@@ -1009,6 +1010,7 @@ static void run_call(SSRGame *game, const char *name) {
         {"VehicleBorrowedGirl", call_vehicle_partner},
         {"DoTip", call_tip},
         {"ExpiredItem", call_expired_item},
+        {"BuyProperty", call_buy_property},
         {"DumpGirl", call_dump_partner},
     };
     for (size_t i = 0; i < sizeof(CALLS) / sizeof(CALLS[0]); i++) {
@@ -3970,10 +3972,11 @@ static void call_tip(SSRGame *game) {
     leaguefixtures_screen(game, 0);
 }
 
-// The call "ExpiredItem": the lifestyle shop on the tab of the product
-// [I: the shop comes with its part; the game menu shows until then].
+static void lifestyle_shop(SSRGame *game, int type);
+
+// The call "ExpiredItem": the lifestyle shop on the tab of the product.
 static void call_expired_item(SSRGame *game) {
-    game_menu(game);
+    lifestyle_shop(game, game->messageData);
 }
 
 
@@ -4210,6 +4213,387 @@ WORD(13)
 WORD(14)
 WORD(15)
 #undef WORD
+
+
+/* -------------------------------------------------------- the lifestyle */
+
+// The products of the tabs of the lifestyle overlay.
+static const char *const SHOP_TABS[3] = {"Items", "Vehicles", "Property"};
+
+static SSRShopType shop_type(const char *tab) {
+    if (strcmp(tab, "Vehicles") == 0) return SSR_SHOP_VEHICLE;
+    if (strcmp(tab, "Property") == 0) return SSR_SHOP_PROPERTY;
+    return SSR_SHOP_ITEM;
+}
+
+static const SSRShopItem *shop_product(const char *uid) {
+    for (int i = 0; i < SSR_SHOP_COUNT; i++) {
+        const SSRShopItem *item = ssr_shop_item(i);
+        if (uid && strcmp(item->uid, uid) == 0) return item;
+    }
+    return NULL;
+}
+
+// c_Product_Item.Owned: 0 not owned, else the condition from 1 to 100.
+static int product_owned(const SSRCareer *c, const SSRShopItem *item) {
+    int v = product_array((SSRCareer *)c, item->type)[item->id - 1];
+    if (v == 0) return 0;
+    int w = v >= 10000 ? v - 10000 : v;
+    float owned = (1100.0f - (float)w) * 0.09090909f;
+    return (int)(owned < 1.0f ? 1.0f : owned);
+}
+
+// GetLifeLeft: 5 new to 0 broken.
+static int product_life_left(const SSRCareer *c, const SSRShopItem *item) {
+    int v = product_array((SSRCareer *)c, item->type)[item->id - 1];
+    if (v >= 10000) return 0;
+    return v > 1000 ? 1 : v > 750 ? 2 : v > 500 ? 3 : v > 250 ? 4 : 5;
+}
+
+// c_Product_Lifestyle.GetRepairPrice.
+static float repair_price(const SSRCareer *c, const SSRShopItem *item) {
+    if (item->lifeType == SSR_LIFE_NONE) return 0;
+    static const float PART[5] = {80, 70, 45, 25, 10};
+    int life = product_life_left(c, item);
+    if (life >= 5) return 0;
+    float price = PART[life] * ((float)item->price / 100.0f);
+    return price < 1 ? 1 : price;
+}
+
+static int count_owned(const SSRCareer *c, SSRShopType type) {
+    int n = 0;
+    for (int i = 0; i < SSR_CAREER_ITEMS; i++) n += product_array((SSRCareer *)c, type)[i] > 0;
+    return n;
+}
+
+// The price in the shop: the star and the number.
+static void shop_price(char *out, size_t capacity, int price) {
+    snprintf(out, capacity, "\xE2\x98\x85%d", price);
+}
+
+// c_GSShopping.BuildButton for a lifestyle product.
+static void shop_button(SSRGame *game, const SSRShopItem *item, int large) {
+    const SSRCareer *c = &game->career;
+    const char *list = "LifestyleList";
+    const char *L = large ? "Large" : "";
+    char name[96], text[96];
+    snprintf(name, sizeof(name), "ShopButton%s", large ? "Large" : "Small");
+    add_op(game, SSR_OP_LIST_ADD_AT, list, name, NULL, 20);
+    snprintf(text, sizeof(text), "hashed_uid=%s", item->uid);
+    add_op(game, SSR_OP_ENTRY_VAR, list, "ItemButton", text, 0);
+    snprintf(text, sizeof(text), "info_hashed_uid=%s", item->uid);
+    add_op(game, SSR_OP_ENTRY_VAR, list, "InfoButton", text, 0);
+    snprintf(name, sizeof(name), "ShopSelected%s", L);
+    add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    snprintf(text, sizeof(text), "sel_uid=%s", item->uid);
+    add_op(game, SSR_OP_ENTRY_VAR, list, name, text, 0);
+    snprintf(name, sizeof(name), "%s%s_Image", item->uid, large ? "_L" : "");
+    add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    snprintf(name, sizeof(name), "ShopTitle%s", L);
+    add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    add_op(game, SSR_OP_LIST_SUB, list, "Title", loc(game, item->uid), 1);
+    add_op(game, SSR_OP_LIST_SUB, list, "TitleShadow", loc(game, item->uid), 1);
+    snprintf(name, sizeof(name), "ShopDescription%s", L);
+    add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    if (item->type == SSR_SHOP_PROPERTY) {
+        snprintf(text, sizeof(text), "%s        %s", loc(game, "LIFESTYLE_BONUS"), loc(game, "PROPERTY_RECOVERY"));
+    } else {
+        snprintf(text, sizeof(text), "%s", loc(game, "LIFESTYLE_BONUS"));
+    }
+    add_op(game, SSR_OP_LIST_SUB, list, "Description", text, 1);
+    int owned = product_owned(c, item);
+    if (owned == 0) {
+        snprintf(name, sizeof(name), "ShopPrice%s", L);
+        add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+        shop_price(text, sizeof(text), item->price);
+        add_op(game, SSR_OP_LIST_SUB, list, "Price", text, 1);
+        add_op(game, SSR_OP_LIST_SUB, list, "PriceShadow", text, 1);
+    } else if (item->lifeType != SSR_LIFE_NONE) {
+        snprintf(name, sizeof(name), "ShopOwnedBar%s", L);
+        add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+        snprintf(text, sizeof(text), "Products,%s_Owned", item->uid);
+        add_op(game, SSR_OP_ENTRY_BAR, list, "ProgressBar", text, 0);
+        add_op(game, SSR_OP_LIST_SUB, list, "UsesRemaining", loc(game, "ITEM_CONDITION"), 1);
+        if (owned <= 25) {
+            snprintf(name, sizeof(name), "ShopFixIcon%s", L);
+            add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+        }
+    } else {
+        snprintf(name, sizeof(name), "ShopOwnedTick%s", L);
+        add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    }
+    snprintf(name, sizeof(name), "ShopUnselected%s", L);
+    add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    snprintf(text, sizeof(text), "unsel_uid=%s", item->uid);
+    add_op(game, SSR_OP_ENTRY_VAR, list, name, text, 0);
+    snprintf(text, sizeof(text), "%s_Owned", item->uid);
+    ssr_tweaks_set_number(game->tweaks, "Products", text, owned);
+}
+
+static void shop_selected(SSRGame *game);
+
+// c_ShopOverlay.RebuildShop for the lifestyle tabs.
+static void rebuild_shop(SSRGame *game, int select) {
+    SSRTweaks *t = game->tweaks;
+    const SSRCareer *c = &game->career;
+    const char *tab = ssr_tweaks_get(t, "Menu", "ShopTab");
+    SSRShopType type = shop_type(tab);
+    static const char *TITLES[3] = {"Items", "Vehicles", "Properties"};
+    ssr_tweaks_set(t, "Menu", "ShopTitle", loc(game, TITLES[type - 1]));
+    char text[600], name[48];
+    snprintf(text, sizeof(text), "%d/%d", count_owned(c, type), ssr_shop_count_by_type(type));
+    ssr_tweaks_set(t, "Menu", "ItemsOwned", text);
+    player_tweaks(game);
+    // BuildShopContent: the order of the products comes from a tweak.
+    add_op(game, SSR_OP_LIST_CLEAR, "LifestyleList", NULL, NULL, 0);
+    snprintf(name, sizeof(name), "%sOrder", SHOP_TABS[type - 1]);
+    snprintf(text, sizeof(text), "%s", ssr_tweaks_get(t, "Products", name));
+    char value[64], popular[64];
+    snprintf(name, sizeof(name), "%s_Value", SHOP_TABS[type - 1]);
+    snprintf(value, sizeof(value), "%s", ssr_tweaks_get(t, "Products", name));
+    snprintf(name, sizeof(name), "%s_Popular", SHOP_TABS[type - 1]);
+    snprintf(popular, sizeof(popular), "%s", ssr_tweaks_get(t, "Products", name));
+    int first = 1;
+    for (char *entry = strtok(text, "|"); entry; entry = strtok(NULL, "|")) {
+        size_t n = strlen(entry);
+        int large = n > 2 && strcmp(entry + n - 2, "_L") == 0;
+        if (large) entry[n - 2] = 0;
+        const SSRShopItem *item = shop_product(entry);
+        if (!item) continue;
+        shop_button(game, item, large);
+        if (select && first) ssr_tweaks_set(t, "Menu", "ItemString", item->uid);
+        first = 0;
+        const char *sticker = strcmp(value, entry) == 0 ? "ShopBestValue" : strcmp(popular, entry) == 0 ? "ShopMostPopular" : NULL;
+        if (sticker) {
+            snprintf(name, sizeof(name), "%s%sInst", sticker, large ? "_L" : "");
+            add_op(game, SSR_OP_ENTRY_CHILD, "LifestyleList", name, "", 0);
+        }
+    }
+    shop_selected(game);
+}
+
+// c_ShopOverlay.OnItemSelected: the text of the buy button.
+static void shop_selected(SSRGame *game) {
+    SSRTweaks *t = game->tweaks;
+    const SSRShopItem *item = shop_product(ssr_tweaks_get(t, "Menu", "ItemString"));
+    const char *text = loc(game, "BUY");
+    if (item && product_owned(&game->career, item) > 0) {
+        static const char *CARE[6] = {NULL, "item_Repair_caps", "item_Upgrade_caps", "item_Clean_caps",
+                                      "item_Restore_caps", "item_Replace_caps"};
+        int life = product_life_left(&game->career, item);
+        if (life == 5) text = "";
+        else if (item->lifeType != SSR_LIFE_NONE) text = loc(game, CARE[item->lifeType]);
+    }
+    ssr_tweaks_set(t, "Menu", "BuyButtonString", text);
+}
+
+// ShopLifestyle.SetUpScreen: the lifestyle overlay on the tab of the type.
+static void lifestyle_shop(SSRGame *game, int type) {
+    snprintf(game->overlay, sizeof(game->overlay), "LifestyleShopOverlay");
+    ssr_tweaks_set(game->tweaks, "Menu", "ShopTab", SHOP_TABS[(type >= 1 && type <= 3 ? type : 1) - 1]);
+    rebuild_shop(game, 1);
+}
+
+static void shop_from_relationships(SSRGame *game) {
+    lifestyle_shop(game, 1);
+}
+
+static void shop_tab(SSRGame *game, int type) {
+    ssr_tweaks_set(game->tweaks, "Menu", "ShopTab", SHOP_TABS[type - 1]);
+    rebuild_shop(game, 1);
+}
+
+static void shop_tab_items(SSRGame *game) {
+    shop_tab(game, 1);
+}
+
+static void shop_tab_vehicles(SSRGame *game) {
+    shop_tab(game, 2);
+}
+
+static void shop_tab_property(SSRGame *game) {
+    shop_tab(game, 3);
+}
+
+// NotEnoughCash: the remake has no bux shop, so the splash of the classic
+// look shows.
+static void not_enough_cash(SSRGame *game, int shortBy) {
+    ssr_tweaks_set_number(game->tweaks, "Menu", "ItemInfoHelpIncrement", 0);
+    if (shortBy <= 0) return;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "BuxShort", shortBy);
+    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "CMESSAGE_NOTENOUGHCASHSHORT"));
+    game->splashEnd = game->now + 1500;
+}
+
+// UpdateBank: the bank does not go under 0.
+static void update_bank(SSRGame *game, int change) {
+    SSRCareer *c = &game->career;
+    c->bank = c->bank + change < 0 ? 0 : c->bank + change;
+    player_tweaks(game);
+}
+
+// bb_GSProducts.OnItemPurchased: the pop-up of the purchase.
+static void item_purchased(SSRGame *game, const char *text) {
+    rebuild_shop(game, 0);
+    ssr_tweaks_set(game->tweaks, "Products", "PurchaseOverlayMessage", text && text[0] ? text : loc(game, "Item purchased"));
+    snprintf(game->modal, sizeof(game->modal), "PurchaseAnim");
+}
+
+// c_Product_Item.Buy.
+static void buy_product(SSRGame *game, const SSRShopItem *item) {
+    SSRCareer *c = &game->career;
+    update_bank(game, -item->price);
+    product_array(c, item->type)[item->id - 1] += 1;
+    save_career(game);
+    ssr_tweaks_set_number(game->tweaks, "Player", "Lifestyle", ssr_career_lifestyle(c));
+    if (c->teamShopping > -1) c->teamShopping += item->type;
+    item_purchased(game, "");
+}
+
+static void repair_check(SSRGame *game, const SSRShopItem *item);
+
+// shopoverlay.buy: TryBuy of the product.
+static void shop_buy(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->retired) {
+        ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "Retired"));
+        game->splashEnd = game->now + 1500;
+        return;
+    }
+    const SSRShopItem *item = shop_product(ssr_tweaks_get(game->tweaks, "Menu", "ItemString"));
+    if (!item) return;
+    if (product_array(c, item->type)[item->id - 1] > 0) {
+        repair_check(game, item);
+        return;
+    }
+    if (c->bank < item->price) {
+        not_enough_cash(game, item->price - c->bank);
+        return;
+    }
+    if (item->type == SSR_SHOP_PROPERTY && count_owned(c, SSR_SHOP_PROPERTY) == 0) {
+        // The first property asks first.
+        game->overlay[0] = 0;
+        char text[512], price[32];
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_PROPERTYCHECK"));
+        shop_price(price, sizeof(price), item->price);
+        replace_all(text, sizeof(text), "$price", price);
+        game->messageData = item->id;
+        message(game, "message", text, 1, 1, "BuyProperty");
+        return;
+    }
+    buy_product(game, item);
+}
+
+static void call_buy_property(SSRGame *game) {
+    const SSRShopItem *item = ssr_shop_nth_of_type(SSR_SHOP_PROPERTY, 1);
+    for (int i = 1; i <= ssr_shop_count_by_type(SSR_SHOP_PROPERTY); i++) {
+        const SSRShopItem *p = ssr_shop_nth_of_type(SSR_SHOP_PROPERTY, i);
+        if (p->id == game->messageData) item = p;
+    }
+    lifestyle_shop(game, 3);
+    if (game->returnState == 1 && item) buy_product(game, item);
+}
+
+static void shop_on_item_selected(SSRGame *game) {
+    shop_selected(game);
+}
+
+// UpsellMsg.CloseLifestyle: the overlay goes, and a shopping trip ends.
+static void shop_close_lifestyle(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    game->overlay[0] = 0;
+    game->modal[0] = 0;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "ItemInfoHelpIncrement", 0);
+    if (c->teamShopping == 0) {
+        ssr_career_update_relation(c, SSR_RELATION_TEAM, -5);
+    } else if (c->teamShopping > 0) {
+        int gain = c->teamShopping * 2;
+        ssr_career_update_relation(c, SSR_RELATION_TEAM, (float)(gain < 1 ? 1 : gain > 5 ? 5 : gain));
+    }
+    c->teamShopping = -1;
+    relationships_screen(game, 0, 0);
+}
+
+static void purchase_close(SSRGame *game) {
+    game->modal[0] = 0;
+}
+
+// c_Product_Lifestyle.DoRepairCheck: the repair box.
+static void repair_check(SSRGame *game, const SSRShopItem *item) {
+    const SSRCareer *c = &game->career;
+    if (product_life_left(c, item) == 5 || item->lifeType == SSR_LIFE_NONE) return;
+    static const char *TYPES[6] = {"", "REPAIR", "UPGRADE", "CLEAN", "RESTORE", "REPLACE"};
+    static const char *NAMES[6] = {"", "item_Repair", "item_Upgrade", "item_Clean", "item_Restore", "item_Replace"};
+    static const char *ALL[4] = {"", "CMESSAGE_REPAIRALLITEMS", "CMESSAGE_REPAIRALLVEHICLES", "CMESSAGE_REPAIRALLPROPERTY"};
+    char text[512], price[32], tag[48], name[64];
+    int all = 0;
+    for (int i = 1; i <= ssr_shop_count_by_type(item->type); i++) {
+        all = (int)((float)all + repair_price(c, ssr_shop_nth_of_type(item->type, i)));
+    }
+    text[0] = 0;
+    if (count_owned(c, item->type) > 1) {
+        snprintf(text, sizeof(text), "%s", loc(game, ALL[item->type]));
+        shop_price(price, sizeof(price), all);
+        replace_all(text, sizeof(text), "$price", price);
+    }
+    ssr_tweaks_set(game->tweaks, "Products", "RepairAllString", text);
+    snprintf(tag, sizeof(tag), "CMESSAGE_ITEMCHECK%s", TYPES[item->lifeType]);
+    snprintf(text, sizeof(text), "%s", loc(game, tag));
+    shop_price(price, sizeof(price), (int)repair_price(c, item));
+    replace_all(text, sizeof(text), "$price", price);
+    snprintf(name, sizeof(name), "%s", loc(game, item->uid));
+    upper(name);
+    replace_all(text, sizeof(text), "$item", name);
+    ssr_tweaks_set(game->tweaks, "Products", "RepairItemString", text);
+    ssr_tweaks_set(game->tweaks, "Products", "RepairTypeString", loc(game, NAMES[item->lifeType]));
+    snprintf(game->modal, sizeof(game->modal), "repairmenu");
+}
+
+static void repair_cancel(SSRGame *game) {
+    game->modal[0] = 0;
+}
+
+static void repair_confirm(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    const SSRShopItem *item = shop_product(ssr_tweaks_get(game->tweaks, "Menu", "ItemString"));
+    if (item) {
+        float r = repair_price(c, item);
+        if ((float)c->bank < r) {
+            not_enough_cash(game, (int)(r - (float)c->bank));
+        } else {
+            update_bank(game, -(int)r);
+            product_array(c, item->type)[item->id - 1] = 1;
+            if (c->teamShopping > -1) c->teamShopping += item->type;
+            save_career(game);
+        }
+    }
+    game->modal[0] = 0;
+    rebuild_shop(game, 0);
+}
+
+static void repair_all(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    const SSRShopItem *item = shop_product(ssr_tweaks_get(game->tweaks, "Menu", "ItemString"));
+    if (item) {
+        int price = 0;
+        for (int i = 1; i <= ssr_shop_count_by_type(item->type); i++) {
+            price = (int)((float)price + repair_price(c, ssr_shop_nth_of_type(item->type, i)));
+        }
+        if (c->bank < price) {
+            not_enough_cash(game, price - c->bank);
+        } else {
+            int *a = product_array(c, item->type);
+            for (int i = 0; i < SSR_CAREER_ITEMS; i++) {
+                if (a[i] > 0) a[i] = 1;
+            }
+            if (c->teamShopping > -1) c->teamShopping += 3;
+            update_bank(game, -price);
+            save_career(game);
+        }
+    }
+    game->modal[0] = 0;
+    rebuild_shop(game, 0);
+}
 
 /* ------------------------------------------------------------ the pairs */
 
@@ -4471,6 +4855,17 @@ static const Route ROUTES[] = {
     {"interview.btn_ok", interview_ok},
     {"debug.interview", interview_screen},
     {"debug.dilemma", dilemma_screen},
+    {"relationships.btn_Shop", shop_from_relationships},
+    {"shop.tab.items", shop_tab_items},
+    {"shop.tab.vehicles", shop_tab_vehicles},
+    {"shop.tab.property", shop_tab_property},
+    {"shopoverlay.onItemSelected", shop_on_item_selected},
+    {"shopoverlay.buy", shop_buy},
+    {"UpsellMsg.CloseLifestyle", shop_close_lifestyle},
+    {"PurchaseAnim.Close", purchase_close},
+    {"Repair.Cancel", repair_cancel},
+    {"Repair.Confirm", repair_confirm},
+    {"Repair.All", repair_all},
     {"dilemma.btn_relationship1", dilemma_top},
     {"dilemma.btn_relationship2", dilemma_bottom},
     {"pairs.btn_0", card0},

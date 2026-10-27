@@ -767,6 +767,71 @@ static void choose_a_dilemma(SSRGame *game, const char *path) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
+// The lifestyle shop: a purchase, too little cash, the question of the
+// first property, a repair, and the end of a trip with the team-mates.
+static void go_shopping(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.bank = 40;
+    c.vehicles[0] = 900;
+    c.teamShopping = 0;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    const SSRCareer *now = ssr_game_career(game);
+    ssr_tweaks_set(tweaks, "Products", "ItemsOrder", "item_ArtSculpture_L|item_Tattoo|item_Phone");
+    ssr_tweaks_set(tweaks, "Products", "VehiclesOrder", "vehicle_Bicycle_L|vehicle_Scooter");
+    ssr_tweaks_set(tweaks, "Products", "PropertyOrder", "property_Apartment_L");
+    ssr_game_message(game, "gamemenu.btn_Life");
+    ssr_game_message(game, "relationships.btn_Shop");
+    CHECK(strcmp(ssr_game_overlay(game), "LifestyleShopOverlay") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ShopTab"), "Items") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "item_ArtSculpture") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemsOwned"), "0/20") == 0);
+    SSRUiOp ops[256];
+    int count = take_ops(game, ops, 256);
+    int buttons = 0;
+    for (int i = 0; i < count; i++) buttons += ops[i].kind == SSR_OP_LIST_ADD_AT;
+    CHECK(buttons == 3 && has_op(ops, count, SSR_OP_ENTRY_CHILD, "LifestyleList", NULL));
+    // The sculpture costs 90: too much.
+    ssr_game_message(game, "shopoverlay.buy");
+    CHECK(now->bank == 40 && now->items[17] == 0 && ssr_game_splash(game));
+    // The tattoo costs 5.
+    ssr_tweaks_set(tweaks, "Menu", "ItemString", "item_Tattoo");
+    ssr_game_message(game, "shopoverlay.onItemSelected");
+    ssr_game_message(game, "shopoverlay.buy");
+    CHECK(now->bank == 35 && now->items[10] == 1 && now->teamShopping == 1);
+    CHECK(strcmp(ssr_game_modal(game), "PurchaseAnim") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemsOwned"), "1/20") == 0);
+    ssr_game_message(game, "PurchaseAnim.Close");
+    CHECK(ssr_game_modal(game)[0] == 0);
+    // The bicycle has a wear of 900, so 2 of its 5 lives are left: the
+    // repair costs 45 a hundredth of the price, 4.5, cut to 4.
+    ssr_game_message(game, "shop.tab.vehicles");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "vehicle_Bicycle") == 0);
+    ssr_game_message(game, "shopoverlay.buy");
+    CHECK(strcmp(ssr_game_modal(game), "repairmenu") == 0);
+    ssr_game_message(game, "Repair.Confirm");
+    CHECK(now->vehicles[0] == 1 && now->bank == 31 && now->teamShopping == 3 && ssr_game_modal(game)[0] == 0);
+    // The first property asks first. No keeps the cash.
+    ssr_game_message(game, "shop.tab.property");
+    ssr_game_message(game, "shopoverlay.buy");
+    CHECK(strcmp(ssr_game_screen(game), "message") == 0 && ssr_game_overlay(game)[0] == 0);
+    ssr_game_message(game, "message.btn_Cancel");
+    CHECK(strcmp(ssr_game_overlay(game), "LifestyleShopOverlay") == 0 && now->properties[0] == 0 && now->bank == 31);
+    // Yes buys it.
+    ssr_game_message(game, "shopoverlay.buy");
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(now->properties[0] == 1 && now->bank == 6);
+    // The trip ends: three purchases give the team 5.
+    float team = now->relationTeam;
+    ssr_game_message(game, "UpsellMsg.CloseLifestyle");
+    CHECK(ssr_game_overlay(game)[0] == 0 && strcmp(ssr_game_screen(game), "relationships") == 0);
+    CHECK(now->teamShopping == -1 && now->relationTeam == (team + 5 > 100 ? 100 : team + 5));
+    ssr_game_message(game, "relationships.btn_Home");
+}
+
 // Drinks the next can after a match: a question when the energy is above
 // 75, then the boost screen of a skill can, and full energy at the end.
 static void drink_a_can(SSRGame *game, SSRTweaks *tweaks) {
@@ -981,6 +1046,7 @@ static void test_starts_a_new_career(void) {
     CHECK(winnerPages == 1);
     spend_time(game, tweaks, path);
     choose_a_dilemma(game, path);
+    go_shopping(game, tweaks, path);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 12 && seasons == 0; i++) play_a_match(game, tweaks);
     CHECK(seasons >= 1);
