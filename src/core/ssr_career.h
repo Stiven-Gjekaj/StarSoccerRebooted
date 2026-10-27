@@ -106,6 +106,8 @@ typedef struct {
     int newsDone;
     // The number of tips that the game menu showed (c_TPlayer.tipcount).
     int tipCount;
+    // The skill of the player in interviews, and the day of the last one.
+    int interviewSkill, lastInterview;
     char gameVersion[16];
 } SSRCareer;
 
