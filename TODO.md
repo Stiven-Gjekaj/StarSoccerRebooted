@@ -132,7 +132,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [ ] The transfer at the end of the season (`DesiredTransfer`). Yes
       keeps the club for now.
 
-## 0.7 The life of the player
+## 0.7 The life of the player (done)
 
 - [x] Relationships (`Relationships`, `Pairs`)
 - [ ] The sounds of the relationships screen and of the pairs game
@@ -145,15 +145,21 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] The news of the week before a match (`GSPlayerPlay`): the partner,
       the requests of the relations, the happiness, the style, the
       vehicles, the other clubs, the dilemma, and the tips
-- [ ] The news checks that wait for their parts: the old pro boots, the
-      transfer window, the captaincy, the sponsors, and the gambling
+- [x] The news checks of the old pro boots, the transfer window, the
+      captaincy, and the sponsors
+- [ ] The gambling news, with the casino of 0.8
 - [ ] The skill bar in the message of a dilemma accident
 - [ ] Check the colour of the interview buttons against the original
-- [ ] Money, the lifestyle shop, boots, and match balls (`ShopLifestyle`,
-      `BootShop`, `MatchBalls`, `BuyItem`)
-- [ ] The agent, transfers, and contract talks (`AgentDetails`,
+- [x] Money, the lifestyle shop, and boots (`ShopLifestyle`, `BootShop`,
+      `BuyItem`)
+- [ ] Match balls (`MatchBalls`)
+- [ ] The warning of the trainer and the loss of skills with no training
+- [x] The agent, transfers, and contract talks (`AgentDetails`,
       `DesiredTransfer`, `Negotiate`)
-- [ ] Retirement (`Retirement`)
+- [ ] The digits of the cards of the negotiate game (`MechDigit`)
+- [x] Retirement (`Retirement`), the score, and the hard mode unlock
+- [ ] The history of the seasons and the trophy log. The score of the
+      retirement counts no medals and no seasons until they come.
 
 ## 0.8 Side games
 
