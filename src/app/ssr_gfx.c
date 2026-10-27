@@ -223,6 +223,21 @@ typedef struct {
 // rotation about the pivot.
 static SDL_FPoint place(const Placement *p, float x, float y) {
     const SSRSceneItem *item = p->item;
+    if (item->projected) {
+        // A point of the plane of a sheet: the corners mix in the space of
+        // the camera, then the perspective divides by z (c_GelSheet).
+        const float *c = item->camera;
+        float w[4] = {(1 - x) * (1 - y), x * (1 - y), x * y, (1 - x) * y};
+        float X = 0, Y = 0, Z = 0;
+        for (int k = 0; k < 4; k++) {
+            X += w[k] * c[k * 3];
+            Y += w[k] * c[k * 3 + 1];
+            Z += w[k] * c[k * 3 + 2];
+        }
+        if (Z < 1) Z = 1;
+        SDL_FPoint out = {320 + item->focal * X / Z + p->offsetX, 480 + item->focal * Y / Z + p->offsetY};
+        return out;
+    }
     if (item->quad) {
         // A point of the four corners, by its parts along the top and the
         // left side.
@@ -251,6 +266,30 @@ static SDL_Vertex vertex(const Placement *p, float x, float y, float u, float v)
 
 static void draw_quad(SSRGfx *gfx, SDL_Texture *texture, const Placement *p, float x0, float y0, float x1, float y1,
                       float u0, float v0, float u1, float v1) {
+    if (p->item->projected) {
+        // The renderer maps the texture in a straight line between the
+        // points. A grid of 8 x 8 cells keeps the perspective of the texture
+        // near the game, which maps it with perspective.
+        enum { CELLS = 8 };
+        SDL_Vertex grid[(CELLS + 1) * (CELLS + 1)];
+        int indices[CELLS * CELLS * 6], count = 0;
+        for (int j = 0; j <= CELLS; j++) {
+            for (int i = 0; i <= CELLS; i++) {
+                float a = (float)i / CELLS, b = (float)j / CELLS;
+                grid[j * (CELLS + 1) + i] = vertex(p, x0 + (x1 - x0) * a, y0 + (y1 - y0) * b, u0 + (u1 - u0) * a,
+                                                   v0 + (v1 - v0) * b);
+            }
+        }
+        for (int j = 0; j < CELLS; j++) {
+            for (int i = 0; i < CELLS; i++) {
+                int k = j * (CELLS + 1) + i;
+                int quad[6] = {k, k + 1, k + CELLS + 2, k, k + CELLS + 2, k + CELLS + 1};
+                for (int q = 0; q < 6; q++) indices[count++] = quad[q];
+            }
+        }
+        SDL_RenderGeometry(gfx->renderer, texture, grid, (CELLS + 1) * (CELLS + 1), indices, count);
+        return;
+    }
     SDL_Vertex vertices[4] = {
         vertex(p, x0, y0, u0, v0),
         vertex(p, x1, y0, u1, v0),
