@@ -419,6 +419,8 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     int historyApps;
     ssr_career_history_totals(c, &historyApps, NULL, NULL, NULL);
     CHECK(rows == 1 && historyApps == c->apps);
+    // The mean rating of the season goes into the form of the career.
+    CHECK(c->careerForm[4] == (int)(c->seasonTotalRating / (float)c->seasonApps));
     const SSRTrophy *place = c->trophyCount ? &c->trophies[c->trophyCount - 1] : NULL;
     CHECK(place && place->year == year - 1 && strncmp(place->tournament, "PRM ", 4) == 0);
     CHECK(place && place->medal == (position == 1 ? 1 : 0));
@@ -1273,9 +1275,26 @@ static void look_at_achievements(SSRGame *game, SSRTweaks *tweaks) {
     SSRUiOp drop;
     while (ssr_game_take_op(game, &drop)) {
     }
+    // The form of the career shows the seasons with a rating, or the last
+    // four of a long text.
+    SSRCareer *form = (SSRCareer *)c;
+    int kept[5];
+    memcpy(kept, form->careerForm, sizeof(kept));
+    int forms[2][5] = {{0, 0, 6, 7, 8}, {10, 10, 10, 10, 9}};
+    const char *texts[2] = {"6-7-8", "10-10-10-9"};
+    for (int k = 0; k < 2; k++) {
+        memcpy(form->careerForm, forms[k], sizeof(kept));
+        ssr_game_message(game, "relationships.btn_Achievements");
+        CHECK(strcmp(ssr_tweaks_get(tweaks, "PlayerStats", "CareerForm"), texts[k]) == 0);
+        ssr_game_message(game, "achievements.btn_Home");
+    }
+    memcpy(form->careerForm, kept, sizeof(kept));
+    while (ssr_game_take_op(game, &drop)) {
+    }
     ssr_game_message(game, "relationships.btn_Achievements");
     CHECK(strcmp(ssr_game_screen(game), "achievements") == 0);
     CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "CareerMatches") == c->apps);
+    CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "CareerHatTricks") == c->hatTricks);
     CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "InternationalGoals") == c->intGoals);
     static SSRUiOp ops[2048];
     int count = take_ops(game, ops, 2048), trophies = 0, clubs = 0, first = -1, firstClub = -1;

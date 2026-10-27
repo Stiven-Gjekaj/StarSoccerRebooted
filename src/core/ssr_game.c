@@ -3135,6 +3135,8 @@ static void season_review(SSRGame *game) {
     const SSRStatRow *last = c->historyCount ? &c->history[c->historyCount - 1] : NULL;
     if (!last || last->year != year || strcmp(last->club, club->data->tla) != 0) {
         ssr_career_add_history(c, year, club->data->tla);
+        // AddCareerForm: the mean rating of the season.
+        ssr_career_add_form(c->careerForm, apps ? (int)(c->seasonTotalRating / (float)apps) : 0);
     }
 }
 
@@ -4129,8 +4131,22 @@ static void player_string_stat(SSRGame *game, const char *name, const char *seas
     ssr_tweaks_set(game->tweaks, "PlayerStats", key, international);
 }
 
-// TweakInterface.UpdatePlayerStats. [I: the remake keeps no form of the
-// career, and no furthest goals and passes, so these show nothing.]
+// GetStringCareerForm: the ratings above 0, or the last four when the
+// text is longer than 12 characters.
+static void career_form_string(const int *form, char *out, size_t capacity) {
+    char text[64] = "", part[80];
+    if (form[4] > 0) snprintf(text, sizeof(text), "%d", form[4]);
+    for (int i = 3; i >= 0; i--) {
+        if (form[i] <= 0) continue;
+        snprintf(part, sizeof(part), "%d-%s", form[i], text);
+        snprintf(text, sizeof(text), "%s", part);
+    }
+    if (strlen(text) <= 12) snprintf(out, capacity, "%s", text);
+    else snprintf(out, capacity, "%d-%d-%d-%d", form[1], form[2], form[3], form[4]);
+}
+
+// TweakInterface.UpdatePlayerStats. [I: the remake keeps no furthest
+// goals and passes, so these show nothing.]
 static void update_player_stats(SSRGame *game) {
     const SSRCareer *c = &game->career;
     player_stat(game, "Matches", c->seasonApps, c->apps, c->intApps);
@@ -4147,7 +4163,9 @@ static void update_player_stats(SSRGame *game) {
     char season[64], international[64];
     form_string(c->form, c->seasonApps, season, sizeof(season));
     form_string(c->intForm, c->intApps, international, sizeof(international));
-    player_string_stat(game, "Form", season, "", international);
+    char career[64];
+    career_form_string(c->careerForm, career, sizeof(career));
+    player_string_stat(game, "Form", season, career, international);
 }
 
 // c_TScreen_Achievements.SetUpScreen and c_AScreen_Achievements.OnActive:
