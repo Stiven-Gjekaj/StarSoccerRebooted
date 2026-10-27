@@ -37,6 +37,8 @@ struct SSRGfx {
     const SSRScene *scene;
     const SSRTweaks *tweaks;
     float offsetX, offsetY;
+    // The time of the scene that draws now, in ms.
+    int gameMS;
 };
 
 SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
@@ -418,6 +420,25 @@ static int wrap_lines(FontSlot *slot, const char *text, float width, char lines[
     return count;
 }
 
+// The space inside a text box (c_GelText.m_padding), and the space that
+// the "new" fonts of Fonts.txt add at the left and the right.
+#define TEXT_PADDING 5.0f
+#define FONT_PAD_LEFT 6.0f
+#define FONT_PAD_RIGHT 5.0f
+
+// A line that is wider than its box moves from side to side in it, at the
+// time of the game (c_GelText.DoBounceScroll): 300 units each 6 seconds.
+static float bounce_scroll(int gameMS, float overflow) {
+    const float distance = 300, period = 6000;
+    float at = (float)(gameMS % (int)period) * distance * 2 / period;
+    if (at > distance) at = distance * 2 - at;
+    at -= distance * 0.5f;
+    float half = overflow * 0.5f < 20 ? 20 : overflow * 0.5f;
+    // A long line moves further, so that all of it shows.
+    if (half > 120) at = at * half / 120;
+    return at;
+}
+
 static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
     if (!item->text || !item->text[0]) return;
     FontSlot *slot = &gfx->fonts[item->font];
@@ -426,8 +447,8 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
     float scaleY = item->fontScaleY > 0 ? item->fontScaleY : 1;
     char lines[MAX_LINES][256];
     int count = wrap_lines(slot, item->text, item->wrap && item->w > 0 ? item->w / scaleX : 0, lines);
-    // A line that is wider than its box gets smaller to fit it.
-    if (item->w > 0) {
+    // A wrapped line that is still wider than its box gets smaller.
+    if (item->wrap && item->w > 0) {
         float widest = 0;
         for (int i = 0; i < count; i++) {
             float width = ssr_font_measure(slot->font, lines[i]) * scaleX;
@@ -444,17 +465,40 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
     float y = item->y;
     if (item->alignY == 'M') y += (item->h - total) / 2;
     if (item->alignY == 'B') y += item->h - total;
+    // The slant moves the text (c_GelTextFR): f7 to the left, and f11 at
+    // the right side.
+    float lean = -item->italic * lineHeight * 0.2f;
+    float rightLean = lineHeight * 0.5f * item->italic;
     for (int i = 0; i < count; i++) {
         float width = ssr_font_measure(slot->font, lines[i]) * scaleX;
-        float x = item->x;
-        if (item->alignX == 'C') x += (item->w - width) / 2;
-        if (item->alignX == 'R') x += item->w - width;
-        // The game moves slanted text to keep it in its box (c_GelTextFR).
-        float height = lineHeight;
-        x -= -item->italic * height * 0.2f;
-        if (item->alignX == 'R') x += height * 0.5f * item->italic;
+        float x;
+        int scroll = !item->wrap && item->w > 0 && width > item->w - TEXT_PADDING * 2;
+        if (scroll) {
+            float centre = (item->w - width) / 2 + bounce_scroll(gfx->gameMS, width - (item->w - TEXT_PADDING * 2));
+            float low = item->w - TEXT_PADDING + rightLean - width, high = TEXT_PADDING;
+            x = centre < low ? low : centre > high ? high : centre;
+        } else if (item->alignX == 'L') {
+            x = TEXT_PADDING + FONT_PAD_LEFT;
+        } else if (item->alignX == 'R') {
+            x = item->w - (TEXT_PADDING + FONT_PAD_RIGHT) + rightLean - width;
+        } else {
+            x = (item->w - width) / 2;
+        }
+        x += item->x - lean;
+        SDL_Rect outer;
+        int clipped = SDL_RenderClipEnabled(gfx->renderer);
+        if (clipped) SDL_GetRenderClipRect(gfx->renderer, &outer);
+        if (scroll) {
+            // The line shows only inside the padding of its box.
+            float left = item->x + TEXT_PADDING + gfx->offsetX;
+            float right = item->x + item->w + rightLean - TEXT_PADDING + gfx->offsetX;
+            SDL_Rect rect = {(int)left, -100000, (int)(right - left), 200000};
+            if (clipped) SDL_GetRectIntersection(&rect, &outer, &rect);
+            SDL_SetRenderClipRect(gfx->renderer, &rect);
+        }
         draw_line(gfx, slot, lines[i], x + gfx->offsetX, y + lineHeight * i + gfx->offsetY, scaleX, scaleY,
                   item->colour, item->italic);
+        if (scroll) SDL_SetRenderClipRect(gfx->renderer, clipped ? &outer : NULL);
     }
 }
 
@@ -467,6 +511,7 @@ void ssr_gfx_set_offset(SSRGfx *gfx, float x, float y) {
 void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene) {
     if (!gfx || !scene) return;
     gfx->scene = scene;
+    gfx->gameMS = ssr_scene_time(scene);
     SDL_Rect clips[32];
     int clipCount = 0;
     for (int i = 0; i < ssr_scene_count(scene); i++) {
