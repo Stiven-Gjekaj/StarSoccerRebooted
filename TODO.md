@@ -299,11 +299,11 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       interviews change the headlines and the rivals.
 - [x] Season stories: the title race and the fight against relegation in
       the ticker
-- [ ] More season stories: a cup run of a small club, a title on the
-      last day
+- [x] More season stories: a cup run of a small club in the ticker, and
+      a title on the last day in the honours
 - [x] Career moments: the debut, the first goal, the milestones of the
       matches and the goals, with an alert
-- [ ] The testimonial match
+- [x] The testimonial match ends the timeline of a career
 - [x] Derbies from the distance between stadiums (under 30 km), in the
       ticker
 - [x] Rivalries that grow from title races and transfers, in the ticker
@@ -315,7 +315,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 - [x] The champions and the top scorers of each league in each season
       (the Honours screen)
-- [ ] The records and a hall of fame for each club, league, and nation
+- [x] A hall of fame of the scorers of the world (Honours)
+- [ ] The records of each club, league, and nation
 - [x] A career timeline: the clubs, the titles, the awards, and the
       moments (Honours, Career)
 - [ ] A legacy after retirement: how the world remembers the player. The
