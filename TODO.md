@@ -244,6 +244,10 @@ place of the atlas image with the same name (`art/NewStarLogo.png`).
 - [x] The names in the text: "New Star Soccer", "NSS", and the "NS-" names
       of the boots and the balls. The credits keep the names of the
       original.
+- [x] The scrolling boards of the pitch (`Banner01Text`, `Banner02Text`,
+      and the hashtag, the plate, and the boot of `Banner04`). The NRG
+      board stays: NRG is a brand of the game. The GOAL board is of
+      Goal.com and stays.
 - [x] A patch on a stripped image, as on a plain image
 - [x] The marks of the casino: the title of the slots (`SlotsTitlePanel`),
       the table and the card backs of blackjack (`BlackJackLogo`,
