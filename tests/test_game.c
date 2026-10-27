@@ -509,6 +509,116 @@ static void busy(SSRGame *game, const char *path) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && ssr_game_career(game)->spentTime == 3);
 }
 
+// Saves the career with full energy, no activities, and no sponsors, and
+// loads it again.
+static void rest(SSRGame *game, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.energy = 100;
+    c.spentTime = 0;
+    c.relationBoss = 50;
+    c.relationSponsors = 0;
+    for (int i = 0; i < 10; i++) c.sponsors[i] = 0;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+}
+
+// The faces of the cards of a new pairs game, from the ops that show them.
+static int card_faces(SSRGame *game, char faces[16][48]) {
+    SSRUiOp ops[128];
+    int count = take_ops(game, ops, 128), found = 0;
+    for (int i = 0; i < count; i++) {
+        int k;
+        if (ops[i].kind != SSR_OP_ANIM_PLAY || !ops[i].ref2[0] || sscanf(ops[i].ref, "Button%d", &k) != 1) continue;
+        if (k < 1 || k > 16) continue;
+        snprintf(faces[k - 1], 48, "%s", ops[i].ref2);
+        found++;
+    }
+    return found;
+}
+
+// Clicks two cards: a pair when same is 1, else two different faces.
+static void click_two(SSRGame *game, char faces[16][48], int same) {
+    for (int a = 0; a < 16; a++) {
+        for (int b = a + 1; b < 16; b++) {
+            if ((strcmp(faces[a], faces[b]) == 0) != same) continue;
+            char message[32];
+            snprintf(message, sizeof(message), "pairs.btn_%d", a);
+            ssr_game_message(game, message);
+            snprintf(message, sizeof(message), "pairs.btn_%d", b);
+            ssr_game_message(game, message);
+            return;
+        }
+    }
+}
+
+// The Life screen: the bars, a won and a lost pairs game, and the limit
+// of three activities between matches.
+static void spend_time(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    rest(game, path);
+    const SSRCareer *c = ssr_game_career(game);
+    ssr_game_message(game, "gamemenu.btn_Life");
+    CHECK(strcmp(ssr_game_screen(game), "relationships") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Player", "BossRelationship_Title"), "BOSS_CAPS_SPACEAFTER 50") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Player", "BossRelationship_Displayed") == 50);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "InternationalBoss") == 0);
+    // No partner and no sponsors: a message, and no activity.
+    ssr_game_message(game, "relationships.btn_Girlfriend");
+    CHECK(strcmp(ssr_game_screen(game), "messageboyfriend") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "relationships") == 0 && c->spentTime == 0);
+    ssr_game_message(game, "relationships.btn_Sponsors");
+    CHECK(strcmp(ssr_game_screen(game), "messagesponsor") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    // The national view turns off the club bars.
+    ssr_game_message(game, "relationships.btn_International");
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "InternationalBoss") == 1);
+    ssr_game_message(game, "relationships.btn_Boss");
+    CHECK(strcmp(ssr_game_screen(game), "relationships") == 0 && c->spentTime == 0);
+    ssr_game_message(game, "relationships.btn_International");
+
+    // A won game: the boss likes the player 5 more.
+    char faces[16][48] = {{0}};
+    SSRUiOp drop;
+    while (ssr_game_take_op(game, &drop)) {
+    }
+    ssr_game_message(game, "relationships.btn_Boss");
+    CHECK(strcmp(ssr_game_screen(game), "pairs") == 0 && c->energy == 65 && c->spentTime == 1);
+    CHECK(card_faces(game, faces) == 16);
+    // The cards turn and move before the player can click.
+    ssr_game_message(game, "pairs.btn_0");
+    ssr_game_update(game, 60 * 4);
+    click_two(game, faces, 1);
+    ssr_game_update(game, 90);
+    CHECK(strcmp(ssr_game_screen(game), "messageboss") == 0 && c->relationBoss == 55);
+    CHECK(strncmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CDILEMMA_BOSS", 13) == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "relationships") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Player", "BossRelationship_Title"), "BOSS_CAPS_SPACEAFTER 55") == 0);
+
+    // A lost game: two misses, then the screen comes back with no change.
+    ssr_game_message(game, "relationships.btn_Team");
+    float team = c->relationTeam;
+    CHECK(card_faces(game, faces) == 16 && c->spentTime == 2 && c->energy == 30);
+    ssr_game_update(game, 60 * 4);
+    click_two(game, faces, 0);
+    ssr_game_update(game, 90);
+    CHECK(strcmp(ssr_game_screen(game), "pairs") == 0);
+    click_two(game, faces, 0);
+    ssr_game_update(game, 90);
+    ssr_game_update(game, 70);
+    CHECK(strcmp(ssr_game_screen(game), "relationships") == 0 && c->relationTeam == team);
+    // The energy is too low for a third activity.
+    ssr_game_message(game, "relationships.btn_Fans");
+    CHECK(strcmp(ssr_game_screen(game), "message") == 0 && c->spentTime == 2);
+    ssr_game_message(game, "message.btn_Ok");
+    ssr_game_message(game, "relationships.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+}
+
 // Drinks the next can after a match: a question when the energy is above
 // 75, then the boost screen of a skill can, and full energy at the end.
 static void drink_a_can(SSRGame *game, SSRTweaks *tweaks) {
@@ -718,6 +828,7 @@ static void test_starts_a_new_career(void) {
     busy(game, path);
     play_a_match(game, tweaks);
     CHECK(ssr_game_career(game)->spentTime == 0 && fabsf(ssr_game_career(game)->relationSponsors - 48.7f) < 1e-4f);
+    spend_time(game, tweaks, path);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 12 && seasons == 0; i++) play_a_match(game, tweaks);
     CHECK(seasons >= 1);

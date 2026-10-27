@@ -12,6 +12,7 @@
 #include "ssr_match.h"
 #include "ssr_random.h"
 #include "ssr_season.h"
+#include "ssr_sort.h"
 #include "ssr_training.h"
 
 #define MAX_OPS 512
@@ -169,6 +170,22 @@ struct SSRGame {
     const char *trainingMessage;
     // The splash message ("Success!", "Fail!") shows until this time.
     int splashEnd;
+
+    // The relationships screen (c_TScreen_Relationships): the national
+    // view, and the bars whose button sends no click (Boss, Team, Fans,
+    // Girlfriend, Sponsors).
+    int showInternational;
+    int relationOff[5];
+    // The pairs game (c_TScreen_Pairs): the relation, the icons in the
+    // order of the list of the game, the state of the clicks, the time of
+    // the last step, the try, and 1 when the list is made.
+    int pairsRelation;
+    struct {
+        int id, randNo, picked, imgId;
+    } icons[16];
+    int iconOrder[16];
+    int pairsMade;
+    int clicked, timeClicked, turn;
 };
 
 enum { REPLAY_NONE, REPLAY_OFFER, REPLAY_PLAY };
@@ -907,6 +924,8 @@ static void call_season_end_transfer(SSRGame *game);
 static void call_play_to_date(SSRGame *game);
 static void call_set_up_fixture(SSRGame *game);
 static void call_debut_tired(SSRGame *game);
+static void call_relation_screen(SSRGame *game);
+static void call_dump_partner(SSRGame *game);
 
 static void run_call(SSRGame *game, const char *name) {
     static const struct {
@@ -926,6 +945,8 @@ static void run_call(SSRGame *game, const char *name) {
         {"PlayToDate", call_play_to_date},
         {"SetUpFixture", call_set_up_fixture},
         {"DebutTired", call_debut_tired},
+        {"DoRelationScreen", call_relation_screen},
+        {"DumpGirl", call_dump_partner},
     };
     for (size_t i = 0; i < sizeof(CALLS) / sizeof(CALLS[0]); i++) {
         if (strcmp(CALLS[i].name, name) == 0) {
@@ -961,6 +982,9 @@ static void player_tweaks(SSRGame *game) {
     ssr_tweaks_set_number(t, "Player", "StarBux", c->bank);
     ssr_tweaks_set_number(t, "Player", "Age", ssr_career_year(c) + 15);
     ssr_tweaks_set_number(t, "Player", "Energy", c->energy);
+    // UpdatePlayerBasicTweaks.
+    ssr_tweaks_set_number(t, "Player", "Happiness", ssr_career_happiness(c));
+    ssr_tweaks_set_number(t, "Player", "Lifestyle", ssr_career_lifestyle(c));
     ssr_tweaks_set_number(t, "Player", "EarningsWage", c->wage);
     ssr_tweaks_set_number(t, "Player", "EarningsBonusGoals", c->goalBonus);
     ssr_tweaks_set_number(t, "Player", "EarningsBonusAssists", c->assistBonus);
@@ -2991,6 +3015,457 @@ static void boost_ok(SSRGame *game) {
     back_from_drink(game);
 }
 
+
+/* ---------------------------------------------------- the relationships */
+
+// The relations of the five bars of the screen.
+static const SSRRelation BAR_RELATIONS[5] = {SSR_RELATION_BOSS, SSR_RELATION_TEAM, SSR_RELATION_FANS,
+                                             SSR_RELATION_PARTNER, SSR_RELATION_SPONSORS};
+static const char *const BAR_BUTTONS[5] = {"BossButton", "TeamButton", "FansButton", "GirlfriendButton",
+                                           "SponsorsButton"};
+// bb_.g_fuseparam_maxrelationshipsperday.
+#define MAX_RELATION_ACTIVITIES 3
+#define ACTIVITY_ENERGY 35.0f
+
+// GetPartnerMessageScreen.
+static const char *partner_screen(const SSRGame *game) {
+    return game->career.gender == 0 ? "messagegirlfriend" : "messageboyfriend";
+}
+
+// A message box with the bar of its relation (SetMessageScreen with one
+// bar).
+static void message_bar(SSRGame *game, const char *layout, const char *text, const char *call) {
+    message(game, layout, text, 0, 1, call);
+    add_op(game, SSR_OP_SHOW, "OneBar", NULL, NULL, 0);
+}
+
+// UpdatePlayerRelationships: the bars of the relations. With instant, the
+// bars show the values at once.
+static void relation_tweaks(SSRGame *game, int instant) {
+    static const char *NAMES[8] = {"BossRelationship",       "TeamRelationship",    "FansRelationship",
+                                   "GirlfriendRelationship", "SponsorsRelationship", "IntBossRelationship",
+                                   "IntTeamRelationship",    "IntFansRelationship"};
+    static const SSRRelation OF[8] = {SSR_RELATION_BOSS,     SSR_RELATION_TEAM,     SSR_RELATION_FANS,
+                                      SSR_RELATION_PARTNER,  SSR_RELATION_SPONSORS, SSR_RELATION_BOSS_INT,
+                                      SSR_RELATION_TEAM_INT, SSR_RELATION_FANS_INT};
+    const SSRCareer *c = &game->career;
+    char name[64];
+    for (int i = 0; i < 8; i++) {
+        float v = ssr_career_relation(c, OF[i]);
+        ssr_tweaks_set_number(game->tweaks, "Player", NAMES[i], v);
+        if (!instant) continue;
+        snprintf(name, sizeof(name), "%s_Displayed", NAMES[i]);
+        ssr_tweaks_set_number(game->tweaks, "Player", name, v);
+    }
+    ssr_tweaks_set_number(game->tweaks, "Player", "SponsorCount", ssr_career_count_sponsors(c));
+    for (int i = 0; i < 10; i++) {
+        snprintf(name, sizeof(name), "SponsorIncome%d", i + 1);
+        ssr_tweaks_set_number(game->tweaks, "Player", name, c->sponsors[i]);
+    }
+}
+
+// c_AScreen_Relationships.DisableButton and EnableButton. A disabled
+// button sends no click.
+static void relation_button(SSRGame *game, int bar, int on, int disable) {
+    add_op(game, SSR_OP_COLOUR, BAR_BUTTONS[bar], NULL, on ? "FFFFFFFF" : "FFFFFF80", 0);
+    game->relationOff[bar] = on ? 0 : disable ? 1 : game->relationOff[bar];
+}
+
+// c_AScreen_Relationships.UpdateButtons, in its order.
+static void relation_buttons(SSRGame *game) {
+    const SSRCareer *c = &game->career;
+    for (int i = 0; i < 3; i++) relation_button(game, i, !game->showInternational, 1);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "InternationalBoss", game->showInternational);
+    if (c->spentTime >= MAX_RELATION_ACTIVITIES) {
+        for (int i = 0; i < 5; i++) relation_button(game, i, 0, 0);
+    }
+    if (c->relationPartner == 0) {
+        relation_button(game, 3, 0, 0);
+        add_op(game, SSR_OP_HIDE, "DumpGirlfriendButton", NULL, NULL, 0);
+    } else {
+        relation_button(game, 3, 1, 0);
+    }
+    relation_button(game, 4, ssr_career_count_sponsors(c) > 0, 0);
+    for (int i = 0; i < 5; i++) {
+        if (ssr_career_relation(c, BAR_RELATIONS[i]) >= 100) relation_button(game, i, 0, 1);
+    }
+    if (c->retired) {
+        for (int i = 0; i < 5; i++) relation_button(game, i, 0, 0);
+    }
+}
+
+// c_TScreen_Relationships.UpdateRelationships.
+static void update_relationships(SSRGame *game, int instant, int international) {
+    const SSRCareer *c = &game->career;
+    game->showInternational = international;
+    relation_buttons(game);
+    static const char *TITLES[5] = {"Boss", "Team", "Fans", "Girlfriend", "Sponsors"};
+    static const char *TAGS[5] = {"BOSS_CAPS_SPACEAFTER", "TEAM_CAPS_SPACEAFTER", "FANS_CAPS_SPACEAFTER",
+                                  "GIRLFRIEND_CAPS_SPACEAFTER", "SPONSORS_CAPS_SPACEAFTER"};
+    static const SSRRelation INT[3] = {SSR_RELATION_BOSS_INT, SSR_RELATION_TEAM_INT, SSR_RELATION_FANS_INT};
+    const SSRNation *nation = ssr_world_nation(game->world, c->nationId);
+    const char *tla = nation && nation->tla ? nation->tla : "";
+    char name[64], text[128];
+    for (int i = 0; i < 5; i++) {
+        snprintf(name, sizeof(name), "%sRelationship_Title", TITLES[i]);
+        snprintf(text, sizeof(text), "%s %d", loc(game, TAGS[i]), (int)ssr_career_relation(c, BAR_RELATIONS[i]));
+        ssr_tweaks_set(game->tweaks, "Player", name, text);
+        if (i >= 3) continue;
+        snprintf(name, sizeof(name), "Int%sRelationship_Title", TITLES[i]);
+        snprintf(text, sizeof(text), "%s %s %d", tla, loc(game, TAGS[i]), (int)ssr_career_relation(c, INT[i]));
+        ssr_tweaks_set(game->tweaks, "Player", name, text);
+    }
+    relation_tweaks(game, instant);
+}
+
+// c_TScreen_Relationships.SetUpScreen.
+static void relationships_screen(SSRGame *game, int instant, int international) {
+    set_screen(game, "relationships");
+    update_relationships(game, instant, international);
+}
+
+static void relationships(SSRGame *game) {
+    relationships_screen(game, 1, 0);
+}
+
+static void relationships_home(SSRGame *game) {
+    game->showInternational = 0;
+    update_relationships(game, 1, 0);
+    game_menu(game);
+}
+
+static void relationships_international(SSRGame *game) {
+    update_relationships(game, 1, !game->showInternational);
+}
+
+// The call "DoRelationScreen".
+static void call_relation_screen(SSRGame *game) {
+    relationships_screen(game, 0, game->showInternational);
+}
+
+static void spent_too_much_time(SSRGame *game) {
+    char text[256], number[16];
+    snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_SPENTTOOMUCHTIME"));
+    snprintf(number, sizeof(number), "%d", MAX_RELATION_ACTIVITIES);
+    replace_all(text, sizeof(text), "$num", number);
+    if (strchr(text, '@')) return;
+    message(game, "message", text, 0, 1, NULL);
+}
+
+// GSPlayerNotEnoughEnergy: the remake has no adverts, so the NRG overlay
+// offers only the cans.
+static void not_enough_energy(SSRGame *game, const char *activity, float need) {
+    float v = need - game->career.energy;
+    ssr_tweaks_set_number(game->tweaks, "WatchAdNRG", "RefillAmount", v < 1 ? 1 : v);
+    ssr_tweaks_set_number(game->tweaks, "WatchAdNRG", "ShowNRGAdReward", 0);
+    ssr_tweaks_set(game->tweaks, "WatchAdNRG", "AdShowedFor", activity);
+    // [I: the NRG overlay comes with the shops of section 3.]
+    message(game, "message", loc(game, "CMESSAGE_NOTENOUGHENERGY"), 0, 1, NULL);
+}
+
+static void start_pairs(SSRGame *game, int relation);
+
+// The checks of an activity that all the bars share, after the checks of
+// the bar. Returns 1 when the activity starts.
+static int activity_allowed(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->spentTime >= MAX_RELATION_ACTIVITIES) {
+        spent_too_much_time(game);
+        return 0;
+    }
+    if (c->energy < ACTIVITY_ENERGY) {
+        not_enough_energy(game, "Relationship", ACTIVITY_ENERGY);
+        return 0;
+    }
+    return 1;
+}
+
+static void activity(SSRGame *game, int bar) {
+    SSRCareer *c = &game->career;
+    if (game->relationOff[bar] || c->retired) return;
+    if (bar == 3) {
+        const char *text = NULL;
+        if (ssr_career_lifestyle(c) < 20.0f) text = "CMESSAGE_NOGIRLFRIENDLIFESTYLE";
+        else if (c->relationPartner == 0) text = "CMESSAGE_NOGIRLFRIEND";
+        if (text) {
+            message(game, partner_screen(game), loc(game, text), 0, 1, "DoRelationScreen");
+            return;
+        }
+    }
+    if (bar == 4 && c->relationSponsors == 0) {
+        message(game, "messagesponsor", loc(game, "CMESSAGE_NOSPONSORS"), 0, 1, "DoRelationScreen");
+        return;
+    }
+    if (!activity_allowed(game)) return;
+    // The time with the partner counts before the game, win or lose.
+    if (bar == 3) c->lastSpendTimePartner = (float)c->sdate;
+    start_pairs(game, bar);
+    c->energy -= ACTIVITY_ENERGY;
+    c->spentTime++;
+}
+
+static void activity_boss(SSRGame *game) {
+    activity(game, 0);
+}
+
+static void activity_team(SSRGame *game) {
+    activity(game, 1);
+}
+
+static void activity_fans(SSRGame *game) {
+    activity(game, 2);
+}
+
+static void activity_partner(SSRGame *game) {
+    activity(game, 3);
+}
+
+static void activity_sponsors(SSRGame *game) {
+    activity(game, 4);
+}
+
+// The end of the relationship: a question, then the call "DumpGirl".
+static void dump_partner(SSRGame *game) {
+    message(game, partner_screen(game), loc(game, "CMESSAGE_GIRLFRIENDEND"), 1, 1, "DumpGirl");
+}
+
+static void call_dump_partner(SSRGame *game) {
+    if (game->returnState == 0) {
+        relationships_screen(game, 1, 0);
+        return;
+    }
+    // [I: DoNews("CNEWS_GIRLFRIENDDUMPED") comes with the news of section
+    // 6.]
+    game->career.relationPartner = 0;
+    relationships_screen(game, 0, 0);
+}
+
+/* ------------------------------------------------------------ the pairs */
+
+// The face of each card by relation and image id (c_<X>CardAnimations).
+static const char *const CARD_FACES[5][4] = {
+    {"BatAnim", "ChairAnim", "BananaAnim", "ShirtAnim"},
+    {"BowlingAnim", "GolfAnim", "BatAnim", "BallAnim"},
+    {"PenAnim", "DiscoAnim", "ShirtAnim", "CameraAnim"},
+    {"RoseAnim", "PrezzieAnim", "CocktailAnim", "HolidayAnim"},
+    {"PhoneAnim", "CashAnim", "ChairAnim", "CameraAnim"},
+};
+// The places of the cards on the grid, in row order.
+static const int CARD_X[4] = {22, 172, 322, 472};
+static const int CARD_Y[4] = {224, 389, 556, 723};
+
+static int compare_icons(void *context, int a, int b) {
+    const SSRGame *game = context;
+    return game->icons[a].randNo - game->icons[b].randNo;
+}
+
+static void card_ref(char *out, size_t capacity, int k) {
+    snprintf(out, capacity, "Button%d", k + 1);
+}
+
+// Plays the flip of card k from the frame at the speed.
+static void flip_card(SSRGame *game, int k, int frame, const char *speed) {
+    char ref[16];
+    card_ref(ref, sizeof(ref), k);
+    add_op(game, SSR_OP_ANIM_PLAY, ref, NULL, speed, frame);
+}
+
+static void card_position(SSRGame *game, int n, int x, int y) {
+    char name[32];
+    snprintf(name, sizeof(name), "Button%d_X", n);
+    ssr_tweaks_set_number(game->tweaks, "Pairs", name, x);
+    snprintf(name, sizeof(name), "Button%d_Y", n);
+    ssr_tweaks_set_number(game->tweaks, "Pairs", name, y);
+}
+
+// c_TScreen_Pairs.SetUpScreen.
+static void start_pairs(SSRGame *game, int relation) {
+    // TPair_Icon.CreateAll: the list in id order, once until the screen
+    // goes.
+    if (!game->pairsMade) {
+        for (int i = 0; i < 16; i++) {
+            game->icons[i].id = i;
+            game->iconOrder[i] = i;
+        }
+        game->pairsMade = 1;
+    }
+    set_screen(game, "pairs");
+    // AScreen_Pairs.LoadItems: a tint for each card (element 2, the
+    // instance, of the gadget), and the places.
+    static const char *TINTS[4] = {"0000FFFF", "008000FF", "AA0000FF", "BB8000FF"};
+    for (int n = 1; n <= 16; n++) {
+        char name[16], ref[16];
+        snprintf(name, sizeof(name), "CardColour%d", ssr_rand2(&game->random, 0, 3) + 1);
+        const char *tint = ssr_tweaks_get(game->tweaks, "Pairs", name);
+        card_ref(ref, sizeof(ref), n - 1);
+        add_op(game, SSR_OP_ELEMENT_COLOUR, ref, NULL, tint && tint[0] ? tint : TINTS[name[10] - '1'], 2);
+        card_position(game, n, CARD_X[(n - 1) % 4], CARD_Y[(n - 1) / 4]);
+    }
+    game->pairsRelation = relation;
+    // TPair_Icon.SetUp: the image ids 1 to 4 four times, the back, and a
+    // random number for the sort.
+    for (int i = 0, j = 1; i < 16; i++, j = j % 4 + 1) {
+        int k = game->iconOrder[i];
+        game->icons[k].randNo = ssr_rand(&game->random, 99);
+        game->icons[k].picked = 0;
+        ssr_rand2(&game->random, 0, 3);
+        game->icons[k].imgId = j;
+    }
+    ssr_sort(game->iconOrder, 16, compare_icons, game, 0);
+    for (int i = 0; i < 16; i++) game->icons[game->iconOrder[i]].id = i;
+    game->clicked = -2;
+    game->timeClicked = game->now;
+    // The game seeds its random numbers from the clock here.
+    game->random.seed = game->now;
+    game->turn = 0;
+    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "Find a pair!"));
+    game->splashEnd = game->now + 1500;
+    // AScreen_Pairs.Init: each card shows its face.
+    char ref[16];
+    for (int k = 0; k < 16; k++) {
+        card_ref(ref, sizeof(ref), k);
+        add_op(game, SSR_OP_ANIM_PLAY, ref, CARD_FACES[relation][game->icons[game->iconOrder[k]].imgId - 1], "0", 0);
+    }
+}
+
+static void flip_cards_down(SSRGame *game) {
+    for (int k = 0; k < 16; k++) flip_card(game, k, 0, "1");
+}
+
+static int compare_shuffle(void *context, int a, int b) {
+    (void)a;
+    (void)b;
+    return ssr_rand2(&((SSRGame *)context)->random, 2, -1);
+}
+
+static int compare_places(void *context, int a, int b) {
+    const int *randNo = context;
+    return randNo[a] - randNo[b];
+}
+
+// NewButtonPositions and AScreen_Pairs.Shuffle.
+static void shuffle_cards(SSRGame *game) {
+    int randNo[16], places[16];
+    for (int i = 0; i < 16; i++) {
+        randNo[i] = ssr_rand(&game->random, 99);
+        places[i] = i;
+    }
+    // The sort of the classic buttons uses no random numbers and moves no
+    // card of the modern screen.
+    ssr_sort(places, 16, compare_places, randNo, 0);
+    for (int i = 0; i < 16; i++) places[i] = i;
+    ssr_sort(places, 16, compare_shuffle, game, 0);
+    for (int n = 1; n <= 16; n++) {
+        int p = places[n - 1];
+        card_position(game, n, CARD_X[p % 4], CARD_Y[p / 4]);
+    }
+}
+
+static void pairs_success(SSRGame *game, int imgId) {
+    static const char *SCREENS[5] = {"messageboss", "messageteam", "messagefans", NULL, "messagesponsor"};
+    static const char *TAGS[5] = {"CDILEMMA_BOSS", "CDILEMMA_TEAM", "CDILEMMA_FANS", "CDILEMMA_GIRL",
+                                  "CDILEMMA_SPONSORS"};
+    int r = game->pairsRelation;
+    char text[64];
+    snprintf(text, sizeof(text), "%s", loc(game, "Success!"));
+    upper(text);
+    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+    game->splashEnd = game->now + 4000;
+    ssr_career_update_relation(&game->career, BAR_RELATIONS[r], 5.0f);
+    relation_tweaks(game, 0);
+    char tag[32];
+    snprintf(tag, sizeof(tag), "%s%d", TAGS[r], imgId);
+    save_career(game);
+    // The screen goes, so the next game makes the list again.
+    game->pairsMade = 0;
+    message_bar(game, SCREENS[r] ? SCREENS[r] : partner_screen(game), loc(game, tag), "DoRelationScreen");
+}
+
+static void pairs_fail(SSRGame *game) {
+    char text[64];
+    snprintf(text, sizeof(text), "%s", loc(game, "Fail!"));
+    upper(text);
+    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+    game->splashEnd = game->now + 1000;
+    save_career(game);
+    // c_ActionAfterPairsFail: the relationships screen after 1000 ms.
+    game->clicked = 3;
+    game->timeClicked = game->now;
+}
+
+// c_TScreen_Pairs.CheckSuccess.
+static void check_pairs(SSRGame *game) {
+    game->turn++;
+    int first = 0, second = 0;
+    for (int i = 0; i < 16; i++) {
+        int k = game->iconOrder[i];
+        if (!game->icons[k].picked) continue;
+        if (!first) first = game->icons[k].imgId;
+        else if (!second) second = game->icons[k].imgId;
+    }
+    if (first == second) {
+        pairs_success(game, first);
+        return;
+    }
+    if (game->turn == 2) {
+        pairs_fail(game);
+        return;
+    }
+    game->clicked = 0;
+    for (int i = 0; i < 16; i++) game->icons[i].picked = 0;
+    flip_cards_down(game);
+}
+
+// c_TScreen_Pairs.Update.
+static void pairs_tick(SSRGame *game) {
+    if (game->clicked == -2 && game->now > game->timeClicked + 2000) {
+        game->clicked = -1;
+        game->timeClicked = game->now;
+        flip_cards_down(game);
+    } else if (game->clicked == -1 && game->now > game->timeClicked + 1000) {
+        game->clicked = 0;
+        game->timeClicked = game->now;
+        shuffle_cards(game);
+    } else if (game->clicked == 2 && game->now > game->timeClicked + 1200) {
+        check_pairs(game);
+    } else if (game->clicked == 3 && game->now > game->timeClicked + 1000) {
+        relationships_screen(game, 0, 0);
+    }
+}
+
+// c_TScreen_Pairs.ClickCard.
+static void click_card(SSRGame *game, int k) {
+    if (game->clicked < 0 || game->clicked >= 2 || k < 0 || k > 15) return;
+    int icon = game->iconOrder[k];
+    if (game->icons[icon].picked) return;
+    game->icons[icon].picked = 1;
+    flip_card(game, k, 40, "-1");
+    game->clicked++;
+    if (game->clicked == 2) game->timeClicked = game->now;
+}
+
+#define CARD(n)                                                                                                        \
+    static void card##n(SSRGame *game) {                                                                               \
+        click_card(game, n);                                                                                           \
+    }
+CARD(0)
+CARD(1)
+CARD(2)
+CARD(3)
+CARD(4)
+CARD(5)
+CARD(6)
+CARD(7)
+CARD(8)
+CARD(9)
+CARD(10)
+CARD(11)
+CARD(12)
+CARD(13)
+CARD(14)
+CARD(15)
+#undef CARD
+
 static void quit_career(SSRGame *game) {
     save_career(game);
     ssr_tweaks_set_number(game->tweaks, "Menu", "CanSavePlayer", 0);
@@ -2998,6 +3473,31 @@ static void quit_career(SSRGame *game) {
 }
 
 static const Route ROUTES[] = {
+    {"gamemenu.btn_Life", relationships},
+    {"relationships.btn_Home", relationships_home},
+    {"relationships.btn_International", relationships_international},
+    {"relationships.btn_Boss", activity_boss},
+    {"relationships.btn_Team", activity_team},
+    {"relationships.btn_Fans", activity_fans},
+    {"relationships.btn_Girlfriend", activity_partner},
+    {"relationships.btn_Sponsors", activity_sponsors},
+    {"relationships.btn_DumpGirl", dump_partner},
+    {"pairs.btn_0", card0},
+    {"pairs.btn_1", card1},
+    {"pairs.btn_2", card2},
+    {"pairs.btn_3", card3},
+    {"pairs.btn_4", card4},
+    {"pairs.btn_5", card5},
+    {"pairs.btn_6", card6},
+    {"pairs.btn_7", card7},
+    {"pairs.btn_8", card8},
+    {"pairs.btn_9", card9},
+    {"pairs.btn_10", card10},
+    {"pairs.btn_11", card11},
+    {"pairs.btn_12", card12},
+    {"pairs.btn_13", card13},
+    {"pairs.btn_14", card14},
+    {"pairs.btn_15", card15},
     {"mainmenu.btn_Career", career},
     {"mainmenu.btn_Options", options},
     {"options.btn_Volume", volume},
@@ -3243,6 +3743,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->ticks -= 1;
             game->now += 16;
             if (strcmp(game->screen, "playeroftheyear") == 0) poty_tick(game);
+        }
+    } else if (strcmp(game->screen, "pairs") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1 && strcmp(game->screen, "pairs") == 0) {
+            game->ticks -= 1;
+            game->now += 16;
+            pairs_tick(game);
         }
     } else if (strcmp(game->screen, "matchstats") == 0 || strcmp(game->screen, "matchreview") == 0) {
         game->ticks += frames;
