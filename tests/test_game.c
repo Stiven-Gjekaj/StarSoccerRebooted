@@ -903,6 +903,15 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     // The energy is 60, so the can goes at once.
     ssr_game_message(game, "UpsellMsg.DrinkNRG");
     CHECK(now->nrg[0] == 0 && now->energy == 100 && ssr_game_overlay(game)[0] == 0);
+    // A match with the agent and the trainer: each counts one match, and
+    // the agent adds a tenth of the wage, at least 1.
+    int apps = now->apps;
+    play_a_match(game, tweaks);
+    if (now->apps == apps + 1) {
+        CHECK(now->agent[0] == 50 && now->trainer[0] == 50);
+        CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsAgentWage") >= 1);
+        CHECK(ssr_tweaks_number(tweaks, "Player", "RecoveryBoostTrainer") == 5);
+    }
 }
 
 // Drinks the next can after a match: a question when the energy is above

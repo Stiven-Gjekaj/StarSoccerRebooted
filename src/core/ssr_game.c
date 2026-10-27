@@ -166,6 +166,8 @@ struct SSRGame {
     // The energy that the rest days give, and the pay of the match.
     int recovery, payWage, payGoals, payAssists, paySponsors;
     float propertyBoost;
+    // The boosts of the agent and of the trainer, and 1 after a club match.
+    int agentWage, agentGoals, agentAssists, agentSponsors, trainerBoost, clubMatch;
     // The screen under the ratings screen (c_TScreen_Ratings.m_prevscreen).
     char ratingsReturn[64];
 
@@ -1107,6 +1109,18 @@ static void game_menu(SSRGame *game) {
     player_tweaks(game);
 }
 
+// GSGetPace, GetPower, and GetTechnique with the boots: the skill and the
+// boost of the boots that the player wears, from 1 to 100. which is 0
+// pace, 1 power, 2 technique.
+static int boot_skill(const SSRCareer *c, int which) {
+    const int *levels = which == 0 ? c->pace : which == 1 ? c->power : c->technique;
+    int sum = 0;
+    for (int i = 0; i < SSR_CAREER_SKILL_LEVELS; i++) sum += levels[i];
+    const SSRBoot *boot = c->bootId > 0 ? ssr_shop_boot(c->bootId) : NULL;
+    if (boot) sum += which == 0 ? boot->pace : which == 1 ? boot->power : boot->technique;
+    return sum < 1 ? 1 : sum > 100 ? 100 : sum;
+}
+
 /* ------------------------------------------------------------ match */
 
 static void match_tweaks(SSRGame *game) {
@@ -1629,9 +1643,13 @@ static void review_stage(SSRGame *game) {
         ssr_tweaks_set_number(t, "Player", "Energy", c->energy);
         break;
     }
-    case 2:
-        ssr_tweaks_set_number(t, "Player", "RecoveryBoostTrainer", 0);
+    case 2: {
+        float e = c->energy + (float)game->trainerBoost;
+        c->energy = e < 0 ? 0 : e > 100 ? 100 : e;
+        ssr_tweaks_set_number(t, "Player", "RecoveryBoostTrainer", game->trainerBoost);
+        ssr_tweaks_set_number(t, "Player", "Energy", c->energy);
         break;
+    }
     case 3: {
         // Each property gives 1.5 more energy.
         float e = c->energy + game->propertyBoost;
@@ -1642,7 +1660,8 @@ static void review_stage(SSRGame *game) {
     }
     case 4: {
         float total = (float)game->recovery + game->propertyBoost;
-        int shown = (int)(total < 0 ? 0 : total > 100 ? 100 : total);
+        int shown = (int)(total < 0 ? 0 : total > 100 ? 100 : total) + game->trainerBoost;
+        shown = shown > 100 ? 100 : shown;
         ssr_tweaks_set_number(t, "Player", "RecoveryTotal", shown);
         break;
     }
@@ -1650,29 +1669,37 @@ static void review_stage(SSRGame *game) {
         ssr_tweaks_set_number(t, "MatchReview", "EarningsWage", game->payWage);
         break;
     case 6:
-        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentWage", 0);
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentWage", game->agentWage);
         break;
     case 7:
         ssr_tweaks_set_number(t, "MatchReview", "EarningsBonusGoals", game->payGoals);
         break;
     case 8:
-        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentBonusGoals", 0);
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentBonusGoals", game->agentGoals);
         break;
     case 9:
         ssr_tweaks_set_number(t, "MatchReview", "EarningsBonusAssists", game->payAssists);
         break;
     case 10:
-        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentBonusAssists", 0);
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentBonusAssists", game->agentAssists);
         break;
     case 11:
         ssr_tweaks_set_number(t, "MatchReview", "EarningsSponsors", game->paySponsors);
         break;
     case 12:
-        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentSponsors", 0);
+        ssr_tweaks_set_number(t, "MatchReview", "EarningsAgentSponsors", game->agentSponsors);
         break;
+    case 14: {
+        // DepleteContracts: the agent counts club matches, the trainer all.
+        int agent = ssr_career_agent(c), trainer = ssr_career_trainer(c);
+        if (game->clubMatch && agent > 0) c->agent[agent - 1]--;
+        if (trainer > 0) c->trainer[trainer - 1]--;
+        break;
+    }
     case 13: {
         // GSPlayerAwardWages: the pay goes into the bank once.
-        int total = game->payWage + game->payGoals + game->payAssists + game->paySponsors;
+        int total = game->payWage + game->payGoals + game->payAssists + game->paySponsors + game->agentWage +
+                    game->agentGoals + game->agentAssists + game->agentSponsors;
         c->bank += total;
         ssr_tweaks_set_number(t, "MatchReview", "EarningsTotal", total);
         ssr_tweaks_set_number(t, "Player", "Bux", c->bank);
@@ -1756,10 +1783,21 @@ static void season_review(SSRGame *game);
 static void match_recovery(SSRGame *game);
 static int count_owned(const SSRCareer *c, SSRShopType type);
 
+// max1 of the agent boosts: a part of a bux is 1.
+static int agent_boost(float v) {
+    return (int)(v > 0 && v < 1 ? 1 : v);
+}
+
 static void stats_continue(SSRGame *game) {
     if (game->statStage < 6) after_relations(game);
     if (game->statStage < 9) after_star_rating(game);
     SSRCareer *c = &game->career;
+    // c_TPlayer.WearBoots: a match uses the boots.
+    if (c->bootId > 0) c->bootUses--;
+    if (c->bootUses <= 0) {
+        c->expiredBoots = c->bootId;
+        c->bootId = 0;
+    }
     season_in(game);
     SSRFixture *f = ssr_season_find(game->season, game->fixtureComp, game->fixtureDate, game->fixtureHome,
                                     game->fixtureAway);
@@ -1788,6 +1826,22 @@ static void stats_continue(SSRGame *game) {
         // A match of the nation pays the wage only.
         game->payGoals = game->payAssists = 0;
     }
+    // The agent adds 10, 20, or 30 in a hundred to the pay of a club match,
+    // and at least 1 (GetAgentWageBoost and the others).
+    static const int AGENT_PART[4] = {0, 10, 20, 30};
+    static const int TRAINER_BOOST[4] = {0, 5, 15, 30};
+    float part = (float)AGENT_PART[ssr_career_agent(c)];
+    game->clubMatch = !(played && played->data->level == 1);
+    game->agentWage = game->agentGoals = game->agentAssists = game->agentSponsors = 0;
+    if (game->clubMatch && part > 0) {
+        game->agentWage = agent_boost((float)c->wage / 100.0f * part);
+        if (game->facts.goals > 0) game->agentGoals = agent_boost((float)(c->goalBonus * game->facts.goals) / 100.0f * part);
+        if (c->assistBonus > 0 && game->facts.assists > 0) {
+            game->agentAssists = agent_boost((float)(c->assistBonus * game->facts.assists) / 100.0f * part);
+        }
+        if (ssr_career_count_sponsors(c) > 0) game->agentSponsors = agent_boost((float)game->paySponsors / 100.0f * part);
+    }
+    game->trainerBoost = TRAINER_BOOST[ssr_career_trainer(c)];
     int end = game->season ? ssr_season_play_to(game->season, game->fixtureDate) : 0;
     season_out(game);
     game->reviewWaits = 1;
@@ -2889,8 +2943,8 @@ static void start_chance(SSRGame *game) {
     game->chance = calloc(1, sizeof(SSRChance));
     if (!game->chance) return;
     const SSRCareer *c = &game->career;
-    SSRChanceSetup s = ssr_match_chance_setup(game->match, ssr_career_skill(c->technique), ssr_career_skill(c->power), 1);
-    s.pace = ssr_career_skill(c->pace);
+    SSRChanceSetup s = ssr_match_chance_setup(game->match, boot_skill(c, 2), boot_skill(c, 1), 1);
+    s.pace = boot_skill(c, 0);
     s.careerGoals = (float)c->goals;
     s.careerPasses = (float)c->passes;
     ssr_chance_start(game->chance, &s, &game->random);
@@ -5051,6 +5105,7 @@ static void shop_drink(SSRGame *game) {
     game->messageData = can;
     message(game, "message", loc(game, "CMESSAGE_DRINKNRGCHECK"), 1, 1, "DrinkNRG");
 }
+
 
 /* ------------------------------------------------------------ the pairs */
 
