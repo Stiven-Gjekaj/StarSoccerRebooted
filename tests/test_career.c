@@ -324,6 +324,7 @@ static void test_keeps_the_records(void) {
     ssr_career_create(&c, "The", "Kid", 0, 0, 62, 1, 1, 0);
     c.clubId = 10;
     c.hatTricks = 4;
+    c.worldSeed = 4242;
     int form[5] = {0, 0, 6, 7, 8};
     memcpy(c.careerForm, form, sizeof(form));
     c.seasonFurthest[0] = 300.5f;
@@ -332,6 +333,7 @@ static void test_keeps_the_records(void) {
     char path[1200];
     snprintf(path, sizeof(path), "%s/records.txt", ssr_test_directory("career_records"));
     CHECK(ssr_career_save(&c, path) && ssr_career_load(&back, path));
+    CHECK(back.worldSeed == 4242);
     CHECK(back.hatTricks == 4 && memcmp(back.careerForm, form, sizeof(form)) == 0);
     CHECK(back.seasonFurthest[0] == 300.5f && back.furthest[1] == 640 && back.intFurthest[3] == 250);
     // A hat trick comes at the 3rd, the 6th, and the 9th goal only.

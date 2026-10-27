@@ -63,6 +63,9 @@ typedef struct {
     // 0 male, 1 female.
     int gender;
     int hardMode;
+    // The seed of the players of the world (ssr_people). Two careers with
+    // the same seed get the same world.
+    int worldSeed;
     // The nation of the player, the nation of the league, and the club.
     int nationId;
     int clubNationId;
