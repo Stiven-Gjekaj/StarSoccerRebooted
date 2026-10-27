@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.0 (2026-10-27)
+
+- The layouts of the game work with more of their language: Spawn, Slot,
+  SortByRef, ReadoutConcat, FontStyle, LineSpacing, Padding, RandomTweak,
+  MechDigit, and SetMessage.
+- The coins of the match review fly up to the bux count.
+- The cards of the contract talks roll to their digits.
+- The about screen shows the logo of the remake behind the credits, with
+  REBOOTED at its place.
+- The casino and the race track have the marks of Star Soccer Rebooted:
+  the slots, the blackjack table, the cards, the icon of blackjack, and
+  the boards of the race tracks.
+- Each screen takes its own random numbers, as in 4.32.
+
 ## 0.10.0 (2026-10-27)
 
 - Choose the match ball for each match type in the match balls overlay.
