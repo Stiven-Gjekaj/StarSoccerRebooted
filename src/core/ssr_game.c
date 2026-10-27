@@ -40,6 +40,8 @@ struct SSRGame {
     char messageCall[64];
     // The number that goes with the call (c_TScreen_Message intdata).
     int messageData;
+    // The param of the GUI message that came last (a row of a list).
+    int messageParam;
     int returnState;
 
     // The career that plays now, and the slot that it uses.
@@ -1987,8 +1989,14 @@ const SSRCareer *ssr_game_career(const SSRGame *game) {
 
 int ssr_game_message(SSRGame *game, const char *message) {
     if (!game || !message) return 0;
+    // A row of a list sends its param after a space (c_GGadget param).
+    char name[128];
+    snprintf(name, sizeof(name), "%s", message);
+    char *space = strchr(name, ' ');
+    game->messageParam = space ? atoi(space + 1) : 0;
+    if (space) *space = 0;
     for (size_t i = 0; i < sizeof(ROUTES) / sizeof(ROUTES[0]); i++) {
-        if (strcmp(ROUTES[i].message, message) == 0) {
+        if (strcmp(ROUTES[i].message, name) == 0) {
             ROUTES[i].handler(game);
             return 1;
         }

@@ -616,6 +616,15 @@ static void apply_ops(SSRApp *app) {
         case SSR_OP_LIST_ADD:
             ssr_scene_list_add(app->scene, op.ref, op.ref2, op.text, op.id);
             break;
+        case SSR_OP_LIST_TEXT:
+            ssr_scene_list_text(app->scene, op.ref, op.id, op.text);
+            break;
+        case SSR_OP_LIST_PARAM:
+            ssr_scene_list_param(app->scene, op.ref, op.id);
+            break;
+        case SSR_OP_LIST_START:
+            ssr_scene_list_start(app->scene, op.ref, (float)op.id);
+            break;
         }
     }
 }

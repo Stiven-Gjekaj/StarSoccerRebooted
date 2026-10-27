@@ -40,6 +40,13 @@ typedef enum {
     SSR_OP_ANIM,
     // The elements ref take the colour in text.
     SSR_OP_COLOUR,
+    // The element number id of the last entry of the list ref takes the
+    // text. "ref@n" names the entry n.
+    SSR_OP_LIST_TEXT,
+    // The clicks of the last entry of the list ref send the param id.
+    SSR_OP_LIST_PARAM,
+    // The next entry of the list ref goes at the y in id.
+    SSR_OP_LIST_START,
 } SSRUiOpKind;
 
 typedef struct {

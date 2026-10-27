@@ -23,6 +23,9 @@ static void test_goes_between_screens(void) {
     CHECK(ssr_game_message(game, "mainmenu.btn_Career"));
     CHECK(strcmp(ssr_game_screen(game), "saveslot") == 0);
     CHECK(!ssr_game_message(game, "no.such_message"));
+    // A message with a param after a space finds its route.
+    CHECK(ssr_game_message(game, "mainmenu.btn_Career 3"));
+    CHECK(!ssr_game_message(game, "no.such_message 3"));
     ssr_game_free(game);
     ssr_tweaks_free(tweaks);
 }
