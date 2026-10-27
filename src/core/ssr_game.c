@@ -291,6 +291,7 @@ static void skill_tweaks(SSRGame *game);
 static void choose_club(SSRGame *game);
 static void star_transition(SSRGame *game, const char *after);
 static void player_tweaks(SSRGame *game);
+static void reset_progress(SSRGame *game);
 
 static void open_slot(SSRGame *game, int slot) {
     game->slot = slot;
@@ -299,6 +300,7 @@ static void open_slot(SSRGame *game, int slot) {
     if (game->slotExists[slot] && ssr_career_load(&game->career, path)) {
         // LoadCareer: the star transition, then the game menu.
         player_tweaks(game);
+        reset_progress(game);
         star_transition(game, "gamemenu");
         return;
     }
@@ -663,6 +665,7 @@ static void call_start_career(SSRGame *game) {
     replace_all(c->headline, sizeof(c->headline), "$lastname", c->shortName);
     save_career(game);
     player_tweaks(game);
+    reset_progress(game);
     // The news page shows the headline once (c_TScreen_WebPage).
     snprintf(game->news, sizeof(game->news), "%s", c->headline);
     c->headline[0] = 0;
@@ -893,6 +896,23 @@ static void star_tweaks(SSRGame *game) {
     const SSRCareer *c = &game->career;
     ssr_tweaks_set_number(game->tweaks, "Player", "StarRating", ssr_career_star_level(c));
     ssr_tweaks_set_number(game->tweaks, "Player", "StarRatingProgress", c->starRating % 100);
+}
+
+// GSResetProgressTweaks: the bars show the values as they are, with no
+// animation from the values before.
+static void reset_progress(SSRGame *game) {
+    skill_tweaks(game);
+    star_tweaks(game);
+    static const char *NAMES[10] = {"Energy",    "BossRelationship", "TeamRelationship", "FansRelationship",
+                                    "StarRatingProgress", "Technique", "Power", "Pace", "Vision", "SetPieces"};
+    char name[64];
+    for (int i = 0; i < 10; i++) {
+        double value = ssr_tweaks_number(game->tweaks, "Player", NAMES[i]);
+        snprintf(name, sizeof(name), "%s_Displayed", NAMES[i]);
+        ssr_tweaks_set_number(game->tweaks, "Player", name, value);
+        snprintf(name, sizeof(name), "%s_Before", NAMES[i]);
+        ssr_tweaks_set_number(game->tweaks, "Player", name, value);
+    }
 }
 
 // UpdateRelationship: a relation stays from 1 to 100.

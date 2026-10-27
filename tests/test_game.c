@@ -369,6 +369,9 @@ static void test_starts_a_new_career(void) {
     // The header of the news page shows the player already.
     CHECK(ssr_tweaks_number(tweaks, "Player", "Age") == 16 && ssr_tweaks_number(tweaks, "Player", "Bux") == 15);
     CHECK(ssr_tweaks_number(tweaks, "Player", "StarBux") == 15);
+    // The bars start at the values of the career, with no animation.
+    CHECK(ssr_tweaks_number(tweaks, "Player", "BossRelationship_Displayed") == career->relationBoss);
+    CHECK(ssr_tweaks_number(tweaks, "Player", "BossRelationship_Before") == career->relationBoss);
     ssr_game_update(game, 30);
     CHECK(strcmp(ssr_game_screen(game), "startransition") == 0);
     ssr_game_update(game, 30);
