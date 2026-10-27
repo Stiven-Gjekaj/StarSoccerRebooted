@@ -21,6 +21,7 @@ typedef struct {
 } Bone;
 
 typedef struct {
+    char *name;
     int bone;
     float r, g, b, a;
     char *attachment;
@@ -314,7 +315,7 @@ SSRSpine *ssr_spine_parse(const unsigned char *data, size_t size) {
     if (!spine->slots) goto bad;
     for (int i = 0; i < spine->slotCount && r.ok; i++) {
         Slot *s = &spine->slots[i];
-        free(read_string(&r));
+        s->name = read_string(&r);
         s->bone = read_int(&r);
         s->r = read_float(&r);
         s->g = read_float(&r);
@@ -383,7 +384,10 @@ SSRSpine *ssr_spine_load(const char *path) {
 
 void ssr_spine_free(SSRSpine *spine) {
     if (!spine) return;
-    for (int i = 0; i < spine->slotCount; i++) free(spine->slots[i].attachment);
+    for (int i = 0; i < spine->slotCount; i++) {
+        free(spine->slots[i].name);
+        free(spine->slots[i].attachment);
+    }
     free(spine->slots);
     free(spine->bones);
     for (int i = 0; i < spine->attachmentCount; i++) {
@@ -466,8 +470,10 @@ static const Attachment *find_attachment(const SSRSpine *spine, int slot, const 
     return NULL;
 }
 
-int ssr_spine_pose(const SSRSpine *spine, int animation, float time, int loop, SSRSpineDraw *out, int max) {
-    if (!spine || animation < 0 || animation >= spine->animationCount) return 0;
+// The bones and the slot colours of the animation at the time. The caller
+// frees the three arrays. Returns 0 when there is no memory.
+static int make_pose(const SSRSpine *spine, int animation, float time, int loop, Pose **posed, float **coloured,
+                     char **usedSlots) {
     const Animation *anim = &spine->animations[animation];
     float t = time < 0 ? 0 : time;
     if (anim->duration > 0) t = loop ? fmodf(t, anim->duration) : (t > anim->duration ? anim->duration : t);
@@ -553,6 +559,28 @@ int ssr_spine_pose(const SSRSpine *spine, int animation, float time, int loop, S
         p->m11 = c * p->wsy;
     }
 
+    *posed = pose;
+    *coloured = colours;
+    *usedSlots = used;
+    return 1;
+}
+
+// The bone matrix of a slot, y down, in the order of SSRSpineDraw.m.
+static void bone_matrix(const Pose *p, float m[6]) {
+    m[0] = p->m00;
+    m[1] = -p->m10;
+    m[2] = -p->m01;
+    m[3] = p->m11;
+    m[4] = p->wx;
+    m[5] = -p->wy;
+}
+
+int ssr_spine_pose(const SSRSpine *spine, int animation, float time, int loop, SSRSpineDraw *out, int max) {
+    if (!spine || animation < 0 || animation >= spine->animationCount) return 0;
+    Pose *pose;
+    float *colours;
+    char *used;
+    if (!make_pose(spine, animation, time, loop, &pose, &colours, &used)) return 0;
     int count = 0;
     for (int i = 0; i < spine->slotCount; i++) {
         if (!used[i] || colours[i * 4 + 3] < 0.005f) continue;
@@ -563,9 +591,9 @@ int ssr_spine_pose(const SSRSpine *spine, int animation, float time, int loop, S
         float c = cosf(radians), s = sinf(radians);
         float aix = a->scaleX * c, aiy = -a->scaleX * s, ajx = a->scaleY * s, ajy = a->scaleY * c;
         float atx = a->x, aty = -a->y;
-        // The bone matrix, y down.
-        const Pose *p = &pose[spine->slots[i].bone];
-        float b00 = p->m00, b01 = -p->m01, b10 = -p->m10, b11 = p->m11, btx = p->wx, bty = -p->wy;
+        float bone[6];
+        bone_matrix(&pose[spine->slots[i].bone], bone);
+        float b00 = bone[0], b10 = bone[1], b01 = bone[2], b11 = bone[3], btx = bone[4], bty = bone[5];
         if (count < max && out) {
             SSRSpineDraw *d = &out[count];
             d->image = a->image;
@@ -587,4 +615,24 @@ int ssr_spine_pose(const SSRSpine *spine, int animation, float time, int loop, S
     free(colours);
     free(used);
     return count;
+}
+
+int ssr_spine_slot(const SSRSpine *spine, int animation, float time, int loop, const char *slot, float m[6],
+                   float rgba[4]) {
+    if (!spine || !slot || animation < 0 || animation >= spine->animationCount) return 0;
+    int index = -1;
+    for (int i = 0; i < spine->slotCount && index < 0; i++) {
+        if (spine->slots[i].name && strcmp(spine->slots[i].name, slot) == 0) index = i;
+    }
+    if (index < 0) return 0;
+    Pose *pose;
+    float *colours;
+    char *used;
+    if (!make_pose(spine, animation, time, loop, &pose, &colours, &used)) return 0;
+    bone_matrix(&pose[spine->slots[index].bone], m);
+    for (int k = 0; k < 4; k++) rgba[k] = colours[index * 4 + k];
+    free(pose);
+    free(colours);
+    free(used);
+    return 1;
 }

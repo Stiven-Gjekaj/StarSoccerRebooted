@@ -41,4 +41,9 @@ typedef struct {
 // animation stays at its last pose. Returns the number of images.
 int ssr_spine_pose(const SSRSpine *spine, int animation, float time, int loop, SSRSpineDraw *out, int max);
 
+// The bone of the slot with the name at the time, as m of SSRSpineDraw,
+// and the colour of the slot. Returns 0 when the slot is not there.
+int ssr_spine_slot(const SSRSpine *spine, int animation, float time, int loop, const char *slot, float m[6],
+                   float rgba[4]);
+
 #endif

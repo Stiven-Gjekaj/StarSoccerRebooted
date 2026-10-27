@@ -175,8 +175,26 @@ static void test_poses_the_animation(void) {
     ssr_spine_free(spine);
 }
 
+// A gel can follow the bone of a slot (c_Slot): the bone of the slot
+// "Leaf" is the child, at 110 on x, and it turns with the child.
+static void test_gives_the_bone_of_a_slot(void) {
+    unsigned char data[4096];
+    size_t size = build(data);
+    SSRSpine *spine = ssr_spine_parse(data, size);
+    float m[6], rgba[4];
+    CHECK(ssr_spine_slot(spine, 0, 0, 1, "Leaf", m, rgba) == 1);
+    CHECK(near(m[4], 110) && near(m[5], 0) && near(m[0], 1));
+    CHECK(ssr_spine_slot(spine, 0, 4.0f / 60, 1, "Leaf", m, rgba) == 1);
+    CHECK(near(m[0], 0) && near(m[1], -1) && near(m[4], 110));
+    CHECK(ssr_spine_slot(spine, 0, 0.75f, 1, "Leaf", m, rgba) == 1);
+    CHECK(near(rgba[0], 1) && near(rgba[1], 0) && near(rgba[3], 1));
+    CHECK(ssr_spine_slot(spine, 0, 0, 1, "Nothing", m, rgba) == 0);
+    ssr_spine_free(spine);
+}
+
 int main(void) {
     test_reads_the_file();
     test_poses_the_animation();
+    test_gives_the_bone_of_a_slot();
     return TEST_RESULT();
 }
