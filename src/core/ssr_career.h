@@ -110,7 +110,7 @@ typedef struct {
     // 1 until the game menu showed the tip of the contract.
     int showContractTip;
     // The match ball of each kind of match: league, cup, continental, and
-    // international (0 is the default ball).
+    // international (0 is the ball of the kind).
     int ballLeague, ballCup, ballContinent, ballInternational;
     // 1 before the first match of the career (c_TPlayer.m_debut).
     int debut;
@@ -242,6 +242,11 @@ void ssr_career_reset_season(SSRCareer *career);
 // Writes the career to the file. The new file takes the place of the old
 // one only when it is complete. Returns 1 when it worked.
 int ssr_career_save(const SSRCareer *career, const char *path);
+
+// GetSelectedBall: the ball (1 to 9) of a match type: 1 the league, 2 the
+// cup, 3 the continent, 4 the nation. SetSelectedBall: a ball of 0 is 1.
+int ssr_career_selected_ball(SSRCareer *career, int type);
+void ssr_career_set_selected_ball(SSRCareer *career, int ball, int type);
 
 // TrophyLog.AddNewTrophy: a trophy with the same year and text as one in
 // the log is not added again.

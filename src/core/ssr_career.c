@@ -23,6 +23,11 @@ void ssr_career_create(SSRCareer *c, const char *first, const char *last, int ge
                        int clubNationId, int wage, int goalBonus, int assistBonus) {
     memset(c, 0, sizeof(*c));
     c->sdate = 1;
+    // The balls of the league, the cup, the continent, and the nation.
+    c->ballLeague = 1;
+    c->ballCup = 2;
+    c->ballContinent = 3;
+    c->ballInternational = 4;
     copy_name(c->firstName, sizeof(c->firstName), first);
     copy_name(c->lastName, sizeof(c->lastName), last);
     trim(c->firstName);
@@ -676,4 +681,20 @@ int ssr_career_skill(const int *levels) {
     int sum = 0;
     for (int i = 0; i < SSR_CAREER_SKILL_LEVELS; i++) sum += levels[i];
     return sum < 1 ? 1 : sum > 100 ? 100 : sum;
+}
+
+int ssr_career_selected_ball(SSRCareer *c, int type) {
+    // A field of 0 takes the ball of the type. [I: for the nation the
+    // game gives 0 and changes the ball of the continent; the remake
+    // gives ball 4.]
+    int *fields[4] = {&c->ballLeague, &c->ballCup, &c->ballContinent, &c->ballInternational};
+    if (type < 1 || type > 4) return 0;
+    if (*fields[type - 1] == 0) *fields[type - 1] = type;
+    return *fields[type - 1];
+}
+
+void ssr_career_set_selected_ball(SSRCareer *c, int ball, int type) {
+    int *fields[4] = {&c->ballLeague, &c->ballCup, &c->ballContinent, &c->ballInternational};
+    if (type < 1 || type > 4) return;
+    *fields[type - 1] = ball == 0 ? 1 : ball;
 }

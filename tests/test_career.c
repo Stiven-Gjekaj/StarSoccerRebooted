@@ -116,7 +116,7 @@ static void test_saves_and_loads_a_career(void) {
     CHECK(back.gambling == 36 && back.casinoCount == 12);
     CHECK(ssr_career_agent(&back) == 1 && ssr_career_trainer(&back) == 2 && back.agent[0] == 51);
     CHECK(back.bootId == 21 && back.bootUses == 4 && back.expiredBoots == -1 && back.oldProBoots == 21);
-    CHECK(back.ballCup == 3 && back.ballLeague == 0);
+    CHECK(back.ballCup == 3 && back.ballLeague == 1);
     CHECK(back.lastNegotiations == 70 && back.lastTransferDate == 66 && back.captain == 3 && back.showContractTip == 1);
     CHECK(back.items[0] == 120 && back.vehicles[19] == 10500 && back.properties[4] == 1);
     // The new season starts the counts again.
@@ -317,7 +317,26 @@ static void test_stores_the_old_stats(void) {
     CHECK(back.history[0].apps == 30 && back.history[0].goals == 5);
 }
 
+// The balls of the match types: a new career has 1 to 4, a field of 0
+// takes the ball of its type, and a choice goes into the save.
+static void test_chooses_the_match_balls(void) {
+    static SSRCareer c, back;
+    ssr_career_create(&c, "The", "Kid", 0, 0, 62, 1, 1, 0);
+    c.clubId = 10;
+    for (int t = 1; t <= 4; t++) CHECK(ssr_career_selected_ball(&c, t) == t);
+    c.ballLeague = c.ballCup = c.ballContinent = c.ballInternational = 0;
+    for (int t = 1; t <= 4; t++) CHECK(ssr_career_selected_ball(&c, t) == t);
+    CHECK(ssr_career_selected_ball(&c, 5) == 0);
+    ssr_career_set_selected_ball(&c, 6, 2);
+    ssr_career_set_selected_ball(&c, 0, 4);
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/balls.txt", ssr_test_directory("career_balls"));
+    CHECK(ssr_career_save(&c, path) && ssr_career_load(&back, path));
+    CHECK(ssr_career_selected_ball(&back, 2) == 6 && ssr_career_selected_ball(&back, 4) == 1);
+}
+
 int main(void) {
+    test_chooses_the_match_balls();
     test_keeps_the_trophies_and_the_history();
     test_stores_the_old_stats();
     test_keeps_the_days_of_training();
