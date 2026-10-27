@@ -171,6 +171,7 @@ void ssr_gfx_text(SSRGfx *gfx, SSRFontSize size, const char *text, float x, floa
         SDL_FRect place = {q->x0, q->y0, q->x1 - q->x0, q->y1 - q->y0};
         SDL_RenderTexture(gfx->renderer, atlas, &source, &place);
     }
+    SDL_SetTextureColorMod(atlas, 255, 255, 255);
 }
 
 // The texture of a PNG page, or of the frame of a RLE page that holds the
@@ -330,23 +331,33 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     draw_atlas_image(gfx, image, &p);
 }
 
-// Draws one line of text with its top left at (x, y), scaled.
+// Draws one line of text with its top left at (x, y), scaled. The glyphs
+// lean by italic: x += (y - baseline) * italic, as c_FontRenderer does.
 static void draw_line(SSRGfx *gfx, FontSlot *slot, const char *text, float x, float y, float scaleX, float scaleY,
-                      uint32_t colour) {
+                      uint32_t colour, float italic) {
     static SSRGlyphQuad quads[MAX_QUADS];
     int count = ssr_font_layout(slot->font, text, 0, 0, quads, MAX_QUADS);
     if (count > MAX_QUADS) count = MAX_QUADS;
     SDL_Texture *atlas = atlas_texture(gfx, slot);
     if (!atlas) return;
-    SDL_SetTextureColorMod(atlas, (colour >> 24) & 0xFF, (colour >> 16) & 0xFF, (colour >> 8) & 0xFF);
-    SDL_SetTextureAlphaMod(atlas, colour & 0xFF);
+    SDL_FColor c = {((colour >> 24) & 0xFF) / 255.0f, ((colour >> 16) & 0xFF) / 255.0f,
+                    ((colour >> 8) & 0xFF) / 255.0f, (colour & 0xFF) / 255.0f};
+    float baseline = ssr_font_ascent(slot->font);
     for (int i = 0; i < count; i++) {
         const SSRGlyphQuad *q = &quads[i];
-        SDL_FRect source = {q->u0 * SSR_FONT_ATLAS_SIZE, q->v0 * SSR_FONT_ATLAS_SIZE, q->x1 - q->x0, q->y1 - q->y0};
-        SDL_FRect place = {x + q->x0 * scaleX, y + q->y0 * scaleY, (q->x1 - q->x0) * scaleX, (q->y1 - q->y0) * scaleY};
-        SDL_RenderTexture(gfx->renderer, atlas, &source, &place);
+        float xs[4] = {q->x0, q->x1, q->x1, q->x0}, ys[4] = {q->y0, q->y0, q->y1, q->y1};
+        float us[4] = {q->u0, q->u1, q->u1, q->u0}, vs[4] = {q->v0, q->v0, q->v1, q->v1};
+        SDL_Vertex v[4];
+        for (int k = 0; k < 4; k++) {
+            v[k].position.x = x + (xs[k] + (ys[k] - baseline) * italic) * scaleX;
+            v[k].position.y = y + ys[k] * scaleY;
+            v[k].color = c;
+            v[k].tex_coord.x = us[k];
+            v[k].tex_coord.y = vs[k];
+        }
+        static const int indices[6] = {0, 1, 2, 0, 2, 3};
+        SDL_RenderGeometry(gfx->renderer, atlas, v, 4, indices, 6);
     }
-    SDL_SetTextureAlphaMod(atlas, 255);
 }
 
 #define MAX_LINES 32
@@ -412,8 +423,12 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
         float x = item->x;
         if (item->alignX == 'C') x += (item->w - width) / 2;
         if (item->alignX == 'R') x += item->w - width;
+        // The game moves slanted text to keep it in its box (c_GelTextFR).
+        float height = lineHeight;
+        x -= -item->italic * height * 0.2f;
+        if (item->alignX == 'R') x += height * 0.5f * item->italic;
         draw_line(gfx, slot, lines[i], x + gfx->offsetX, y + lineHeight * i + gfx->offsetY, scaleX, scaleY,
-                  item->colour);
+                  item->colour, item->italic);
     }
 }
 
