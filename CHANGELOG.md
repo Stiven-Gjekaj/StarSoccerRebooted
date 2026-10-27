@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.0 (2026-10-27)
+
+- You can start a new career. Choose a save slot, give the name, the
+  gender, and the nation of your player, and choose the league country.
+  The game gives you a club, as the original does. The news page tells of
+  your first contract, and the game menu opens.
+- The careers save to the data directory of each platform. You can load
+  and delete them from the save slots.
+- The options save: the volume, the distance unit, and the replays.
+- The news ticker runs its welcome texts along the bottom of the screens.
+- The app runs the expression language of the layouts. The texts, the
+  conditions, and the variables of a screen work, for example the number
+  of cans on the game menu.
+- Lists that the code fills, swipe panels, readouts, and the texts that
+  come from the career work.
+- The ball of the match moments is ready, with the posts, the nets, and
+  the goal line. The match comes in 0.5.
+
 ## 0.3.0 (2026-10-27)
 
 - The app runs on iOS and Android. On Android it imports the game that is
