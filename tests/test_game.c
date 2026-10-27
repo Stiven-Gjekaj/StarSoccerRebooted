@@ -370,6 +370,16 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(strcmp(ssr_game_screen(game), "league") == 0 && ssr_tweaks_number(tweaks, "Menu", "ShowLeaguePlay") == 1);
     ssr_game_message(game, "leaguefixtures.btn_Back");
     CHECK(strcmp(ssr_game_screen(game), "seasonreview") == 0);
+    // The place goes into the trophy log, and the season into the stat
+    // history, once, also when the review opens again.
+    int rows = 0;
+    for (int i = 0; i < c->historyCount; i++) rows += c->history[i].year == year - 1;
+    int historyApps;
+    ssr_career_history_totals(c, &historyApps, NULL, NULL, NULL);
+    CHECK(rows == 1 && historyApps == c->apps);
+    const SSRTrophy *place = c->trophyCount ? &c->trophies[c->trophyCount - 1] : NULL;
+    CHECK(place && place->year == year - 1 && strncmp(place->tournament, "PRM ", 4) == 0);
+    CHECK(place && place->medal == (position == 1 ? 1 : 0));
     // The awards come one at a time; the buttons show at the end.
     ssr_game_message(game, "seasonreview.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "playeroftheyear") == 0);

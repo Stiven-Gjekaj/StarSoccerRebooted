@@ -2859,6 +2859,19 @@ static void season_review(SSRGame *game) {
     ssr_tweaks_set_number(t, "PlayerStats", "SeasonAveragePasses", apps ? c->seasonPasses / apps : 0);
     ssr_tweaks_set_number(t, "PlayerStats", "SeasonAverageAssists", apps ? c->seasonAssists / apps : 0);
     ssr_tweaks_set_number(t, "PlayerStats", "SeasonAverageRating", apps ? c->seasonTotalRating / (float)apps : 0);
+    // The place of the club in the trophy log, and the row of the season
+    // in the stat history.
+    int year = ssr_career_year(c) - 1;
+    char trophy[64];
+    snprintf(trophy, sizeof(trophy), "%s %s", comp->data->tla, place);
+    int medal = position != 1 ? 0 : club->league < comp->data->id ? 2 : 1;
+    ssr_career_add_trophy(c, year, club->data->tla, trophy, medal);
+    // [I: the game adds a row each time that the screen opens. The remake
+    // adds one row for the season.]
+    const SSRStatRow *last = c->historyCount ? &c->history[c->historyCount - 1] : NULL;
+    if (!last || last->year != year || strcmp(last->club, club->data->tla) != 0) {
+        ssr_career_add_history(c, year, club->data->tla);
+    }
 }
 
 // The end of the season: PlayToDate reached the new year.
@@ -2898,7 +2911,17 @@ static int award_poty(SSRGame *game, int type) {
         won = c->wonMajorAward && average >= 9.0f;
         break;
     }
-    if (won) c->potyAwards++;
+    if (won) {
+        c->potyAwards++;
+        // The award goes into the trophy log, with the tla of the club for
+        // the club award and of the league for the others.
+        static const char *const TAGS[5] = {"poty_ClubPOTY", "poty_YoungPOTY", "poty_LeaguePOTY", "poty_DivisionPOTY",
+                                            "poty_WorldPOTY"};
+        int kind = type == 1 ? 0 : type == 2 ? 1 : type == 3 ? (top ? 2 : 3) : 4;
+        const SSRSeasonClub *mine = ssr_season_club(s, c->clubId, 0);
+        const char *team = type == 1 ? (mine ? mine->data->tla : "") : comp ? comp->data->tla : "";
+        ssr_career_add_trophy(c, ssr_career_year(c) - 1, team, loc(game, TAGS[kind]), 6 + kind);
+    }
     return won;
 }
 
