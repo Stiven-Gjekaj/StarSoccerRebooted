@@ -7,7 +7,8 @@
 // Set SSR_SHOT to a path to save the first frame as a PNG and quit. Set
 // SSR_SHOT_MS to save a later frame, that many milliseconds after the first.
 // Set SSR_PRESS to "x,y" to press that point of the screen 1.5 seconds
-// after the first frame. Set SSR_WINDOW to "WxH" for the size of the window in points.
+// after the first frame. More presses go after ';', 1.5 seconds apart, and
+// "type:text" types the text. Set SSR_WINDOW to "WxH" for the size of the window in points.
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -44,6 +45,8 @@ typedef struct {
     SSRGame *game;
     int gameScreen;
     char settingsPath[2048];
+    char saveDirectory[2048];
+    int typing;
     // The screen that shows now, from NewGUI/Screens, and its last frame.
     SSRUiTree *screen;
     SSRScene *scene;
@@ -84,9 +87,12 @@ static char *read_screen_file(void *context, const char *name, size_t *size) {
     return copy;
 }
 
+// The text of a tag. A female player gets the female text of the language
+// (c_TLocale with the gender column).
 static const char *translate(void *context, const char *tag) {
     const SSRApp *app = context;
-    return app->text ? ssr_text_get(app->text, tag, 0) : tag;
+    const SSRCareer *career = ssr_game_career(app->game);
+    return app->text ? ssr_text_get(app->text, tag, career && career->gender == 1) : tag;
 }
 
 static int image_size(void *context, const char *name, const char *file, float *w, float *h) {
@@ -147,6 +153,28 @@ static void follow_game(SSRApp *app) {
 
 static SSRSceneEnv scene_env(SSRApp *app);
 
+// Gives the changes that the logic asks for to the elements of the screen.
+static void apply_ops(SSRApp *app) {
+    SSRUiOp op;
+    while (app->scene && ssr_game_take_op(app->game, &op)) {
+        switch (op.kind) {
+        case SSR_OP_TEXT:
+            ssr_scene_set_text(app->scene, op.ref, op.text);
+            break;
+        case SSR_OP_SHOW:
+        case SSR_OP_HIDE:
+            ssr_scene_set_visible(app->scene, op.ref, op.kind == SSR_OP_SHOW);
+            break;
+        case SSR_OP_LIST_CLEAR:
+            ssr_scene_list_clear(app->scene, op.ref);
+            break;
+        case SSR_OP_LIST_ADD:
+            ssr_scene_list_add(app->scene, op.ref, op.ref2, op.text, op.id);
+            break;
+        }
+    }
+}
+
 // A click: the actions of the block of the Click() run, its sounds play,
 // and the logic gets the message.
 static void click(SSRApp *app, const SSRSceneItem *item) {
@@ -179,6 +207,8 @@ static void load_game(SSRApp *app) {
     app->text = ssr_text_load(path);
     ssr_game_free(app->game);
     app->game = ssr_game_create(app->tweaks);
+    ssr_game_set_data(app->game, app->world, translate, app, app->saveDirectory);
+    ssr_game_set_seed(app->game, (int)SDL_GetTicks());
     ssr_game_load_settings(app->game, app->settingsPath);
     apply_settings(app);
     app->gameScreen = ssr_game_screen_version(app->game);
@@ -300,6 +330,8 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     if (!pref) return SDL_APP_FAILURE;
     SDL_snprintf(app->gameDirectory, sizeof(app->gameDirectory), "%sgame", pref);
     SDL_snprintf(app->settingsPath, sizeof(app->settingsPath), "%ssettings.txt", pref);
+    SDL_snprintf(app->saveDirectory, sizeof(app->saveDirectory), "%ssaves", pref);
+    SDL_CreateDirectory(app->saveDirectory);
     SDL_free(pref);
     app->tweaks = ssr_tweaks_create();
 
@@ -323,6 +355,11 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
 
 SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
     SSRApp *app = state;
+    if (event->type == SDL_EVENT_TEXT_INPUT) ssr_game_type(app->game, event->text.text);
+    if (event->type == SDL_EVENT_KEY_DOWN && ssr_game_wants_text(app->game)) {
+        if (event->key.key == SDLK_BACKSPACE) ssr_game_key(app->game, SSR_KEY_BACKSPACE);
+        if (event->key.key == SDLK_RETURN || event->key.key == SDLK_KP_ENTER) ssr_game_key(app->game, SSR_KEY_ENTER);
+    }
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
     if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) fit_screen(app);
     if (event->type == SDL_EVENT_DROP_FILE && event->drop.data) import_copy(app, event->drop.data);
@@ -352,7 +389,9 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
         }
         ssr_scene_touch(app->scene, down, x + app->left, y + app->top);
         // A click is when the touch goes up on the element, as in the game.
-        int up = event->type == SDL_EVENT_MOUSE_BUTTON_UP || event->type == SDL_EVENT_FINGER_UP;
+        // A touch that moved a list is a swipe, not a click.
+        int up = (event->type == SDL_EVENT_MOUSE_BUTTON_UP || event->type == SDL_EVENT_FINGER_UP) &&
+                 !ssr_scene_dragged(app->scene);
         const SSRSceneItem *item = up ? ssr_scene_hit_item(app->scene, x + app->left, y + app->top) : NULL;
         if (item) click(app, item);
     }
@@ -401,7 +440,20 @@ SDL_AppResult SDL_AppIterate(void *state) {
             ms = (int)(now - app->lastFrame);
         }
         app->lastFrame = now;
+        apply_ops(app);
         ssr_scene_update(app->scene, &env, ms);
+        ssr_game_update(app->game, ms * 60 / 1000.0f);
+        follow_game(app);
+        // The keyboard of the phone shows while a name box has the focus.
+        int typing = ssr_game_wants_text(app->game);
+        if (typing != app->typing) {
+            app->typing = typing;
+            if (typing) {
+                SDL_StartTextInput(app->window);
+            } else {
+                SDL_StopTextInput(app->window);
+            }
+        }
         ssr_gfx_set_tweaks(app->gfx, app->tweaks);
         ssr_gfx_draw_scene(app->gfx, app->scene);
     }
@@ -414,17 +466,27 @@ SDL_AppResult SDL_AppIterate(void *state) {
     }
     if (app->message[0]) draw_centered_text(app, app->height - 40, app->message);
 
-    // The press comes 1.5 s after the first frame, when the buttons are in.
+    // The presses come 1.5 s apart, from 1.5 s after the first frame, when
+    // the buttons are in. A press "type:text" types the text.
     const char *press = SDL_getenv("SSR_PRESS");
     static int pressed = 0;
     static Uint64 firstFrame = 0;
     if (!firstFrame) firstFrame = SDL_GetTicks();
-    if (press && *press && !pressed && app->scene && SDL_GetTicks() - firstFrame >= 1500) {
-        pressed = 1;
+    if (press && *press && app->scene && SDL_GetTicks() - firstFrame >= (Uint64)(pressed + 1) * 1500) {
+        const char *at = press;
+        for (int i = 0; i < pressed && at; i++) {
+            at = SDL_strchr(at, ';');
+            if (at) at++;
+        }
+        pressed++;
         float x = 0, y = 0;
-        if (SDL_sscanf(press, "%f,%f", &x, &y) == 2) {
+        char text[64];
+        if (at && SDL_sscanf(at, "type:%63[^;]", text) == 1) {
+            ssr_game_type(app->game, text);
+        } else if (at && SDL_sscanf(at, "%f,%f", &x, &y) == 2) {
             const SSRSceneItem *item = ssr_scene_hit_item(app->scene, x + app->left, y + app->top);
             if (item) click(app, item);
+            if (!item) SDL_Log("Pressed nothing at %g,%g", x, y);
         }
     }
 
