@@ -3642,7 +3642,7 @@ void ssr_scene_list_sub(SSRScene *scene, const char *list, const char *ref, cons
 // The gel of the copy: ref, or "ref#n" for the element n of the ref (0 is
 // the first gel with the ref).
 static Gel *spawn_part(const SSRScene *scene, int id, const char *ref) {
-    Gel *g = spawned(scene, id);
+    Gel *g = id == 0 ? scene->root : spawned(scene, id);
     if (!g || !ref) return g;
     const char *hash = strchr(ref, '#');
     if (!hash) return find_below(g, ref);

@@ -203,6 +203,8 @@ void ssr_scene_anim(SSRScene *scene, const char *ref, float speed, int toEnd);
 // scale.
 void ssr_scene_place(SSRScene *scene, const char *ref, float x, float y, float scale);
 
+// The calls of a copy take its id. The id 0 is the whole screen, so that
+// the code can change an element of the screen by its ref.
 // Moves the copy with the id, or the element with the ref inside it, to
 // (x, y) in its parent. ref can be NULL.
 void ssr_scene_spawn_place(SSRScene *scene, int id, const char *ref, float x, float y);
