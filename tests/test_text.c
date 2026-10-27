@@ -83,7 +83,27 @@ static void test_puts_the_names_of_the_remake(void) {
     ssr_text_free(text);
 }
 
+// The table has the columns of DeviceLanguageCodes.txt.
+static void test_finds_the_language_of_the_device(void) {
+    const char *table = "Locale Code\tAndroid/WP Language Code\tiOS Language Code\tDistance\t\r\n"
+                        "0\ten\ten\t0\tEnglish\r\n"
+                        "2\tpt_BR\tpt_BR\t1\tPortugese Brasil\r\n"
+                        "8\tpt_PT\tpt_PT\t1\tPortugese\r\n"
+                        "12\tzh\tzh\t1\tChinese\r\n";
+    int metres = -1;
+    CHECK(ssr_text_device_language(table, "en", "US", &metres) == 0 && metres == 0);
+    CHECK(ssr_text_device_language(table, "pt", "BR", &metres) == 2 && metres == 1);
+    CHECK(ssr_text_device_language(table, "pt", "PT", NULL) == 8);
+    CHECK(ssr_text_device_language(table, "pt", NULL, NULL) == -1);
+    CHECK(ssr_text_device_language(table, "zh", "CN", NULL) == 12);
+    CHECK(ssr_text_device_language(table, "nl", "NL", NULL) == -1);
+    CHECK(strcmp(ssr_text_language_code(12), "ch") == 0);
+    CHECK(strcmp(ssr_text_language_code(2), "br") == 0);
+    CHECK(strcmp(ssr_text_language_code(13), "en") == 0);
+}
+
 int main(void) {
+    test_finds_the_language_of_the_device();
     test_gets_the_text_of_a_tag();
     test_puts_the_names_of_the_remake();
     test_formats_the_values();

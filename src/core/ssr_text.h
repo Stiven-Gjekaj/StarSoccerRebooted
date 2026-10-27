@@ -35,4 +35,16 @@ int ssr_text_rebrand(SSRText *text);
 size_t ssr_text_format(char *out, size_t capacity, const char *template, const char *const *names,
                        const char *const *values, int count);
 
+// The code of a language (c_TLocale.GetNationCode): 0 "en", 1 "tr", 2 "br",
+// 3 "it", 4 "es", 5 "pl", 6 "de", 7 "fr", 8 "pt", 9 "ru", 10 "ja",
+// 11 "ko", 12 "ch". Another number gives "en".
+const char *ssr_text_language_code(int language);
+
+// The language of the device from the table of
+// "MyData/Languages/DeviceLanguageCodes.txt" (GSSetLanguageFromDevice).
+// A code with a country, for example "pt_BR", needs the same language and
+// country. The first row that agrees wins. metres gets the "Distance"
+// column. Returns -1 when no row agrees.
+int ssr_text_device_language(const char *table, const char *language, const char *country, int *metres);
+
 #endif

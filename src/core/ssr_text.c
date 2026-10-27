@@ -181,3 +181,49 @@ size_t ssr_text_format(char *out, size_t capacity, const char *template, const c
     if (capacity > 0) out[length < capacity ? length : capacity - 1] = 0;
     return length;
 }
+
+const char *ssr_text_language_code(int language) {
+    static const char *const CODES[] = {"en", "tr", "br", "it", "es", "pl", "de",
+                                        "fr", "pt", "ru", "ja", "ko", "ch"};
+    return language >= 0 && language < 13 ? CODES[language] : "en";
+}
+
+// Copies the field of the line up to the next tab, without spaces at the
+// ends. Returns the start of the next field, or NULL at the end of the line.
+static const char *field(const char *p, char *out, size_t capacity) {
+    size_t n = 0;
+    while (*p == ' ') p++;
+    while (*p && *p != '\t' && *p != '\n' && *p != '\r') {
+        if (n + 1 < capacity) out[n++] = *p;
+        p++;
+    }
+    while (n > 0 && out[n - 1] == ' ') n--;
+    out[n] = 0;
+    return *p == '\t' ? p + 1 : NULL;
+}
+
+int ssr_text_device_language(const char *table, const char *language, const char *country, int *metres) {
+    if (!table || !language || !*language) return -1;
+    const char *line = strchr(table, '\n');
+    // The first line holds the names of the columns.
+    while (line) {
+        line++;
+        char cells[4][32] = {{0}};
+        const char *p = line;
+        for (int i = 0; i < 4 && p; i++) p = field(p, cells[i], sizeof(cells[i]));
+        char *separator = strchr(cells[1], '_');
+        int match;
+        if (separator) {
+            *separator = 0;
+            match = strcmp(cells[1], language) == 0 && country && strcmp(separator + 1, country) == 0;
+        } else {
+            match = cells[1][0] && strcmp(cells[1], language) == 0;
+        }
+        if (match && isdigit((unsigned char)cells[0][0])) {
+            if (metres) *metres = atoi(cells[3]);
+            return atoi(cells[0]);
+        }
+        line = strchr(line, '\n');
+    }
+    return -1;
+}
