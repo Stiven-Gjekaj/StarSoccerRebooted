@@ -1,0 +1,22 @@
+# The score bar of the match: clean plates of the remake (SSRPlate) in
+# place of the toggle image with its bright rim, a soft shadow in place of
+# the black outline, a softer glass, and the names and the scores in the
+# middle of the plates.
+- Draw:(WhiteToggle,-3,-4,572,68,,#000000FF)
++ Draw:(SSRPlate,-3,-2,572,66,,#00000070)
+- Draw:(WhiteToggle,2,2,252,58,,#FF0000FF) ref:T1ChanceBar
++ Draw:(SSRPlate,2,2,252,58,,#FF0000FF) ref:T1ChanceBar
+- Draw:(WhiteToggle,313,2,252,58,,#008000FF) ref:T2ChanceBar
++ Draw:(SSRPlate,313,2,252,58,,#008000FF) ref:T2ChanceBar
+- Text:(TEAM1,-280,-30,200,50)
++ Text:(TEAM1,-280,-26,200,50)
+- Text:(TEAM2, 78,-30,200,50)
++ Text:(TEAM2, 78,-26,200,50)
+- Text:("99",-100,-30,80,50)
++ Text:("99",-100,-26,80,50)
+- Text:("99",18,-30,80,50)
++ Text:("99",18,-26,80,50)
+- Draw:(BarGlass,-2,-2,257,63,,#B0FFB0FF)
++ Draw:(BarGlass,-2,-2,257,63,,#406040FF)
+- Draw:(BarGlass,312,0,257,61,,#B0FFB0FF)
++ Draw:(BarGlass,312,0,257,61,,#406040FF)
