@@ -17,6 +17,8 @@ typedef enum {
     // The player taps the big ball.
     SSR_CHANCE_TAP,
     SSR_CHANCE_FLIGHT,
+    // A dribble chance: swipes push the ball past the defenders.
+    SSR_CHANCE_DRIBBLE,
     SSR_CHANCE_OVER,
 } SSRChanceState;
 
@@ -34,6 +36,8 @@ typedef enum {
     SSR_RESULT_INTERCEPTED,
     // A defender took the ball while the player aimed.
     SSR_RESULT_LOST,
+    // The ball of a dribble crossed the finish line.
+    SSR_RESULT_DRIBBLED,
 } SSRChanceResult;
 
 // The facts of the player, the teams, and the match for one chance.
@@ -44,7 +48,7 @@ typedef struct {
     // The strengths of the team of the player and of the other team.
     float teamStrength, opponentStrength;
     // The skills of the player, from 1 to 100.
-    int power, technique, vision;
+    int power, technique, vision, pace;
     int level, starLevel, clubId;
     int careerApps, chances;
     float careerGoals, careerPasses;
@@ -78,6 +82,11 @@ typedef struct {
     int now;
     // 1 for each warning beep of the tap ball, and for the kick sound.
     int beep, kicked;
+    // The dribble: 1 after the first touch, the swipe (c_SwipeDetector),
+    // and the speed of the ball.
+    int dribbling, swiping;
+    float swipeX, swipeY;
+    float dribbleX, dribbleY;
 } SSRChance;
 
 // The start of the ball for a chance type (c_TBall.m_Reset).

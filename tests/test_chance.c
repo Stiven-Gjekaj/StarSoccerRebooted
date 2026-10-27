@@ -206,7 +206,45 @@ static void test_a_short_tap_cancels_the_aim(void) {
     CHECK(c.kicking == 0 && c.state == SSR_CHANCE_AIM);
 }
 
+// Swipes up from (x, 900): each swipe pushes the ball up the screen.
+static void swipe_up(SSRChance *c, int *now, int count, SSRRandom *random) {
+    for (int k = 0; k < count && c->state == SSR_CHANCE_DRIBBLE; k++) {
+        SSRTapTouch down = {320, 900, 1, 1}, up = {320, 720, 0, 0};
+        ssr_chance_update(c, *now += 16, &down, random);
+        ssr_chance_update(c, *now += 16, &up, random);
+        SSRTapTouch none = {0};
+        for (int i = 0; i < 20 && c->state == SSR_CHANCE_DRIBBLE; i++) ssr_chance_update(c, *now += 16, &none, random);
+    }
+}
+
+static void test_dribbles_past_the_defenders(void) {
+    SSRRandom random = {SSR_RANDOM_START};
+    SSRChance c;
+    SSRChanceSetup s = setup_for(11);
+    s.pace = 50;
+    ssr_chance_start(&c, &s, &random);
+    CHECK(c.state == SSR_CHANCE_DRIBBLE && c.ball.x == 320 && c.ball.y == 850 && c.players.count == 4);
+    // Nothing moves before the first touch.
+    SSRTapTouch none = {0};
+    int now = 1000;
+    for (int i = 0; i < 30; i++) ssr_chance_update(&c, now += 16, &none, &random);
+    CHECK(c.ball.y == 850 && !c.dribbling);
+    // With the defenders out of the way, the ball crosses the line.
+    for (int i = 0; i < c.players.count; i++) c.players.list[i].x = -1000;
+    swipe_up(&c, &now, 40, &random);
+    CHECK(c.result == SSR_RESULT_DRIBBLED && c.ball.y <= 200);
+
+    // A defender in the way takes the ball.
+    ssr_chance_start(&c, &s, &random);
+    for (int i = 0; i < c.players.count; i++) c.players.list[i].x = -1000;
+    c.players.list[0].x = 320;
+    c.players.list[0].y = 600;
+    swipe_up(&c, &now, 40, &random);
+    CHECK(c.result == SSR_RESULT_INTERCEPTED);
+}
+
 int main(void) {
+    test_dribbles_past_the_defenders();
     test_places_the_ball();
     test_sets_up_the_players();
     test_shoots_a_penalty();

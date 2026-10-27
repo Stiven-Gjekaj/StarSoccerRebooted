@@ -96,6 +96,48 @@ static void keeper(SSRChance *c, SSRRandom *random) {
     ssr_players_add_keeper(&c->players, &c->info, c->setup.opponentStrength, random);
 }
 
+// m_SetUpDribbling: four defenders in a staggered line or in a ring, the
+// ball at (320, 850), and the finish line at y = 200.
+static void start_dribble(SSRChance *c, SSRRandom *random) {
+    c->info.startX = 320;
+    c->info.startY = 850;
+    SSRMatchPlayer *d[4];
+    for (int i = 0; i < 4; i++) {
+        d[i] = ssr_players_add_defender(&c->players, &c->info, c->setup.opponentStrength, 0, 1, 0, random);
+    }
+    if (!d[0] || !d[1] || !d[2] || !d[3]) return;
+    if (ssr_rand(random, 2) == 1) {
+        d[0]->x = 320 + ssr_rand_float(random, -100, 100);
+        d[0]->y = 700;
+        static const int LOW[3] = {10, 75, 150}, HIGH[3] = {150, 225, 350};
+        for (int i = 1; i < 4; i++) {
+            int left = d[i - 1]->x > 320;
+            int r = ssr_rand2(random, LOW[i - 1], HIGH[i - 1]);
+            d[i]->x = (float)(left ? 320 - r : 320 + r);
+            d[i]->y = (float)(850 - 150 * (i + 1));
+        }
+    } else {
+        float a0 = ssr_rand_float(random, 0, 360), r = ssr_rand_float(random, 150, 250);
+        for (int i = 0; i < 4; i++) {
+            float a = a0 + 90.0f * (float)i;
+            // The fourth uses 290 for its y, as the game does.
+            float ay = i == 3 ? a0 + 290 : a;
+            d[i]->x = 320 + (float)cos((double)(a * 0.017453292f)) * r;
+            d[i]->y = 500 + (float)sin((double)(ay * 0.017453292f)) * r;
+            d[i]->x += (float)ssr_rand2(random, -75, 75);
+            d[i]->y += (float)ssr_rand2(random, -25, 25);
+        }
+    }
+    // c_TBall.m_Reset(5) resets the tap ball too, with its random numbers.
+    SSRTapSetup tap = {.chanceType = 5, .level = c->setup.level, .careerApps = c->setup.careerApps,
+                       .careerGoals = c->setup.careerGoals, .careerPasses = c->setup.careerPasses};
+    ssr_tapball_reset(&c->tap, &tap, random);
+    ssr_ball_place(&c->ball, 320, 850);
+    c->kicking = 3;
+    c->actionType = 11;
+    c->state = SSR_CHANCE_DRIBBLE;
+}
+
 void ssr_chance_start(SSRChance *c, const SSRChanceSetup *setup, SSRRandom *random) {
     memset(c, 0, sizeof(*c));
     c->setup = *setup;
@@ -129,6 +171,10 @@ void ssr_chance_start(SSRChance *c, const SSRChanceSetup *setup, SSRRandom *rand
     ssr_tapball_reset(&c->tap, &tap, random);
 
     ssr_players_clear(&c->players);
+    if (setup->type == 11) {
+        start_dribble(c, random);
+        return;
+    }
     switch (setup->type) {
     case 1:
         defenders(c, 8, 0, 1, random);
@@ -427,6 +473,64 @@ static void aim(SSRChance *c, const SSRTapTouch *touch, SSRRandom *random) {
     }
 }
 
+// One tick of a dribble: the swipe, the ball, the tackles, the line.
+static void dribble(SSRChance *c, const SSRTapTouch *touch, SSRRandom *random) {
+    SSRBall *b = &c->ball;
+    if (!c->dribbling) {
+        // Nothing moves until the first touch.
+        if (!touch->down) return;
+        c->dribbling = 1;
+    }
+    b->oldX = b->x;
+    b->oldY = b->y;
+    if (!c->swiping && touch->down) {
+        c->swiping = 1;
+        c->swipeX = touch->x;
+        c->swipeY = touch->y;
+    } else if (c->swiping && !touch->down) {
+        // The swipe adds a push along its way (c_TBall.m_CheckForSwipe).
+        c->swiping = 0;
+        float dir = direction_to(c->swipeX, c->swipeY, touch->x, touch->y);
+        float dist = distance(c->swipeX, c->swipeY, touch->x, touch->y);
+        if (dist < 10) dist = 10;
+        if (dist > 180) dist = 180;
+        float push = (dist + (float)c->setup.pace) * 0.009f;
+        b->direction = dir;
+        c->dribbleX += (float)cos((double)(dir * D2R)) * push;
+        c->dribbleY += (float)sin((double)(dir * D2R)) * push;
+    }
+    // c_TBall.m_Move.
+    float vx = c->dribbleX, vy = c->dribbleY;
+    b->x += vx;
+    b->y += vy;
+    c->dribbleX *= 0.985f;
+    c->dribbleY *= 0.985f;
+    b->power = (float)sqrt((double)(vx * vx + vy * vy));
+    // A defender within 15 takes the ball.
+    for (int i = 0; i < c->players.count; i++) {
+        const SSRMatchPlayer *p = &c->players.list[i];
+        if (p->type != SSR_PLAYER_DEFENDER || distance(b->x, b->y, p->x, p->y) >= 15) continue;
+        static const float FX[] = {8, 0, -8, 0}, FY[] = {-2, 8, -2, -8};
+        b->x = p->x + FX[p->facing & 3];
+        b->y = p->y + FY[p->facing & 3];
+        b->power = 0;
+        c->lastTouchedBy = p->id;
+        finish(c, SSR_RESULT_INTERCEPTED);
+        break;
+    }
+    if (b->alive && (b->x < 0 || b->x > 640 || b->y < 0 || b->y > 960)) finish(c, SSR_RESULT_MISSED);
+    update_players(c, random);
+    // The finish line from (-200, 200) to (800, 200).
+    if (b->alive && ((b->oldY >= 200 && b->y <= 200) || (b->oldY <= 200 && b->y >= 200)) && b->oldY != b->y) {
+        float t = (200 - b->oldY) / (b->y - b->oldY);
+        float x = b->oldX + (b->x - b->oldX) * t;
+        if (x >= -200 && x <= 800) {
+            c->kickYards = distance(320, 850, b->x, b->y) / 15;
+            finish(c, SSR_RESULT_DRIBBLED);
+        }
+    }
+}
+
 void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRandom *random) {
     c->now = now;
     c->beep = c->kicked = 0;
@@ -473,6 +577,9 @@ void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRando
         update_players(c, random);
         break;
     }
+    case SSR_CHANCE_DRIBBLE:
+        dribble(c, touch, random);
+        break;
     case SSR_CHANCE_OVER:
         // The players stop, and the keeper picks up the ball.
         update_players(c, random);
