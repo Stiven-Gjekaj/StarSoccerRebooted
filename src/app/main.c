@@ -12,8 +12,8 @@
 // Set SSR_AUTOCHANCE to "dx,dy" to play each chance of the player with a
 // drag of (dx, dy) from the ball. Set SSR_SHOT_TAP to save the frame of
 // the first tap ball, and SSR_SHOT_DRIBBLE for the first dribble.
-// Set SSR_AUTOMATCH to 1 to press Play each time that the match waits, or
-// to 2 to also go on from the match stats. Set SSR_SHOT_SCREEN to a screen
+// Set SSR_AUTOMATCH to 1 to press Play each time that the match waits, to 2
+// to also go on from the match stats, or to 3 to open the ratings from them. Set SSR_SHOT_SCREEN to a screen
 // name to save the frame SSR_SHOT_MS after that screen opens.
 
 #define SDL_MAIN_USE_CALLBACKS 1
@@ -750,11 +750,13 @@ static void auto_chance(SSRApp *app) {
 
 // SSR_AUTOMATCH presses the Play button of the match when the match waits
 // (Match.MatchState 1, 2, or 3), and with 2 the Continue button of the match
-// stats 3 s after it shows. The presses come 1.5 s apart.
+// stats 3 s after it shows. With 3 it opens the ratings from the match stats
+// one time. The presses come 1.5 s apart.
 static void auto_match(SSRApp *app) {
     const char *setting = SDL_getenv("SSR_AUTOMATCH");
     if (!setting || !*setting) return;
     static Uint64 last = 0, statsReady = 0;
+    static int ratingsOpened = 0;
     Uint64 now = SDL_GetTicks();
     if (now - last < 1500) return;
     const char *screen = ssr_game_screen(app->game);
@@ -766,6 +768,10 @@ static void auto_match(SSRApp *app) {
                ssr_tweaks_number(app->tweaks, "MatchStats", "StatStage") >= 10) {
         if (!statsReady) statsReady = now;
         if (now - statsReady >= 3000) message = "matchstats.btn_Play";
+    } else if (strcmp(screen, "matchstats") == 0 && SDL_atoi(setting) == 3 && !ratingsOpened &&
+               ssr_tweaks_number(app->tweaks, "MatchStats", "StatStage") >= 10) {
+        ratingsOpened = 1;
+        message = "skills.btn_Ratings";
     }
     if (!message) return;
     last = now;
