@@ -359,7 +359,9 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       names of the players, images, and screens, in a zip file with
       `pack.txt` ([docs/packs.md](docs/packs.md))
 - [ ] Stadiums and logos in a pack
-- [ ] An editor in the app for the leagues, the clubs, and the players
+- [x] An editor in the app, first step: a tap on the name of a club on the
+      squad screen renames it. The edit goes into the pack "custom".
+- [ ] An editor for the leagues, the kits, and the players
 - [x] Data packs: the player installs a pack from a file (a drop on the
       window, or the path at the start)
 - [x] A screen to choose or remove a pack (Options, Packs), and an

@@ -90,3 +90,11 @@ the same age as the player of the user.
 The players of a career are in `saves/peopleN.txt`, next to the career.
 The seed of the world is in the career (`worldseed`). Two careers with the
 same seed and the same club start with the same players.
+
+## The editor
+
+A tap on the name of the club on the squad screen changes the name. The
+app keeps the edit in the pack `custom` (`packs/custom/world/Clubs.txt`)
+and chooses that pack. The world reads the pack at each start. A zip file
+of the folder `packs/custom` is a data pack that other players can
+install.
