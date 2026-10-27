@@ -1285,6 +1285,10 @@ static SSRSceneEnv scene_env(SSRApp *app) {
         .provide = provide,
         .context = app,
     };
+    // Each screen takes other random numbers, as the game does. SSR_SEED
+    // gives the same numbers each time.
+    const char *seed = SDL_getenv("SSR_SEED");
+    env.seed = seed && *seed ? (uint32_t)SDL_atoi(seed) * 2654435761u : (uint32_t)SDL_GetTicksNS() | 1u;
     return env;
 }
 

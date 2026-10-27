@@ -1579,6 +1579,32 @@ static void test_knows_set_message(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// RandomTweak() puts a whole number from the range in a tweak, one time
+// with a dot (c_RandomTweak).
+static void test_puts_a_random_number_in_a_tweak(void) {
+    int seen[2] = {0, 0};
+    for (int i = 0; i < 40; i++) {
+        SSRTweaks *tweaks = ssr_tweaks_create();
+        ssr_tweaks_set_number(tweaks, "Menu", "StarManPic", -1);
+        SSRUiTree *tree;
+        layout = "Rect:(0,0,0,0)\n"
+                 "\t.RandomTweak(Menu,StarManPic,0,1.99)\n";
+        SSRUiFiles files = {read_layout, NULL};
+        tree = ssr_ui_parse("Screen.uis", &files);
+        SSRSceneEnv env = test_env(tweaks);
+        env.seed = ((uint32_t)i + 1) * 2654435761u;
+        SSRScene *scene = ssr_scene_open(tree, &env);
+        ssr_scene_update(scene, &env, 16);
+        int pic = (int)ssr_tweaks_number(tweaks, "Menu", "StarManPic");
+        CHECK(pic == 0 || pic == 1);
+        if (pic == 0 || pic == 1) seen[pic] = 1;
+        ssr_scene_free(scene);
+        ssr_ui_free(tree);
+        ssr_tweaks_free(tweaks);
+    }
+    CHECK(seen[0] && seen[1]);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -1962,6 +1988,7 @@ int main(void) {
     test_pads_a_text();
     test_spaces_the_lines_of_a_text_box();
     test_knows_set_message();
+    test_puts_a_random_number_in_a_tweak();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();

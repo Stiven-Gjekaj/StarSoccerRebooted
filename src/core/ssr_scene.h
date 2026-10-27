@@ -122,6 +122,9 @@ typedef struct {
     // "GS_PlayerClubName". NULL keeps the text of the line.
     const char *(*provide)(void *context, const char *name);
     void *context;
+    // The start of the random numbers of the scene, for example of
+    // RandomTweak(). 0 gives the same numbers each time.
+    uint32_t seed;
 } SSRSceneEnv;
 
 typedef struct SSRScene SSRScene;

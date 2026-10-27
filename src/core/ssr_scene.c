@@ -92,6 +92,7 @@ typedef enum {
     D_SCROLLING_LIST,
     D_SCROLL_INDICATOR,
     D_SORT_BY_REF,
+    D_RANDOM_TWEAK,
     D_SHOW_SHELL,
     D_SWIPE_PANEL,
     D_EMIT_PLACER,
@@ -1832,6 +1833,15 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
     } else if (is(n, "EmitSize")) {
         d = new_doodad(D_EMIT_SIZE, NULL);
         if (d) d->v[0] = m->argCount > 0;
+    } else if (is(n, "RandomTweak")) {
+        // RandomTweak(Cat,Name,min,max): a whole number from min up to
+        // max (c_RandomTweak).
+        d = new_doodad(D_RANDOM_TWEAK, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+        d->v[0] = (float)number(s, m, 2, 0);
+        d->v[1] = (float)number(s, m, 3, 0);
     } else if (is(n, "SetMessage")) {
         // SetMessage(screen) names the layout of the next message
         // (c_SetMessageScreen). The save slots are its only user, and the
@@ -2196,7 +2206,7 @@ SSRScene *ssr_scene_open(const SSRUiTree *tree, const SSRSceneEnv *env) {
     SSRScene *s = calloc(1, sizeof(SSRScene));
     if (!s) return NULL;
     s->env = env;
-    s->random.seed = SSR_RANDOM_START;
+    s->random.seed = env->seed ? env->seed : SSR_RANDOM_START;
     s->root = new_gel(GEL_GROUP, NULL);
     snprintf(s->layers[0].name, sizeof(s->layers[0].name), "Default");
     s->layerCount = 1;
@@ -2752,6 +2762,9 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         d->v[2] = -y;
         break;
     }
+    case D_RANDOM_TWEAK:
+        ssr_tweaks_set_number(s->env->tweaks, d->text[0], d->text[1], (int)ssr_rand_float(&s->random, d->v[0], d->v[1]));
+        break;
     case D_SORT_BY_REF: {
         // The children that the tweak names show, one below the other, with
         // the padding between them. The other children do not show.
