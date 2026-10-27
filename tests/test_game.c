@@ -1090,6 +1090,78 @@ static void play_roulette(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
+// Blackjack: six hands, the player holds at once. The test sends the
+// messages of the slides, as the layout does.
+static void play_blackjack(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.bank = 500;
+    c.energy = 100;
+    c.gambling = 0;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    const SSRCareer *now = ssr_game_career(game);
+    ssr_game_message(game, "gamemenu.btn_Life");
+    ssr_game_message(game, "relationships.btn_Casino");
+    ssr_game_message(game, "casino.btn_BlackJack");
+    CHECK(strcmp(ssr_game_screen(game), "blackjack") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Casino", "PlayerBJTotal"), "?") == 0);
+    for (int i = 0; i < 4; i++) ssr_game_message(game, "casino.btn_StakeUp");
+    CHECK(ssr_tweaks_number(tweaks, "Casino", "Stake") == 10);
+    int bank = 500, outcomes[3] = {0};
+    SSRUiOp ops[512];
+    for (int hand = 1; hand <= 6; hand++) {
+        float energy = now->energy;
+        ssr_game_message(game, "blackjack.btn_Play");
+        CHECK(now->bank == bank - 10 && now->gambling == 3 * hand);
+        // The fifth bet comes after four of weight 3: it costs 5 energy.
+        CHECK(now->energy == (hand == 5 ? energy - 5 : energy));
+        // Back does nothing during a hand.
+        ssr_game_message(game, "blackjack.btn_Quit");
+        CHECK(strcmp(ssr_game_screen(game), "blackjack") == 0);
+        ssr_tweaks_set_number(tweaks, "Casino", "CasinoOutcome", 99);
+        int shown = 0, next = 0, dealt = 0;
+        for (int f = 0; f < 20 * 60 && !next; f++) {
+            ssr_game_update(game, 1);
+            int count = take_ops(game, ops, 512);
+            for (int i = 0; i < count; i++) {
+                if (ops[i].kind == SSR_OP_HOOK && ops[i].ref2[0]) {
+                    dealt++;
+                    if (strncmp(ops[i].ref, "PlayerCard", 10) == 0) ssr_game_message(game, "blackjack.playerCardSlid");
+                    else if (strcmp(ops[i].ref, "DealerCardToFlip") == 0) ssr_game_message(game, "blackjack.dealerCardFlipped");
+                    else ssr_game_message(game, "blackjack.dealerCardSlid");
+                }
+                if (ops[i].kind == SSR_OP_SHOW && strcmp(ops[i].ref, "HoldButton") == 0) shown = 1;
+                if (ops[i].kind == SSR_OP_SHOW && strcmp(ops[i].ref, "PlayButton") == 0) next = 1;
+            }
+            if (shown) {
+                shown = 0;
+                ssr_game_message(game, "blackjack.btn_Hold");
+            }
+        }
+        CHECK(next && dealt >= 4);
+        double outcome = ssr_tweaks_number(tweaks, "Casino", "CasinoOutcome");
+        int winnings = (int)ssr_tweaks_number(tweaks, "Casino", "Winnings");
+        CHECK(outcome == 1 ? winnings == 20 : outcome == 0 ? winnings == 10 : outcome == -1 && winnings == 0);
+        outcomes[(int)outcome + 1]++;
+        bank = bank - 10 + winnings;
+        CHECK(now->bank == bank);
+        // The totals show a number now.
+        CHECK(strcmp(ssr_tweaks_get(tweaks, "Casino", "PlayerBJTotal"), "?") != 0);
+    }
+    CHECK(outcomes[0] + outcomes[1] + outcomes[2] == 6);
+    // Back: six bets of 3, with the reset at the fifth, leave 6: 3 energy.
+    float energy = now->energy;
+    ssr_game_message(game, "blackjack.btn_Quit");
+    CHECK(strcmp(ssr_game_screen(game), "casino") == 0);
+    ssr_game_message(game, "casino.btn_Back");
+    CHECK(now->energy == energy - 3);
+    ssr_game_message(game, "relationships.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+}
+
 static void go_shopping(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     SSRCareer c = *ssr_game_career(game);
     c.bank = 40;
@@ -1658,6 +1730,7 @@ static void test_starts_a_new_career(void) {
     choose_a_dilemma(game, path);
     go_to_the_casino(game, tweaks, path);
     play_roulette(game, tweaks, path);
+    play_blackjack(game, tweaks, path);
     go_shopping(game, tweaks, path);
     hire_and_kit_out(game, tweaks, path);
     get_old_boots_and_a_sponsor(game, tweaks, path);

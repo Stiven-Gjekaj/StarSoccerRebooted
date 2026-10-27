@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include "ssr_aftermatch.h"
+#include "ssr_blackjack.h"
 #include "ssr_career.h"
 #include "ssr_casino.h"
 #include "ssr_contract.h"
@@ -127,6 +128,10 @@ struct SSRGame {
     SSRRoulette roulette;
     SSRRouletteBet rouletteBet;
     int rouletteSpinning;
+    // Blackjack: the cards in their places on the screen, and Hit and Hold
+    // off while a card slides.
+    SSRBlackjack blackjack;
+    int playerCardsDealt, dealerCardsDealt, blackjackHitOff;
     int slot;
     int slotExists[SSR_CAREER_SLOTS];
 
@@ -6744,6 +6749,224 @@ static void casino_message(SSRGame *game, const char *tag, int amount) {
     show_splash(game, strcmp(tag, "bet_YouWon") == 0 ? "splashmessagebux" : "splashmessage", 1500);
 }
 
+/* -------------------------------------------------------- the blackjack */
+
+static void blackjack_card_dealt(SSRGame *game, int player, int flip);
+
+// AScreen_BlackJack.GetCardRef: the template of a card, "QueenOfHeart",
+// or "FlippedCard" for a card face down.
+static void playing_card_ref(const SSRCard *card, char *out, size_t capacity) {
+    static const char *const RANKS[13] = {"Ace", "Two",   "Three", "Four", "Five",  "Six", "Seven",
+                                          "Eight", "Nine", "Ten",   "Jack", "Queen", "King"};
+    static const char *const SUITS[4] = {"Heart", "Diamond", "Club", "Spade"};
+    if (card->desflip < 1.0f) snprintf(out, capacity, "FlippedCard");
+    else snprintf(out, capacity, "%sOf%s", RANKS[card->num - 1], SUITS[card->suit]);
+}
+
+// ShowScores: the totals over the card places.
+static void blackjack_scores(SSRGame *game, const char *player, const char *dealer) {
+    ssr_tweaks_set(game->tweaks, "Casino", "PlayerBJTotal", player);
+    ssr_tweaks_set(game->tweaks, "Casino", "BankerBJTotal", dealer);
+}
+
+// HideContextButtons and ShowContextButtons: Play and Back.
+static void blackjack_context(SSRGame *game, int show) {
+    add_op(game, show ? SSR_OP_SHOW : SSR_OP_HIDE, "PlayButton", NULL, NULL, 0);
+    add_op(game, show ? SSR_OP_SHOW : SSR_OP_HIDE, "BackButton", NULL, NULL, 0);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "HomeButtonDisabled", !show);
+}
+
+// The banner of a hand (TQuickMessage "splashmessagecards").
+static void blackjack_banner(SSRGame *game, const char *tag) {
+    char text[128];
+    snprintf(text, sizeof(text), "%s", loc(game, tag));
+    for (char *p = text; *p; p++) *p = (char)toupper((unsigned char)*p);
+    if (strcmp(tag, "bet_YouWon") == 0) {
+        char cash[24];
+        number_with_commas(game->bet * 2, cash, sizeof(cash));
+        size_t n = strlen(text);
+        snprintf(text + n, sizeof(text) - n, " \xE2\x98\x85%s", cash);
+    }
+    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+    show_splash(game, "splashmessagecards", 1500);
+}
+
+// Win, Lose, and Tie of TScreen_BlackJack. [I: the sounds come with the
+// sounds of the game.]
+static void blackjack_result(SSRGame *game, int result) {
+    int back = result == 1 ? game->bet * 2 : result == 0 ? game->bet : 0;
+    if (back > 0) {
+        update_bank(game, back);
+        save_career(game);
+    }
+    check_stake(game);
+    if (result == 1) add_op(game, SSR_OP_SHOW, "TickerTapeShower", NULL, NULL, 0);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", result == 1 ? 1 : result == 0 ? 0 : -1);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", back);
+}
+
+// The things that the rules ask the screen to show (AScreen_BlackJack).
+static void blackjack_events(SSRGame *game) {
+    SSRBlackjack *bj = &game->blackjack;
+    char ref[32], slot[32];
+    for (int i = 0; i < bj->eventCount; i++) {
+        const SSRBlackjackEvent *e = &bj->events[i];
+        const SSRCard *card = e->card >= 0 ? &bj->cards[e->card] : NULL;
+        switch (e->kind) {
+        case SSR_BJ_DEALT:
+            // Hit: a copy of the card slides into its place.
+            if (!card || card->posinhand == 0) break;
+            playing_card_ref(card, ref, sizeof(ref));
+            snprintf(slot, sizeof(slot), "%sCard%d", card->owner == SSR_OWNER_DEALER ? "Dealer" : "Player",
+                     card->posinhand);
+            add_op(game, SSR_OP_HOOK, slot, ref, NULL, 0);
+            add_op(game, SSR_OP_ANIM_PLAY, slot, NULL, "1", 0);
+            game->blackjackHitOff = 1;
+            break;
+        case SSR_BJ_FLIP:
+            // FlipDealerCard: the face turns up over the hole card.
+            playing_card_ref(card, ref, sizeof(ref));
+            add_op(game, SSR_OP_HOOK, "DealerCardToFlip", ref, NULL, 0);
+            add_op(game, SSR_OP_SHOW, "DealerCardToFlip", NULL, NULL, 0);
+            add_op(game, SSR_OP_HIDE, "DealerCard2", NULL, NULL, 0);
+            add_op(game, SSR_OP_ANIM_PLAY, "DealerCardToFlip", NULL, "1", 0);
+            blackjack_card_dealt(game, 0, 1);
+            break;
+        case SSR_BJ_BANNER:
+            blackjack_banner(game, e->tag);
+            break;
+        case SSR_BJ_BUTTONS:
+            add_op(game, e->value ? SSR_OP_SHOW : SSR_OP_HIDE, "HitButton", NULL, NULL, 0);
+            add_op(game, e->value ? SSR_OP_SHOW : SSR_OP_HIDE, "HoldButton", NULL, NULL, 0);
+            break;
+        case SSR_BJ_RESULT:
+            blackjack_result(game, e->value);
+            break;
+        case SSR_BJ_NEXT:
+            // ResetCards, then Play and Back show again.
+            for (int k = 1; k <= 5; k++) {
+                snprintf(slot, sizeof(slot), "DealerCard%d", k);
+                add_op(game, SSR_OP_HOOK, slot, "", NULL, 0);
+                snprintf(slot, sizeof(slot), "PlayerCard%d", k);
+                add_op(game, SSR_OP_HOOK, slot, "", NULL, 0);
+            }
+            add_op(game, SSR_OP_SHOW, "DealerCard2", NULL, NULL, 0);
+            add_op(game, SSR_OP_HOOK, "DealerCardToFlip", "", NULL, 0);
+            add_op(game, SSR_OP_HIDE, "DealerCardToFlip", NULL, NULL, 0);
+            game->playerCardsDealt = game->dealerCardsDealt = 0;
+            game->blackjackHitOff = 0;
+            blackjack_context(game, 1);
+            break;
+        }
+    }
+    bj->eventCount = 0;
+}
+
+// The total of the first count cards of a hand, as the screen shows it.
+// The soft total takes an ace as 11 when the total before it is 10 or
+// less, and never takes it back.
+static void shown_total(const SSRBlackjack *bj, const int *hand, int count, char *out, size_t capacity,
+                        const char *or_) {
+    int hard = 0, soft = 0;
+    for (int i = 0; i < count; i++) {
+        int v = bj->cards[hand[i]].num;
+        v = v < 1 ? 1 : v > 10 ? 10 : v;
+        hard += v;
+        soft += v == 1 && soft <= 10 ? 11 : v;
+    }
+    if (soft <= 0) snprintf(out, capacity, "?");
+    else if (hard != soft) snprintf(out, capacity, "%d %s %d", hard, or_, soft);
+    else snprintf(out, capacity, "%d", soft);
+}
+
+// AScreen_BlackJack.CardDealt: a card is in its place, so its value shows.
+// The hole card stays hidden.
+static void blackjack_card_dealt(SSRGame *game, int player, int flip) {
+    const SSRBlackjack *bj = &game->blackjack;
+    if (!flip) {
+        if (player) game->playerCardsDealt++;
+        else game->dealerCardsDealt++;
+    }
+    int shown = game->dealerCardsDealt;
+    if (shown == 2 && !flip) shown = 1;
+    int p = game->playerCardsDealt < bj->playerCount ? game->playerCardsDealt : bj->playerCount;
+    int d = shown < bj->dealerCount ? shown : bj->dealerCount;
+    char ptext[32], dtext[32];
+    shown_total(bj, bj->player, p, ptext, sizeof(ptext), loc(game, "or"));
+    shown_total(bj, bj->dealer, d, dtext, sizeof(dtext), loc(game, "or"));
+    blackjack_scores(game, ptext, dtext);
+    game->blackjackHitOff = 0;
+}
+
+static void blackjack_player_slid(SSRGame *game) {
+    blackjack_card_dealt(game, 1, 0);
+}
+
+static void blackjack_dealer_slid(SSRGame *game) {
+    blackjack_card_dealt(game, 0, 0);
+}
+
+// casino.btn_BlackJack: BlackJack.SetUpScreen. The numbers take a new seed
+// from the clock.
+static void blackjack_screen(SSRGame *game) {
+    game->casinoRandom.seed = game->now;
+    set_screen(game, "blackjack");
+    add_op(game, SSR_OP_HIDE, "TickerTapeShower", NULL, NULL, 0);
+    add_op(game, SSR_OP_HIDE, "HitButton", NULL, NULL, 0);
+    add_op(game, SSR_OP_HIDE, "HoldButton", NULL, NULL, 0);
+    game->playerCardsDealt = game->dealerCardsDealt = 0;
+    game->blackjackHitOff = 0;
+    blackjack_scores(game, "?", "?");
+    game->splashEnd = game->now;
+    ssr_blackjack_setup(&game->blackjack, &game->casinoRandom);
+    game->blackjack.buttons = 0;
+    check_stake(game);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", 0);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", 0);
+}
+
+// blackjack.btn_Play: the bet, then the deal.
+static void blackjack_play(SSRGame *game) {
+    SSRBlackjack *bj = &game->blackjack;
+    if (bj->turn == SSR_BJ_PLAYER || bj->turn == SSR_BJ_DEALER) return;
+    if (!casino_bet(game, game->bet, 3)) return;
+    disable_stake(game);
+    // Reset clears the messages, the energy alert of the bet too.
+    game->splashEnd = game->now;
+    ssr_blackjack_play(bj, &game->casinoRandom);
+    blackjack_events(game);
+    blackjack_context(game, 0);
+}
+
+// blackjack.btn_Hit: a card for the player. The button is off while a
+// card slides.
+static void blackjack_hit(SSRGame *game) {
+    if (game->blackjack.turn != SSR_BJ_PLAYER || game->blackjackHitOff) return;
+    ssr_blackjack_play(&game->blackjack, &game->casinoRandom);
+    blackjack_events(game);
+}
+
+static void blackjack_hold(SSRGame *game) {
+    if (game->blackjackHitOff) return;
+    ssr_blackjack_hold(&game->blackjack);
+    blackjack_events(game);
+}
+
+// blackjack.btn_Quit: Back is hidden while a hand runs. The next visit
+// makes a new deck.
+static void blackjack_quit(SSRGame *game) {
+    if (game->blackjack.turn != SSR_BJ_IDLE) return;
+    ssr_blackjack_clear(&game->blackjack);
+    casino_screen(game);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", 0);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", 0);
+}
+
+static void blackjack_tick(SSRGame *game) {
+    ssr_blackjack_update(&game->blackjack, &game->casinoRandom, game->now < game->splashEnd);
+    blackjack_events(game);
+}
+
 /* --------------------------------------------------------- the roulette */
 
 // The wheel turns and the ball moves on the screen (SetElementAngle and
@@ -7144,6 +7367,14 @@ static const Route ROUTES[] = {
     {"casino.btn_Back", casino_back},
     {"casino.btn_Home", casino_home},
     {"casino.btn_Slots", slots_screen},
+    {"casino.btn_BlackJack", blackjack_screen},
+    {"blackjack.btn_Play", blackjack_play},
+    {"blackjack.btn_Hit", blackjack_hit},
+    {"blackjack.btn_Hold", blackjack_hold},
+    {"blackjack.btn_Quit", blackjack_quit},
+    {"blackjack.playerCardSlid", blackjack_player_slid},
+    {"blackjack.dealerCardSlid", blackjack_dealer_slid},
+    {"blackjack.dealerCardFlipped", blackjack_dealer_slid},
     {"casino.btn_Roulette", roulette_screen},
     {"roulette.btn_Quit", roulette_quit},
     {"roulette.btn_Green", roulette_green},
@@ -7376,6 +7607,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->ticks -= 1;
             game->now += 16;
             if (strcmp(game->screen, "playeroftheyear") == 0) poty_tick(game);
+        }
+    } else if (strcmp(game->screen, "blackjack") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1) {
+            game->ticks -= 1;
+            game->now += 16;
+            blackjack_tick(game);
         }
     } else if (strcmp(game->screen, "roulette") == 0) {
         game->ticks += frames;
