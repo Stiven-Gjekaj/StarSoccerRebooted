@@ -40,6 +40,9 @@ struct SSRGfx {
     // One texture for each PNG page, and one for each image of a RLE page.
     SDL_Texture **pageTextures;
     SDL_Texture **frameTextures;
+    // The same pages with premultiplied alpha, for Gloss().
+    SDL_Texture **glossPages;
+    SDL_Texture **glossFrames;
     // The Img: files of the scene that draws now.
     const SSRScene *scene;
     const SSRTweaks *tweaks;
@@ -77,6 +80,8 @@ SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
     if (gfx->atlases) {
         gfx->pageTextures = SDL_calloc((size_t)ssr_atlas_page_count(gfx->atlases) + 1, sizeof(SDL_Texture *));
         gfx->frameTextures = SDL_calloc((size_t)ssr_atlas_image_count(gfx->atlases) + 1, sizeof(SDL_Texture *));
+        gfx->glossPages = SDL_calloc((size_t)ssr_atlas_page_count(gfx->atlases) + 1, sizeof(SDL_Texture *));
+        gfx->glossFrames = SDL_calloc((size_t)ssr_atlas_image_count(gfx->atlases) + 1, sizeof(SDL_Texture *));
     } else {
         SDL_Log("The atlases of the import are not there.");
     }
@@ -93,9 +98,13 @@ void ssr_gfx_free(SSRGfx *gfx) {
     if (gfx->atlases) {
         for (int i = 0; i < ssr_atlas_page_count(gfx->atlases); i++) SDL_DestroyTexture(gfx->pageTextures[i]);
         for (int i = 0; i < ssr_atlas_image_count(gfx->atlases); i++) SDL_DestroyTexture(gfx->frameTextures[i]);
+        for (int i = 0; i < ssr_atlas_page_count(gfx->atlases); i++) SDL_DestroyTexture(gfx->glossPages[i]);
+        for (int i = 0; i < ssr_atlas_image_count(gfx->atlases); i++) SDL_DestroyTexture(gfx->glossFrames[i]);
     }
     SDL_free(gfx->pageTextures);
     SDL_free(gfx->frameTextures);
+    SDL_free(gfx->glossPages);
+    SDL_free(gfx->glossFrames);
     ssr_atlas_free(gfx->atlases);
     SDL_free(gfx);
 }
@@ -197,23 +206,43 @@ void ssr_gfx_text(SSRGfx *gfx, SSRFontSize size, const char *text, float x, floa
 
 // The texture of a PNG page, or of the frame of a RLE page that holds the
 // image.
-static SDL_Texture *atlas_texture_for(SSRGfx *gfx, const SSRAtlasImage *image) {
+// The game keeps its textures with premultiplied alpha. A blend that does
+// not use the alpha (Gloss) needs the colours that way too.
+static void premultiply(SSRImage *pixels) {
+    size_t count = (size_t)pixels->width * (size_t)pixels->height;
+    for (size_t i = 0; i < count; i++) {
+        unsigned char *p = pixels->pixels + i * 4;
+        for (int c = 0; c < 3; c++) p[c] = (unsigned char)((p[c] * p[3] + 127) / 255);
+    }
+}
+
+// The texture of a PNG page, or of the frame of a RLE page that holds the
+// image. With premultiplied, the copy with premultiplied alpha.
+static SDL_Texture *atlas_texture_kind(SSRGfx *gfx, const SSRAtlasImage *image, int premultiplied) {
     const SSRAtlasPage *page = ssr_atlas_page(gfx->atlases, image->page);
     if (!page) return NULL;
     SSRImage pixels;
     if (page->rle) {
         int index = page->firstImage + image->frame;
-        if (gfx->frameTextures[index]) return gfx->frameTextures[index];
+        SDL_Texture **slot = premultiplied ? &gfx->glossFrames[index] : &gfx->frameTextures[index];
+        if (*slot) return *slot;
         if (!ssr_atlas_frame_pixels(gfx->atlases, image->page, image->frame, &pixels)) return NULL;
-        gfx->frameTextures[index] = texture_from_pixels(gfx->renderer, pixels.width, pixels.height, pixels.pixels);
+        if (premultiplied) premultiply(&pixels);
+        *slot = texture_from_pixels(gfx->renderer, pixels.width, pixels.height, pixels.pixels);
         ssr_image_free(&pixels);
-        return gfx->frameTextures[index];
+        return *slot;
     }
-    if (gfx->pageTextures[image->page]) return gfx->pageTextures[image->page];
+    SDL_Texture **slot = premultiplied ? &gfx->glossPages[image->page] : &gfx->pageTextures[image->page];
+    if (*slot) return *slot;
     if (!ssr_atlas_page_pixels(gfx->atlases, image->page, &pixels)) return NULL;
-    gfx->pageTextures[image->page] = texture_from_pixels(gfx->renderer, pixels.width, pixels.height, pixels.pixels);
+    if (premultiplied) premultiply(&pixels);
+    *slot = texture_from_pixels(gfx->renderer, pixels.width, pixels.height, pixels.pixels);
     ssr_image_free(&pixels);
-    return gfx->pageTextures[image->page];
+    return *slot;
+}
+
+static SDL_Texture *atlas_texture_for(SSRGfx *gfx, const SSRAtlasImage *image) {
+    return atlas_texture_kind(gfx, image, 0);
 }
 
 // The atlases hold the images by the names of the Img: lines. The file of
@@ -233,6 +262,8 @@ int ssr_gfx_image_size(SSRGfx *gfx, const char *name, const char *file, float *w
 typedef struct {
     const SSRSceneItem *item;
     SDL_FColor colour;
+    // 1 for the premultiplied pages of Gloss().
+    int premultiplied;
     float cosA, sinA;
     float offsetX, offsetY;
     // The fade of the alpha (SSRSceneItem.fade) from the y0 to the y1 of
@@ -327,7 +358,7 @@ static void draw_quad(SSRGfx *gfx, SDL_Texture *texture, const Placement *p, flo
 }
 
 static void draw_atlas_image(SSRGfx *gfx, const SSRAtlasImage *image, const Placement *p) {
-    SDL_Texture *texture = atlas_texture_for(gfx, image);
+    SDL_Texture *texture = atlas_texture_kind(gfx, image, p->premultiplied);
     if (!texture) return;
     const SSRAtlasPage *page = ssr_atlas_page(gfx->atlases, image->page);
     const SSRSceneItem *item = p->item;
@@ -410,17 +441,24 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     if (!texture && !image) return;
     SDL_BlendMode mode = SDL_BLENDMODE_BLEND;
     if (item->blend == SSR_BLEND_ADD) mode = SDL_BLENDMODE_ADD;
-    // Gloss() adds the image times the colour under it.
+    // Gloss() adds the image times the colour under it (DST_COLOR, ONE).
+    // The game premultiplies the alpha, so the image and its colour carry
+    // it.
+    p.premultiplied = 0;
     if (item->blend == SSR_BLEND_GLOSS) {
         mode = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_DST_COLOR, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD,
                                           SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD);
+        p.premultiplied = image != NULL;
+        p.colour.r *= p.colour.a;
+        p.colour.g *= p.colour.a;
+        p.colour.b *= p.colour.a;
     }
     if (texture) {
         SDL_SetTextureBlendMode(texture, mode);
         draw_quad(gfx, texture, &p, 0, 0, 1, 1, 0, 0, 1, 1);
         return;
     }
-    SDL_Texture *page = atlas_texture_for(gfx, image);
+    SDL_Texture *page = atlas_texture_kind(gfx, image, p.premultiplied);
     if (page) SDL_SetTextureBlendMode(page, mode);
     draw_atlas_image(gfx, image, &p);
     // A shadow draws the image alone (c_GImage.Render2).
