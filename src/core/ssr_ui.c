@@ -733,3 +733,46 @@ const char *ssr_ui_constant(const SSRUiTree *tree, const char *name) {
     if (!tree || !name) return NULL;
     return pair_get(&tree->constants, name, strlen(name));
 }
+
+// The text from start to end with no spaces, tabs, or line ends at its
+// start and end.
+static void trim_span(const char **start, const char **end) {
+    while (*start < *end && (**start == ' ' || **start == '\t' || **start == '\r')) (*start)++;
+    while (*end > *start && ((*end)[-1] == ' ' || (*end)[-1] == '\t' || (*end)[-1] == '\r')) (*end)--;
+}
+
+static int patch_removes(const char *patch, const char *line, size_t length) {
+    for (const char *p = patch; p && *p;) {
+        const char *end = strchr(p, '\n');
+        if (!end) end = p + strlen(p);
+        const char *next = *end ? end + 1 : end;
+        if (*p == '-') {
+            const char *a = p + 1, *b = end;
+            trim_span(&a, &b);
+            if (b > a && (size_t)(b - a) <= length && strncmp(a, line, (size_t)(b - a)) == 0) return 1;
+        }
+        p = next;
+    }
+    return 0;
+}
+
+int ssr_ui_patch(char *text, const char *patch) {
+    if (!text || !patch) return 0;
+    char *out = text;
+    int removed = 0;
+    for (char *p = text; *p;) {
+        char *end = strchr(p, '\n');
+        size_t full = end ? (size_t)(end - p) + 1 : strlen(p);
+        const char *a = p, *b = p + (end ? (size_t)(end - p) : full);
+        trim_span(&a, &b);
+        if (patch_removes(patch, a, (size_t)(b - a))) {
+            removed++;
+        } else {
+            memmove(out, p, full);
+            out += full;
+        }
+        p += full;
+    }
+    *out = 0;
+    return removed;
+}

@@ -233,7 +233,25 @@ static void test_nests_branch_blocks(void) {
     ssr_ui_free(tree);
 }
 
+static void test_puts_a_patch_on_a_layout(void) {
+    char text[] = "Rect:(0,0,10,10)\r\n"
+                  "\t//TM\r\n"
+                  "\tText:(TM,428,6)\r\n"
+                  "\tText:(TM,421,6)  \n"
+                  "\tText:(TMX,1,1)\n"
+                  "Draw:(Logo,0,0)";
+    const char *patch = "# The remake has no TM.\n"
+                        "-\tText:(TM, \n"
+                        "-\n"
+                        "Text:(TMX,1,1)\n";
+    CHECK(ssr_ui_patch(text, patch) == 2);
+    CHECK(strcmp(text, "Rect:(0,0,10,10)\r\n\t//TM\r\n\tText:(TMX,1,1)\n" "Draw:(Logo,0,0)") == 0);
+    // A patch with no "-" lines changes nothing.
+    CHECK(ssr_ui_patch(text, "Text:(TMX,1,1)\n") == 0);
+}
+
 int main(void) {
+    test_puts_a_patch_on_a_layout();
     test_nests_branch_blocks();
     test_keeps_quoted_text_whole();
     test_pushes_and_pops_the_parent();
