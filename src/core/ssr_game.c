@@ -5,9 +5,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "ssr_aftermatch.h"
 #include "ssr_career.h"
+#include "ssr_contract.h"
 #include "ssr_fs.h"
 #include "ssr_match.h"
 #include "ssr_random.h"
@@ -213,6 +215,15 @@ struct SSRGame {
     // has had one, the words to repeat, the buttons, the decoys, the
     // sequence (a decoy is below 0), the word of the sequence, the time of
     // the next step, the state, and the sentence so far.
+    // The contract talks: the statics of TContractOffer, the offer on the
+    // screen, the relation of the new boss of each club (75 at the start,
+    // not in the save), and the negotiate game.
+    SSRContractState contract;
+    SSRContractOffer offer;
+    int *newBossRel;
+    int newBossRelCount;
+    int shirts[6];
+    int negTurn, lastClick, timeClickedNeg, clickDelay, negotiateAccepted, proceedAt;
     int interviewDone;
     int difficulty, buttonCount, buttons, decoys;
     int sequence[15];
@@ -989,6 +1000,10 @@ static void call_change_staff(SSRGame *game);
 static void call_change_boots(SSRGame *game);
 static void call_reopen_staff(SSRGame *game);
 static void call_agent_get(SSRGame *game);
+static void call_negotiations_cancelled(SSRGame *game);
+static void call_negotiation_accepted(SSRGame *game);
+static void call_sign_new_contract(SSRGame *game);
+static void call_sign_for_new_club(SSRGame *game);
 static void call_trainer_get(SSRGame *game);
 static void call_boots_expired(SSRGame *game);
 static void call_dump_partner(SSRGame *game);
@@ -1024,6 +1039,10 @@ static void run_call(SSRGame *game, const char *name) {
         {"ChangeSoftBat", call_change_boots},
         {"ReopenAgentTrainerShop", call_reopen_staff},
         {"AgentGet", call_agent_get},
+        {"NegotiationsCancelled", call_negotiations_cancelled},
+        {"NegotiationAccepted", call_negotiation_accepted},
+        {"SignNewContract", call_sign_new_contract},
+        {"SignForNewClub", call_sign_for_new_club},
         {"TrainerGet", call_trainer_get},
         {"BootsExpired", call_boots_expired},
         {"DumpGirl", call_dump_partner},
@@ -5185,6 +5204,406 @@ static void call_boots_expired(SSRGame *game) {
     boots_shop(game);
 }
 
+
+/* ------------------------------------------------------------ contracts */
+
+// TClub.newbossrel: the relation that the boss of the club gives a new
+// contract.
+static int *new_boss_rel(SSRGame *game, int clubId) {
+    if (!game->world || clubId < 0) return NULL;
+    if (clubId >= game->newBossRelCount) {
+        int count = clubId + 64;
+        int *grown = realloc(game->newBossRel, sizeof(int) * (size_t)count);
+        if (!grown) return NULL;
+        for (int i = game->newBossRelCount; i < count; i++) grown[i] = 75;
+        game->newBossRel = grown;
+        game->newBossRelCount = count;
+    }
+    return &game->newBossRel[clubId];
+}
+
+// GetOffer with setboss: the boss of the club of the player gives the
+// relation of now.
+static void get_offer(SSRGame *game, int clubId, int endOfSeason) {
+    if (clubId == game->career.clubId) {
+        int *rel = new_boss_rel(game, clubId);
+        if (rel) *rel = (int)game->career.relationBoss;
+    }
+    ssr_contract_offer(&game->contract, &game->career, clubId, endOfSeason, &game->offer);
+}
+
+static const SSRClub *offer_club(SSRGame *game) {
+    return ssr_world_club(game->world, game->offer.clubId);
+}
+
+// The figures of the offer against the contract of now (UpdateInstructs).
+static void offer_tweaks(SSRGame *game, int wage, int goals, int assists) {
+    SSRTweaks *t = game->tweaks;
+    const SSRCareer *c = &game->career;
+    ssr_tweaks_set_number(t, "Negotiation", "Wage", wage);
+    ssr_tweaks_set_number(t, "Negotiation", "GoalBonus", goals);
+    ssr_tweaks_set_number(t, "Negotiation", "AssistBonus", assists);
+    ssr_tweaks_set_number(t, "Negotiation", "Total", wage + goals + assists);
+    ssr_tweaks_set_number(t, "Negotiation", "WageDiff", wage - c->wage);
+    ssr_tweaks_set_number(t, "Negotiation", "GoalBonusDiff", goals - c->goalBonus);
+    ssr_tweaks_set_number(t, "Negotiation", "AssistBonusDiff", assists - c->assistBonus);
+    ssr_tweaks_set_number(t, "Negotiation", "TotalDiff", wage + goals + assists - c->wage - c->goalBonus - c->assistBonus);
+}
+
+// c_TScreen_Contract.SetUpScreen.
+static void contract_screen(SSRGame *game, int animate) {
+    SSRTweaks *t = game->tweaks;
+    const SSRClub *club = offer_club(game);
+    int *rel = new_boss_rel(game, game->offer.clubId);
+    set_screen(game, "contract");
+    offer_tweaks(game, game->offer.wage, game->offer.goalBonus, game->offer.assistBonus);
+    char text[256];
+    snprintf(text, sizeof(text), "%s", loc(game, "NEGOTIATION_OFFER_3"));
+    replace_all(text, sizeof(text), "$clubname", club ? club->name : "");
+    ssr_tweaks_set(t, "Negotiation", "Offer", text);
+    ssr_tweaks_set_number(t, "Player", "NewBossRelationship", rel ? *rel : 75);
+    if (animate) ssr_tweaks_set_number(t, "Player", "NewBossRelationship_Displayed", rel ? *rel : 75);
+    ssr_tweaks_set_number(t, "Negotiation", "IsNewClub", game->offer.clubId != game->career.clubId);
+    // The date of the letter is the date of the device.
+    time_t now = time(NULL);
+    struct tm *day = localtime(&now);
+    char d[8], m[8], y[8];
+    snprintf(d, sizeof(d), "%02d", day ? day->tm_mday : 1);
+    snprintf(m, sizeof(m), "%02d", day ? day->tm_mon + 1 : 1);
+    snprintf(y, sizeof(y), "%02d", day ? day->tm_year % 100 : 0);
+    snprintf(text, sizeof(text), "%s", loc(game, "Contract_Date"));
+    replace_all(text, sizeof(text), "$D", d);
+    replace_all(text, sizeof(text), "$M", m);
+    replace_all(text, sizeof(text), "$Y", y);
+    ssr_tweaks_set(t, "Menu", "DateString", text);
+    int done = game->offer.negotiationSuccess;
+    add_op(game, done ? SSR_OP_HIDE : SSR_OP_SHOW, "EnabledNegotiateButton", NULL, NULL, 0);
+    add_op(game, done ? SSR_OP_SHOW : SSR_OP_HIDE, "DisabledNegotiateButton", NULL, NULL, 0);
+}
+
+// A message of the boss that ends the talk before it starts.
+static void no_talk(SSRGame *game, const char *tag, float boss) {
+    relationships_screen(game, 1, 0);
+    ssr_career_update_relation(&game->career, SSR_RELATION_BOSS, boss);
+    relation_tweaks(game, 0);
+    message_bar(game, "messageboss", loc(game, tag), "NegotiationsCancelled");
+}
+
+// c_TScreen_GameMenu.ButtonContract: the talk with the boss of the club.
+static void game_contract(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->retired) return;
+    if (c->sdate < c->lastNegotiations + 56) {
+        no_talk(game, "CMESSAGE_NOBONUSTOOSOON", -5);
+        return;
+    }
+    if ((int)c->relationBoss < 25) {
+        message(game, "messageboss", loc(game, "CMESSAGE_NOBONUSRELATIONSHIPBOSS"), 0, 1, NULL);
+        return;
+    }
+    if ((int)c->relationTeam < 25) {
+        no_talk(game, "CMESSAGE_NOBONUSRELATIONSHIPTEAM", -5);
+        return;
+    }
+    if ((int)c->relationFans < 25) {
+        no_talk(game, "CMESSAGE_NOBONUSRELATIONSHIPFANS", -5);
+        return;
+    }
+    get_offer(game, c->clubId, 0);
+    if (c->wage > game->offer.wage) {
+        no_talk(game, "CMESSAGE_NOBONUSLUCRATIVE", -5);
+        return;
+    }
+    if (game->offer.wage == c->wage) {
+        no_talk(game, "CMESSAGE_NOBONUSSTARRATING", -3);
+        return;
+    }
+    contract_screen(game, 1);
+}
+
+static void call_negotiations_cancelled(SSRGame *game) {
+    game_menu(game);
+}
+
+static void call_negotiation_accepted(SSRGame *game) {
+    add_op(game, SSR_OP_HIDE, "EnabledNegotiateButton", NULL, NULL, 0);
+    add_op(game, SSR_OP_SHOW, "DisabledNegotiateButton", NULL, NULL, 0);
+}
+
+
+// c_TContractOffer.SignContract.
+static void sign_contract(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    const SSRContractOffer *o = &game->offer;
+    const SSRClub *club = offer_club(game);
+    int *rel = new_boss_rel(game, o->clubId);
+    c->wage = o->wage;
+    c->goalBonus = o->goalBonus;
+    c->assistBonus = o->assistBonus;
+    c->lastTransferDate = c->lastNegotiations = c->sdate;
+    game->contract.doneRumour = 0;
+    int fee = ssr_career_agent(c) * o->wage;
+    char text[600], cash[32];
+    text[0] = 0;
+    if (o->endOfSeason) {
+        if (c->captain == 1) c->captain = 0;
+        else if (c->captain == 3) c->captain = 2;
+        if (fee > 0) {
+            snprintf(text, sizeof(text), " %s", loc(game, "CMESSAGE_AGENTBOOST2"));
+            shop_price(cash, sizeof(cash), fee);
+            replace_all(text, sizeof(text), "$num", cash);
+            update_bank(game, fee);
+        }
+        game->messageData = rel ? *rel : 75;
+        message(game, "message", text, 0, 1, "ConfirmSeasonEndTransfer");
+        return;
+    }
+    if (o->clubId == c->clubId) {
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_TRANSFERSAMECLUB"));
+        if (ssr_career_agent(c) > 0) {
+            size_t n = strlen(text);
+            snprintf(text + n, sizeof(text) - n, " %s", loc(game, "CMESSAGE_AGENTBOOST"));
+        }
+        replace_all(text, sizeof(text), "$clubname", club ? club->tla : "");
+        if (rel) c->relationBoss = (float)*rel;
+        game_menu(game);
+        message(game, "message", text, 0, 1, "SignNewContract");
+    } else {
+        // A transfer in the window.
+        int old = c->clubId;
+        c->clubId = o->clubId;
+        c->debut = 1;
+        if (rel) c->relationBoss = (float)*rel;
+        c->relationTeam = (float)ssr_rand2(&game->random, 35, 50);
+        c->relationFans = (float)ssr_rand2(&game->random, 50, 60);
+        if (c->captain == 1) c->captain = 0;
+        else if (c->captain == 3) c->captain = 2;
+        game_menu(game);
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_TRANSFERNEWCLUBMOBILE"));
+        replace_all(text, sizeof(text), "$clubname", club ? club->tla : "");
+        if (fee > 0) {
+            size_t n = strlen(text);
+            snprintf(text + n, sizeof(text) - n, " %s", loc(game, "CMESSAGE_AGENTBOOST2"));
+            shop_price(cash, sizeof(cash), fee);
+            replace_all(text, sizeof(text), "$num", cash);
+            update_bank(game, fee);
+        }
+        game->messageData = old;
+        message(game, "message", text, 0, 1, "SignForNewClub");
+    }
+    save_career(game);
+    relation_tweaks(game, 1);
+    player_tweaks(game);
+}
+
+static void call_sign_new_contract(SSRGame *game) {
+    const SSRClub *club = ssr_world_club(game->world, game->career.clubId);
+    do_news(game, "CNEWS_RENEWCONTRACTMOBILE", club ? club->tla : "", NULL);
+    char wage[32];
+    shop_price(wage, sizeof(wage), game->career.wage);
+    replace_all(game->career.headline, sizeof(game->career.headline), "$wage", wage);
+    webpage_to(game, "gamemenu", 0);
+}
+
+static void call_sign_for_new_club(SSRGame *game) {
+    const SSRClub *old = ssr_world_club(game->world, game->messageData);
+    const SSRClub *club = ssr_world_club(game->world, game->career.clubId);
+    char tag[40];
+    snprintf(tag, sizeof(tag), "CNEWS_TRANSFERMOBILE%d", ssr_rand(&game->random, 10));
+    do_news(game, tag, old ? old->tla : "", club ? club->tla : "");
+    webpage_to(game, "gamemenu", 0);
+}
+
+static void contract_accept(SSRGame *game) {
+    sign_contract(game);
+}
+
+static void negotiate_screen(SSRGame *game);
+static void contract_reject(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (game->offer.clubId == c->clubId) {
+        c->lastNegotiations = c->sdate;
+        int *rel = new_boss_rel(game, c->clubId);
+        if (rel) c->relationBoss = (float)*rel;
+    }
+    game_menu(game);
+    save_career(game);
+}
+
+// c_TContractOffer.DoNegotiation.
+static void contract_negotiate(SSRGame *game) {
+    int *rel = new_boss_rel(game, game->offer.clubId);
+    const SSRClub *club = offer_club(game);
+    char text[512];
+    if (game->offer.negotiationSuccess) {
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_NONEGOTIATING"));
+        replace_all(text, sizeof(text), "$clubname", club ? club->tla : "");
+        message(game, "message", text, 0, 1, "NegotiationAccepted");
+    } else if (rel && *rel >= 40) {
+        negotiate_screen(game);
+    } else if (game->offer.clubId != game->career.clubId && !game->offer.endOfSeason) {
+        message(game, "message", loc(game, "CMESSAGE_NEGOTIATIONSCANCELLED"), 0, 1, "NegotiationsCancelled");
+        if (rel) *rel = 0;
+    } else {
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_NONEGOTIATING"));
+        replace_all(text, sizeof(text), "$clubname", club ? club->tla : "");
+        message(game, "message", text, 0, 1, NULL);
+    }
+}
+
+/* ------------------------------------------------------------ negotiate */
+
+static const int CARD_XS[5] = {10, 130, 250, 370, 490};
+
+static void negotiate_buttons(SSRGame *game, int show) {
+    int n = game->shirts[game->negTurn];
+    add_op(game, show && n > 1 ? SSR_OP_SHOW : SSR_OP_HIDE, "LowerButton", NULL, NULL, 0);
+    add_op(game, show && n < 11 ? SSR_OP_SHOW : SSR_OP_HIDE, "HigherButton", NULL, NULL, 0);
+    add_op(game, show && game->negTurn > 1 ? SSR_OP_SHOW : SSR_OP_HIDE, "AcceptButton", NULL, NULL, 0);
+}
+
+// The figures of the offer with the increase of the turn (UpdateInstrucs).
+static void negotiate_increase(const SSRGame *game, int *w, int *g, int *a) {
+    int t = game->negTurn;
+    *w = t == 99 ? 2 : t >= 3 && t <= 4 ? 1 : 0;
+    *g = t == 99 || t == 4 ? 1 : 0;
+    *a = t == 99 ? 1 : 0;
+}
+
+static void negotiate_instructions(SSRGame *game) {
+    int w, g, a;
+    negotiate_increase(game, &w, &g, &a);
+    if (game->negTurn == 100) w = g = a = 0;
+    offer_tweaks(game, game->offer.wage + w, game->offer.goalBonus + g, game->offer.assistBonus + a);
+}
+
+// c_TScreen_Negotiate.SetUpScreen.
+static void negotiate_screen(SSRGame *game) {
+    set_screen(game, "negotiate");
+    char text[64];
+    snprintf(text, sizeof(text), "%s", loc(game, "Negotiate!"));
+    upper(text);
+    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+    game->splashEnd = game->now + 1500;
+    game->negotiateAccepted = 0;
+    game->negTurn = 1;
+    game->lastClick = 0;
+    game->proceedAt = 0;
+    for (int i = 0; i < 6; i++) game->shirts[i] = 0;
+    for (int card = 1; card <= 5; card++) {
+        int same;
+        do {
+            if (card == 1 && ssr_career_star_level(&game->career) == 1) {
+                game->shirts[1] = ssr_rand(&game->random, 2) == 1 ? 1 : 11;
+            } else {
+                game->shirts[card] = ssr_rand(&game->random, 11);
+            }
+            same = 0;
+            for (int k = 1; k < card; k++) same |= game->shirts[k] == game->shirts[card];
+        } while (same);
+    }
+    for (int card = 1; card <= 5; card++) {
+        snprintf(text, sizeof(text), "Card%d", card);
+        ssr_tweaks_set_number(game->tweaks, "Negotiation", text, card == 1 ? game->shirts[1] : 0);
+    }
+    game->clickDelay = 3000;
+    const SSRClub *club = offer_club(game);
+    char offer[256];
+    snprintf(offer, sizeof(offer), "%s", loc(game, "NEGOTIATION_OFFER_3"));
+    replace_all(offer, sizeof(offer), "$clubname", club ? club->name : "");
+    add_op(game, SSR_OP_TEXT, "TeamOfferText", NULL, offer, 0);
+    negotiate_buttons(game, 1);
+    negotiate_instructions(game);
+}
+
+// ProceedToContract.
+static void negotiate_proceed(SSRGame *game) {
+    if (game->negTurn <= 99) {
+        int w, g, a;
+        negotiate_increase(game, &w, &g, &a);
+        ssr_contract_increase(&game->offer, w, g, a);
+    }
+    contract_screen(game, 0);
+}
+
+static void negotiate_guess(SSRGame *game, int up) {
+    if (game->negotiateAccepted || game->negTurn > 5 || game->now < game->splashEnd) return;
+    if (game->lastClick != 0) return;
+    game->negTurn++;
+    game->lastClick = up ? 1 : -1;
+    game->timeClickedNeg = game->now;
+    negotiate_buttons(game, 0);
+    // RevealCard: the shirt of the turn shows.
+    int n = game->shirts[game->negTurn];
+    char name[16];
+    snprintf(name, sizeof(name), "Card%d", game->negTurn);
+    ssr_tweaks_set_number(game->tweaks, "Negotiation", name, n);
+    game->clickDelay = n * (500 - n * 20);
+    if (game->negTurn < 5) add_op(game, SSR_OP_SET_X, "GuessButtons", NULL, NULL, CARD_XS[game->negTurn]);
+}
+
+static void negotiate_higher(SSRGame *game) {
+    negotiate_guess(game, 1);
+}
+
+static void negotiate_lower(SSRGame *game) {
+    negotiate_guess(game, 0);
+}
+
+static void negotiate_accept(SSRGame *game) {
+    if (game->negotiateAccepted) return;
+    game->negotiateAccepted = 1;
+    negotiate_buttons(game, 0);
+    negotiate_proceed(game);
+}
+
+// c_TScreen_Negotiate.Update and CheckFailOrSuccess.
+static void negotiate_tick(SSRGame *game) {
+    if (game->proceedAt) {
+        if (game->now >= game->proceedAt) {
+            game->proceedAt = 0;
+            negotiate_proceed(game);
+        }
+        return;
+    }
+    if (game->negTurn > 1 && game->negTurn <= 5 && game->lastClick != 0 && game->now > game->timeClickedNeg + game->clickDelay) {
+        int now = game->shirts[game->negTurn], before = game->shirts[game->negTurn - 1];
+        int right = (game->lastClick < 0 && now < before) || (game->lastClick > 0 && now > before);
+        game->lastClick = 0;
+        char text[32];
+        if (!right) {
+            // Fail: the boss likes the player less.
+            game->negTurn = 100;
+            int *rel = new_boss_rel(game, game->offer.clubId);
+            if (rel) *rel -= ssr_rand2(&game->random, 10, 20);
+            negotiate_instructions(game);
+            snprintf(text, sizeof(text), "%s", loc(game, "Fail!"));
+            upper(text);
+            ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+            game->splashEnd = game->now + 1000;
+            game->proceedAt = game->now + 1000;
+            return;
+        }
+        negotiate_instructions(game);
+        if (game->negTurn == 5) {
+            game->negTurn = 99;
+            negotiate_instructions(game);
+            add_op(game, SSR_OP_HIDE, "Shirts", NULL, NULL, 0);
+            add_op(game, SSR_OP_SHOW, "StarShowerAnim", NULL, NULL, 0);
+            add_op(game, SSR_OP_SHOW, "SigAnimContainer", NULL, NULL, 0);
+            add_op(game, SSR_OP_SHOW, "StampAnimContainer", NULL, NULL, 0);
+            snprintf(text, sizeof(text), "%s", loc(game, "Success!"));
+            upper(text);
+            ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+            game->splashEnd = game->now + 1000;
+            game->proceedAt = game->now + 3000;
+            return;
+        }
+        negotiate_buttons(game, 1);
+    }
+}
+
+
 /* ------------------------------------------------------------ the pairs */
 
 // The face of each card by relation and image id (c_<X>CardAnimations).
@@ -5445,6 +5864,13 @@ static const Route ROUTES[] = {
     {"interview.btn_ok", interview_ok},
     {"debug.interview", interview_screen},
     {"debug.dilemma", dilemma_screen},
+    {"gamemenu.btn_Contract", game_contract},
+    {"contract.btn_Accept", contract_accept},
+    {"contract.btn_Reject", contract_reject},
+    {"contract.btn_Negotiate", contract_negotiate},
+    {"negotiate.btn_Higher", negotiate_higher},
+    {"negotiate.btn_Lower", negotiate_lower},
+    {"negotiate.btn_Accept", negotiate_accept},
     {"relationships.btn_Shop", shop_from_relationships},
     {"shop.tab.items", shop_tab_items},
     {"shop.tab.vehicles", shop_tab_vehicles},
@@ -5564,6 +5990,7 @@ SSRGame *ssr_game_create(SSRTweaks *tweaks) {
 
 void ssr_game_free(SSRGame *game) {
     if (!game) return;
+    free(game->newBossRel);
     free(game->match);
     free(game->chance);
     free(game->replay);
@@ -5746,6 +6173,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->ticks -= 1;
             game->now += 16;
             interview_tick(game);
+        }
+    } else if (strcmp(game->screen, "negotiate") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1 && strcmp(game->screen, "negotiate") == 0) {
+            game->ticks -= 1;
+            game->now += 16;
+            negotiate_tick(game);
         }
     } else if (strcmp(game->screen, "dilemma") == 0) {
         game->ticks += frames;

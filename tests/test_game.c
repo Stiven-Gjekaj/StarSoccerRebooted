@@ -940,6 +940,58 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && ssr_game_overlay(game)[0] == 0);
 }
 
+// The talk with the boss of the club: the contract, a turn of the
+// negotiate game, and the signature.
+static void renew_the_contract(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.starRating = 400;
+    c.relationBoss = c.relationTeam = c.relationFans = 80;
+    c.lastNegotiations = 0;
+    c.wage = 1;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    if (strcmp(ssr_game_screen(game), "gamemenu") != 0) ssr_game_message(game, "message.btn_Cancel");
+    const SSRCareer *now = ssr_game_career(game);
+    ssr_game_message(game, "gamemenu.btn_Contract");
+    CHECK(strcmp(ssr_game_screen(game), "contract") == 0 && ssr_tweaks_number(tweaks, "Negotiation", "IsNewClub") == 0);
+    int wage = (int)ssr_tweaks_number(tweaks, "Negotiation", "Wage");
+    CHECK(wage > 1 && ssr_tweaks_number(tweaks, "Negotiation", "WageDiff") == wage - 1);
+    ssr_game_message(game, "contract.btn_Negotiate");
+    CHECK(strcmp(ssr_game_screen(game), "negotiate") == 0);
+    // The guess of the second shirt, after the splash.
+    int first = (int)ssr_tweaks_number(tweaks, "Negotiation", "Card1");
+    CHECK(first >= 1 && first <= 11);
+    ssr_game_update(game, 100);
+    ssr_game_message(game, first <= 6 ? "negotiate.btn_Higher" : "negotiate.btn_Lower");
+    int second = (int)ssr_tweaks_number(tweaks, "Negotiation", "Card2");
+    CHECK(second >= 1 && second <= 11 && second != first);
+    ssr_game_update(game, 60 * 4);
+    int right = first <= 6 ? second > first : second < first;
+    if (!right) {
+        // A wrong guess goes back to the contract with the same offer.
+        CHECK(strcmp(ssr_game_screen(game), "contract") == 0);
+        CHECK(ssr_tweaks_number(tweaks, "Negotiation", "Wage") == wage);
+    } else {
+        CHECK(strcmp(ssr_game_screen(game), "negotiate") == 0);
+        ssr_game_message(game, "negotiate.btn_Accept");
+        CHECK(strcmp(ssr_game_screen(game), "contract") == 0);
+    }
+    wage = (int)ssr_tweaks_number(tweaks, "Negotiation", "Wage");
+    ssr_game_message(game, "contract.btn_Accept");
+    CHECK(now->wage == wage && now->lastNegotiations == now->sdate && strcmp(ssr_game_screen(game), "message") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "webpagenews") == 0);
+    ssr_game_message(game, "webpage.btn_Ok");
+    // A second talk is too soon.
+    ssr_game_message(game, "gamemenu.btn_Contract");
+    CHECK(strcmp(ssr_game_screen(game), "messageboss") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+}
+
 // Drinks the next can after a match: a question when the energy is above
 // 75, then the boost screen of a skill can, and full energy at the end.
 static void drink_a_can(SSRGame *game, SSRTweaks *tweaks) {
@@ -1156,6 +1208,7 @@ static void test_starts_a_new_career(void) {
     choose_a_dilemma(game, path);
     go_shopping(game, tweaks, path);
     hire_and_kit_out(game, tweaks, path);
+    renew_the_contract(game, tweaks, path);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 12 && seasons == 0; i++) play_a_match(game, tweaks);
     CHECK(seasons >= 1);
