@@ -218,6 +218,12 @@ static void open_block(Parser *p, int modifierBlock) {
     SSRUiNode *owner = last_element(p);
     SSRUiNode *target = owner;
     if (modifierBlock && owner && owner->modifierCount > 0) target = owner->modifiers[owner->modifierCount - 1];
+    // A '<' in a '<' block is the block of the last line of the outer block,
+    // for example of an if() in the block of a DoIf().
+    if (modifierBlock && top(p)->modifierBlock && top(p)->target->childCount > 0) {
+        SSRUiNode *outer = top(p)->target;
+        owner = target = outer->children[outer->childCount - 1];
+    }
     if (!target) {
         // A block with no element before it gets a group of its own.
         target = calloc(1, sizeof(SSRUiNode));

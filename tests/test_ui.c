@@ -208,7 +208,33 @@ static void test_keeps_quoted_text_whole(void) {
     ssr_ui_free(tree);
 }
 
+static void test_nests_branch_blocks(void) {
+    const MemoryFile files[] = {
+        {"n.uis", "Draw:(G,0,0,5,5)\n"
+                  "\tDoIf(A,B,1)\n"
+                  "\t<\n"
+                  "\t\tDoIf(C,D,1)\n"
+                  "\t\t<\n"
+                  "\t\t\tConvergeTo(0,-410)\n"
+                  "\t\t>\n"
+                  "\t\tFader(1)\n"
+                  "\t>\n"},
+        {NULL, NULL},
+    };
+    SSRUiTree *tree = parse(files, "n.uis");
+    const SSRUiNode *draw = child(ssr_ui_root(tree), 0);
+    CHECK(is(draw, "Draw") && draw->modifierCount == 1 && draw->childCount == 0);
+    const SSRUiNode *outer = draw->modifiers[0];
+    CHECK(is(outer, "DoIf") && outer->childCount == 2);
+    const SSRUiNode *inner = child(outer, 0);
+    CHECK(is(inner, "DoIf") && inner->childCount == 1 && is(child(inner, 0), "ConvergeTo"));
+    CHECK(is(child(outer, 1), "Fader"));
+    CHECK(ssr_ui_problem_count(tree) == 0);
+    ssr_ui_free(tree);
+}
+
 int main(void) {
+    test_nests_branch_blocks();
     test_keeps_quoted_text_whole();
     test_pushes_and_pops_the_parent();
     test_reads_elements_modifiers_and_blocks();
