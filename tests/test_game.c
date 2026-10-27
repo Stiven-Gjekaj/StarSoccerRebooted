@@ -187,6 +187,8 @@ static void fail_the_trials(SSRGame *game, SSRTweaks *tweaks) {
             CHECK(splash && strcmp(ssr_tweaks_get(tweaks, "Menu", "QuickMessage"), "FAIL!") == 0);
         }
         CHECK(ssr_game_career(game)->technique[0] == 0 && ssr_game_career(game)->pace[0] == 0);
+        // The end of the fifth trial gives the award of the trials.
+        CHECK((ssr_game_career(game)->awards[1] > 0) == (trial == 5));
     }
 }
 
@@ -290,6 +292,7 @@ static void transfer_at_season_end(SSRGame *game, SSRTweaks *tweaks) {
     // An agent gets a fee: its message comes first.
     if (strcmp(ssr_game_screen(game), "message") == 0) ssr_game_message(game, "message.btn_Ok");
     CHECK(c->clubId == club && c->wage == wage);
+    CHECK(c->awards[34] > 0);
     transfers++;
 }
 
@@ -393,6 +396,8 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     int year = ssr_career_year(c);
     starManSum += c->seasonStarMan;
     CHECK(c->starMan == starManSum);
+    // Star Man gives an award, and 10 of them another.
+    CHECK((c->awards[8] > 0) == (c->starMan > 0) && (c->awards[9] > 0) == (c->starMan >= 10));
     CHECK(ssr_career_week(c) == 1 && ssr_tweaks_number(tweaks, "Menu", "DisableQuitButton") == 1);
     CHECK(strcmp(ssr_tweaks_get(tweaks, "PlayerStats", "SeasonLeague"), "PRM") == 0);
     CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "SeasonMatches") == c->seasonApps && c->seasonApps > 0);
@@ -1999,6 +2004,44 @@ static void gambling_news(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
+// The club makes the player captain: a good season, 25 matches for the
+// club, and good relations. The armband gives its award, and one more at
+// 18 or younger (CheckCaptaincy).
+static void become_captain(SSRGame *game, const char *path) {
+    static SSRCareer before;
+    before = *ssr_game_career(game);
+    SSRCareer c = before;
+    c.captain = 0;
+    c.seasonApps = 10;
+    c.apps = 30;
+    c.seasonTotalRating = 85;
+    c.starRating = 9900;
+    c.relationBoss = c.relationTeam = c.relationFans = 90;
+    c.awards[80] = c.awards[119] = 0;
+    // The news before it in the chain: the old boots came, and the
+    // transfer window just closed.
+    c.oldProBoots = 21;
+    c.lastTransferDate = c.sdate;
+    // Other news can take the week. The test tries again.
+    const SSRCareer *now = NULL;
+    for (int i = 0; i < 4; i++) {
+        SSRCareer week = c;
+        now = news_week(game, path, &week);
+        ssr_game_message(game, "gamemenu.btn_Play");
+        if (now->captain == 1) break;
+        for (int k = 0; k < 4 && strcmp(ssr_game_screen(game), "gamemenu") != 0; k++) {
+            if (strcmp(ssr_game_screen(game), "contract") == 0) ssr_game_message(game, "contract.btn_Reject");
+            else if (strncmp(ssr_game_screen(game), "webpage", 7) == 0) ssr_game_message(game, "webpage.btn_Ok");
+            else ssr_game_message(game, "message.btn_Ok");
+        }
+    }
+    CHECK(now && now->captain == 1 && strcmp(ssr_game_screen(game), "messageboss") == 0);
+    CHECK(now->awards[80] > 0 && (now->awards[119] > 0) == (ssr_career_age(now) <= 18));
+    ssr_game_message(game, "message.btn_Ok");
+    // The other tests go on with the career from before.
+    news_week(game, path, &before);
+}
+
 // The news before a match: the old boots of an ex pro, then a sponsor.
 static void get_old_boots_and_a_sponsor(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     SSRCareer c = *ssr_game_career(game);
@@ -2038,6 +2081,7 @@ static void get_old_boots_and_a_sponsor(SSRGame *game, SSRTweaks *tweaks, const 
     CHECK(strcmp(ssr_game_screen(game), "messagesponsor") == 0);
     ssr_game_message(game, "message.btn_Ok");
     CHECK(now->sponsors[0] == 1 && now->relationSponsors == 50 && strcmp(ssr_game_screen(game), "relationships") == 0);
+    CHECK(now->awards[35] > 0 && now->awards[36] == 0);
     ssr_game_message(game, "relationships.btn_Home");
     (void)tweaks;
 }
@@ -2341,6 +2385,7 @@ static void test_starts_a_new_career(void) {
     go_shopping(game, tweaks, path);
     hire_and_kit_out(game, tweaks, path);
     get_old_boots_and_a_sponsor(game, tweaks, path);
+    become_captain(game, path);
     renew_the_contract(game, tweaks, path);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 24 && seasons < 2; i++) play_a_match(game, tweaks);

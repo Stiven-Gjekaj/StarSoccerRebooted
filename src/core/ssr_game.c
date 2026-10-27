@@ -375,6 +375,7 @@ static void upper(const SSRGame *game, char *text) {
 }
 
 static void show_splash(SSRGame *game, const char *layout, int ms);
+static void award(SSRGame *game, int id);
 
 // A banner (TQuickMessage.InitBanner): the text goes to the tweak
 // QuickMessage with MyToUpper, and the layout "splashmessage" shows it.
@@ -1081,6 +1082,8 @@ static void end_trial(SSRGame *game) {
     game->training = NULL;
     char text[1024];
     if (trial >= 5) {
+        // The end of the trials gives an award.
+        award(game, 1);
         trial_success_text(game, text, sizeof(text));
         message(game, won ? "messagedefault" : "message", text, 0, 1, "TrialDone");
         return;
@@ -1128,8 +1131,6 @@ static void call_trial_done(SSRGame *game) {
     ssr_tweaks_set_number(game->tweaks, "Menu", "TrialCompleteIncrement", 1);
     message(game, "message", "", 0, 1, "StartCareer");
 }
-
-static void award(SSRGame *game, int id);
 
 // GSPlayerUtility.UpdateRelationship: the relation changes, then a club
 // relation, the sponsors, the partner, or the happiness at 100 unlocks its
@@ -1893,6 +1894,13 @@ static void end_match(SSRGame *game) {
         c->chances += m->chances;
         c->seasonStarMan += game->after.starMan;
         c->starMan += game->after.starMan;
+        // TScreen_StarMan: Star Man, and 10, 25, and 50 of them.
+        if (game->after.starMan > 0) {
+            award(game, 8);
+            if (c->starMan >= 10) award(game, 9);
+            if (c->starMan >= 25) award(game, 10);
+            if (c->starMan >= 50) award(game, 11);
+        }
         c->seasonTotalRating += rating;
         c->totalRating += rating;
         ssr_career_add_form(c->form, (int)rating);
@@ -4923,6 +4931,13 @@ static float club_strength(SSRGame *game) {
     return club ? (float)club->strength : 0;
 }
 
+// The awards of the armband of the club or of the nation, and of an
+// armband at 18 or younger.
+static void captain_award(SSRGame *game, int nation) {
+    award(game, nation ? 81 : 80);
+    if (ssr_career_age(&game->career) <= 18) award(game, 119);
+}
+
 static void captain_message(SSRGame *game, const char *tag, const char *team) {
     char text[512];
     snprintf(text, sizeof(text), "%s", loc(game, tag));
@@ -4955,6 +4970,7 @@ static int news_captaincy(SSRGame *game, const SSRFixture *next) {
             }
             c->captain = c->captain == 2 ? 3 : 1;
             captain_message(game, "CMESSAGE_CAPTAINCY", team);
+            captain_award(game, 0);
             return 1;
         }
         if (c->seasonApps <= 4) return 0;
@@ -4987,6 +5003,7 @@ static int news_captaincy(SSRGame *game, const SSRFixture *next) {
         }
         c->captain = c->captain == 1 ? 3 : 2;
         captain_message(game, "CMESSAGE_CAPTAINCY", team);
+        captain_award(game, 1);
         save_career(game);
         return 1;
     }
@@ -5067,6 +5084,9 @@ static void call_sponsorship_offer(SSRGame *game) {
     int i = game->messageData;
     if (i >= 0 && i < 10) c->sponsors[i] = i / 2 + 1;
     relationships_screen(game, 0, 0);
+    // A sponsor, and all ten.
+    award(game, 35);
+    if (ssr_career_count_sponsors(c) == 10) award(game, 36);
 }
 
 // The random news of the week, by the round of the next match.
@@ -5590,8 +5610,6 @@ static void not_enough_cash(SSRGame *game, int shortBy) {
 }
 
 // UpdateBank: the bank does not go under 0.
-static void award(SSRGame *game, int id);
-
 static void update_bank(SSRGame *game, int change) {
     SSRCareer *c = &game->career;
     c->bank = c->bank + change < 0 ? 0 : c->bank + change;
@@ -6422,6 +6440,7 @@ static void sign_contract(SSRGame *game) {
         }
         game->messageData = old;
         message(game, "message", text, 0, 1, "SignForNewClub");
+        award(game, 34);
     }
     save_career(game);
     relation_tweaks(game, 1);
@@ -6953,6 +6972,8 @@ static void call_confirm_transfer(SSRGame *game) {
     c->relationTeam = (float)ssr_rand2(&game->random, 35, 50);
     c->relationFans = (float)ssr_rand2(&game->random, 50, 60);
     new_season(game);
+    // NewSeasonSetUp4 after a transfer: the award of a transfer.
+    award(game, 34);
 }
 
 static void call_new_season(SSRGame *game) {
