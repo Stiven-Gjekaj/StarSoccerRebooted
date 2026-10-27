@@ -107,6 +107,11 @@ if(IOS OR ANDROID)
     return()
 endif()
 
+# The tool that compares a screen of the remake with the original game.
+add_executable(screendiff tools/screendiff.c tests/ssr_imagewriter.c)
+target_include_directories(screendiff PRIVATE src/third_party)
+target_link_libraries(screendiff PRIVATE ssr_core)
+
 enable_testing()
 
 # The helpers that each test uses: the checks and a writer for zip archives.
