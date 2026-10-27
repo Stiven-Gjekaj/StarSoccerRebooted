@@ -203,7 +203,7 @@ layouts that use the modifier.
       `FontShadow` on an element that is not a text.
 - [x] `DownloadImage` (56): an image from the web of the game. 4.32 has
       no definitions, so the image stays.
-- [ ] `ScrollIndicator` (29): the bar that shows the place in a list
+- [x] `ScrollIndicator` (29): the bar that shows the place in a list
 - [x] `Message` (18) in the block of a click: the click sends the
       message
 - [ ] `SetMessage` (1): a message box from a layout
