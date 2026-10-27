@@ -47,7 +47,22 @@ static void test_wears_the_products(void) {
     CHECK(strcmp(ssr_shop_item(0)->uid, "item_Tattoo") == 0);
 }
 
+static void test_chooses_the_boots_of_the_shop(void) {
+    int available[SSR_BOOT_COUNT + 1];
+    // Year 1, age 16, no boots: the pure, the two stickers, the two boots
+    // above 21, and each sixth other boot from the third.
+    ssr_shop_boots_available(1, 0, 10, 26, available);
+    int shown[SSR_BOOT_COUNT + 1] = {0};
+    shown[1] = shown[10] = shown[22] = shown[23] = shown[4] = shown[11] = shown[17] = 1;
+    for (int id = 1; id <= SSR_BOOT_COUNT; id++) CHECK(available[id] == shown[id]);
+    // The boots that the player wears always show, a hard boot too.
+    ssr_shop_boots_available(2, 25, 10, 26, available);
+    CHECK(available[25] == 1 && available[1] == 0 && available[26] == 0);
+    CHECK(ssr_shop_boot(21)->control == 1 && ssr_shop_boot(27) == NULL && ssr_shop_boot(0) == NULL);
+}
+
 int main(void) {
+    test_chooses_the_boots_of_the_shop();
     test_wears_the_products();
     test_lists_the_products_by_price();
     return TEST_RESULT();

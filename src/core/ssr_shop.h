@@ -52,4 +52,27 @@ const SSRShopItem *ssr_shop_nth_of_type(SSRShopType type, int n);
 // arrays are the items, the vehicles, and the properties of the player.
 void ssr_shop_wear(SSRRandom *random, int *items, int *vehicles, int *properties);
 
+// The boots of the shop (c_SoccerProducts, the free version). Ids 24 to 26
+// are bought with real money in the game, so the remake shows them only
+// when the player wears them (the old pro boots).
+#define SSR_BOOT_COUNT 26
+
+typedef struct {
+    int id;
+    // The name, for example "NS-Pure". The title is the tag "Title_" + name.
+    const char *name;
+    int price, uses, pace, power, technique;
+    // 0 none, 1 control, 2 swerve, 3 both.
+    int control;
+    int hard;
+} SSRBoot;
+
+// The boots with the id from 1, or NULL.
+const SSRBoot *ssr_shop_boot(int id);
+
+// Product_Boot.UpdateAvailability: available[id] is 1 for each boot that
+// the shop shows. A sixth of the other soft boots shows, by the age.
+// popular and value are the ids of the boots of the stickers.
+void ssr_shop_boots_available(int year, int bootId, int popular, int value, int available[SSR_BOOT_COUNT + 1]);
+
 #endif

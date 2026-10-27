@@ -126,3 +126,45 @@ const SSRShopItem *ssr_shop_nth_of_type(SSRShopType type, int n) {
     }
     return NULL;
 }
+
+static const SSRBoot BOOTS[SSR_BOOT_COUNT] = {
+    {1, "NS-Pure", 3, 5, 5, 5, 5, 0, 0},           {2, "NS-Mercury", 5, 7, 10, 10, 5, 0, 0},
+    {3, "NS-Geo", 5, 7, 5, 10, 10, 0, 0},          {4, "NS-Carnivore", 5, 7, 10, 5, 10, 0, 0},
+    {5, "NS-Tempo", 10, 10, 10, 10, 10, 0, 0},     {6, "NS-Lema", 15, 10, 15, 15, 10, 0, 0},
+    {7, "NS-Viper", 15, 10, 10, 15, 15, 0, 0},     {8, "NS-Neptune", 15, 10, 15, 10, 15, 0, 0},
+    {9, "NS-Raptor", 20, 15, 15, 15, 15, 0, 0},    {10, "NS-Cortex", 30, 15, 20, 20, 15, 0, 0},
+    {11, "NS-Hunter", 30, 15, 15, 20, 20, 0, 0},   {12, "NS-Bullet", 30, 15, 20, 15, 20, 0, 0},
+    {13, "NS-Strike", 40, 20, 20, 20, 20, 0, 0},   {14, "NS-Prey", 50, 20, 25, 25, 20, 0, 0},
+    {15, "NS-Cobra", 50, 20, 20, 25, 25, 0, 0},    {16, "NS-Dynamic", 50, 20, 25, 20, 25, 0, 0},
+    {17, "NS-Uzi", 100, 25, 25, 25, 25, 0, 0},     {18, "NS-Punk", 150, 30, 30, 30, 30, 0, 0},
+    {19, "NS-Falcon", 200, 35, 35, 35, 35, 0, 0},  {20, "NS-Instinct", 250, 40, 40, 40, 40, 0, 0},
+    {21, "NS-CNTRL_Mk1", 250, 15, 10, 10, 10, 1, 0}, {22, "NS-CNTRL_Mk2", 400, 30, 20, 20, 20, 1, 0},
+    {23, "NS-SWRV_Mk1", 500, 45, 30, 30, 30, 2, 0},  {24, "NS-CNTRL_Mk3", 0, 100, 40, 40, 40, 1, 1},
+    {25, "NS-SWRV_Mk2", 0, 100, 40, 40, 40, 2, 1},   {26, "NS-SWRV+CNTRL", 0, 150, 40, 40, 40, 3, 1},
+};
+
+const SSRBoot *ssr_shop_boot(int id) {
+    return id >= 1 && id <= SSR_BOOT_COUNT ? &BOOTS[id - 1] : NULL;
+}
+
+void ssr_shop_boots_available(int year, int bootId, int popular, int value, int available[SSR_BOOT_COUNT + 1]) {
+    // GetAge is the year plus 15.
+    int a = (year + 15) % 6;
+    available[0] = 0;
+    for (int id = 1; id <= SSR_BOOT_COUNT; id++) {
+        available[id] = 0;
+        if ((id == 1 && year == 1) || id == bootId) {
+            available[id] = 1;
+            continue;
+        }
+        const SSRBoot *boot = &BOOTS[id - 1];
+        // A hard boot has no price in the remake: it shows only when worn.
+        if (boot->hard) continue;
+        if (id > 21 || id == popular || id == value) {
+            available[id] = 1;
+            continue;
+        }
+        if (a == 0) available[id] = 1;
+        if (++a > 5) a = 0;
+    }
+}
