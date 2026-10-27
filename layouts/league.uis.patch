@@ -5,7 +5,7 @@
 + Rect:() ref:SquadButton
 + {
 + PushOrigin:(324,@n)
-+ M_NavButton:(0,0,Squad,,)
++ M_NavButton:(0,0,SSR_Squad,,)
 + {
 + Draw:(ILife,27,22,96,)
 + }

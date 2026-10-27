@@ -3159,13 +3159,13 @@ static void squad_fill(SSRGame *game) {
         }
         n = ssr_people_top_scorers(game->people, clubs, count, list, 20);
         ssr_tweaks_set(t, "Squad", "Title", comp ? comp->data->tla : "");
-        ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "Team"));
+        ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "SSR_Squad"));
     } else {
         n = ssr_people_squad(game->people, club ? club->id : 0, list, 64);
         if (n > 64) n = 64;
         qsort(list, (size_t)n, sizeof(list[0]), by_position);
         ssr_tweaks_set(t, "Squad", "Title", club ? club->name : "");
-        ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "Goals"));
+        ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "SSR_Scorers"));
     }
     add_op(game, SSR_OP_LIST_START, "PlayerList", NULL, NULL, 52);
     for (int i = 0; i < n; i++) {

@@ -951,6 +951,17 @@ static void load_language(SSRApp *app) {
         app->text = ssr_text_load(path);
     }
     ssr_text_rebrand(app->text);
+    // The texts of the remake, for the screens and the news of the remake.
+    const char *base = SDL_GetBasePath();
+    SDL_snprintf(path, sizeof(path), "%sdata/text.txt", base ? base : "");
+    size_t size = 0;
+    char *own = SDL_LoadFile(path, &size);
+    if (own) {
+        ssr_text_add(app->text, own, size, ssr_text_language_code(language));
+        SDL_free(own);
+    } else {
+        SDL_Log("The app has no data/text.txt.");
+    }
     app->textLanguage = language;
     ssr_gfx_set_language(app->gfx, ssr_text_language_code(language));
     // TNation.LoadNames and TContinent.LoadNames.
