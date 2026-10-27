@@ -30,6 +30,8 @@ in one folder.
     world/Continents.txt
     world/PromotionPlaces.txt
     world/Names.txt
+    world/Players.txt
+    crests/<club id>.png
     art/<name>.png
     art/<name>.patch.png
     layouts/<name>.uis
@@ -53,9 +55,37 @@ One `name=value` on each line.
 
 ### world/
 
-A file of the folder `world/` takes the place of the file with the same
-name in the data set of the game (`MyData/v2025b`). The columns are the
-same as in the files of the game. The other files come from the game.
+A file of the folder `world/` changes the file with the same name in the
+data set of the game (`MyData/v2025b`). The names of the columns are the
+same as in the files of the game.
+
+- A row of the pack changes the record with the same `id`. A row with a
+  new `id` adds a record. The other records of the game stay.
+- A pack gives only the columns that it changes. A column that is not
+  there, or an empty cell, keeps the value of the game.
+- In `PromotionPlaces.txt`, the rows of a league (`parentid`) in the pack
+  take the place of all the rows of that league.
+
+These columns change what the player sees:
+
+| File | Column | What it changes |
+| --- | --- | --- |
+| `Clubs.txt` | `shortname`, `tla` | The name of the club, and its short name |
+| `Clubs.txt` | `homekitshirtcol1`, `homekitshirtcol2`, `homekitshortscol` | The home kit, as `#RRGGBB` |
+| `Clubs.txt` | `awaykitshirtcol1`, `awaykitshortscol` | The away kit |
+| `Clubs.txt` | `strength`, `leagueid` | The strength of the club, and its league |
+| `Competitions.txt` | `tla` | The name of a league or a cup |
+| `Nations.txt` | `shortname`, `tla` | The name of a nation |
+
+This `Clubs.txt` renames one club and gives it a red and black kit:
+
+    id	shortname	tla	homekitshirtcol1	homekitshirtcol2
+    817	Bedford Eagles	EAGLES	#FF0000	#000000
+
+This `Competitions.txt` renames one league:
+
+    id	tla
+    2320	National League
 
 `world/Names.txt` gives the names of the made-up players. It has the same
 format as `data/names.txt` of the remake:
@@ -79,6 +109,42 @@ screen. See [layouts/README.md](../layouts/README.md).
   be in a pack. Another kind stops the install.
 - A file of more than 16 MB stops the install.
 - The checks come before the app writes a file.
+
+### world/Players.txt
+
+The real players and the managers of the clubs. The first row has the
+names of the columns. The order of the columns is free.
+
+| Column | Value |
+| --- | --- |
+| `club` | The `id` of the club in `Clubs.txt` |
+| `first`, `last` | The names of the player |
+| `position` | `GK`, `DEF`, `MID`, `ATT`, or `MGR` for the manager |
+| `nation` | The `id` of the nation in `Nations.txt` |
+| `age` | The age at the start of a new career |
+| `skill` | The skill from 1 to 99 |
+| `potential` | The skill that the player can reach, up to 100 |
+
+- `club`, `last`, and `position` are necessary. The app makes up the
+  other values when a cell is empty.
+- A squad takes up to 40 real players. Made-up players fill each
+  position to the shape of a squad: 3 keepers, 7 defenders, 7
+  midfielders, and 5 attackers.
+
+    club	first	last	position	nation	age	skill	potential
+    817	Sam	Example	GK	62	28	60
+    817	Alex	Sample	MGR	62	45
+
+### crests/
+
+A file `crests/<club id>.png` is the crest of the club. The crest takes
+the place of the shield of the club on the screens of the match and on
+the fixtures of the club.
+
+- The app cuts the image to a circle and puts a white ring around it.
+  Give a square image with the crest in the middle, for example 256 by
+  256 pixels.
+- A transparent part of the image shows white.
 
 ## The players of the world
 

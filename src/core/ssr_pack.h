@@ -13,10 +13,11 @@
 //
 // The other files of a pack:
 //
-//     world/Clubs.txt     the data set files of the game (Clubs.txt,
-//                         Nations.txt, Competitions.txt, Continents.txt,
-//                         PromotionPlaces.txt), with the same columns
-//     world/Players.txt   the players of the world (ssr_people)
+//     world/Clubs.txt     the rows that change the data set files of the
+//                         game (Clubs.txt, Nations.txt, Competitions.txt,
+//                         Continents.txt, PromotionPlaces.txt)
+//     world/Players.txt   the real players of the clubs (ssr_people)
+//     crests/<id>.png     the crest of the club with the id
 //     art/<name>.png      an image of the remake or of an atlas
 //     layouts/<name>.uis  a screen
 
