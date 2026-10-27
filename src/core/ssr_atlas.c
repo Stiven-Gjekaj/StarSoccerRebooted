@@ -1,5 +1,6 @@
 #include "ssr_atlas.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -509,6 +510,30 @@ int ssr_atlas_page_pixels(SSRAtlases *a, int page, SSRImage *out) {
                 paste(out, &frame, unpack->x, unpack->y);
             }
             free(frame.pixels);
+        }
+    }
+    return 1;
+}
+
+int ssr_atlas_patch(SSRImage *page, const SSRAtlasImage *image, const SSRImage *patch) {
+    if (!page || !image || !patch || image->kind != SSR_ATLAS_PLAIN) return 0;
+    if (patch->width != image->originalWidth || patch->height != image->originalHeight) return 0;
+    const float *r = image->rect;
+    float u0 = r[2], v0 = r[3], u1 = r[6], v1 = r[7];
+    if (u0 == u1 || v0 == v1) return 0;
+    int px0 = (int)floorf(fminf(u0, u1) * page->width), px1 = (int)ceilf(fmaxf(u0, u1) * page->width);
+    int py0 = (int)floorf(fminf(v0, v1) * page->height), py1 = (int)ceilf(fmaxf(v0, v1) * page->height);
+    for (int py = py0 < 0 ? 0 : py0; py < py1 && py < page->height; py++) {
+        // The centre of the page pixel, as a part of the box.
+        float by = r[1] + ((py + 0.5f) / page->height - v0) / (v1 - v0) * (r[5] - r[1]);
+        int sy = (int)floorf(by * patch->height);
+        if (sy < 0 || sy >= patch->height) continue;
+        for (int px = px0 < 0 ? 0 : px0; px < px1 && px < page->width; px++) {
+            float bx = r[0] + ((px + 0.5f) / page->width - u0) / (u1 - u0) * (r[4] - r[0]);
+            int sx = (int)floorf(bx * patch->width);
+            if (sx < 0 || sx >= patch->width) continue;
+            const unsigned char *from = patch->pixels + ((size_t)sy * patch->width + sx) * 4;
+            if (from[3] > 0) memcpy(page->pixels + ((size_t)py * page->width + px) * 4, from, 4);
         }
     }
     return 1;

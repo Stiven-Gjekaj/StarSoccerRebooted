@@ -225,8 +225,45 @@ static void test_refuses_a_damaged_key(void) {
     CHECK(ssr_atlas_load(directory, missing, 1) == NULL);
 }
 
+// A box of 4 x 4 with the left column trimmed. The page holds the other
+// 3 x 4 pixels at (2, 2), from the bottom up as the keys of the game do.
+static void test_patches_an_image(void) {
+    unsigned char pagePixels[8 * 8 * 4];
+    memset(pagePixels, 7, sizeof(pagePixels));
+    SSRImage page = {8, 8, pagePixels};
+    SSRAtlasImage image = {0};
+    image.kind = SSR_ATLAS_PLAIN;
+    image.originalWidth = image.originalHeight = 4;
+    const float rect[8] = {0.25f, 1.0f, 0.25f, 0.75f, 1.0f, 0.0f, 0.625f, 0.25f};
+    memcpy(image.rect, rect, sizeof(rect));
+    unsigned char patchPixels[4 * 4 * 4];
+    for (int y = 0; y < 4; y++) {
+        for (int x = 0; x < 4; x++) {
+            unsigned char *p = patchPixels + (y * 4 + x) * 4;
+            p[0] = (unsigned char)(x * 10 + y);
+            p[1] = p[2] = 0;
+            p[3] = x == 2 && y == 1 ? 0 : 255;
+        }
+    }
+    SSRImage patch = {4, 4, patchPixels};
+    CHECK(ssr_atlas_patch(&page, &image, &patch));
+    // The page pixel (2, 2) is the box pixel (1, 0), the top of the box.
+    CHECK(pagePixels[(2 * 8 + 2) * 4] == 10 && pagePixels[(2 * 8 + 2) * 4 + 3] == 255);
+    CHECK(pagePixels[(5 * 8 + 4) * 4] == 33);
+    // The clear pixel of the patch keeps the page pixel.
+    CHECK(pagePixels[(3 * 8 + 3) * 4] == 7);
+    // The pixels around the image stay.
+    CHECK(pagePixels[(2 * 8 + 1) * 4] == 7 && pagePixels[(6 * 8 + 2) * 4] == 7 && pagePixels[(2 * 8 + 5) * 4] == 7);
+    // A patch of another size, or an image that is not plain, takes none.
+    SSRImage small = {2, 2, patchPixels};
+    CHECK(!ssr_atlas_patch(&page, &image, &small));
+    image.kind = SSR_ATLAS_SLICED;
+    CHECK(!ssr_atlas_patch(&page, &image, &patch));
+}
+
 int main(void) {
     test_reads_the_key();
+    test_patches_an_image();
     test_decodes_the_pages();
     test_refuses_a_damaged_key();
     return TEST_RESULT();
