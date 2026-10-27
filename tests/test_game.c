@@ -2747,6 +2747,30 @@ static void test_starts_a_new_career(void) {
     CHECK(ssr_career_skill(career->technique) >= 30 && ssr_career_skill(career->power) >= 30);
     CHECK(ssr_career_skill(career->pace) >= 30 && ssr_career_skill(career->vision) >= 30);
     CHECK(ssr_career_skill(career->setPieces) >= 30);
+    // Contract drama: a young player with few matches goes on loan to the
+    // one club that is 8 to 30 points weaker, and comes back after a season.
+    ssr_game_update(game, 60);
+    ssr_game_message(game, "playeroftheyear.btn_Play");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "SSR_LoanOffer") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(career->loanFrom == strongest && career->clubId == 101);
+    ssr_game_update(game, 60);
+    ssr_game_message(game, "playeroftheyear.btn_Play");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "SSR_LoanEnds") == 0);
+    CHECK(career->loanFrom == 0 && career->clubId == strongest);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_SEASONENDTRANSFER") == 0);
+    // A key player: the club refuses to sell, and the player has not the
+    // Bux of the release clause.
+    SSRCareer *key = (SSRCareer *)career;
+    key->seasonApps = 12;
+    key->seasonTotalRating = 12 * 8.0f;
+    key->relationBoss = 80;
+    key->bank = 0;
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "SSR_RefuseToSell") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "SSR_ClauseNoBux") == 0);
     ssr_game_free(game);
     ssr_tweaks_free(tweaks);
 }

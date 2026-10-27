@@ -327,6 +327,7 @@ static void test_keeps_the_records(void) {
     c.worldSeed = 4242;
     c.startAge = 24;
     c.position = SSR_CAREER_HOLDING;
+    c.loanFrom = 915;
     c.injury = 12;
     int form[5] = {0, 0, 6, 7, 8};
     memcpy(c.careerForm, form, sizeof(form));
@@ -339,6 +340,7 @@ static void test_keeps_the_records(void) {
     CHECK(back.worldSeed == 4242 && back.injury == 12);
     // A custom career starts at its own age.
     CHECK(back.startAge == 24 && ssr_career_age(&back) == ssr_career_year(&back) + 23);
+    CHECK(back.loanFrom == 915);
     back.startAge = 0;
     // The position gives the focus at the start of a match.
     CHECK(back.position == SSR_CAREER_HOLDING && ssr_career_focus(&back) == 1);

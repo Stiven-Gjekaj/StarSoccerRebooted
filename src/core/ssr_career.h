@@ -81,6 +81,8 @@ typedef struct {
     // The position of the player: SSR_CAREER_FORWARD as in 4.32, or a
     // position of the remake. It gives the focus at the start of a match.
     int position;
+    // The club that lent the player for a season, or 0.
+    int loanFrom;
     // The nation of the player, the nation of the league, and the club.
     int nationId;
     int clubNationId;

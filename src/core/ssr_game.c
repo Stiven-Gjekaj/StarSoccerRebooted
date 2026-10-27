@@ -202,6 +202,8 @@ struct SSRGame {
     int customPosition, customClub, customBux;
     int customClubs[512];
     int customClubCount;
+    // The club of the loan that the boss offers.
+    int loanClub;
     // 0 no name, 1 the first name, 2 the last name takes the keyboard.
     int typing;
     // The seed that the player types on the world screen.
@@ -1605,6 +1607,9 @@ static void call_start_career(SSRGame *game) {
 
 static void call_drink(SSRGame *game);
 static void call_season_end_transfer(SSRGame *game);
+static void call_loan_back(SSRGame *game);
+static void call_loan_offer(SSRGame *game);
+static void call_release_clause(SSRGame *game);
 static void call_play_to_date(SSRGame *game);
 static void call_play_with_pain(SSRGame *game);
 static void call_set_up_fixture(SSRGame *game);
@@ -1658,6 +1663,9 @@ static void run_call(SSRGame *game, const char *name) {
         {"StartCareer", call_start_career},
         {"DrinkNRG", call_drink},
         {"SeasonEndTransfer", call_season_end_transfer},
+        {"LoanBack", call_loan_back},
+        {"LoanOffer", call_loan_offer},
+        {"ReleaseClause", call_release_clause},
         {"Retirement", call_retirement},
         {"CaughtGambling", call_caught_gambling},
         {"TeamMatesCasino", call_teammates_casino},
@@ -4464,9 +4472,117 @@ static void new_season(SSRGame *game) {
     star_transition(game, "gamemenu");
 }
 
-// playeroftheyear.btn_Play: GSSeasonEndTransfer asks about a transfer.
-static void poty_play(SSRGame *game) {
+static void desired_transfer_screen(SSRGame *game, int nation);
+
+// The contract drama of the remake: loans and release clauses.
+// A player of this age or younger with fewer matches in a season can go on
+// loan.
+#define LOAN_AGE 21
+#define LOAN_APPS 5
+// A key player: the matches and the mean rating of the season, and the
+// boss relation, that make the club refuse to sell.
+#define KEY_APPS 10
+#define KEY_RATING 7.0f
+#define KEY_BOSS 70
+
+// A smaller club of the same nation for a loan: 8 to 30 points weaker.
+static const SSRClub *loan_club(SSRGame *game) {
+    const SSRCareer *c = &game->career;
+    if (ssr_career_age(c) > LOAN_AGE || c->seasonApps >= LOAN_APPS || c->loanFrom) return NULL;
+    const SSRClub *mine = game->world ? ssr_world_club(game->world, c->clubId) : NULL;
+    if (!mine) return NULL;
+    const SSRClub *list[256];
+    int n = 0;
+    for (int i = 0; i < game->world->clubCount && n < 256; i++) {
+        const SSRClub *x = &game->world->clubs[i];
+        int gap = mine->strength - x->strength;
+        if (x->nation == mine->nation && x->league > 0 && x->bTeamOf == 0 && gap >= 8 && gap <= 30 &&
+            league_duration(game->world, x->league) > 0) {
+            list[n++] = x;
+        }
+    }
+    return n ? list[ssr_rand(&game->random, n) - 1] : NULL;
+}
+
+// The release clause of a key player in Bux, or 0 when the club sells.
+static int release_clause(SSRGame *game) {
+    const SSRCareer *c = &game->career;
+    float rating = c->seasonApps ? c->seasonTotalRating / (float)c->seasonApps : 0;
+    if (c->seasonApps < KEY_APPS || rating < KEY_RATING || (int)c->relationBoss < KEY_BOSS) return 0;
+    int fee = ssr_contract_transfer_value(c) / 1000;
+    return fee < 50 ? 50 : fee;
+}
+
+static void season_end_question(SSRGame *game) {
     message(game, "message", loc(game, "CMESSAGE_SEASONENDTRANSFER"), 1, 1, "SeasonEndTransfer");
+}
+
+// playeroftheyear.btn_Play: GSSeasonEndTransfer asks about a transfer. In
+// the remake a loan ends first, or the boss offers a loan.
+static void poty_play(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    char text[512];
+    if (c->loanFrom) {
+        const SSRClub *home = game->world ? ssr_world_club(game->world, c->loanFrom) : NULL;
+        if (home) {
+            c->clubId = home->id;
+            c->clubNationId = home->nation;
+        }
+        c->loanFrom = 0;
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_LoanEnds"));
+        replace_all(text, sizeof(text), "$club", home ? home->name : "");
+        message(game, "message", text, 0, 1, "LoanBack");
+        return;
+    }
+    const SSRClub *loan = loan_club(game);
+    if (loan) {
+        game->loanClub = loan->id;
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_LoanOffer"));
+        replace_all(text, sizeof(text), "$club", loan->name);
+        message(game, "message", text, 1, 1, "LoanOffer");
+        return;
+    }
+    season_end_question(game);
+}
+
+static void call_loan_back(SSRGame *game) {
+    season_end_question(game);
+}
+
+// The call "LoanOffer": Yes goes to the smaller club for a season.
+static void call_loan_offer(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    const SSRClub *loan = game->world ? ssr_world_club(game->world, game->loanClub) : NULL;
+    if (game->returnState != 1 || !loan) {
+        season_end_question(game);
+        return;
+    }
+    c->loanFrom = c->clubId;
+    c->clubId = loan->id;
+    c->clubNationId = loan->nation;
+    char text[256];
+    snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentLoan"));
+    replace_all(text, sizeof(text), "$club", loan->name);
+    ssr_career_add_moment(c, c->sdate, text);
+    new_season(game);
+}
+
+// The call "ReleaseClause": Yes pays the clause and looks for a new club.
+static void call_release_clause(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (game->returnState != 1) {
+        new_season(game);
+        return;
+    }
+    int fee = release_clause(game);
+    if (c->bank < fee) {
+        message(game, "message", loc(game, "SSR_ClauseNoBux"), 0, 1, "NewSeasonNoClubsInterested");
+        return;
+    }
+    c->bank -= fee;
+    player_tweaks(game);
+    const SSRClub *club = ssr_world_club(game->world, c->clubId);
+    desired_transfer_screen(game, club ? club->nation : c->clubNationId);
 }
 
 static void do_news(SSRGame *game, const char *tag, const char *team, const char *team2);
@@ -4653,6 +4769,18 @@ static void call_season_end_transfer(SSRGame *game) {
         return;
     }
     const SSRClub *club = ssr_world_club(game->world, game->career.clubId);
+    // A key player: the club refuses to sell, unless the player pays the
+    // release clause.
+    int fee = release_clause(game);
+    if (fee > 0) {
+        char text[512], number[16];
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_RefuseToSell"));
+        replace_all(text, sizeof(text), "$club", club ? club->name : "");
+        snprintf(number, sizeof(number), "%d", fee);
+        replace_all(text, sizeof(text), "$fee", number);
+        message(game, "message", text, 1, 1, "ReleaseClause");
+        return;
+    }
     desired_transfer_screen(game, club ? club->nation : game->career.clubNationId);
 }
 
