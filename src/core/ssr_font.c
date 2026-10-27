@@ -329,8 +329,8 @@ static const Glyph *glyph_for(SSRFont *font, uint32_t codepoint) {
     g->present = g->glyph != 0;
     int advance, bearing;
     stbtt_GetGlyphHMetrics(&font->info, g->glyph, &advance, &bearing);
-    // The game keeps the advance as a short.
-    g->advance = floorf(advance * font->scale);
+    // Android gives the hinted advance in whole pixels.
+    g->advance = roundf(advance * font->scale);
     int x0, y0, x1, y1;
     stbtt_GetGlyphBitmapBox(&font->info, g->glyph, font->scale, font->scale, &x0, &y0, &x1, &y1);
     g->inkWidth = x1 - x0;
