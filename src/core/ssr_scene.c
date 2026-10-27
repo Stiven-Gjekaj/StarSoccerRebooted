@@ -1327,7 +1327,19 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
             if (*at == ',') comma++;
         }
         if (at && m->argCount > 2) snprintf(prefix, sizeof(prefix), "%.*s", (int)strcspn(at, ","), at);
-        d->text[2] = keep(s, prefix);
+        // The suffix comes after the number. ReadoutLoc reads both from the
+        // language. The two go in one text: prefix, 0x1f, suffix.
+        char suffix[64];
+        snprintf(suffix, sizeof(suffix), "%s", arg(m, 3));
+        if (is(n, "ReadoutLoc") && s->env && s->env->text) {
+            const char *p = prefix[0] ? s->env->text(s->env->context, prefix) : "";
+            const char *q = suffix[0] ? s->env->text(s->env->context, suffix) : "";
+            snprintf(prefix, sizeof(prefix), "%s", p ? p : "");
+            snprintf(suffix, sizeof(suffix), "%s", q ? q : "");
+        }
+        char both[160];
+        snprintf(both, sizeof(both), "%s\x1f%s", prefix, suffix);
+        d->text[2] = keep(s, both);
         d->v[0] = (float)number(s, m, 5, 0);
         d->v[1] = 1.8347578e11f;
     } else if (is(n, "StringReadout")) {
@@ -2299,7 +2311,9 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         d->v[1] = value;
         char number[64], text[256];
         readout_text(value, (int)d->v[0], number, sizeof(number));
-        snprintf(text, sizeof(text), "%s%s", d->text[2] ? d->text[2] : "", number);
+        const char *split = strchr(d->text[2], '\x1f');
+        int prefixLength = split ? (int)(split - d->text[2]) : (int)strlen(d->text[2]);
+        snprintf(text, sizeof(text), "%.*s%s%s", prefixLength, d->text[2], number, split ? split + 1 : "");
         set_shown(g, text);
         break;
     }

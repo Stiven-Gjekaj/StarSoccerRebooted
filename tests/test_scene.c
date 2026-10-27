@@ -632,6 +632,8 @@ static void test_readouts_conditions_and_click_actions(void) {
              "\tReadout(Player,SponsorIncome1,* )\n"
              "Text:(\"0\",0,30,100,20)\n"
              "\tReadout(Player,Energy,,,,2)\n"
+             "Text:(\"45'\",0,200,100,20)\n"
+             "\tReadout(Player,SponsorIncome1,,')\n"
              "Text:(Old,0,60,100,20)\n"
              "\tStringReadout(SaveSlot,Slot0Data)\n"
              "Text:(Club,0,90,100,20)\n"
@@ -667,6 +669,7 @@ static void test_readouts_conditions_and_click_actions(void) {
     ssr_scene_update(scene, &env, 0);
     CHECK(find_text(scene, "* 15"));
     CHECK(find_text(scene, "7.25"));
+    CHECK(find_text(scene, "15'"));
     CHECK(find_text(scene, "Save Slot 1"));
     CHECK(find_text(scene, "LEE"));
     CHECK(find_image(scene, "Boot1") && !find_image(scene, "Boot0"));
