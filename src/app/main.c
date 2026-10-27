@@ -182,6 +182,11 @@ static void pitch_name(const SSRChance *chance, char *out, size_t capacity) {
         SDL_snprintf(out, capacity, "Pitch_Pen_AM.uis");
         return;
     }
+    if (type == 11) {
+        // The dribble plays on the practice pitch (GSGetChanceScreenName).
+        SDL_snprintf(out, capacity, "Pitch_Prac_AM.uis");
+        return;
+    }
     const char *kind = type == 1 || type == 9 ? "M" : "A";
     char letter = side == 1 ? 'b' : 'a';
     int mirror = side == 2;
@@ -243,7 +248,8 @@ static void update_ball_view(SSRApp *app, const SSRChance *chance) {
     int id = app->ballCopy;
     ssr_scene_spawn_place(app->scene, id, NULL, b->x, b->y);
     ssr_scene_spawn_place(app->scene, id, "BallHook", 0, -b->z);
-    ssr_scene_spawn_set(app->scene, id, "BallHook", SSR_GEL_SCALE, 1 + b->z / 100);
+    ssr_scene_spawn_set(app->scene, id, "BallHook", SSR_GEL_SCALE,
+                        (1 + b->z / 100) * (chance->info.chanceType == 11 ? 1.5f : 1));
     // GetVelDir: a heading near an axis, or a diagonal.
     float c = SDL_cosf(b->direction * SDL_PI_F / 180), s = SDL_sinf(b->direction * SDL_PI_F / 180);
     const char *roll;
@@ -332,8 +338,10 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         const SSRMatchPlayer *p = &chance->players.list[i];
         char anim[32];
         player_anim(p, anim, sizeof(anim));
-        // The game adds z to y here (c_AMatchPlayer.p_Update).
+        // The game adds z to y here (c_AMatchPlayer.p_Update). A dribble
+        // shows the players at 1.5 times their size.
         ssr_scene_spawn_place(app->scene, app->playerCopies[i], NULL, p->x, p->y + p->z);
+        if (chance->info.chanceType == 11) ssr_scene_spawn_set(app->scene, app->playerCopies[i], NULL, SSR_GEL_SCALE, 1.5f);
         ssr_scene_spawn_anim(app->scene, app->playerCopies[i], "PlayerAnim", anim);
         // The run plays at the speed of the player (c_AMatchPlayer): half the
         // speed times Match.RunSpeedFactor.
@@ -722,6 +730,10 @@ static void auto_chance(SSRApp *app) {
         } else {
             ssr_game_touch(app->game, 0, chance->ball.x + dx, chance->ball.y + dy);
         }
+    } else if (chance->state == SSR_CHANCE_DRIBBLE) {
+        // A swipe up the screen each 600 ms.
+        int down = (t % 600) < 100;
+        ssr_game_touch(app->game, down, 320, down ? 900 : 720);
     } else if (chance->state == SSR_CHANCE_TAP) {
         const SSRTapBall *tap = &chance->tap;
         // The tap waits 1.5 s, so that a frame can show the tap ball.
