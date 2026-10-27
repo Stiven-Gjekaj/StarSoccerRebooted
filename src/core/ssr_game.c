@@ -2241,6 +2241,19 @@ static void end_match(SSRGame *game) {
     f.workRate = 0;
     game->facts = f;
     ssr_aftermatch_rate(&f, &game->after);
+    // Match context: the fans care more about a derby or a match of a big
+    // rivalry. The change of the relation of the fans is half as big again.
+    if (game->season && game->world) {
+        SSRFixture *fixture = ssr_season_find(game->season, game->fixtureComp, game->fixtureDate, game->fixtureHome,
+                                              game->fixtureAway);
+        SSRSeasonComp *comp = ssr_season_comp(game->season, game->fixtureComp);
+        if (fixture && comp && comp->data->level == 0) {
+            int a = ssr_fixture_home_team(game->season, fixture), b = ssr_fixture_away_team(game->season, fixture);
+            if (ssr_world_is_derby(game->world, a, b) || ssr_honours_rivalry(&game->honours, a, b) >= SSR_RIVALRY_POINTS) {
+                game->after.fans = game->after.fans * 3 / 2;
+            }
+        }
+    }
     // The counts of the club, or of the nation (c_TScreen_MatchStats).
     SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, game->fixtureComp) : NULL;
     float rating = game->after.rating;
