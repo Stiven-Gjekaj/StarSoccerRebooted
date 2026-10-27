@@ -319,8 +319,9 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [ ] The records of each club, league, and nation
 - [x] A career timeline: the clubs, the titles, the awards, and the
       moments (Honours, Career)
-- [ ] A legacy after retirement: how the world remembers the player. The
-      world continues in a manager career or with a new player.
+- [x] A legacy after retirement: the old player stays in the hall of fame
+      of the world that a new player continues
+- [ ] The world continues in a manager career
 
 ### The match
 
@@ -347,8 +348,9 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       of the career.
 - [x] Challenge starts: the pace at its maximum, or no Bux and no NRG
 - [ ] A challenge start at age 30 in the lowest league
-- [ ] Many careers in one world. The next player can play against the
-      last one.
+- [x] Many careers in one world: Options, World can make the next new
+      career continue the world of the last career
+- [ ] The next player can play against the last one
 
 ## The database
 
