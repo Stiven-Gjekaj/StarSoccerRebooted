@@ -223,6 +223,19 @@ void ssr_scene_list_start(SSRScene *scene, const char *list, float y);
 // text with the ref takes the text when it is not NULL.
 void ssr_scene_list_sub(SSRScene *scene, const char *list, const char *ref, const char *text, int visible);
 
+// The builders of an entry of a list, as the game makes the buttons of a
+// shop (c_GTemplate.CreateDisposable and AddLocalChild). The list gets a
+// copy of the template at x, under the entry before it.
+int ssr_scene_list_add_at(SSRScene *scene, const char *list, const char *template_, float x);
+// The part ref of the last entry of the list (the entry itself when ref is
+// NULL or "") gets a copy of the template, at the place of the template.
+int ssr_scene_entry_child(SSRScene *scene, const char *list, const char *ref, const char *template_);
+// The strvar %name of the part ref of the last entry takes the value.
+int ssr_scene_entry_var(SSRScene *scene, const char *list, const char *ref, const char *name, const char *value);
+// The ProgressBar of the part ref of the last entry follows the tweak
+// group,name (c_ProgressBar.SetSourceTweakValue).
+int ssr_scene_entry_bar(SSRScene *scene, const char *list, const char *ref, const char *group, const char *name);
+
 // The first element with the ref hook gets a copy of the template in the
 // place of its children, at its origin (c_GGadget.Clone into a hook).
 // Returns 1 when both are there.

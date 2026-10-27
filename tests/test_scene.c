@@ -454,6 +454,64 @@ static void test_converges_after_a_delay_and_on_press(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static const SSRSceneItem *find_text(const SSRScene *scene, const char *text);
+
+// A button of a shop: an entry from a template, parts from other
+// templates, a variable that the click copies to a tweak, and a bar that
+// follows the tweak of its product.
+static void test_builds_a_shop_button(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    // The expression takes the kind of the tweak at the parse.
+    ssr_tweaks_set(tweaks, "Menu", "ItemString", "");
+    SSRUiTree *tree;
+    SSRScene *scene = build("Rect:(0,0,300,100) ref:ShopButtonSmall\n"
+                            "{\n"
+                            "\tRect:(0,0,300,100) ref:ItemButton\n"
+                            "\t\tstrvar(%hashed_uid)\n"
+                            "\t\tClick()\n"
+                            "\t\t<\n"
+                            "\t\t\t.:set(twk(Menu,ItemString),%hashed_uid)\n"
+                            "\t\t\t.:Message(shopoverlay.onItemSelected)\n"
+                            "\t\t>\n"
+                            "} Template\n"
+                            "Rect:(0,0,0,0) ref:ShopTitle\n"
+                            "{\n"
+                            "\tText:(x,20,10,200,30) ref:Title\n"
+                            "} Template\n"
+                            "Rect:(0,0,0,0) ref:ShopOwnedBar\n"
+                            "{\n"
+                            "\tDraw:(YellowBar,10,60,100,10) ref:ProgressBar\n"
+                            "\t\tProgressBar(Products,None,0,100,0)\n"
+                            "} Template\n"
+                            "Rect:(0,0,640,800) ref:LifestyleList\n",
+                            tweaks, &tree);
+    SSRSceneEnv env = test_env(tweaks);
+    CHECK(ssr_scene_list_add_at(scene, "LifestyleList", "ShopButtonSmall", 20) == 1);
+    CHECK(ssr_scene_entry_var(scene, "LifestyleList", "ItemButton", "hashed_uid", "item_Phone") == 1);
+    CHECK(ssr_scene_entry_var(scene, "LifestyleList", "ItemButton", "missing", "x") == 0);
+    CHECK(ssr_scene_entry_child(scene, "LifestyleList", "ItemButton", "ShopTitle") == 1);
+    ssr_scene_list_sub(scene, "LifestyleList", "Title", "Phone", 1);
+    CHECK(ssr_scene_entry_child(scene, "LifestyleList", "ItemButton", "ShopOwnedBar") == 1);
+    CHECK(ssr_scene_entry_bar(scene, "LifestyleList", "ProgressBar", "Products", "item_Phone_Owned") == 1);
+    ssr_tweaks_set_number(tweaks, "Products", "item_Phone_Owned", 50);
+    // A second entry goes under the first.
+    CHECK(ssr_scene_list_add_at(scene, "LifestyleList", "ShopButtonSmall", 20) == 1);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_text(scene, "Phone") != NULL);
+    const SSRSceneItem *bar = find_image(scene, "YellowBar");
+    CHECK(bar && near(bar->w, 50) && near(bar->x, 30));
+    const SSRSceneItem *button = ssr_scene_hit_item(scene, 100, 50);
+    CHECK(button != NULL);
+    if (button) {
+        const char *message = ssr_scene_click(scene, &env, button);
+        CHECK(message && strcmp(message, "shopoverlay.onItemSelected") == 0);
+        CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "item_Phone") == 0);
+    }
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // Message() in the block of a click sends its message, also from a click
 // with no message of its own.
 static void test_sends_the_message_of_a_click_block(void) {
@@ -1509,6 +1567,7 @@ int main(void) {
     test_plays_an_animation_from_a_frame();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
+    test_builds_a_shop_button();
     test_mixes_colours_and_orders_layers();
     test_emits_particles();
     test_definitions_do_not_draw();

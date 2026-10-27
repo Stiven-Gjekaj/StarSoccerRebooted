@@ -3787,6 +3787,64 @@ static void change_sub(Gel *g, const char *ref, const char *text, int visible) {
     for (int i = 0; i < g->childCount; i++) change_sub(g->children[i], ref, text, visible);
 }
 
+int ssr_scene_list_add_at(SSRScene *scene, const char *list, const char *template_, float x) {
+    Gel *g = scene && list ? find_ref_first(scene, list) : NULL;
+    Gel *model = scene && template_ ? find_ref_first(scene, template_) : NULL;
+    if (!g || !model) return 0;
+    Gel *entry = clone_gel(model);
+    if (!entry) return 0;
+    entry->x = x;
+    entry->y = g->listY;
+    entry->hidden = 0;
+    g->listY += entry->h;
+    add_child(g, entry);
+    return 1;
+}
+
+// The part of the last entry of the list: the entry, or the first gel with
+// the ref inside it.
+static Gel *entry_part(const SSRScene *scene, const char *list, const char *ref) {
+    Gel *entry = last_entry(scene, list);
+    if (!entry || !ref || !ref[0]) return entry;
+    return find_below(entry, ref);
+}
+
+int ssr_scene_entry_child(SSRScene *scene, const char *list, const char *ref, const char *template_) {
+    Gel *part = entry_part(scene, list, ref);
+    Gel *model = scene && template_ ? find_ref_first(scene, template_) : NULL;
+    if (!part || !model) return 0;
+    Gel *copy = clone_gel(model);
+    if (!copy) return 0;
+    copy->hidden = 0;
+    add_child(part, copy);
+    return 1;
+}
+
+int ssr_scene_entry_var(SSRScene *scene, const char *list, const char *ref, const char *name, const char *value) {
+    Gel *part = entry_part(scene, list, ref);
+    if (!part || !name || !value) return 0;
+    char full[64];
+    snprintf(full, sizeof(full), "%%%s", name);
+    for (int i = 0; i < part->varCount; i++) {
+        if (strcmp(part->vars[i]->name, full) != 0) continue;
+        snprintf(part->vars[i]->s, sizeof(part->vars[i]->s), "%s", value);
+        return 1;
+    }
+    return 0;
+}
+
+int ssr_scene_entry_bar(SSRScene *scene, const char *list, const char *ref, const char *group, const char *name) {
+    Gel *part = entry_part(scene, list, ref);
+    if (!part || !group || !name) return 0;
+    for (Doodad *d = part->doodads; d; d = d->next) {
+        if (d->kind != D_PROGRESS_BAR) continue;
+        d->text[0] = keep(scene, group);
+        d->text[1] = keep(scene, name);
+        return 1;
+    }
+    return 0;
+}
+
 int ssr_scene_set_hook(SSRScene *scene, const char *hook, const char *template_) {
     Gel *g = scene && hook ? find_ref_first(scene, hook) : NULL;
     Gel *model = scene && template_ ? find_ref_first(scene, template_) : NULL;
