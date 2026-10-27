@@ -525,15 +525,17 @@ static const Glyph *glyph_for(SSRFont *font, uint32_t codepoint) {
     stbtt_GetGlyphBitmapBox(&face->info, g->glyph, face->scale, face->scale, &x0, &y0, &x1, &y1);
     g->inkWidth = x1 - x0;
     if (g->present) bake(font, g);
-    // The glyph table gives the place of the ink and the advance that the
-    // game had: the ink starts bearingX after the pen, and bearingY above
-    // the baseline (c_FontRenderer.Write).
+    // The glyph table gives the advance that the game had, and the place of
+    // the ink after the pen: bearingX (c_FontRenderer.Write). The height of
+    // the ink stays with the outline. [I: Android draws hinted glyphs, so
+    // the table has their heights. The remake draws the outline with no
+    // hinting, and a top from the table would put the bottom of a round
+    // letter one pixel under the baseline.]
     const TableEntry *t = table_entry(font, codepoint);
     if (t) {
         g->advance = t->advance;
         g->inkWidth = t->w;
         g->xoff = t->bearingX;
-        g->yoff = -t->bearingY;
     }
     return g;
 }

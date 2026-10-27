@@ -47,7 +47,7 @@ void ssr_font_clear_fallbacks(SSRFont *font);
 // the end, then 14 bytes for each character: an int character, then the
 // width, the height, bearingX, bearingY, and the advance as shorts. All
 // numbers are big endian. A character of the table takes its advance, its
-// ink width, and the place of its ink from the table. NULL data takes the
+// ink width, and the left of its ink from the table. NULL data takes the
 // table away. Returns the number of characters of the block.
 int ssr_font_set_glyph_table(SSRFont *font, const unsigned char *data, size_t size, int face, int sizeIndex);
 

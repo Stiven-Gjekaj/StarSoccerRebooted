@@ -220,11 +220,14 @@ static void test_uses_a_glyph_table(const char *path) {
     CHECK(ssr_font_set_glyph_table(font, data, size, 0, 0) == 2);
     CHECK(ssr_font_measure(font, "H") == 40);
     CHECK(ssr_font_measure(font, "Hix") == 40 + 9 + x);
-    SSRGlyphQuad quads[4];
+    SSRGlyphQuad plain[4], quads[4];
+    CHECK(ssr_font_set_glyph_table(font, NULL, 0, 0, 0) == 0);
+    CHECK(ssr_font_layout(font, "Hi", 10, 0, plain, 4) == 2);
+    CHECK(ssr_font_set_glyph_table(font, data, size, 0, 0) == 2);
     CHECK(ssr_font_layout(font, "Hi", 10, 0, quads, 4) == 2);
-    float baseline = floorf(ssr_font_ascent(font) + 0.5f);
-    CHECK(quads[0].x0 == 10 + 3 && quads[0].y0 == baseline - 20);
-    CHECK(quads[1].x0 == 10 + 40 - 2 && quads[1].y0 == baseline - 21);
+    // The left of the ink comes from the table, the top from the outline.
+    CHECK(quads[0].x0 == 10 + 3 && quads[0].y0 == plain[0].y0 && quads[0].y1 == plain[0].y1);
+    CHECK(quads[1].x0 == 10 + 40 - 2 && quads[1].y0 == plain[1].y0);
     CHECK(ssr_font_set_glyph_table(font, data, size, 0, 1) == 1);
     CHECK(ssr_font_measure(font, "H") == 99);
     // No table, or a table with no block for the size.
