@@ -3832,6 +3832,22 @@ static void anim_speed(Gel *g, const char *ref, float speed, int toEnd) {
     for (int i = 0; i < g->childCount; i++) anim_speed(g->children[i], ref, speed, toEnd);
 }
 
+static void anim_play(SSRScene *s, Gel *g, const char *ref, const char *anim, float frame, float speed) {
+    if (g->kind == GEL_ANIM && g->ref && strcmp(g->ref, ref) == 0) {
+        if (anim && (!g->animName || strcmp(g->animName, anim) != 0)) set_animation(g, keep(s, anim));
+        g->frame = frame;
+        g->speed = speed;
+        g->state = 1;
+    }
+    for (int i = 0; i < g->childCount; i++) anim_play(s, g->children[i], ref, anim, frame, speed);
+}
+
+void ssr_scene_anim_play(SSRScene *scene, const char *ref, const char *anim, float frame, float speed) {
+    if (!scene || !ref) return;
+    if (scene->root) anim_play(scene, scene->root, ref, anim, frame, speed);
+    for (int i = 0; i < scene->detachedCount; i++) anim_play(scene, scene->detached[i], ref, anim, frame, speed);
+}
+
 void ssr_scene_anim(SSRScene *scene, const char *ref, float speed, int toEnd) {
     if (!scene || !ref) return;
     if (scene->root) anim_speed(scene->root, ref, speed, toEnd);

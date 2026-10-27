@@ -454,6 +454,50 @@ static void test_converges_after_a_delay_and_on_press(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// A card of the pairs game: the code chooses the face, and plays the flip
+// forward to the back or back to the face.
+static void test_plays_an_animation_from_a_frame(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "Animation:(40,Clamp,0) ref:RoseAnim\n"
+             "{\n"
+             "\tDuring:(0,19)\n"
+             "\t{\n"
+             "\t\tDraw:(PRose,0,0,10,10)\n"
+             "\t}\n"
+             "\tDuring:(20,39)\n"
+             "\t{\n"
+             "\t\tDraw:(PCardBack,0,0,10,10)\n"
+             "\t}\n"
+             "}\n"
+             "Rect:(0,0,10,10) ref:Card\n"
+             "{\n"
+             "\tAnimInstance:(0,0) ref:Card\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    // The instance has no animation yet.
+    CHECK(!find_image(scene, "PRose") && !find_image(scene, "PCardBack"));
+    ssr_scene_anim_play(scene, "Card", "RoseAnim", 0, 0);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "PRose") && !find_image(scene, "PCardBack"));
+    // Forward: the card turns to its back and stays there.
+    ssr_scene_anim_play(scene, "Card", NULL, 0, 1);
+    for (int i = 0; i < 60; i++) ssr_scene_update(scene, &env, 16);
+    CHECK(!find_image(scene, "PRose") && find_image(scene, "PCardBack"));
+    // Back: the face shows again.
+    ssr_scene_anim_play(scene, "Card", NULL, 40, -1);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "PCardBack"));
+    for (int i = 0; i < 60; i++) ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "PRose") && !find_image(scene, "PCardBack"));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // The Glow of the main menu: 0 to 299 turns to 240 degrees, gets half the
 // size about its centre, and goes from grey to white.
 static void test_plays_an_animation(void) {
@@ -1389,6 +1433,7 @@ int main(void) {
     test_moves_copies_and_sorts_by_y();
     test_runs_expressions();
     test_plays_an_animation();
+    test_plays_an_animation_from_a_frame();
     test_mixes_colours_and_orders_layers();
     test_emits_particles();
     test_definitions_do_not_draw();

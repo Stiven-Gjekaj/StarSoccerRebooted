@@ -222,6 +222,10 @@ void ssr_scene_list_sub(SSRScene *scene, const char *list, const char *ref, cons
 // The AnimInstance elements with the ref play at the speed, and jump to the
 // end of their animation when toEnd is 1 (c_GelAnimInstance).
 void ssr_scene_anim(SSRScene *scene, const char *ref, float speed, int toEnd);
+// The AnimInstance elements with the ref play the animation (or their own
+// one when anim is NULL) from the frame at the speed. A speed below 0 plays
+// the animation back to its start.
+void ssr_scene_anim_play(SSRScene *scene, const char *ref, const char *anim, float frame, float speed);
 
 // Moves the first element with the ref to (x, y) in its parent, at the
 // scale.
