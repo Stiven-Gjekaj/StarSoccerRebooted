@@ -1561,6 +1561,18 @@ static void play_blackjack(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     CHECK(strcmp(ssr_game_screen(game), "casino") == 0);
     ssr_game_message(game, "casino.btn_Back");
     if (hands == 6) CHECK(now->energy == energy - 3);
+    // An alert at the bottom tells the energy of the bets. A tap on it
+    // ends it.
+    int alertId = 0;
+    const char *layout = ssr_game_alert(game, &alertId);
+    CHECK(layout && strcmp(layout, "bottommessageenergy") == 0 && alertId > 0);
+    char lost[16];
+    snprintf(lost, sizeof(lost), " -%d", (int)(energy - now->energy + 0.5f));
+    CHECK(strstr(ssr_tweaks_get(tweaks, "Menu", "BottomQuickMessage"), lost) != NULL);
+    ssr_game_update(game, 60);
+    CHECK(ssr_game_alert(game, NULL) != NULL);
+    ssr_game_message(game, "message.dismiss");
+    CHECK(ssr_game_alert(game, NULL) == NULL);
     ssr_game_message(game, "relationships.btn_Home");
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }

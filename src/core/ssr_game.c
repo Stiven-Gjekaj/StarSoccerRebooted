@@ -239,6 +239,14 @@ struct SSRGame {
     // its layout (TQuickMessage).
     int splashEnd;
     char splashLayout[32];
+    // The alerts at the bottom of the screen (TQuickMessage.CreateAlert).
+    // Each starts when the one before it ends. id counts the alerts.
+    struct {
+        char layout[40];
+        char text[160];
+        int start, finish, id;
+    } alerts[8];
+    int alertCount, alertIds;
 
     // The relationships screen (c_TScreen_Relationships): the national
     // view, and the bars whose button sends no click (Boss, Team, Fans,
@@ -376,6 +384,34 @@ static void quick_message(SSRGame *game, const char *text, int ms) {
     upper(game, banner);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", banner);
     show_splash(game, "splashmessage", ms);
+}
+
+// TQuickMessage.CreateAlert: the text in capitals in the layout, for ms,
+// after the alerts before it. A full queue drops the alert.
+static void alert(SSRGame *game, const char *layout, const char *text, int ms) {
+    if (game->alertCount >= (int)(sizeof(game->alerts) / sizeof(game->alerts[0]))) return;
+    int start = game->now;
+    for (int i = 0; i < game->alertCount; i++) {
+        if (game->alerts[i].finish > start) start = game->alerts[i].finish;
+    }
+    int at = game->alertCount++;
+    snprintf(game->alerts[at].layout, sizeof(game->alerts[at].layout), "%s", layout);
+    snprintf(game->alerts[at].text, sizeof(game->alerts[at].text), "%s", text);
+    upper(game, game->alerts[at].text);
+    game->alerts[at].start = start;
+    game->alerts[at].finish = start + ms;
+    game->alerts[at].id = ++game->alertIds;
+}
+
+// message.dismiss: TQuickMessage.Dismiss. All the alerts move back, so that
+// the first one ends now and the next one starts.
+static void alert_dismiss(SSRGame *game) {
+    if (game->alertCount == 0) return;
+    int shift = game->alerts[0].finish - game->now;
+    for (int i = 0; i < game->alertCount; i++) {
+        game->alerts[i].start -= shift;
+        game->alerts[i].finish -= shift;
+    }
 }
 
 /* -------------------------------------------------------------- settings */
@@ -7154,7 +7190,14 @@ static void casino_back(SSRGame *game) {
         ssr_career_update_relation(c, SSR_RELATION_TEAM, (float)(gain < 1 ? 1 : gain > 5 ? 5 : gain));
     }
     set_teammates_bet_count(game, -1);
-    if (game->betCount > 0) add_energy(c, (float)-(game->betCount / 3 + 1));
+    // The bets cost energy, and an alert tells how much.
+    if (game->betCount > 0) {
+        int energy = game->betCount / 3 + 1;
+        add_energy(c, (float)-energy);
+        char text[64];
+        snprintf(text, sizeof(text), "%s -%d", loc(game, "Energy"), energy);
+        alert(game, "bottommessageenergy", text, 2800);
+    }
     game->betCount = 0;
     player_tweaks(game);
     relationships_screen(game, count == -1, 0);
@@ -8376,6 +8419,7 @@ static const Route ROUTES[] = {
     {"shop.tab.boots", shop_tab_boots},
     {"shop.tab.nrg", shop_tab_nrg},
     {"UpsellMsg.Close", shop_close},
+    {"message.dismiss", alert_dismiss},
     {"UpsellMsg.DrinkNRG", shop_drink},
     {"UpsellMsg.CloseLifestyle", shop_close_lifestyle},
     {"PurchaseAnim.Close", purchase_close},
@@ -9098,6 +9142,20 @@ void ssr_game_touch(SSRGame *game, int down, float x, float y) {
 
 int ssr_game_banner(const SSRGame *game) {
     return game && game->now < game->bannerEnd;
+}
+
+const char *ssr_game_alert(SSRGame *game, int *id) {
+    if (id) *id = 0;
+    if (!game) return NULL;
+    int kept = 0;
+    for (int i = 0; i < game->alertCount; i++) {
+        if (game->alerts[i].finish > game->now) game->alerts[kept++] = game->alerts[i];
+    }
+    game->alertCount = kept;
+    if (kept == 0 || game->alerts[0].start > game->now) return NULL;
+    ssr_tweaks_set(game->tweaks, "Menu", "BottomQuickMessage", game->alerts[0].text);
+    if (id) *id = game->alerts[0].id;
+    return game->alerts[0].layout;
 }
 
 int ssr_game_splash(const SSRGame *game) {

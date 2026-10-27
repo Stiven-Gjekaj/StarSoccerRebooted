@@ -252,6 +252,10 @@ int ssr_game_splash(const SSRGame *game);
 const char *ssr_game_take_sound(SSRGame *game);
 // The layout of the splash message, for example "splashmessagebux".
 const char *ssr_game_splash_layout(const SSRGame *game);
+// The layout of the alert at the bottom of the screen that shows now, for
+// example "bottommessageenergy", or NULL. id changes with each alert. The
+// tweak Menu:BottomQuickMessage gets its text.
+const char *ssr_game_alert(SSRGame *game, int *id);
 
 // The touch of the player in the units of the layouts, for a chance.
 void ssr_game_touch(SSRGame *game, int down, float x, float y);
