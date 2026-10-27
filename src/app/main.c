@@ -17,7 +17,8 @@
 // as the presses go.
 // Set SSR_AUTOMATCH to 1 to press Play each time that the match waits, to 2
 // to also go on from the match stats, or to 3 to open the ratings from
-// them. Each of them also watches the replay of a goal. Set SSR_SHOT_SCREEN
+// them, or to 4 to press Ok on each message box (the trials). Each of them
+// also watches the replay of a goal. Set SSR_SHOT_SCREEN
 // to a screen name to save the frame SSR_SHOT_MS after that screen opens,
 // or SSR_SHOT_REPLAY to save it 1.5 s after the first replay starts.
 
@@ -911,6 +912,9 @@ static void auto_chance(SSRApp *app) {
     }
     Uint64 now = SDL_GetTicks();
     if (!start) start = now;
+    // An aim that did not start (the touch only ended the instruction of a
+    // drill) starts again.
+    if (chance->state == SSR_CHANCE_AIM && chance->kicking == 0 && now - start > 800) start = now;
     Uint64 t = now - start;
     if (chance->state != SSR_CHANCE_TAP) tapStart = 0;
     if (chance->state == SSR_CHANCE_AIM) {
@@ -952,6 +956,8 @@ static void auto_match(SSRApp *app) {
     int state = (int)ssr_tweaks_number(app->tweaks, "Match", "MatchState");
     if (ssr_game_replaying(app->game) == 1) {
         message = "matchchance.btn_WatchReplay";
+    } else if (SDL_atoi(setting) == 4 && (strcmp(screen, "messagedefault") == 0 || strcmp(screen, "message") == 0)) {
+        message = "message.btn_Ok";
     } else if (strcmp(screen, "match") == 0 && state >= 1 && state <= 3) {
         message = "match.btn_Play";
     } else if (strcmp(screen, "matchstats") == 0 && SDL_atoi(setting) == 2 &&
