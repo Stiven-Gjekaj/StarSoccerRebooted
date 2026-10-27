@@ -27,6 +27,7 @@ while [ ! -f "$out/remake.png" ] && [ $i -lt 40 ]; do
     i=$((i + 1))
 done
 kill $pid 2>/dev/null || true
+wait $pid 2>/dev/null || true
 if [ ! -f "$out/remake.png" ]; then
     echo "The app did not get to the screen $screen. See $out/remake.log." >&2
     exit 1
