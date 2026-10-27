@@ -3385,7 +3385,7 @@ static void honours_fill(SSRGame *game) {
     SSRTweaks *t = game->tweaks;
     int career = game->honoursMode == 1;
     ssr_tweaks_set(t, "Honours", "Title", loc(game, career ? "Career" : "SSR_Honours"));
-    ssr_tweaks_set(t, "Honours", "Column", loc(game, career ? "Week" : "Season"));
+    ssr_tweaks_set(t, "Honours", "Column", loc(game, career ? "Year" : "Season"));
     ssr_tweaks_set(t, "Honours", "ModeText", loc(game, career ? "World" : "Career"));
     ssr_tweaks_set_number(t, "Honours", "Scroll", 0);
     add_op(game, SSR_OP_LIST_CLEAR, "HonourList", NULL, NULL, 0);
