@@ -691,6 +691,12 @@ static void apply_ops(SSRApp *app) {
         case SSR_OP_ANIM:
             ssr_scene_anim(app->scene, op.ref, (float)SDL_atof(op.text), op.id);
             break;
+        case SSR_OP_HOOK:
+            ssr_scene_set_hook(app->scene, op.ref, op.ref2);
+            break;
+        case SSR_OP_SUB:
+            ssr_scene_sub(app->scene, op.ref, op.ref2, op.text[0] ? op.text : NULL, op.id);
+            break;
         case SSR_OP_ELEMENT_COLOUR:
             ssr_scene_set_element_colour(app->scene, op.ref, op.id, op.text);
             break;
