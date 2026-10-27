@@ -31,6 +31,8 @@ typedef enum {
 
 #define SSR_CAREER_TROPHIES 256
 #define SSR_CAREER_HISTORY 128
+// The awards of the achievements screen have the ids 1 to 125.
+#define SSR_CAREER_AWARDS 200
 
 // A trophy or an award of the trophy log. medal is 0 for a league place
 // that is not first, 1 for a league title, 2 for a title with promotion,
@@ -172,6 +174,9 @@ typedef struct {
     // season, in the order of the rows.
     SSRStatRow history[SSR_CAREER_HISTORY];
     int historyCount;
+    // The day of the unlock of each award, by its id. 0 is locked
+    // (c_TPlayer.achievements).
+    int awards[SSR_CAREER_AWARDS];
 } SSRCareer;
 
 // The start of a new career (c_TPlayer.m_Create). The values come from
@@ -251,6 +256,11 @@ void ssr_career_set_selected_ball(SSRCareer *career, int ball, int type);
 // TrophyLog.AddNewTrophy: a trophy with the same year and text as one in
 // the log is not added again.
 void ssr_career_add_trophy(SSRCareer *career, int year, const char *team, const char *tournament, int medal);
+// Unlocks the award with the id on the day of the career. Returns 1 when
+// the award was locked before (c_TPlayer.CheckAchievement).
+int ssr_career_unlock_award(SSRCareer *career, int id);
+// The number of the awards that the career unlocked.
+int ssr_career_award_count(const SSRCareer *career);
 // CountMedalsByType: the trophies with the medal, in the year or, for
 // year 0, in all years. CountNoofClubsWhereMedalsOfTypeWon: the number of
 // different teams with the medal.

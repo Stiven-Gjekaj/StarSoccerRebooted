@@ -297,6 +297,26 @@ static void test_keeps_the_days_of_training(void) {
     CHECK(ssr_career_load(&back, path) && back.lastTrained[0] == 0 && back.deplete[4] == 0);
 }
 
+// An award keeps the day of its unlock. A second unlock changes nothing
+// (c_TPlayer.CheckAchievement), and the save keeps the awards.
+static void test_keeps_the_awards(void) {
+    static SSRCareer c, back;
+    ssr_career_create(&c, "The", "Kid", 0, 0, 62, 1, 1, 0);
+    c.clubId = 10;
+    c.sdate = 40;
+    CHECK(ssr_career_award_count(&c) == 0);
+    CHECK(ssr_career_unlock_award(&c, 33) == 1);
+    c.sdate = 50;
+    CHECK(ssr_career_unlock_award(&c, 33) == 0 && c.awards[33] == 40);
+    CHECK(ssr_career_unlock_award(&c, 125) == 1 && c.awards[125] == 50);
+    CHECK(ssr_career_unlock_award(&c, SSR_CAREER_AWARDS) == 0);
+    CHECK(ssr_career_award_count(&c) == 2);
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/awards.txt", ssr_test_directory("career_awards"));
+    CHECK(ssr_career_save(&c, path) && ssr_career_load(&back, path));
+    CHECK(back.awards[33] == 40 && back.awards[125] == 50 && ssr_career_award_count(&back) == 2);
+}
+
 // StoreOldStats: a career of the second year with no history gets a row
 // of year 0 with the counts before the season.
 static void test_stores_the_old_stats(void) {
@@ -337,6 +357,7 @@ static void test_chooses_the_match_balls(void) {
 
 int main(void) {
     test_chooses_the_match_balls();
+    test_keeps_the_awards();
     test_keeps_the_trophies_and_the_history();
     test_stores_the_old_stats();
     test_keeps_the_days_of_training();

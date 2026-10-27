@@ -379,6 +379,9 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
         const SSRStatRow *h = &c->history[i];
         fprintf(file, "history=%d:%s:%d:%d:%d:%d\n", h->year, h->club, h->apps, h->goals, h->assists, h->starMan);
     }
+    for (int id = 0; id < SSR_CAREER_AWARDS; id++) {
+        if (c->awards[id] > 0) fprintf(file, "award=%d:%d\n", id, c->awards[id]);
+    }
     int ok = !ferror(file);
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
@@ -544,6 +547,11 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "horses") == 0) read_text(value, c->horses, sizeof(c->horses));
         else if (strcmp(key, "trophy") == 0) read_trophy(c, value);
         else if (strcmp(key, "history") == 0) read_history(c, value);
+        else if (strcmp(key, "award") == 0) {
+            int id = atoi(value);
+            const char *day = strchr(value, ':');
+            if (id >= 0 && id < SSR_CAREER_AWARDS && day) c->awards[id] = atoi(day + 1);
+        }
     }
     fclose(file);
     // StatHistory.StoreOldStats: a career from before the history gets
@@ -615,6 +623,18 @@ void ssr_career_add_trophy(SSRCareer *c, int year, const char *team, const char 
     t->medal = medal;
     snprintf(t->tournament, sizeof(t->tournament), "%s", tournament);
     snprintf(t->team, sizeof(t->team), "%s", team ? team : "");
+}
+
+int ssr_career_unlock_award(SSRCareer *c, int id) {
+    if (!c || id < 0 || id >= SSR_CAREER_AWARDS || c->awards[id] > 0) return 0;
+    c->awards[id] = c->sdate > 0 ? c->sdate : 1;
+    return 1;
+}
+
+int ssr_career_award_count(const SSRCareer *c) {
+    int count = 0;
+    for (int id = 0; c && id < SSR_CAREER_AWARDS; id++) count += c->awards[id] > 0;
+    return count;
 }
 
 int ssr_career_count_medals(const SSRCareer *c, int medal, int year) {
