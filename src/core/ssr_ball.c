@@ -61,6 +61,36 @@ SSRGoal ssr_goal(int side) {
     return goal;
 }
 
+int ssr_ball_type_attributes(int ball, int attributes[4]) {
+    static const int TYPES[SSR_BALL_TYPES][4] = {
+        {2, 2, 2, 2}, {3, 1, 1, 2}, {3, 3, 2, 1}, {1, 1, 3, 3}, {2, 3, 3, 2},
+        {1, 3, 1, 3}, {4, 2, 2, 2}, {3, 2, 4, 2}, {2, 2, 2, 4},
+    };
+    if (ball < 1 || ball > SSR_BALL_TYPES) return 0;
+    for (int i = 0; i < 4; i++) attributes[i] = TYPES[ball - 1][i];
+    return 1;
+}
+
+// c_TBall_Type.GetBallSpeed and the others: the factor of an attribute.
+static float attribute_factor(int attribute) {
+    switch (attribute) {
+    case 1: return 0.9f;
+    case 2: return 1.0f;
+    case 3: return 1.04f;
+    case 4: return 1.08f;
+    default: return 0.0f;
+    }
+}
+
+void ssr_ball_type_factors(int ball, float *speed, float *bounce, float *weight, float *curl) {
+    int a[4];
+    if (!ssr_ball_type_attributes(ball, a)) ssr_ball_type_attributes(1, a);
+    if (speed) *speed = attribute_factor(a[0]);
+    if (bounce) *bounce = attribute_factor(a[1]);
+    if (weight) *weight = attribute_factor(a[2]);
+    if (curl) *curl = attribute_factor(a[3]);
+}
+
 void ssr_ball_place(SSRBall *ball, float x, float y) {
     SSRBall fresh = {0};
     *ball = fresh;

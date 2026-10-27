@@ -86,8 +86,23 @@ static void test_uses_the_factors_of_a_ball(void) {
     CHECK(ball.bounces == 1 && fabsf(ball.zVelocity - zv) < 1e-5f);
 }
 
+// The table of the match balls of 4.32.
+static void test_knows_the_match_balls(void) {
+    float speed, bounce, weight, curl;
+    ssr_ball_type_factors(2, &speed, &bounce, &weight, &curl);
+    CHECK(speed == 1.04f && bounce == 0.9f && weight == 0.9f && curl == 1.0f);
+    ssr_ball_type_factors(9, &speed, &bounce, &weight, &curl);
+    CHECK(speed == 1.0f && curl == 1.08f);
+    ssr_ball_type_factors(0, &speed, &bounce, &weight, &curl);
+    CHECK(speed == 1.0f && bounce == 1.0f && weight == 1.0f && curl == 1.0f);
+    int a[4];
+    CHECK(ssr_ball_type_attributes(6, a) && a[0] == 1 && a[1] == 3 && a[2] == 1 && a[3] == 3);
+    CHECK(!ssr_ball_type_attributes(10, a));
+}
+
 int main(void) {
     test_holds_a_slow_ball();
+    test_knows_the_match_balls();
     test_uses_the_factors_of_a_ball();
     static const Sample centre[] = {
         {10, 320.0000f, 358.0110f, 21.7500f, 1.5000f, 6.8679f, 270.0000f},

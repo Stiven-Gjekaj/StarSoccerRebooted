@@ -58,6 +58,17 @@ SSRGoal ssr_goal(int side);
 // A ball at rest at (x, y), with the factors of the NS-Pro ball.
 void ssr_ball_place(SSRBall *ball, float x, float y);
 
+// The match balls (c_TBall_Type.SetUp): 1 NS-Pro, 2 NS-Rocket, 3 NS-Arrow,
+// 4 NS-Bender, 5 NS-Bouncer, 6 NS-Floater, and the three balls of the
+// SpecialEffect charity, 7 to 9. Each has a speed, a bounce, a weight,
+// and a curl from 1 to 4. Returns 0 for another number.
+#define SSR_BALL_TYPES 9
+int ssr_ball_type_attributes(int ball, int attributes[4]);
+
+// The factors of the ball for the physics: an attribute 1 is 0.9, 2 is 1,
+// 3 is 1.04, and 4 is 1.08. Another number gives the factors of NS-Pro.
+void ssr_ball_type_factors(int ball, float *speed, float *bounce, float *weight, float *curl);
+
 // c_TBall.Kick: the heading in degrees, the power of the shot (10 to 100),
 // the dip and the curl, the height, and 1 for a header.
 void ssr_ball_kick(SSRBall *ball, float direction, float power, float dip, float curl, float height, int header);
