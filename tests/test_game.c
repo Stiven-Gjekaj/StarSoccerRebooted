@@ -2548,6 +2548,8 @@ static void test_starts_a_new_career(void) {
     int notPickedBefore = notPicked;
     play_a_match(game, tweaks);
     CHECK(painAsked == 1 && notPicked == notPickedBefore + 1 && ssr_game_career(game)->injury == 0);
+    const SSRCareer *healed = ssr_game_career(game);
+    CHECK(healed->momentCount > 0 && strcmp(healed->moments[healed->momentCount - 1].text, "SSR_MomentFit") == 0);
     // Each club of the league has a manager.
     CHECK(people && people->managerCount == 4 && ssr_people_manager(people, ssr_game_career(game)->clubId));
     char peoplePath[1200];

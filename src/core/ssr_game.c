@@ -666,6 +666,11 @@ static void people_played(void *context, SSRSeason *s, const SSRSeasonComp *comp
         int days = f->sdate - game->peopleDate;
         ssr_people_pass_days(game->people, days);
         SSRCareer *c = &game->career;
+        if (c->injury > 0 && c->injury <= days) {
+            // The comeback of the player.
+            alert(game, "bottommessagemoment", loc(game, "SSR_MomentFit"), 4000);
+            ssr_career_add_moment(c, f->sdate, loc(game, "SSR_MomentFit"));
+        }
         c->injury = c->injury > days ? c->injury - days : 0;
         game->peopleDate = f->sdate;
     }
