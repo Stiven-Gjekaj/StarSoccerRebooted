@@ -173,7 +173,9 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] The sounds of the casino and of the races. The gallop plays every
       890 ms on one channel; the original has two loops.
 - [ ] The alerts at the bottom of the screen: the energy of the bets
-- [ ] The coin shower and the ticker tape of a win (`Spawn`)
+- [x] The coin shower and the ticker tape of a win (`Spawn`). Each win
+      shows a new ticker tape. A tie of blackjack gives the bet back with
+      no sound.
 - [ ] The camera of the race moves all horses; check it against the
       original
 - [ ] The size of the roulette wheel: the remake takes 545 for the width
