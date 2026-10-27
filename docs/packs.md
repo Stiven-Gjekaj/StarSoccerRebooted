@@ -6,6 +6,12 @@ screens. A pack holds only data. It holds no code.
 
 ## Install a pack
 
+- On macOS, Windows, and Linux, open Options, then World, and press Get
+  packs. The list comes from the index of the packs
+  ([StarSoccerRebooted-Packs](https://github.com/Stiven-Gjekaj/StarSoccerRebooted-Packs)).
+  A tap on a pack downloads it, checks its size and its SHA-256, and
+  installs it. The store builds of iOS and Android have no pack browser.
+
 - Open Options, then Packs, and press Install. Choose the zip file of
   the pack.
 - On the desktop, you can also drop the zip file of the pack on the
@@ -21,7 +27,9 @@ screens. A pack holds only data. It holds no code.
 ## The files of a pack
 
 A pack is a zip file. The file `pack.txt` is at the top of the zip file or
-in one folder.
+in one folder. `tools/make_pack.sh <folder>` makes the zip file of a
+folder. To share a pack, add it to the index of the packs (see the readme
+of [StarSoccerRebooted-Packs](https://github.com/Stiven-Gjekaj/StarSoccerRebooted-Packs)).
 
     pack.txt
     world/Clubs.txt
