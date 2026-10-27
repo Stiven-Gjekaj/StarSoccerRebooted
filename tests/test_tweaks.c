@@ -1,5 +1,6 @@
 // Tests ssr_tweaks.
 
+#include <math.h>
 #include <string.h>
 
 #include "ssr_test.h"
@@ -51,12 +52,16 @@ static void test_loads_the_start_values(void) {
           "\tString:(Cohort,Name of active cohort,None)\r\n"
           "\tString:(CohortURL,Optional direct cohort url,)\r\n"
           "\tRange:(YStart,Y Start,-40,40,1)\r\n"
+          "\tRange:(Rate,Rate,0.2,0.3,10)\r\n"
           "\tLinearBuff:(A-B,X.Y,1,10,Z.W,0,100,HRLR)\r\n"
           "EndCategory\r\n",
           file);
     fclose(file);
     SSRTweaks *tweaks = ssr_tweaks_create();
-    CHECK(ssr_tweaks_load(tweaks, path) == 7);
+    CHECK(ssr_tweaks_load(tweaks, path) == 8);
+    double min = 0, max = 0;
+    CHECK(ssr_tweaks_range(tweaks, "Crowd", "Rate", &min, &max) && fabs(min - 2) < 1e-9 && fabs(max - 3) < 1e-9);
+    CHECK(!ssr_tweaks_range(tweaks, "Crowd", "Active", &min, &max));
     CHECK(ssr_tweaks_number(tweaks, "Crowd", "Active") == 1);
     CHECK(ssr_tweaks_number(tweaks, "Crowd", "HatLikelihood") > 0.2999 &&
           ssr_tweaks_number(tweaks, "Crowd", "HatLikelihood") < 0.3001);

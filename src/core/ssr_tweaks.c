@@ -10,6 +10,9 @@
 typedef struct {
     char *key;
     char *value;
+    // A Range: tweak keeps its ends.
+    int range;
+    double min, max;
 } Entry;
 
 struct SSRTweaks {
@@ -113,6 +116,7 @@ void ssr_tweaks_set(SSRTweaks *tweaks, const char *group, const char *name, cons
         free(copy);
         return;
     }
+    memset(&tweaks->entries[tweaks->count], 0, sizeof(Entry));
     tweaks->entries[tweaks->count].key = key;
     tweaks->entries[tweaks->count].value = copy;
     tweaks->count++;
@@ -214,7 +218,14 @@ int ssr_tweaks_load(SSRTweaks *tweaks, const char *path) {
             int n = split_args(p, parts, 16);
             if (n < 3) continue;
             double scale = n >= 5 ? strtod(parts[4], NULL) : 1;
-            ssr_tweaks_set_number(tweaks, group, parts[0], strtod(parts[2], NULL) * scale);
+            double min = strtod(parts[2], NULL) * scale, max = n >= 4 ? strtod(parts[3], NULL) * scale : min;
+            ssr_tweaks_set_number(tweaks, group, parts[0], min);
+            Entry *entry = find(tweaks, group, parts[0]);
+            if (entry) {
+                entry->range = 1;
+                entry->min = min;
+                entry->max = max;
+            }
             count++;
         } else if (strncmp(p, "Colour:(", 8) == 0 || strncmp(p, "String:(", 8) == 0) {
             int n = split_args(p, parts, 16);
@@ -225,6 +236,14 @@ int ssr_tweaks_load(SSRTweaks *tweaks, const char *path) {
     }
     fclose(file);
     return count;
+}
+
+int ssr_tweaks_range(const SSRTweaks *tweaks, const char *group, const char *name, double *min, double *max) {
+    Entry *entry = find(tweaks, group, name);
+    if (!entry || !entry->range) return 0;
+    *min = entry->min;
+    *max = entry->max;
+    return 1;
 }
 
 unsigned int ssr_tweaks_colour(const SSRTweaks *tweaks, const char *group, const char *name, unsigned int fallback) {

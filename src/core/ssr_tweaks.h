@@ -28,6 +28,10 @@ double ssr_tweaks_number(const SSRTweaks *tweaks, const char *group, const char 
 
 // The value as a colour 0xRRGGBBAA. It reads "RRGGBBAA", "#RRGGBBAA", and
 // "#RRGGBB". Another value gives fallback.
+// The ends of a Range:(Name,Label,min,max,scale) tweak, each times the
+// scale. Returns 0 when the tweak is not a range.
+int ssr_tweaks_range(const SSRTweaks *tweaks, const char *group, const char *name, double *min, double *max);
+
 unsigned int ssr_tweaks_colour(const SSRTweaks *tweaks, const char *group, const char *name, unsigned int fallback);
 
 // 1 when the value is the same as the text, or the same number. "1" and
