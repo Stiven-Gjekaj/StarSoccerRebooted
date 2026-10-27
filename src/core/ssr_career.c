@@ -44,6 +44,7 @@ void ssr_career_create(SSRCareer *c, const char *first, const char *last, int ge
     c->newsDone = 1;
     c->teamShopping = -1;
     c->expiredBoots = -1;
+    c->showContractTip = 1;
     c->energy = 100;
     c->nrg[0] = c->nrg[1] = c->nrg[2] = 1;
     for (int i = 0; i < 10; i++) c->ratings[i] = 5;
@@ -330,6 +331,8 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     write_ints(file, "boots", boots, 9);
     int balls[4] = {c->ballLeague, c->ballCup, c->ballContinent, c->ballInternational};
     write_ints(file, "balls", balls, 4);
+    int contract[5] = {c->lastNegotiations, c->lastTransferDate, c->lastAgentHint, c->captain, c->showContractTip};
+    write_ints(file, "contract", contract, 5);
     fprintf(file, "debut=%d\nintnotpickedmsg=%d\n", c->debut, c->intNotPickedMessage);
     write_ints(file, "technique", c->technique, SSR_CAREER_SKILL_LEVELS);
     write_ints(file, "pace", c->pace, SSR_CAREER_SKILL_LEVELS);
@@ -444,6 +447,14 @@ int ssr_career_load(SSRCareer *c, const char *path) {
             c->oldProBoots = v[6];
             c->tryBoots = v[7];
             c->noBootsMatches = v[8];
+        } else if (strcmp(key, "contract") == 0) {
+            int v[5] = {0, 0, 0, 0, 1};
+            read_ints(value, v, 5);
+            c->lastNegotiations = v[0];
+            c->lastTransferDate = v[1];
+            c->lastAgentHint = v[2];
+            c->captain = v[3];
+            c->showContractTip = v[4];
         } else if (strcmp(key, "balls") == 0) {
             int v[4] = {0};
             read_ints(value, v, 4);

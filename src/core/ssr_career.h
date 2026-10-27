@@ -78,6 +78,13 @@ typedef struct {
     // with no boots.
     int bootId, bootUses, expiredBoots, currentBootId, currentBootUses, tryingBoots;
     int oldProBoots, tryBoots, noBootsMatches;
+    // The days of the last contract talk, of the last signature, and of
+    // the last hint of the agent.
+    int lastNegotiations, lastTransferDate, lastAgentHint;
+    // The captaincy: 0 none, 1 the club, 2 the nation, 3 both.
+    int captain;
+    // 1 until the game menu showed the tip of the contract.
+    int showContractTip;
     // The match ball of each kind of match: league, cup, continental, and
     // international (0 is the default ball).
     int ballLeague, ballCup, ballContinent, ballInternational;
