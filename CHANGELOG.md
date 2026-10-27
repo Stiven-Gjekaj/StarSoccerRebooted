@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.23.0 (2026-10-27)
+
+- Rain: some matches are in the rain, more often far from the equator.
+  The commentary says so at the kick-off, the sky has rain clouds, and
+  the ball rolls further on the wet pitch.
+
 ## 0.22.0 (2026-10-27)
 
 - The editor: a tap on the name of the club on the squad screen renames
