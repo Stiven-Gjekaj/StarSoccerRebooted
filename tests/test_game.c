@@ -494,6 +494,21 @@ static void not_picked_by_the_boss(SSRGame *game, SSRTweaks *tweaks, const char 
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
+// Saves the career after three activities and with two sponsors, and
+// loads it again.
+static void busy(SSRGame *game, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.spentTime = 3;
+    c.sponsors[0] = c.sponsors[1] = 4;
+    c.relationSponsors = 50;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && ssr_game_career(game)->spentTime == 3);
+}
+
 // Drinks the next can after a match: a question when the energy is above
 // 75, then the boost screen of a skill can, and full energy at the end.
 static void drink_a_can(SSRGame *game, SSRTweaks *tweaks) {
@@ -699,6 +714,10 @@ static void test_starts_a_new_career(void) {
     }
     CHECK(replays > 0);
     not_picked_by_the_boss(game, tweaks, path);
+    // A match starts the activities again, and each sponsor takes 0.65.
+    busy(game, path);
+    play_a_match(game, tweaks);
+    CHECK(ssr_game_career(game)->spentTime == 0 && fabsf(ssr_game_career(game)->relationSponsors - 48.7f) < 1e-4f);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 12 && seasons == 0; i++) play_a_match(game, tweaks);
     CHECK(seasons >= 1);

@@ -1619,6 +1619,8 @@ static void season_review(SSRGame *game);
 // matchstats.btn_Play: the stages that did not come run now. Then the
 // result counts in the table (c_TPlayer.MyMatchPlayed), the other teams
 // play up to the day of the match (PlayToDate), and the results show.
+static void match_recovery(SSRGame *game);
+
 static void stats_continue(SSRGame *game) {
     if (game->statStage < 6) after_relations(game);
     if (game->statStage < 9) after_star_rating(game);
@@ -1634,6 +1636,7 @@ static void stats_continue(SSRGame *game) {
     }
     // MatchRecovery comes first in PlayToDate, with the rest days to the
     // next match.
+    match_recovery(game);
     game->recovery = ssr_energy_recovery(game->season ? ssr_season_rest_days(game->season) : 14, ssr_career_age(c));
     game->payWage = c->wage;
     game->payGoals = game->facts.goals * c->goalBonus;
@@ -1904,8 +1907,18 @@ static void not_picked(SSRGame *game, const char *text) {
     message(game, "messageboss", shown, 0, 1, "PlayToDate");
 }
 
+// GSMatchRecovery, the start of PlayToDate: the relationship activities
+// start again, and each sponsor takes a little of the relation.
+static void match_recovery(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    c->spentTime = 0;
+    int n = ssr_career_count_sponsors(c);
+    if (n > 0) ssr_career_update_relation(c, SSR_RELATION_SPONSORS, (float)n * -0.65f);
+}
+
 // The call "PlayToDate": the days up to the date in the message.
 static void call_play_to_date(SSRGame *game) {
+    match_recovery(game);
     season_in(game);
     after_play_to(game, ssr_season_play_to(game->season, game->messageData));
 }
