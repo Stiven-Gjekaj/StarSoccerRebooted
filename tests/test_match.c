@@ -121,7 +121,30 @@ static void test_a_tired_player_comes_off(void) {
     CHECK(m.setup.subTime == -9);
 }
 
+// After a good dribble the attack goes on to a shot or a cross.
+static void test_a_dribble_leads_to_an_attack(void) {
+    SSRMatch m;
+    SSRRandom random = {11};
+    SSRMatchSetup s = setup_for();
+    ssr_match_start(&m, &s, localise, NULL, &random);
+    ssr_match_play(&m, 0);
+    m.state = SSR_MATCH_PLAYER_CHANCE;
+    m.chanceType = 11;
+    SSRChance chance;
+    memset(&chance, 0, sizeof(chance));
+    chance.result = SSR_RESULT_DRIBBLED;
+    chance.info.chanceType = 11;
+    ssr_match_chance_done(&m, &chance, 1000, &random);
+    CHECK(m.state == SSR_MATCH_STAGES && m.stage == 11 && m.dribbles == 1);
+    SSRMatchEvent event = SSR_MATCH_EVENT_NONE;
+    for (int now = 1000; now < 60000 && event != SSR_MATCH_EVENT_CHANCE; now += 16) {
+        event = ssr_match_update(&m, now, &random);
+    }
+    CHECK(event == SSR_MATCH_EVENT_CHANCE && (m.chanceType == 2 || m.chanceType == 8));
+}
+
 int main(void) {
+    test_a_dribble_leads_to_an_attack();
     test_plays_a_match();
     test_counts_the_goals_of_the_player();
     test_a_tired_player_comes_off();

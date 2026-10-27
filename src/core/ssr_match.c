@@ -469,12 +469,6 @@ static SSRMatchEvent run_stage(SSRMatch *m, int now, SSRRandom *random) {
             say(m, 0, "CMATCHTEXT_CHANCEPLAYERWONBALL1", m->setup.myTeam, 0);
             break;
         }
-        if (m->chanceType == 11) {
-            // The dribble game is not in the remake yet: the player gets past.
-            m->stage = 11;
-            say_numbered(m, 0, "CMATCHTEXT_CHANCEPLAYERDRIBBLED", ssr_rand(random, 5), m->setup.myTeam, 0);
-            break;
-        }
         m->state = SSR_MATCH_PLAYER_CHANCE;
         return SSR_MATCH_EVENT_CHANCE;
     case 5:
@@ -613,6 +607,7 @@ static float distance_to_goal_yards(const SSRChance *c) {
 // The skill that a shot or a pass of the chance rates.
 static int rating_of(const SSRChance *c) {
     int type = c->info.chanceType;
+    if (type == 11) return 7;
     if (type == 9 || type == 10) return 4;
     if (type == 3 || type == 4 || type == 7) return 6;
     if (type == 8) return 5;
@@ -645,6 +640,15 @@ void ssr_match_chance_done(SSRMatch *m, const SSRChance *c, int now, SSRRandom *
         } else {
             m->stage = 10;
         }
+        m->state = SSR_MATCH_STAGES;
+        break;
+    case SSR_RESULT_DRIBBLED:
+        // m_ChancePlayerDribbled: the attack goes on at stage 11.
+        m->dribbles++;
+        rate(m, 7, 1);
+        m->matchTick = now + 4 * m->textSpeed;
+        say_numbered(m, 0, "CMATCHTEXT_CHANCEPLAYERDRIBBLED", ssr_rand(random, 5), m->setup.myTeam, 0);
+        m->stage = 11;
         m->state = SSR_MATCH_STAGES;
         break;
     case SSR_RESULT_INTERCEPTED:
