@@ -100,6 +100,11 @@ Macro:(M_PlayerRow,?REF?,?COLOR?)
 			FontScale(0.5,0.5)
 		Draw:(ScrollFade,-1,-2,561,30,,#FFFFFF70)
 	} Template
+		// A tap on a player of the world names the player (the editor).
+		Click(squad.row_player,0)
+		<
+			PlaySnd(UISelect)
+		>
 EndM
 
 // The list.

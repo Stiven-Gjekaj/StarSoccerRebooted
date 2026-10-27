@@ -919,6 +919,26 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         ssr_game_key(game, SSR_KEY_ENTER);
         CHECK(!ssr_game_wants_text(game) && strcmp(ssr_game_text(game, "GS_SquadTitle"), edited) == 0);
         CHECK(edited[strlen(edited) - 1] == 'X');
+        // The editor: a tap on a player of the world names the player.
+        SSRPeople *editPeople = ssr_game_people(game);
+        SSRPerson *named = NULL;
+        for (int i = 0; editPeople && i < editPeople->count && !named; i++) {
+            if (editPeople->list[i].club == ssr_game_career(game)->clubId) named = &editPeople->list[i];
+        }
+        CHECK(named != NULL);
+        if (named) {
+            char message[64];
+            snprintf(message, sizeof(message), "squad.row_player %d", named->id + 1);
+            int id = named->id;
+            ssr_game_message(game, message);
+            CHECK(ssr_game_wants_text(game));
+            for (int i = 0; i < 40; i++) ssr_game_key(game, SSR_KEY_BACKSPACE);
+            ssr_game_type(game, "Ann Example");
+            ssr_game_key(game, SSR_KEY_ENTER);
+            named = ssr_people_find(editPeople, id);
+            CHECK(named && strcmp(named->first, "Ann") == 0 && strcmp(named->last, "Example") == 0);
+            take_ops(game, ops, 256);
+        }
         // The editor: the club wears the next kit of the editor. The kits
         // go round.
         CHECK(ssr_tweaks_number(tweaks, "Squad", "CanKit") == 1);

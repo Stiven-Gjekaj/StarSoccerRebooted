@@ -210,8 +210,9 @@ struct SSRGame {
     char seedText[16];
     // The name of a club that the player types in the editor.
     char editText[64];
-    // 1 when the editor names a league, 0 a club.
-    int editLeague;
+    // What the editor names: EDIT_CLUB, EDIT_LEAGUE, or EDIT_PLAYER, and
+    // the id of the player.
+    int editKind, editPerson;
 
     // The nationality (c_TScreen_ChooseNation): 1 when the Ok shows full.
     int canPlay;
@@ -3729,6 +3730,9 @@ static void squad_row(SSRGame *game, const SSRPerson *p, const char *club, int y
     for (int k = 0; k < 5; k++) snprintf(texts[k + 2], 96, "%d", values[k]);
     add_op(game, SSR_OP_LIST_ADD, "PlayerList", p->rival ? "RivalEntry" : "PlayerEntry", "", 0);
     for (int k = 0; k < 7; k++) add_op(game, SSR_OP_LIST_TEXT, "PlayerList", NULL, texts[k], k + 1);
+    // A tap on the row names a player of the world. The player of the user
+    // has 0.
+    add_op(game, SSR_OP_LIST_PARAM, "PlayerList", NULL, NULL, p->id >= 0 ? p->id + 1 : 0);
 }
 
 // The squad of the club, the best of each position first, or the top
@@ -4103,6 +4107,8 @@ static void honours_back(SSRGame *game) {
 // The editor: the name of the club of the squad screen goes into the
 // world now, and into the data pack "custom" for the next start. The world
 // reads the pack "custom" from then on.
+enum { EDIT_CLUB, EDIT_LEAGUE, EDIT_PLAYER };
+
 // Writes the edits into the pack "custom" (the clubs, or the names of the
 // competitions), and chooses that pack.
 static void save_edits(SSRGame *game, int league) {
@@ -4122,14 +4128,41 @@ static void edit_done(SSRGame *game) {
     if (!game->editText[0] || !game->world) return;
     // The world belongs to the app, but the editor changes it in place.
     SSRWorld *world = (SSRWorld *)game->world;
-    if (game->editLeague) {
+    if (game->editKind == EDIT_PLAYER) {
+        // A player of the world: the first word is the first name. The
+        // people of the career keep the new name.
+        SSRPerson *p = game->people ? ssr_people_find(game->people, game->editPerson) : NULL;
+        if (!p) return;
+        const char *space = strchr(game->editText, ' ');
+        if (space) {
+            snprintf(p->first, sizeof(p->first), "%.*s", (int)(space - game->editText), game->editText);
+            snprintf(p->last, sizeof(p->last), "%s", space + 1);
+        } else {
+            snprintf(p->last, sizeof(p->last), "%s", game->editText);
+        }
+        save_career(game);
+        squad_fill(game);
+        return;
+    }
+    if (game->editKind == EDIT_LEAGUE) {
         SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, game->leagueComp) : NULL;
         if (!comp || !ssr_world_set_competition_name(world, comp->data->id, game->editText)) return;
     } else if (!ssr_world_set_club_name(world, game->squadClub, game->editText, NULL)) {
         return;
     }
     ssr_tweaks_set(game->tweaks, "Squad", "Title", game->editText);
-    save_edits(game, game->editLeague);
+    save_edits(game, game->editKind == EDIT_LEAGUE);
+}
+
+// squad.row_player: a tap on a player of the world names the player.
+static void squad_player(SSRGame *game) {
+    if (game->typing == 4) edit_done(game);
+    SSRPerson *p = game->people && game->messageParam > 0 ? ssr_people_find(game->people, game->messageParam - 1) : NULL;
+    if (!p) return;
+    game->typing = 4;
+    game->editKind = EDIT_PLAYER;
+    game->editPerson = p->id;
+    snprintf(game->editText, sizeof(game->editText), "%s %s", p->first, p->last);
 }
 
 // The kits of the editor: the two colours of the shirt and the shorts.
@@ -4167,14 +4200,14 @@ static void squad_edit(SSRGame *game) {
         SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, game->leagueComp) : NULL;
         if (!comp || comp->data->level != 0) return;
         game->typing = 4;
-        game->editLeague = 1;
+        game->editKind = EDIT_LEAGUE;
         snprintf(game->editText, sizeof(game->editText), "%s", comp->data->tla);
         return;
     }
     const SSRClub *club = game->world ? ssr_world_club(game->world, game->squadClub) : NULL;
     if (!club || game->squadMode != 0) return;
     game->typing = 4;
-    game->editLeague = 0;
+    game->editKind = EDIT_CLUB;
     snprintf(game->editText, sizeof(game->editText), "%s", club->name);
 }
 
@@ -10385,6 +10418,7 @@ static const Route ROUTES[] = {
     {"squad.btn_Honours", honours_screen},
     {"squad.btn_Position", squad_position},
     {"squad.btn_Kit", squad_kit},
+    {"squad.row_player", squad_player},
     {"honours.btn_Back", honours_back},
     {"honours.btn_Mode", honours_mode},
     {"league.row_team", league_row},
