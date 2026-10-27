@@ -2055,6 +2055,8 @@ static void match_recovery(SSRGame *game) {
     c->spentTime = 0;
     int n = ssr_career_count_sponsors(c);
     if (n > 0) ssr_career_update_relation(c, SSR_RELATION_SPONSORS, (float)n * -0.65f);
+    // TShopItem.UpdateLife: the products wear.
+    ssr_shop_wear(&game->random, c->items, c->vehicles, c->properties);
 }
 
 // The call "PlayToDate": the days up to the date in the message.
