@@ -373,6 +373,7 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     write_floats(file, "intfurthest", c->intFurthest, 4);
     fprintf(file, "potyawards=%d\nwonmajoraward=%d\n", c->potyAwards, c->wonMajorAward);
     fprintf(file, "worldseed=%d\n", c->worldSeed);
+    fprintf(file, "injury=%d\n", c->injury);
     fprintf(file, "starrating=%d\n", c->starRating);
     fprintf(file, "retired=%d\n", c->retired);
     fprintf(file, "newsdone=%d\ntipcount=%d\n", c->newsDone, c->tipCount);
@@ -558,6 +559,7 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "potyawards") == 0) c->potyAwards = number;
         else if (strcmp(key, "wonmajoraward") == 0) c->wonMajorAward = number;
         else if (strcmp(key, "worldseed") == 0) c->worldSeed = number;
+        else if (strcmp(key, "injury") == 0) c->injury = number;
         else if (strcmp(key, "starrating") == 0) c->starRating = number;
         else if (strcmp(key, "retired") == 0) c->retired = number;
         else if (strcmp(key, "newsdone") == 0) c->newsDone = number;

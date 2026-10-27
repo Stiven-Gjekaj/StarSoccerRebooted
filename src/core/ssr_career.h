@@ -70,6 +70,8 @@ typedef struct {
     // 0 male, 1 female.
     int gender;
     int hardMode;
+    // The days of an injury of the player, or 0.
+    int injury;
     // The seed of the players of the world (ssr_people). Two careers with
     // the same seed get the same world.
     int worldSeed;
