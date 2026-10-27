@@ -194,7 +194,7 @@ The app logs each modifier of a layout that the scene skips. A run over
 all the layouts of 4.32 found these. The number is the count of layouts
 that use the modifier.
 
-- [ ] `Blend` (81): the blend factors of an image
+- [x] `Blend` (81): the blend factors of an image
 - [ ] `FontShadow` (65) and `ShadowCol` (62): the shadow of a text
 - [ ] `DownloadImage` (56): an image from the web of the game
 - [ ] `ScrollIndicator` (29): the bar that shows the place in a list
