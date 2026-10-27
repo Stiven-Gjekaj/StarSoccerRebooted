@@ -51,6 +51,7 @@ static void test_changes_and_saves_the_options(void) {
     snprintf(path, sizeof(path), "%s/settings.txt", ssr_test_directory("game_settings"));
     remove(path);
     CHECK(!ssr_game_load_settings(game, path));
+    ssr_game_set_pack(game, "harbour");
     CHECK(ssr_game_save_settings(game, path));
     ssr_game_free(game);
 
@@ -59,6 +60,7 @@ static void test_changes_and_saves_the_options(void) {
     CHECK(ssr_game_settings(game)->volume == 1);
     CHECK(ssr_game_load_settings(game, path));
     CHECK(ssr_game_settings(game)->volume == 0 && ssr_game_settings(game)->distance == 1);
+    CHECK(strcmp(ssr_game_settings(game)->pack, "harbour") == 0);
     CHECK(ssr_tweaks_number(other, "Menu", "SettingsDistance") == 1);
     ssr_game_free(game);
     ssr_tweaks_free(other);

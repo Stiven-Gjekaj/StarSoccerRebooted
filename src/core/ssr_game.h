@@ -119,6 +119,9 @@ typedef struct {
     // the order of c_TLocale.GetNationCode. -1 until the player or the
     // device chooses one.
     int language;
+    // The id of the data pack that the world reads (ssr_pack), or "" for
+    // the world of the game.
+    char pack[48];
 } SSRSettings;
 
 // The tickers of a career, in the order of the game
@@ -171,6 +174,9 @@ const SSRCareer *ssr_game_career(const SSRGame *game);
 int ssr_game_load_settings(SSRGame *game, const char *path);
 int ssr_game_save_settings(const SSRGame *game, const char *path);
 const SSRSettings *ssr_game_settings(const SSRGame *game);
+// Chooses the data pack of the world. "" or NULL chooses the world of the
+// game. The app loads the world again.
+void ssr_game_set_pack(SSRGame *game, const char *id);
 
 // The priority of a ticker of a kind (c_Ticker_*.Priority), or -1 when it
 // does not show. Most kinds add 1 to *count each time. With no career, only

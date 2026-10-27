@@ -8923,6 +8923,12 @@ int ssr_game_load_settings(SSRGame *game, const char *path) {
     while (fgets(line, sizeof(line), file)) {
         char key[64];
         int value;
+        if (strncmp(line, "pack=", 5) == 0) {
+            char *text = line + 5;
+            text[strcspn(text, "\r\n")] = 0;
+            snprintf(game->settings.pack, sizeof(game->settings.pack), "%s", text);
+            continue;
+        }
         if (sscanf(line, "%63[^=]=%d", key, &value) != 2) continue;
         if (strcmp(key, "volume") == 0 && value >= 0 && value <= 2) game->settings.volume = value;
         if (strcmp(key, "distance") == 0) game->settings.distance = value != 0;
@@ -8946,6 +8952,7 @@ int ssr_game_save_settings(const SSRGame *game, const char *path) {
     int ok = fprintf(file, "volume=%d\ndistance=%d\nreplays=%d\ndoneloseskills=%d\nhardmodeunlocked=%d\nlanguage=%d\n",
                      game->settings.volume, game->settings.distance, game->settings.replays,
                      game->settings.doneLoseSkills, game->settings.hardModeUnlocked, game->settings.language) > 0;
+    ok = fprintf(file, "pack=%s\n", game->settings.pack) > 0 && ok;
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
         remove(temp);
@@ -8956,6 +8963,11 @@ int ssr_game_save_settings(const SSRGame *game, const char *path) {
 
 const SSRSettings *ssr_game_settings(const SSRGame *game) {
     return game ? &game->settings : NULL;
+}
+
+void ssr_game_set_pack(SSRGame *game, const char *id) {
+    if (!game) return;
+    snprintf(game->settings.pack, sizeof(game->settings.pack), "%s", id ? id : "");
 }
 
 /* ------------------------------------------------------------ the ticker */
