@@ -221,6 +221,21 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     seasons++;
 }
 
+static int winnerPages = 0;
+
+// Play on the results: the news of a cup winner shows first, once.
+static void results_play(SSRGame *game, SSRTweaks *tweaks) {
+    ssr_game_message(game, "leaguefixtures.btn_Play");
+    if (strcmp(ssr_game_screen(game), "webpagenews") != 0) return;
+    SSRUiOp ops[16];
+    int count = take_ops(game, ops, 16);
+    CHECK(has_op(ops, count, SSR_OP_TEXT, "MessageText", "PRM have won the CUP!"));
+    CHECK(ssr_game_career(game)->headlineResult[0] == 0);
+    winnerPages++;
+    ssr_game_message(game, "webpage.btn_Ok");
+    (void)tweaks;
+}
+
 static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     SSRUiOp ops[256];
     int apps = ssr_game_career(game)->apps, bank = ssr_game_career(game)->bank;
@@ -245,7 +260,7 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
             CHECK(ssr_tweaks_number(tweaks, "Menu", "LeagueFixturesResults") == 1);
             CHECK(ssr_game_career(game)->apps == apps);
             notPicked++;
-            ssr_game_message(game, "leaguefixtures.btn_Play");
+            results_play(game, tweaks);
             if (strcmp(ssr_game_screen(game), "league") == 0) ssr_game_message(game, "league.btn_Continue");
             if (strcmp(ssr_game_screen(game), "seasonreview") == 0) finish_season(game, tweaks);
             CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
@@ -403,7 +418,7 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(ssr_tweaks_number(tweaks, "Menu", "LeagueFixturesResults") == 1);
     rows = take_ops(game, ops, 256);
     CHECK(has_op(ops, rows, SSR_OP_LIST_ADD, "FixtureList", "") && !has_op(ops, rows, SSR_OP_LIST_TEXT, "FixtureList", "vs."));
-    ssr_game_message(game, "leaguefixtures.btn_Play");
+    results_play(game, tweaks);
     CHECK(strcmp(ssr_game_screen(game), "league") == 0 && ssr_tweaks_number(tweaks, "Menu", "ShowLeaguePlay") == 1);
     rows = take_ops(game, ops, 256);
     int entries = 0;
@@ -494,13 +509,14 @@ static void not_picked_by_the_boss(SSRGame *game, SSRTweaks *tweaks, const char 
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
-// Saves the career after three activities and with two sponsors, and
-// loads it again.
+// Saves the career after three activities, with two sponsors and the news
+// of a cup winner, and loads it again.
 static void busy(SSRGame *game, const char *path) {
     SSRCareer c = *ssr_game_career(game);
     c.spentTime = 3;
     c.sponsors[0] = c.sponsors[1] = 4;
     c.relationSponsors = 50;
+    snprintf(c.headlineResult, sizeof(c.headlineResult), "PRM have won the CUP!");
     ssr_game_message(game, "gamemenu.btn_Quit");
     CHECK(ssr_career_save(&c, path));
     ssr_game_message(game, "mainmenu.btn_Career");
@@ -824,10 +840,13 @@ static void test_starts_a_new_career(void) {
     }
     CHECK(replays > 0);
     not_picked_by_the_boss(game, tweaks, path);
-    // A match starts the activities again, and each sponsor takes 0.65.
+    // A match starts the activities again, and each sponsor takes 0.65. The
+    // news of a cup winner shows on the results, once.
     busy(game, path);
+    CHECK(winnerPages == 0);
     play_a_match(game, tweaks);
     CHECK(ssr_game_career(game)->spentTime == 0 && fabsf(ssr_game_career(game)->relationSponsors - 48.7f) < 1e-4f);
+    CHECK(winnerPages == 1);
     spend_time(game, tweaks, path);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 12 && seasons == 0; i++) play_a_match(game, tweaks);

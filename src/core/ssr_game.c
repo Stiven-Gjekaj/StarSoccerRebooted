@@ -115,8 +115,9 @@ struct SSRGame {
     // The star transition: the screen after it, and its frames.
     char afterTransition[64];
     float transitionFrames;
-    // The headline that the news page shows.
+    // The headline that the news page shows, and the screen after it.
     char news[512];
+    char newsNext[32];
     char shown[256];
 
     // The match that plays now, and the chance of the player in it.
@@ -352,7 +353,17 @@ static void season_in(SSRGame *game) {
 }
 
 static void season_out(SSRGame *game) {
-    if (game->season) game->career.sdate = game->season->player.sdate;
+    if (!game->season) return;
+    game->career.sdate = game->season->player.sdate;
+    // c_TCompetition.DoCupWinnerNews: the results show it next.
+    SSRSeason *s = game->season;
+    if (s->hasWinnerNews) {
+        char *text = game->career.headlineResult;
+        snprintf(text, sizeof(game->career.headlineResult), "%s", loc(game, "CRESULTNEWS_COMPETITIONWINNERS"));
+        replace_all(text, sizeof(game->career.headlineResult), "$winningteam", s->winnerTla);
+        replace_all(text, sizeof(game->career.headlineResult), "$competition", s->winnerCompetition);
+        s->hasWinnerNews = 0;
+    }
 }
 
 // A new season state for the career: no competition is set up.
@@ -963,6 +974,24 @@ static void webpage(SSRGame *game) {
     add_op(game, SSR_OP_TEXT, "MessageText", NULL, game->news, 0);
 }
 
+// c_TScreen_WebPage.SetUpScreen: the result headline first, else the
+// headline. Each shows once. The page of the style news has its own
+// look. Ok goes to the next screen.
+static void webpage_to(SSRGame *game, const char *next, int style) {
+    SSRCareer *c = &game->career;
+    if (c->headlineResult[0]) {
+        snprintf(game->news, sizeof(game->news), "%s", c->headlineResult);
+        c->headlineResult[0] = 0;
+    } else if (c->headline[0]) {
+        snprintf(game->news, sizeof(game->news), "%s", c->headline);
+        c->headline[0] = 0;
+    }
+    snprintf(game->newsNext, sizeof(game->newsNext), "%s", next ? next : "");
+    set_screen(game, style ? "webpagestyle" : "webpagenews");
+    add_op(game, SSR_OP_TEXT, "MessageText", NULL, game->news, 0);
+}
+
+
 // The star transition (c_TScreen_StarTransition) shows for 55 frames, then
 // the screen under it comes back.
 static void star_transition(SSRGame *game, const char *after) {
@@ -1004,7 +1033,14 @@ static void player_tweaks(SSRGame *game) {
     ssr_tweaks_set_number(t, "Menu", "CanSavePlayer", 1);
 }
 
+static void webpage_to(SSRGame *game, const char *next, int style);
+
 static void game_menu(SSRGame *game) {
+    // GameMenu.SetUpScreen: a headline that is left shows first.
+    if (game->career.headline[0]) {
+        webpage_to(game, "gamemenu", 0);
+        return;
+    }
     set_screen(game, "gamemenu");
     ssr_tweaks_set_number(game->tweaks, "Menu", "TabPos", 0);
     player_tweaks(game);
@@ -1976,6 +2012,8 @@ static void play_matches(SSRGame *game) {
     }
     game->wasPicked = 1;
     game->subTime = 0;
+    // The end of GSPlayerPlayMatches: the next week has news again.
+    game->career.newsDone = 0;
     int status = selection_status(game, f->level == 1);
     SSRCareer *c = &game->career;
     int star = ssr_career_star_level(c);
@@ -2053,6 +2091,11 @@ static void leaguefixtures_play(SSRGame *game) {
     if (ssr_tweaks_number(game->tweaks, "Menu", "LeagueFixturesResults") == 0) {
         ssr_season_keep_positions(game->season);
         play_matches(game);
+        return;
+    }
+    // The news of a cup winner shows before the tables.
+    if (game->career.headlineResult[0]) {
+        webpage_to(game, "leaguefixtures", 0);
         return;
     }
     season_in(game);
@@ -3124,6 +3167,17 @@ static void relationships_screen(SSRGame *game, int instant, int international) 
     update_relationships(game, instant, international);
 }
 
+// c_TScreen_WebPage.ButtonOk: the screen after the news.
+static void webpage_ok(SSRGame *game) {
+    char next[32];
+    snprintf(next, sizeof(next), "%s", game->newsNext);
+    game->newsNext[0] = 0;
+    if (!next[0] || strcmp(next, "gamemenu") == 0) game_menu(game);
+    else if (strcmp(next, "relationships") == 0) relationships_screen(game, 0, 0);
+    else if (strcmp(next, "leaguefixtures") == 0) leaguefixtures_play(game);
+    else set_screen(game, next);
+}
+
 static void relationships(SSRGame *game) {
     relationships_screen(game, 1, 0);
 }
@@ -3525,7 +3579,7 @@ static const Route ROUTES[] = {
     {"choosenation.cmb_Nation", combo_nation},
     {"choosenation.cmb_League", combo_league},
     {"choosenation.btn_Ok", nation_ok},
-    {"webpage.btn_Ok", game_menu},
+    {"webpage.btn_Ok", webpage_ok},
     {"gamemenu.btn_Quit", quit_career},
     {"gamemenu.btn_Play", game_play},
     {"gamemenu.btn_League", game_league},
