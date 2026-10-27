@@ -35,6 +35,7 @@ add_library(ssr_core STATIC
     src/core/ssr_tsv.c
     src/core/ssr_world.c
     src/core/ssr_pack.c
+    src/core/ssr_people.c
     src/core/ssr_text.c
     src/core/ssr_font.c
     src/core/ssr_diff.c
@@ -158,6 +159,7 @@ ssr_add_test(test_image)
 ssr_add_test(test_tsv)
 ssr_add_test(test_world)
 ssr_add_test(test_pack)
+ssr_add_test(test_people)
 ssr_add_test(test_text)
 ssr_add_test(test_font)
 ssr_add_test(test_diff)
