@@ -852,6 +852,44 @@ static void test_moves_copies_and_sorts_by_y(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// CloneTweak gives each copy its own kit: the items keep the cel colours
+// of the moment that their gel draws.
+static void test_clones_kit_colours(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_kind(tweaks, "MatchColours", "MyShirt", "FF0000FF", SSR_TWEAK_COLOUR);
+    ssr_tweaks_set_kind(tweaks, "MatchColours", "OppShirt", "0000FFFF", SSR_TWEAK_COLOUR);
+    SSRUiTree *tree;
+    layout = "Rect:(0,0,0,0) ref:Pitch\n"
+             "Rect:(0,0) $HIDE ref:Player\n"
+             "{\n"
+             "\tDraw:(Body,0,0,10,10)\n"
+             "\t\tCloneTweak(MatchColours,OppShirt,CelColours,Shirt) ref:Shirt\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    int mine = ssr_scene_spawn(scene, "Pitch", "Player", 0, NULL, 0);
+    int theirs = ssr_scene_spawn(scene, "Pitch", "Player", 0, NULL, 0);
+    ssr_scene_spawn_clone(scene, mine, "Shirt", "MatchColours", "MyShirt");
+    ssr_scene_spawn_place(scene, theirs, NULL, 100, 0);
+    ssr_scene_update(scene, &env, 0);
+    int red = 0, blue = 0;
+    for (int i = 0; i < ssr_scene_count(scene); i++) {
+        const SSRSceneItem *item = ssr_scene_item(scene, i);
+        if (!item->image || strcmp(item->image, "Body") != 0) continue;
+        CHECK(item->cels != NULL);
+        if (item->cels && strstr(item->cels, "Shirt=FF0000FF;")) red += item->x < 50;
+        if (item->cels && strstr(item->cels, "Shirt=0000FFFF;")) blue += item->x >= 50;
+    }
+    CHECK(red == 1 && blue == 1);
+    // The tweak keeps the last value, as in the game.
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "CelColours", "Shirt"), "0000FFFF") == 0);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // DoIf runs its block while the tweak is in its range, or has its text.
 static void test_runs_a_block_by_a_tweak(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
@@ -1001,6 +1039,7 @@ int main(void) {
     test_fills_lists_and_changes_elements();
     test_readouts_conditions_and_click_actions();
     test_converges_after_a_delay_and_on_press();
+    test_clones_kit_colours();
     test_runs_a_block_by_a_tweak();
     test_moves_copies_and_sorts_by_y();
     test_runs_expressions();

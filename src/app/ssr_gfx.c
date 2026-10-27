@@ -299,6 +299,22 @@ static void draw_atlas_image(SSRGfx *gfx, const SSRAtlasImage *image, const Plac
     }
 }
 
+// The colour of the cel that CloneTweak gave the item ("Cel=RRGGBBAA;").
+// Returns 0 when the item has no colour for the cel.
+static int item_cel(const SSRSceneItem *item, const char *cel, char *out, size_t capacity) {
+    size_t length = SDL_strlen(cel);
+    for (const char *p = item->cels; p && *p;) {
+        const char *end = SDL_strchr(p, ';');
+        if (!end) break;
+        if (SDL_strncmp(p, cel, length) == 0 && p[length] == '=') {
+            SDL_snprintf(out, capacity, "%.*s", (int)(end - p - length - 1), p + length + 1);
+            return 1;
+        }
+        p = end + 1;
+    }
+    return 0;
+}
+
 static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     if (item->w == 0 || item->h == 0) return;
     Placement p;
@@ -342,6 +358,8 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
         const SSRAtlasImage *cel = ssr_atlas_find(gfx->atlases, name);
         if (!cel) continue;
         const char *tweak = gfx->tweaks ? ssr_tweaks_get(gfx->tweaks, "CelColours", cels[i]) : "";
+        char own[24];
+        if (item_cel(item, cels[i], own, sizeof(own))) tweak = own;
         char text[24];
         SDL_snprintf(text, sizeof(text), "#%s", tweak[0] == '#' ? tweak + 1 : tweak);
         uint32_t colour = ssr_scene_mix_colour(text, item->colour);

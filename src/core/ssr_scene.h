@@ -69,6 +69,9 @@ typedef struct {
     const char *clickSound;
     // The element of the item, for ssr_scene_click.
     const void *owner;
+    // The cel colours of CloneTweak for the item, "Cel=RRGGBBAA;", or NULL.
+    // A cel that is not there takes the tweak CelColours:Cel.
+    const char *cels;
     // 1 when a Clip: around the item cuts it to the box of the clip, on
     // the screen.
     int clipped;
@@ -181,6 +184,9 @@ void ssr_scene_place(SSRScene *scene, const char *ref, float x, float y, float s
 void ssr_scene_spawn_place(SSRScene *scene, int id, const char *ref, float x, float y);
 // Plays the animation on the AnimInstance with the ref inside the copy.
 void ssr_scene_spawn_anim(SSRScene *scene, int id, const char *ref, const char *anim);
+// The CloneTweak doodads with the ref in the copy take their value from the
+// tweak group,name.
+void ssr_scene_spawn_clone(SSRScene *scene, int id, const char *ref, const char *group, const char *name);
 // Shows or hides the copy, or the element with the ref inside it.
 void ssr_scene_spawn_show(SSRScene *scene, int id, const char *ref, int visible);
 

@@ -97,6 +97,9 @@ typedef enum {
     D_EX,
     // DoIf(Cat,Name,min,max) < >: the block runs while the tweak is in range.
     D_DOIF,
+    // CloneTweak(Cat,Name,Cat,Name): the second tweak takes the value of the
+    // first.
+    D_CLONE_TWEAK,
 } DoodadKind;
 
 // The flags of a doodad, as c_Doodad has them.
@@ -201,6 +204,8 @@ struct Gel {
     // YDepth(n): the depth is the y on the screen plus n.
     int yDepth;
     float yDepthOffset;
+    // The cel colours that CloneTweak gave in this frame: "Cel=RRGGBBAA;".
+    char cels[192];
 };
 
 typedef struct {
@@ -281,6 +286,8 @@ struct SSRScene {
         float x, y, w, h;
     } clips[32];
     int clipCount;
+    // The cel colours of the gel that draws now (CloneTweak), or NULL.
+    const char *cels;
     Gel *pressed;
     Gel *candidate;
     // The swipe (SwipePanel): the gel that the touch started on, and if the
@@ -1361,6 +1368,14 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         char velocity[160];
         snprintf(velocity, sizeof(velocity), "%s\x1f%s", arg(m, 2), arg(m, 3));
         d->text[2] = keep(s, velocity);
+    } else if (is(n, "CloneTweak")) {
+        d = new_doodad(D_CLONE_TWEAK, m);
+        if (!d) return NULL;
+        char source[160];
+        snprintf(source, sizeof(source), "%s\x1f%s", arg(m, 0), arg(m, 1));
+        d->text[0] = keep(s, source);
+        d->text[1] = keep(s, arg(m, 2));
+        d->text[2] = keep(s, arg(m, 3));
     } else if (is(n, "DoIf") || is(n, "DoIfNot")) {
         // c_DoIf: a number tweak from min to max, or a text tweak that is the
         // same as the text.
@@ -1843,6 +1858,7 @@ static void build_node(SSRScene *s, const SSRUiNode *node, Gel *parent) {
         }
         if (attach_else(s, target, target->doodads, m)) continue;
         Doodad *d = make_doodad(s, target, m, &show);
+        if (d && m->ref) d->ref = keep(s, m->ref);
         if (d) append_doodad(&target->doodads, d);
         if (g->kind == GEL_SEQUENCE && (is(m->name, "SpreadOver") || is(m->name, "Repeat"))) {
             g->first = target->first;
@@ -1873,6 +1889,7 @@ static void build_node(SSRScene *s, const SSRUiNode *node, Gel *parent) {
         }
         if (attach_else(s, target, target->doodads, m)) continue;
         Doodad *d = make_doodad(s, target, m, &show);
+        if (d && m->ref) d->ref = keep(s, m->ref);
         if (d) append_doodad(&target->doodads, d);
     }
     bake_at_parse(target);
@@ -1937,6 +1954,7 @@ static SSRSceneItem *add_item(SSRScene *s, SSRItemKind kind, const Gel *g, int l
         item->clickSound = g->clickSound;
         item->owner = g;
     }
+    item->cels = s->cels;
     // The item keeps its clip, so that the sort of the layers cannot lose it.
     if (s->clipCount > 0) {
         item->clipped = 1;
@@ -2268,6 +2286,21 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         if (d->exCount >= 1) {
             ssr_ex_operate(d->text[0], d->ex[0], d->exCount >= 2 ? d->ex[1] : NULL, d->exCount >= 3 ? d->ex[2] : NULL,
                            &host);
+        }
+        break;
+    }
+    case D_CLONE_TWEAK: {
+        char group[80];
+        const char *split = strchr(d->text[0], '\x1f');
+        if (!split) break;
+        snprintf(group, sizeof(group), "%.*s", (int)(split - d->text[0]), d->text[0]);
+        const char *value = ssr_tweaks_get(s->env->tweaks, group, split + 1);
+        ssr_tweaks_set(s->env->tweaks, d->text[1], d->text[2], value);
+        // The game draws at once, with the tweak of this moment. The remake
+        // draws later, so the items of the gel keep the colour.
+        if (strcmp(d->text[1], "CelColours") == 0) {
+            size_t used = strlen(g->cels);
+            snprintf(g->cels + used, sizeof(g->cels) - used, "%s=%s;", d->text[2], value[0] == '#' ? value + 1 : value);
         }
         break;
     }
@@ -2785,7 +2818,16 @@ static Gel *get_embed(const SSRScene *s, const char *name) {
     return NULL;
 }
 
+static void draw_gel_inner(SSRScene *s, Gel *g, const Frame *parent);
+
 static void draw_gel(SSRScene *s, Gel *g, const Frame *parent) {
+    const char *cels = s->cels;
+    g->cels[0] = 0;
+    draw_gel_inner(s, g, parent);
+    s->cels = cels;
+}
+
+static void draw_gel_inner(SSRScene *s, Gel *g, const Frame *parent) {
     if (g->dead) return;
     if (g->kind == GEL_EMBED) {
         // It draws nothing. A DrawEmbedded draws its children.
@@ -2807,6 +2849,7 @@ static void draw_gel(SSRScene *s, Gel *g, const Frame *parent) {
     if (g->layer >= 0) f.layer = g->layer;
     if (g->depth != DEPTH_INHERIT) f.depth = g->depth;
     pump(s, g, g->doodads);
+    if (g->cels[0]) s->cels = keep_frame(s, g->cels);
     if (g->hidden || g->dead) return;
     f.m = mat_concat(parent->m, local_matrix(g));
     g->baked = f.m;
@@ -3288,4 +3331,22 @@ void ssr_scene_place(SSRScene *scene, const char *ref, float x, float y, float s
     g->x = x;
     g->y = y;
     g->sx = g->sy = scale;
+}
+
+void ssr_scene_spawn_clone(SSRScene *scene, int id, const char *ref, const char *group, const char *name) {
+    Gel *g = spawned(scene, id);
+    if (!g || !ref) return;
+    char source[160];
+    snprintf(source, sizeof(source), "%s\x1f%s", group, name);
+    // The CloneTweak doodads with the ref in the copy and in its children.
+    Gel *stack[64];
+    int count = 0;
+    stack[count++] = g;
+    while (count > 0) {
+        Gel *at = stack[--count];
+        for (Doodad *d = at->doodads; d; d = d->next) {
+            if (d->kind == D_CLONE_TWEAK && d->ref && strcmp(d->ref, ref) == 0) d->text[0] = keep(scene, source);
+        }
+        for (int i = 0; i < at->childCount && count < 64; i++) stack[count++] = at->children[i];
+    }
 }
