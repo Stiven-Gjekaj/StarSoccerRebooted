@@ -66,9 +66,18 @@ static void test_places_images_with_origins_and_variables(void) {
                             "\tScale(2,2)\n"
                             "\tAngle(45)\n"
                             "PopOrigin\n"
-                            "DrawLTRB:(Glint,10,10,30,50)\n",
+                            "DrawLTRB:(Glint,10,10,30,50)\n"
+                            "Draw:(Glint,0,0,1,1)\n"
+                            "\tBlend(ONE,ONE)\n"
+                            "Draw:(Glint,0,0,1,1)\n"
+                            "\tBlend(ONE,ZERO)\n"
+                            "Draw:(Glint,0,0,1,1)\n"
+                            "\tBlend(ONE,INV_IMAGE_ALPHA)\n",
                             tweaks, &tree);
-    CHECK(ssr_scene_count(scene) == 4);
+    CHECK(ssr_scene_count(scene) == 7);
+    // Blend(): additive, a copy, and the default.
+    CHECK(ssr_scene_item(scene, 4)->blend == SSR_BLEND_ADD && ssr_scene_item(scene, 5)->blend == SSR_BLEND_COPY);
+    CHECK(ssr_scene_item(scene, 6)->blend == SSR_BLEND_ALPHA);
     const SSRSceneItem *sky = ssr_scene_item(scene, 0);
     CHECK(sky && strcmp(sky->image, "Title_Sky") == 0 && sky->w == 640 && sky->h == 1136);
 

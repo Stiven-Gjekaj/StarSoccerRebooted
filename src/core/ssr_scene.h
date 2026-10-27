@@ -28,6 +28,8 @@ typedef enum {
     SSR_BLEND_ADD,
     // Gloss(): src DST_COLOR, dst ONE.
     SSR_BLEND_GLOSS,
+    // Blend(ONE,ZERO): the image takes the place of the screen under it.
+    SSR_BLEND_COPY,
 } SSRBlend;
 
 typedef struct {

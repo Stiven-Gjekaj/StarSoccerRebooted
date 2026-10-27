@@ -1343,6 +1343,14 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         g->blend = SSR_BLEND_ADD;
     } else if (is(n, "Gloss")) {
         g->blend = SSR_BLEND_GLOSS;
+    } else if (is(n, "Blend")) {
+        // c_BlendHelper: the factors of the image and of the screen. The
+        // default is ONE and INV_IMAGE_ALPHA. [I: the layouts of 4.32 use
+        // only (ONE,ONE) and (ONE,ZERO); other factors draw as the default.]
+        const char *src = arg(m, 0)[0] ? arg(m, 0) : "ONE", *dst = arg(m, 1)[0] ? arg(m, 1) : "INV_IMAGE_ALPHA";
+        if (strcmp(src, "ONE") == 0 && strcmp(dst, "ONE") == 0) g->blend = SSR_BLEND_ADD;
+        else if (strcmp(src, "ONE") == 0 && strcmp(dst, "ZERO") == 0) g->blend = SSR_BLEND_COPY;
+        else g->blend = SSR_BLEND_ALPHA;
     } else if (is(n, "Layer")) {
         g->layer = find_layer(s, arg(m, 0));
     } else if (is(n, "Depth")) {
