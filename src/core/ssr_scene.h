@@ -160,6 +160,11 @@ uint32_t ssr_scene_mix_colour(const char *colour, uint32_t parent);
 const char *ssr_scene_hit(const SSRScene *scene, float x, float y);
 
 // The last item with a click at the point, or NULL.
+// The box on the screen of the element with the ref, as the last frame drew
+// it. An element with no size gives the box of its parent. Returns 0 when
+// the ref is not there.
+int ssr_scene_ref_box(const SSRScene *scene, const char *ref, float *x, float *y, float *w, float *h);
+
 const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y);
 
 // Runs the "< >" block of the Click() of the item: SetTweak, IncrementTweak,

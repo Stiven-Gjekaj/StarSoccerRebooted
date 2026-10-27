@@ -3601,6 +3601,18 @@ static const SSRSceneItem *hit(const SSRScene *scene, float x, float y, int clic
     return NULL;
 }
 
+int ssr_scene_ref_box(const SSRScene *scene, const char *ref, float *x, float *y, float *w, float *h) {
+    const Gel *g = scene && ref ? find_ref(scene, ref) : NULL;
+    // A Rect:() with no size takes the box of its parent.
+    while (g && g->w == 0 && g->h == 0 && g->parent) g = g->parent;
+    if (!g) return 0;
+    if (x) *x = g->baked.tx;
+    if (y) *y = g->baked.ty;
+    if (w) *w = g->w * g->baked.a;
+    if (h) *h = g->h * g->baked.d;
+    return 1;
+}
+
 const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y) {
     return hit(scene, x, y, 1);
 }

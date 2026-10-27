@@ -712,6 +712,31 @@ static void test_converges_to_a_tweak(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The box of a ref on the screen: a Rect:() with no size has the box of
+// its parent, as the tape of the ticker.
+static void test_gives_the_box_of_a_ref(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "PushOrigin:(10,900)\n"
+             "Rect:(0,0,640,37)\n"
+             "{{\n"
+             "\tDraw:(Back,0,0,640,37)\n"
+             "\tRect:() ref:TickerTape\n"
+             "}}\n"
+             "PopOrigin\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 16);
+    float x, y, w, h;
+    CHECK(ssr_scene_ref_box(scene, "TickerTape", &x, &y, &w, &h));
+    CHECK(near(x, 10) && near(y, 900) && near(w, 640) && near(h, 37));
+    CHECK(!ssr_scene_ref_box(scene, "Nothing", &x, &y, &w, &h));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // An entry with an empty text keeps the text of its template, as the
 // "No Records" row of the trophies.
 static void test_keeps_the_text_of_a_template(void) {
@@ -1841,6 +1866,7 @@ int main(void) {
     test_moves_the_target_of_a_converge();
     test_converges_to_a_tweak();
     test_keeps_the_text_of_a_template();
+    test_gives_the_box_of_a_ref();
     test_shows_the_place_in_a_list();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
