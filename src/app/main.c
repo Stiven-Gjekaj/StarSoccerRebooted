@@ -783,7 +783,8 @@ static void apply_op(SSRApp *app, SSRScene *s, const SSRUiOp *o) {
         ssr_scene_spawn_set(s, 0, op.ref, SSR_GEL_X, (float)op.id);
         break;
     case SSR_OP_HOOK:
-        ssr_scene_set_hook(s, op.ref, op.ref2);
+        if (op.id == 1) ssr_scene_set_child(s, op.ref, op.ref2);
+        else ssr_scene_set_hook(s, op.ref, op.ref2);
         break;
     case SSR_OP_SUB:
         ssr_scene_sub(s, op.ref, op.ref2, op.text[0] ? op.text : NULL, op.id);

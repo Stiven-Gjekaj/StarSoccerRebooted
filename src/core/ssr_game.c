@@ -6819,14 +6819,14 @@ static void blackjack_events(SSRGame *game) {
             playing_card_ref(card, ref, sizeof(ref));
             snprintf(slot, sizeof(slot), "%sCard%d", card->owner == SSR_OWNER_DEALER ? "Dealer" : "Player",
                      card->posinhand);
-            add_op(game, SSR_OP_HOOK, slot, ref, NULL, 0);
+            add_op(game, SSR_OP_HOOK, slot, ref, NULL, 1);
             add_op(game, SSR_OP_ANIM_PLAY, slot, NULL, "1", 0);
             game->blackjackHitOff = 1;
             break;
         case SSR_BJ_FLIP:
             // FlipDealerCard: the face turns up over the hole card.
             playing_card_ref(card, ref, sizeof(ref));
-            add_op(game, SSR_OP_HOOK, "DealerCardToFlip", ref, NULL, 0);
+            add_op(game, SSR_OP_HOOK, "DealerCardToFlip", ref, NULL, 1);
             add_op(game, SSR_OP_SHOW, "DealerCardToFlip", NULL, NULL, 0);
             add_op(game, SSR_OP_HIDE, "DealerCard2", NULL, NULL, 0);
             add_op(game, SSR_OP_ANIM_PLAY, "DealerCardToFlip", NULL, "1", 0);

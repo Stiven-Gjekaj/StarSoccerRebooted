@@ -52,7 +52,8 @@ typedef enum {
     SSR_OP_ANIM_PLAY,
     // The element number id of the elements ref takes the colour in text.
     SSR_OP_ELEMENT_COLOUR,
-    // The element ref gets a copy of the template ref2.
+    // The element ref gets a copy of the template ref2. With id 1 the copy
+    // keeps the place of the template (c_Gel.SetParent).
     SSR_OP_HOOK,
     // The elements ref2 inside the element ref show when id is 1, and take
     // the text when it is not "".
