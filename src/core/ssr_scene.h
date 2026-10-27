@@ -69,6 +69,8 @@ typedef struct {
     // block plays with PlaySnd(name). NULL when there is none.
     const char *click;
     const char *clickSound;
+    // The element of the item, for ssr_scene_click.
+    const void *owner;
 } SSRSceneItem;
 
 typedef struct {
@@ -86,6 +88,9 @@ typedef struct {
     int (*image_size)(void *context, const char *name, const char *file, float *w, float *h);
     // Gives the Spine file with the name, for example "S2GrassAnim", or NULL.
     const SSRSpine *(*spine)(void *context, const char *name);
+    // Gives the text of a GS_ function of a layout, for example
+    // "GS_PlayerClubName". NULL keeps the text of the line.
+    const char *(*provide)(void *context, const char *name);
     void *context;
 } SSRSceneEnv;
 
@@ -126,5 +131,13 @@ const char *ssr_scene_hit(const SSRScene *scene, float x, float y);
 
 // The last item with a click at the point, or NULL.
 const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y);
+
+// Runs the "< >" block of the Click() of the item: SetTweak, IncrementTweak,
+// PlaySnd, and the other actions. Returns the message of the click, or
+// NULL when the item has no click.
+const char *ssr_scene_click(SSRScene *scene, const SSRSceneEnv *env, const SSRSceneItem *item);
+
+// The next sound that a click asked for, or NULL when there is none.
+const char *ssr_scene_take_sound(SSRScene *scene);
 
 #endif

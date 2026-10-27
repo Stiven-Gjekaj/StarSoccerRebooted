@@ -589,7 +589,90 @@ static void test_emits_particles(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static const char *provide(void *context, const char *name) {
+    (void)context;
+    return strcmp(name, "GS_PlayerClubName") == 0 ? "LEE" : NULL;
+}
+
+static const SSRSceneItem *find_text(const SSRScene *scene, const char *text) {
+    for (int i = 0; i < ssr_scene_count(scene); i++) {
+        const SSRSceneItem *item = ssr_scene_item(scene, i);
+        if (item->text && strcmp(item->text, text) == 0) return item;
+    }
+    return NULL;
+}
+
+// The texts that come from the state of the game, the conditions, and the
+// actions of a click.
+static void test_readouts_conditions_and_click_actions(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Player", "SponsorIncome1", 15);
+    ssr_tweaks_set_number(tweaks, "Player", "Energy", 7.25);
+    ssr_tweaks_set(tweaks, "SaveSlot", "Slot0Data", "Save Slot 1");
+    ssr_tweaks_set_number(tweaks, "Menu", "OwnedBoot", 1);
+    ssr_tweaks_set_number(tweaks, "Menu", "FocusedItem", 2);
+    SSRUiTree *tree;
+    layout = "Text:(\"00\",0,0,100,20)\n"
+             "\tReadout(Player,SponsorIncome1,* )\n"
+             "Text:(\"0\",0,30,100,20)\n"
+             "\tReadout(Player,Energy,,,,2)\n"
+             "Text:(Old,0,60,100,20)\n"
+             "\tStringReadout(SaveSlot,Slot0Data)\n"
+             "Text:(Club,0,90,100,20)\n"
+             "\tGS_PlayerClubName()\n"
+             "Rect:(0,0,10,10)\n"
+             "\tSelector(Menu,OwnedBoot)\n"
+             "{\n"
+             "\tDraw:(Boot0,0,0,10,10)\n"
+             "\tDraw:(Boot1,0,0,10,10)\n"
+             "}\n"
+             "Draw:(Focus,0,0,10,10,,#000000FF)\n"
+             "\tif(twk(Menu,FocusedItem)=2)\n"
+             "\t<\n"
+             "\t\tColour(#FF0000FF)\n"
+             "\t\tConvergeCol(#FF0000FF,Instant)\n"
+             "\t>\n"
+             "\telse\n"
+             "\t<\n"
+             "\t\tConvergeCol(#0000FFFF,1)\n"
+             "\t>\n"
+             "Rect:(200,0,100,100)\n"
+             "\tClick(menu.next)\n"
+             "\t<\n"
+             "\t\tPlaySnd(UISelect)\n"
+             "\t\tSetTweak(Combo,ShowNations,1)\n"
+             "\t\tIncrementTweak(Menu,Page,0,1)\n"
+             "\t>\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    env.provide = provide;
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(find_text(scene, "* 15"));
+    CHECK(find_text(scene, "7.25"));
+    CHECK(find_text(scene, "Save Slot 1"));
+    CHECK(find_text(scene, "LEE"));
+    CHECK(find_image(scene, "Boot1") && !find_image(scene, "Boot0"));
+    CHECK(find_image(scene, "Focus")->colour == 0xFF0000FF);
+    ssr_tweaks_set_number(tweaks, "Menu", "FocusedItem", 0);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "Focus")->colour == 0x0000FFFF);
+
+    const SSRSceneItem *next = ssr_scene_hit_item(scene, 250, 50);
+    CHECK(next && strcmp(ssr_scene_click(scene, &env, next), "menu.next") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Combo", "ShowNations") == 1);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "Page") == 1);
+    CHECK(strcmp(ssr_scene_take_sound(scene), "UISelect") == 0 && ssr_scene_take_sound(scene) == NULL);
+    ssr_scene_click(scene, &env, next);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "Page") == 0);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_readouts_conditions_and_click_actions();
     test_converges_after_a_delay_and_on_press();
     test_plays_an_animation();
     test_mixes_colours_and_orders_layers();

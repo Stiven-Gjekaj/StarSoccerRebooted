@@ -74,6 +74,13 @@ typedef enum {
     D_TWEEN_POS,
     D_SHINE,
     D_PLAY_ANIM,
+    D_READOUT,
+    D_STRING_READOUT,
+    D_PROVIDER,
+    D_SELECTOR,
+    D_INCREMENT_TWEAK,
+    D_IF,
+    D_PLAY_SOUND,
     D_EMIT_PLACER,
     D_EMIT_MOVER,
     D_EMIT_SPINNER,
@@ -94,8 +101,10 @@ struct Doodad {
     DoodadKind kind;
     unsigned flags;
     Doodad *next;
-    // Press() and NoPress(): the doodads of the "< >" block.
+    // Press(), NoPress(), and if(): the doodads of the "< >" block. other
+    // is the block of the else of an if().
     Doodad *chain;
+    Doodad *other;
     // D_SHOW: the node with the ShowIf modifiers.
     const SSRUiNode *node;
     float v[8];
@@ -141,8 +150,11 @@ struct Gel {
     float fontScaleX, fontScaleY;
     int wrap;
     float italic;
-    // Click(message) < PlaySnd(name) >.
+    // Click(message) < PlaySnd(name) >, and the actions of its block.
     const char *click, *clickSound;
+    Doodad *clickChain;
+    // The text that a readout gives, in place of the text of the line.
+    char *shown;
 
     // GEL_ANIM: the name of the animation, and its state.
     const char *animName;
@@ -197,6 +209,13 @@ struct SSRScene {
     char **strings;
     int stringCount;
     int stringCapacity;
+    // The strings of the items of the last frame. The next frame frees them.
+    char **frameStrings;
+    int frameStringCount;
+    int frameStringCapacity;
+    // The sounds that PlaySnd() of a click asked for.
+    const char *sounds[8];
+    int soundCount;
 
     Gel *root;
     // The gels with no parent: animations, templates, and emitters.
@@ -257,6 +276,27 @@ static const char *keep(SSRScene *scene, const char *text) {
     strcpy(copy, text);
     scene->strings[scene->stringCount++] = copy;
     return copy;
+}
+
+static const char *keep_frame(SSRScene *scene, const char *text) {
+    if (!text) return NULL;
+    if (scene->frameStringCount == scene->frameStringCapacity) {
+        int capacity = scene->frameStringCapacity ? scene->frameStringCapacity * 2 : 256;
+        char **grown = realloc(scene->frameStrings, (size_t)capacity * sizeof(char *));
+        if (!grown) return "";
+        scene->frameStrings = grown;
+        scene->frameStringCapacity = capacity;
+    }
+    char *copy = malloc(strlen(text) + 1);
+    if (!copy) return "";
+    strcpy(copy, text);
+    scene->frameStrings[scene->frameStringCount++] = copy;
+    return copy;
+}
+
+static void free_frame_strings(SSRScene *scene) {
+    for (int i = 0; i < scene->frameStringCount; i++) free(scene->frameStrings[i]);
+    scene->frameStringCount = 0;
 }
 
 static void push_gel(Gel ***list, int *count, int *capacity, Gel *gel) {
@@ -533,6 +573,7 @@ static void free_doodads(Doodad *d) {
     while (d) {
         Doodad *next = d->next;
         free_doodads(d->chain);
+        free_doodads(d->other);
         free(d);
         d = next;
     }
@@ -543,6 +584,8 @@ static void free_gel(Gel *g) {
     for (int i = 0; i < g->childCount; i++) free_gel(g->children[i]);
     free(g->children);
     free_doodads(g->doodads);
+    free_doodads(g->clickChain);
+    free(g->shown);
     free(g->frames);
     free(g);
 }
@@ -560,6 +603,7 @@ static Doodad *clone_doodads(const Doodad *d) {
         *copy = *d;
         copy->next = NULL;
         copy->chain = clone_doodads(d->chain);
+        copy->other = clone_doodads(d->other);
         *tail = copy;
         tail = &copy->next;
     }
@@ -575,6 +619,11 @@ static Gel *clone_gel(const Gel *g) {
     copy->children = NULL;
     copy->childCount = copy->childCapacity = 0;
     copy->doodads = clone_doodads(g->doodads);
+    copy->clickChain = clone_doodads(g->clickChain);
+    if (g->shown) {
+        copy->shown = malloc(strlen(g->shown) + 1);
+        if (copy->shown) strcpy(copy->shown, g->shown);
+    }
     if (g->frameCount) {
         copy->frames = malloc((size_t)g->frameCount * sizeof(char *));
         if (copy->frames) memcpy(copy->frames, g->frames, (size_t)g->frameCount * sizeof(char *));
@@ -874,6 +923,56 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
                 break;
             }
         }
+        // The block runs once each time that the player clicks.
+        int innerShow = 0;
+        free_doodads(g->clickChain);
+        g->clickChain = make_doodads(s, g, (const SSRUiNode *const *)m->children, m->childCount, &innerShow);
+    } else if (is(n, "PlaySnd")) {
+        d = new_doodad(D_PLAY_SOUND, m);
+        if (d) d->text[0] = keep(s, arg(m, 0));
+    } else if (is(n, "Readout") || is(n, "ReadoutLoc")) {
+        // The value of a tweak as text: prefix, number, suffix (c_Readout).
+        d = new_doodad(D_READOUT, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+        // The prefix keeps its spaces, as the game reads it.
+        char prefix[64] = "";
+        const char *at = m->raw;
+        for (int comma = 0; at && *at && comma < 2; at++) {
+            if (*at == ',') comma++;
+        }
+        if (at && m->argCount > 2) snprintf(prefix, sizeof(prefix), "%.*s", (int)strcspn(at, ","), at);
+        d->text[2] = keep(s, prefix);
+        d->v[0] = (float)number(s, m, 5, 0);
+        d->v[1] = 1.8347578e11f;
+    } else if (is(n, "StringReadout")) {
+        d = new_doodad(D_STRING_READOUT, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+    } else if (strncmp(n, "GS_", 3) == 0) {
+        // A text that the logic of the game gives, by its name.
+        d = new_doodad(D_PROVIDER, m);
+        if (d) d->text[0] = keep(s, n);
+    } else if (is(n, "Selector")) {
+        d = new_doodad(D_SELECTOR, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+    } else if (is(n, "IncrementTweak")) {
+        d = new_doodad(D_INCREMENT_TWEAK, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+        d->v[0] = (float)number(s, m, 2, 0);
+        d->v[1] = (float)number(s, m, 3, 0);
+    } else if (is(n, "if")) {
+        d = new_doodad(D_IF, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        int innerShow = 0;
+        d->chain = make_doodads(s, g, (const SSRUiNode *const *)m->children, m->childCount, &innerShow);
     } else if (is(n, "set") && is(arg(m, 0), "gel.text")) {
         g->text = keep(s, arg(m, 1));
         g->localise = 0;
@@ -1073,9 +1172,23 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
     return d;
 }
 
+// "else < >" gives its block to the if() before it, as the chain for a
+// false condition. Returns 1 when the modifier is an else.
+static int attach_else(SSRScene *s, Gel *g, Doodad *list, const SSRUiNode *m) {
+    if (!is(m->name, "else")) return 0;
+    Doodad *last = list;
+    while (last && last->next) last = last->next;
+    if (last && last->kind == D_IF && !last->other) {
+        int innerShow = 0;
+        last->other = make_doodads(s, g, (const SSRUiNode *const *)m->children, m->childCount, &innerShow);
+    }
+    return 1;
+}
+
 static Doodad *make_doodads(SSRScene *s, Gel *g, const SSRUiNode *const *mods, int count, int *show) {
     Doodad *list = NULL;
     for (int i = 0; i < count; i++) {
+        if (attach_else(s, g, list, mods[i])) continue;
         Doodad *d = make_doodad(s, g, mods[i], show);
         if (d) append_doodad(&list, d);
     }
@@ -1318,6 +1431,7 @@ static void build_node(SSRScene *s, const SSRUiNode *node, Gel *parent) {
             isTemplate = 1;
             continue;
         }
+        if (attach_else(s, target, target->doodads, m)) continue;
         Doodad *d = make_doodad(s, target, m, &show);
         if (d) append_doodad(&target->doodads, d);
         if (g->kind == GEL_SEQUENCE && (is(m->name, "SpreadOver") || is(m->name, "Repeat"))) {
@@ -1347,6 +1461,7 @@ static void build_node(SSRScene *s, const SSRUiNode *node, Gel *parent) {
             isTemplate = 1;
             continue;
         }
+        if (attach_else(s, target, target->doodads, m)) continue;
         Doodad *d = make_doodad(s, target, m, &show);
         if (d) append_doodad(&target->doodads, d);
     }
@@ -1410,6 +1525,7 @@ static SSRSceneItem *add_item(SSRScene *s, SSRItemKind kind, const Gel *g, int l
     if (g) {
         item->click = g->click;
         item->clickSound = g->clickSound;
+        item->owner = g;
     }
     return item;
 }
@@ -1517,6 +1633,35 @@ static void pump(SSRScene *s, Gel *g, Doodad *d) {
             if (d->flags & F_ONCE) d->flags &= ~F_ACTIVE;
         }
     }
+}
+
+static void set_shown(Gel *g, const char *text) {
+    if (g->shown && strcmp(g->shown, text) == 0) return;
+    char *copy = malloc(strlen(text) + 1);
+    if (!copy) return;
+    strcpy(copy, text);
+    free(g->shown);
+    g->shown = copy;
+}
+
+// A number as c_Readout shows it: the text of the float as Java makes it,
+// cut after the decimal places, or padded with zeros.
+static void readout_text(float value, int decimals, char *out, size_t capacity) {
+    int digits = 1;
+    float limit = 10;
+    while (fabsf(value) >= limit && digits < 12) {
+        limit *= 10;
+        digits++;
+    }
+    if (value < 0) digits++;
+    char text[64];
+    snprintf(text, sizeof(text), "%.6f", value);
+    // Java writes a float with a ".0" at least, so the integer part is
+    // there in full.
+    int keep = digits;
+    if (decimals > 0) keep += 1 + decimals;
+    if (keep > (int)strlen(text)) keep = (int)strlen(text);
+    snprintf(out, capacity, "%.*s", keep, text);
 }
 
 static void update(SSRScene *s, Gel *g, Doodad *d) {
@@ -1643,6 +1788,56 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         g->hx = g->w / 2;
         break;
     }
+    case D_READOUT: {
+        float value = (float)ssr_tweaks_number(s->env->tweaks, d->text[0], d->text[1]);
+        if (value == d->v[1]) break;
+        d->v[1] = value;
+        char number[64], text[256];
+        readout_text(value, (int)d->v[0], number, sizeof(number));
+        snprintf(text, sizeof(text), "%s%s", d->text[2] ? d->text[2] : "", number);
+        set_shown(g, text);
+        break;
+    }
+    case D_STRING_READOUT:
+        set_shown(g, ssr_tweaks_get(s->env->tweaks, d->text[0], d->text[1]));
+        break;
+    case D_PROVIDER:
+        if (s->env->provide) {
+            const char *text = s->env->provide(s->env->context, d->text[0]);
+            if (text) set_shown(g, text);
+        }
+        break;
+    case D_SELECTOR: {
+        // Only the child at the index of the tweak shows.
+        int index = (int)ssr_tweaks_number(s->env->tweaks, d->text[0], d->text[1]);
+        for (int i = 0; i < g->childCount; i++) g->children[i]->hidden = i != index;
+        break;
+    }
+    case D_INCREMENT_TWEAK: {
+        double value = ssr_tweaks_number(s->env->tweaks, d->text[0], d->text[1]) + 1;
+        if (value > d->v[1]) value = d->v[0];
+        ssr_tweaks_set_number(s->env->tweaks, d->text[0], d->text[1], value);
+        break;
+    }
+    case D_IF: {
+        SSRExprScope scope = {variable, tweak, s};
+        int ok = 0;
+        int on = ssr_expr_eval(d->text[0], &scope, &ok) != 0 && ok;
+        // The other block runs again when the condition changes (c_Iff).
+        if (on) {
+            if (!(d->flags & F_FIRED)) rearm(d->other);
+            pump(s, g, d->chain);
+            d->flags |= F_FIRED;
+        } else {
+            if (d->flags & F_FIRED) rearm(d->chain);
+            pump(s, g, d->other);
+            d->flags &= ~F_FIRED;
+        }
+        break;
+    }
+    case D_PLAY_SOUND:
+        if (s->soundCount < 8) s->sounds[s->soundCount++] = d->text[0];
+        break;
     case D_PLAY_ANIM: {
         Gel *target = d->text[0] ? find_ref(s, d->text[0]) : s->instance;
         if (target && target->kind == GEL_ANIM) set_animation(target, d->text[1]);
@@ -1789,7 +1984,7 @@ static void draw_spine(SSRScene *s, const Gel *g, const Frame *f) {
         if (!s->env->image_size || !s->env->image_size(s->env->context, d->image, d->file, &iw, &ih)) continue;
         SSRSceneItem *item = add_item(s, SSR_ITEM_IMAGE, NULL, f->layer, f->depth);
         if (!item) return;
-        item->image = keep(s, d->image);
+        item->image = keep_frame(s, d->image);
         item->quad = 1;
         item->w = iw;
         item->h = ih;
@@ -1825,13 +2020,17 @@ static void draw_image(SSRScene *s, const Gel *g, const Frame *f, const char *im
 
 static void draw_text(SSRScene *s, const Gel *g, const Frame *f) {
     char value[1024];
-    text_value(s, g->text ? g->text : "", value, sizeof(value));
     const char *text = value;
-    // A tag that the language does not have stays as it is.
-    if (g->localise && s->env->text) text = s->env->text(s->env->context, value);
+    if (g->shown) {
+        text = g->shown;
+    } else {
+        text_value(s, g->text ? g->text : "", value, sizeof(value));
+        // A tag that the language does not have stays as it is.
+        if (g->localise && s->env->text) text = s->env->text(s->env->context, value);
+    }
     SSRSceneItem *item = add_item(s, SSR_ITEM_TEXT, g, f->layer, f->depth);
     if (!item) return;
-    item->text = keep(s, text);
+    item->text = keep_frame(s, text);
     set_box(item, g, f->m, 0, 0);
     item->quad = 0;
     item->alignX = g->alignX;
@@ -2182,6 +2381,7 @@ void ssr_scene_update(SSRScene *s, const SSRSceneEnv *env, int ms) {
     s->lerps = (int)s->frameDelta;
     s->shineTarget = 0.5f - 0.3f * sinf(s->gameMS * 0.04f * PI_F / 180) + 0.1f * sinf(s->gameMS * 0.013f * PI_F / 180);
 
+    free_frame_strings(s);
     s->count = 0;
     s->order = 0;
     s->animFrame = 0;
@@ -2236,6 +2436,8 @@ void ssr_scene_free(SSRScene *scene) {
     free(scene->refs);
     for (int i = 0; i < scene->stringCount; i++) free(scene->strings[i]);
     free(scene->strings);
+    free_frame_strings(scene);
+    free(scene->frameStrings);
     free(scene->items);
     free(scene->keys);
     free(scene->files);
@@ -2284,6 +2486,25 @@ static const SSRSceneItem *hit(const SSRScene *scene, float x, float y, int clic
 
 const SSRSceneItem *ssr_scene_hit_item(const SSRScene *scene, float x, float y) {
     return hit(scene, x, y, 1);
+}
+
+const char *ssr_scene_click(SSRScene *scene, const SSRSceneEnv *env, const SSRSceneItem *item) {
+    if (!scene || !env || !item || !item->click) return NULL;
+    Gel *g = (Gel *)item->owner;
+    if (g) {
+        scene->env = env;
+        pump(scene, g, g->clickChain);
+        scene->env = NULL;
+    }
+    return item->click;
+}
+
+const char *ssr_scene_take_sound(SSRScene *scene) {
+    if (!scene || scene->soundCount == 0) return NULL;
+    const char *sound = scene->sounds[0];
+    memmove(scene->sounds, scene->sounds + 1, (size_t)(scene->soundCount - 1) * sizeof(const char *));
+    scene->soundCount--;
+    return sound;
 }
 
 const char *ssr_scene_hit(const SSRScene *scene, float x, float y) {
