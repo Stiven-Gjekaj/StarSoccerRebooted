@@ -147,7 +147,9 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [ ] Check the colour of the interview buttons against the original
 - [x] Money, the lifestyle shop, and boots (`ShopLifestyle`, `BootShop`,
       `BuyItem`)
-- [ ] Match balls (`MatchBalls`)
+- [x] Match balls (`MatchBalls`): six free balls, one for each match
+      type. The three balls of SpecialEffect are a purchase in 4.32, so
+      they stay hidden
 - [x] The warning of the trainer and the loss of skills with no training
 - [x] The agent, transfers, and contract talks (`AgentDetails`,
       `DesiredTransfer`, `Negotiate`)
