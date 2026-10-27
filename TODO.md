@@ -416,7 +416,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] Choose the position of the player, and change it later (the list
       of the rivals). The position gives the focus at the kick-off.
 - [ ] More kinds of match moments: set pieces, defence, saves
-- [ ] Replays of whole matches: the owner chose not to add them
+- Replays of whole matches are not in the plan. The owner chose this on
+  2026-10-28. The replays of goals stay.
 
 ## After 1.0
 
