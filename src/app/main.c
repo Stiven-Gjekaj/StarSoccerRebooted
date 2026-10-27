@@ -107,6 +107,7 @@ typedef struct {
     // The splash message of a drill (splashmessage.uis).
     SSRScene *splashScene;
     SSRUiTree *splashScreen;
+    char splashName[48];
     int ballCopy, arrowCopy;
     SSRAudio *audio;
     // The Spine files that the screens use, and when the screen opened.
@@ -711,7 +712,20 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     }
     // The splash message of a drill (TQuickMessage "splashmessage").
     if (ssr_game_splash(app->game)) {
-        if (!app->splashScene) app->splashScene = open_layer(app, "splashmessage.uis", &app->splashScreen, env);
+        // A new message in another layout opens that layout.
+        const char *layout = ssr_game_splash_layout(app->game);
+        if (app->splashScene && SDL_strcmp(app->splashName, layout) != 0) {
+            ssr_scene_free(app->splashScene);
+            ssr_ui_free(app->splashScreen);
+            app->splashScene = NULL;
+            app->splashScreen = NULL;
+        }
+        if (!app->splashScene) {
+            char file[64];
+            SDL_snprintf(file, sizeof(file), "%s.uis", layout);
+            SDL_strlcpy(app->splashName, layout, sizeof(app->splashName));
+            app->splashScene = open_layer(app, file, &app->splashScreen, env);
+        }
         ssr_scene_update(app->splashScene, env, ms);
     } else if (app->splashScene) {
         ssr_scene_free(app->splashScene);
