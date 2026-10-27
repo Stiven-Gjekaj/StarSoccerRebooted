@@ -166,6 +166,14 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 - **The scene draws a CloneTweak colour into each item.** The game draws
   each gel at once, with the tweak of that moment. The remake makes all the
   items first, so each item keeps its cel colours.
+- **A `Sheet:` that renders into a surface draws its children each frame,
+  in its place.** The game draws them one time into `$PITCH` and then
+  draws the surface. The picture is the same, but sharper, and the remake
+  needs no render to a texture.
+- **A sheet with perspective draws each image as a grid of 8 x 8 cells.**
+  Reason: the renderer maps a texture in a straight line between the
+  points, and the game maps it with perspective. The grid keeps the error
+  near 0.1 texel.
 - **Each item keeps the box of its clip.** Reason: the layers sort the items
   after the clip, so a clip that starts and ends as items can lose its
   items.
