@@ -1,0 +1,19 @@
+// The alert of a career moment: the debut, the first goal, and the
+// matches and the goals of a milestone. A screen of the remake. The text
+// is the tweak Menu/BottomQuickMessage.
+
+UnsortedLayer:(AfterGloss,1)
+
+Import:(ButtonDefs.uis)
+Import:(ButtonMacros.uis)
+Import:(JDButtonDefs.uis)
+Import:(JDButtonMacros.uis)
+Import:(bottommessage.uih)
+
+Rect:(0,0,0,0) ref:QuickMessageText
+{
+	AnimInstance:(0,0,BottomMessageAnim)
+	AnimInstance:(0,0,MessageBurstAnim) ref:QuickMessageBurst
+	M_QuickMessageText:(SSR_Moment)
+	M_QuickMessageIcon:(IStar,60,@n+11,140,QuickMessageIconCash)
+}

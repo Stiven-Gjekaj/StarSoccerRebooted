@@ -232,7 +232,7 @@ static void watch_a_replay(SSRGame *game, SSRTweaks *tweaks) {
 
 // The end of a season: the review, the table, the awards, and the next
 // season.
-static int seasons = 0, notPicked = 0, substitutes = 0, records = 0, squadSeen = 0;
+static int seasons = 0, notPicked = 0, substitutes = 0, records = 0, squadSeen = 0, moments = 0;
 
 static int transfers = 0;
 
@@ -747,6 +747,17 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         }
     }
     CHECK(strcmp(ssr_game_screen(game), "matchstats") == 0 && !ssr_game_match(game));
+    // The first match of the career is the debut: an alert of a moment.
+    if (apps == 0) {
+        int id = 0;
+        const char *layout = ssr_game_alert(game, &id);
+        for (int k = 0; k < 64 && layout && strcmp(layout, "bottommessagemoment") != 0; k++) {
+            ssr_game_message(game, "message.dismiss");
+            layout = ssr_game_alert(game, &id);
+        }
+        CHECK(layout && strcmp(layout, "bottommessagemoment") == 0);
+        moments++;
+    }
     // The commentary scrolled to its last rows.
     CHECK(ssr_tweaks_number(tweaks, "Menu", "CommentaryWindowScroll") < -400);
     // The number of chances is random. A substitute can have only one.
@@ -2555,7 +2566,7 @@ static void test_starts_a_new_career(void) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
     CHECK(interviews >= 2 && interviewsWon >= 1);
     // A pass of the first match is a record of the career.
-    CHECK(records >= 1 && squadSeen);
+    CHECK(records >= 1 && squadSeen && moments == 1);
     gambling_news(game, tweaks, path);
     // The player retires at the end of the next season.
     retireNow = 1;

@@ -2014,6 +2014,36 @@ static void after_star_rating(SSRGame *game) {
     star_tweaks(game);
 }
 
+// The moments of a career after a match of the club: the debut, the first
+// goal, and the matches and the goals of a milestone. Each opens an alert.
+static void career_moments(SSRGame *game, int goalsBefore) {
+    const SSRCareer *c = &game->career;
+    static const int APPS[] = {50, 100, 200, 300, 400, 500};
+    static const int GOALS[] = {25, 50, 100, 150, 200, 300};
+    char text[256], number[16];
+    if (c->apps == 1) {
+        const SSRClub *club = game->world ? ssr_world_club(game->world, c->clubId) : NULL;
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentDebut"));
+        replace_all(text, sizeof(text), "$club", club ? club->name : "");
+        alert(game, "bottommessagemoment", text, 4000);
+    }
+    if (goalsBefore == 0 && c->goals > 0) alert(game, "bottommessagemoment", loc(game, "SSR_MomentFirstGoal"), 4000);
+    for (size_t i = 0; i < sizeof(APPS) / sizeof(APPS[0]); i++) {
+        if (c->apps != APPS[i]) continue;
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentApps"));
+        snprintf(number, sizeof(number), "%d", APPS[i]);
+        replace_all(text, sizeof(text), "$num", number);
+        alert(game, "bottommessagemoment", text, 4000);
+    }
+    for (size_t i = 0; i < sizeof(GOALS) / sizeof(GOALS[0]); i++) {
+        if (goalsBefore >= GOALS[i] || c->goals < GOALS[i]) continue;
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentGoals"));
+        snprintf(number, sizeof(number), "%d", GOALS[i]);
+        replace_all(text, sizeof(text), "$num", number);
+        alert(game, "bottommessagemoment", text, 4000);
+    }
+}
+
 // The end of the match (c_TMatch.EndMatch): the career keeps the stats, and
 // the match stats screen opens (c_TScreen_MatchStats.SetUpScreen). The match
 // has no fixture yet, so it is a league match of the club [I].
@@ -2059,6 +2089,7 @@ static void end_match(SSRGame *game) {
         c->intTotalRating += rating;
         ssr_career_add_form(c->intForm, (int)rating);
     } else {
+        int goalsBefore = c->goals;
         c->apps++;
         c->seasonApps++;
         c->goals += m->goals;
@@ -2083,6 +2114,7 @@ static void end_match(SSRGame *game) {
         c->seasonTotalRating += rating;
         c->totalRating += rating;
         ssr_career_add_form(c->form, (int)rating);
+        career_moments(game, goalsBefore);
     }
     memcpy(game->matchFurthest, m->furthest, sizeof(game->matchFurthest));
     game->matchPostHits = m->postHits;
