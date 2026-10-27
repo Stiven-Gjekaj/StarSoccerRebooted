@@ -123,6 +123,10 @@ void ssr_match_start(SSRMatch *m, const SSRMatchSetup *setup, const char *(*loca
     m->textSpeed = 800;
     m->energy = setup->energy;
     m->lastFocus = m->lastWorkRate = 2;
+    m->penaltyTaker = ssr_rand(random, 9);
+    // c_TMatch: the stadium by the strength of the home team.
+    float home = setup->homeStrength;
+    m->stadiumSize = home >= 90 ? 4 : home >= 75 ? 3 : home >= 55 ? 2 : home >= 35 ? 1 : 0;
     set_up_chances(m, random);
     // The wind at kick-off.
     int top = setup->starLevel / 2;

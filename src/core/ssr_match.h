@@ -100,6 +100,9 @@ typedef struct {
     // success (TPlayer.p_UpdateRating).
     int ratingIndex[SSR_MATCH_RATINGS], ratingSuccess[SSR_MATCH_RATINGS];
     int ratingCount;
+    // The size of the stadium of the home team, from 0 to 4, and the place
+    // of the player in a penalty shoot-out.
+    int stadiumSize, penaltyTaker;
 } SSRMatch;
 
 // Makes the match before the kick-off: the minutes of the chances of the

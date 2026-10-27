@@ -79,6 +79,7 @@ static void test_plays_a_match(void) {
     for (int i = 0; i < 120; i++) marked += m.playerChance[i] != 0;
     CHECK(marked >= 3);
     CHECK(m.state == SSR_MATCH_PREMATCH && m.textSpeed == 800);
+    CHECK(m.stadiumSize == 2 && m.penaltyTaker >= 1 && m.penaltyTaker <= 9);
     Seen seen;
     play(&m, &random, SSR_RESULT_MISSED, &seen);
     CHECK(m.state == SSR_MATCH_FULL_TIME && m.minute == 90);
