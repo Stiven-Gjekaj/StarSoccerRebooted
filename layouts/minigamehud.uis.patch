@@ -20,3 +20,9 @@
 + Draw:(BarGlass,-2,-2,257,63,,#406040FF)
 - Draw:(BarGlass,312,0,257,61,,#B0FFB0FF)
 + Draw:(BarGlass,312,0,257,61,,#406040FF)
+# The clock: a clean face of the remake (SSRClock) on a soft shadow, in
+# place of the toggle image and its black frame.
+- Draw:(WhiteToggle,-30,-41,60,73,,#DEDEDEFF)
++ Draw:(SSRClock,-32,-42,64,77,,#00000070)
++ Draw:(SSRClock,-30,-41,60,73,,#DEDEDEFF)
+- Draw:(ButtonFrame,-37,-48,75,88,,#000000FF)
