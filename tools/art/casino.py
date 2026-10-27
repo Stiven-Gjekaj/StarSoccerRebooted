@@ -209,3 +209,14 @@ tw = natural_width('SSR', 12, track=0.06)
 d = text_path('SSR', -tw / 2, -6, tw, 12, track=0.06)
 body += f'<path d="{d}" fill="#5493e8"/></g>'
 save('IBlackJackColour.patch', body, 273, 210)
+
+
+# CardAce1.patch (119 x 144): the ace on the banners of the cards. NEW
+# goes, so that the card says STAR and SOCCER round the spade. Each row
+# gets the white of the card from the first to the last column. The rows
+# stop before the S of STAR and before the spade (y, first, last).
+ROWS = [(y, 26, 49) for y in range(38, 52)] + [(52, 23, 49)]
+ROWS += [(53, 23, 49), (54, 23, 49), (55, 23, 48), (56, 23, 48), (57, 23, 47), (58, 23, 46), (59, 23, 46),
+         (60, 23, 45), (61, 23, 44), (62, 23, 44), (63, 23, 43)]
+body = ''.join(f'<rect x="{a}" y="{y}" width="{b - a + 1}" height="1" fill="#ffffff"/>' for y, a, b in ROWS)
+save('CardAce1.patch', body, 119, 144)
