@@ -22,6 +22,7 @@ static char *read_layout(void *context, const char *name, size_t *size) {
 static const char *translate(void *context, const char *tag) {
     (void)context;
     if (strcmp(tag, "MENU_PLAY") == 0) return "Play";
+    if (strcmp(tag, "nrg_Cans") == 0) return "Cans";
     if (strcmp(tag, "Consent_TEXT_ATT_2") == 0) return "Second screen";
     return tag;
 }
@@ -715,6 +716,74 @@ static void test_fills_lists_and_changes_elements(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The doodads of the expression language: set, add, if with ".:", the
+// variables of a gel, and the own variables of each copy of a template.
+static void test_runs_expressions(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_kind(tweaks, "Player", "Cans", "3", SSR_TWEAK_FLOAT);
+    ssr_tweaks_set_kind(tweaks, "Player", "StarBux", "1234", SSR_TWEAK_FLOAT);
+    SSRUiTree *tree;
+    layout = "Text:(Old,0,0,100,20)\n"
+             "\tset(gel.text,fmt(twk(Player,Cans),X)::\" \"::loc(nrg_Cans))\n"
+             "Text:(Count,0,30,100,20)\n"
+             "\tfloat(%c,%t,%n)\n"
+             "\t.set(%c,twk(Player,StarBux))\n"
+             "\t.add(%n,5)\n"
+             "\tif(%c != twk(Player,StarBux))\n"
+             "\t<\n"
+             "\t\t.:set(%t,%t+1)\n"
+             "\t>\n"
+             "\tset(gel.text,\"Count \"::fmt(%t,X)::\"/\"::fmt(%n,X))\n"
+             "Rect:(0,0,10,10)\n"
+             "\tset(gel.vis,twk(Player,Cans)>5)\n"
+             "{\n"
+             "\tDraw:(Hidden,0,0,10,10)\n"
+             "}\n"
+             "Rect:(0,0,100,20) ref:Row\n"
+             "\tfloat(%k)\n"
+             "\tinit(%k,7)\n"
+             "{\n"
+             "\tText:(Row,0,0,100,20) ref:Row\n"
+             "\t\tadd(%k,1)\n"
+             "\t\tset(gel.text,\"Row \"::fmt(%k,X))\n"
+             "} Template\n"
+             "Rect:(0,0,0,0) ref:Rows\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    CHECK(ssr_scene_list_add(scene, "Rows", "Row", NULL, 0));
+    CHECK(ssr_scene_list_add(scene, "Rows", "Row", NULL, 0));
+    ssr_scene_update(scene, &env, 0);
+    CHECK(find_text(scene, "3 Cans"));
+    CHECK(find_text(scene, "Count 0/5"));
+    CHECK(!find_image(scene, "Hidden"));
+    // Each copy adds to its own %k.
+    int rows = 0;
+    for (int i = 0; i < ssr_scene_count(scene); i++) {
+        const SSRSceneItem *item = ssr_scene_item(scene, i);
+        if (item->text && strcmp(item->text, "Row 8") == 0) rows++;
+    }
+    CHECK(rows == 2);
+
+    ssr_tweaks_set_number(tweaks, "Player", "StarBux", 1300);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_text(scene, "Count 1/5"));
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_text(scene, "Count 1/5"));
+    ssr_tweaks_set_number(tweaks, "Player", "StarBux", 1234);
+    ssr_scene_update(scene, &env, 16);
+    ssr_tweaks_set_number(tweaks, "Player", "StarBux", 1300);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_text(scene, "Count 2/5"));
+    ssr_tweaks_set_number(tweaks, "Player", "Cans", 6);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "Hidden") && find_text(scene, "6 Cans"));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // A drag on a swipe panel scrolls the list under it, and the list keeps
 // the speed of the drag, then slows down and stops at its ends.
 static void test_scrolls_a_list_by_a_swipe(void) {
@@ -798,6 +867,7 @@ int main(void) {
     test_fills_lists_and_changes_elements();
     test_readouts_conditions_and_click_actions();
     test_converges_after_a_delay_and_on_press();
+    test_runs_expressions();
     test_plays_an_animation();
     test_mixes_colours_and_orders_layers();
     test_emits_particles();

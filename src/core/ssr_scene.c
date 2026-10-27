@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ssr_ex.h"
 #include "ssr_expr.h"
 #include "ssr_random.h"
 
@@ -92,6 +93,8 @@ typedef enum {
     D_EMIT_LIFETIME,
     D_EMIT_ANIM_START,
     D_EMIT_SIZE,
+    // set, add, lerp, and the other doodads of the expression language.
+    D_EX,
 } DoodadKind;
 
 // The flags of a doodad, as c_Doodad has them.
@@ -117,6 +120,9 @@ struct Doodad {
     const char *text[3];
     // The ref of the line, for the code that changes a doodad (ACombo).
     const char *ref;
+    // D_EX and D_IF: the items of the phrase. text[0] of D_EX is the op.
+    SSRExNode *ex[3];
+    int exCount;
 };
 
 typedef struct Gel Gel;
@@ -187,6 +193,9 @@ struct Gel {
     // GEL_CROWD and GEL_SPINE: the values of the line at the parse.
     float p[10];
     const char *name, *animationName;
+    // The %variables of float(), strvar(), and colvar().
+    SSRExVar **vars;
+    int varCount;
 };
 
 typedef struct {
@@ -260,6 +269,8 @@ struct SSRScene {
     // The touch. pressed is the gel of Press() from the last frame.
     int touchDown;
     float touchX, touchY;
+    // The gel that the parse reads now, for the %variables.
+    Gel *parseGel;
     Gel *pressed;
     Gel *candidate;
     // The swipe (SwipePanel): the gel that the touch started on, and if the
@@ -599,6 +610,7 @@ static void free_doodads(Doodad *d) {
         Doodad *next = d->next;
         free_doodads(d->chain);
         free_doodads(d->other);
+        for (int i = 0; i < d->exCount; i++) ssr_ex_free(d->ex[i]);
         free(d);
         d = next;
     }
@@ -612,12 +624,55 @@ static void free_gel(Gel *g) {
     free_doodads(g->clickChain);
     free(g->shown);
     free(g->frames);
+    for (int i = 0; i < g->varCount; i++) free(g->vars[i]);
+    free(g->vars);
     free(g);
 }
 
 static void add_child(Gel *parent, Gel *child) {
     child->parent = parent;
     push_gel(&parent->children, &parent->childCount, &parent->childCapacity, child);
+}
+
+// The variables of a copy: each old variable of the copied gels and its new
+// variable. A variable of a gel outside the copy stays the same.
+static struct {
+    SSRExVar **from, **to;
+    int count, capacity;
+} cloneVars;
+
+static SSRExVar *remap_var(void *context, SSRExVar *old) {
+    (void)context;
+    for (int i = 0; i < cloneVars.count; i++) {
+        if (cloneVars.from[i] == old) return cloneVars.to[i];
+    }
+    return old;
+}
+
+static void clone_vars(Gel *copy, const Gel *g) {
+    copy->vars = NULL;
+    copy->varCount = 0;
+    if (!g->varCount) return;
+    copy->vars = calloc((size_t)g->varCount, sizeof(SSRExVar *));
+    if (!copy->vars) return;
+    for (int i = 0; i < g->varCount; i++) {
+        SSRExVar *v = malloc(sizeof(SSRExVar));
+        if (!v) break;
+        *v = *g->vars[i];
+        copy->vars[copy->varCount++] = v;
+        if (cloneVars.count == cloneVars.capacity) {
+            int capacity = cloneVars.capacity ? cloneVars.capacity * 2 : 32;
+            SSRExVar **from = realloc(cloneVars.from, (size_t)capacity * sizeof(SSRExVar *));
+            if (!from) continue;
+            cloneVars.from = from;
+            SSRExVar **to = realloc(cloneVars.to, (size_t)capacity * sizeof(SSRExVar *));
+            if (!to) continue;
+            cloneVars.to = to;
+            cloneVars.capacity = capacity;
+        }
+        cloneVars.from[cloneVars.count] = g->vars[i];
+        cloneVars.to[cloneVars.count++] = v;
+    }
 }
 
 static Doodad *clone_doodads(const Doodad *d) {
@@ -629,20 +684,22 @@ static Doodad *clone_doodads(const Doodad *d) {
         copy->next = NULL;
         copy->chain = clone_doodads(d->chain);
         copy->other = clone_doodads(d->other);
+        for (int i = 0; i < d->exCount; i++) copy->ex[i] = ssr_ex_clone(d->ex[i], remap_var, NULL);
         *tail = copy;
         tail = &copy->next;
     }
     return first;
 }
 
-// A deep copy of the gel and its children (InstantiateHierarchy).
-static Gel *clone_gel(const Gel *g) {
+static Gel *clone_tree(const Gel *g) {
     Gel *copy = malloc(sizeof(Gel));
     if (!copy) return NULL;
     *copy = *g;
     copy->parent = NULL;
     copy->children = NULL;
     copy->childCount = copy->childCapacity = 0;
+    // The variables come first, so that the doodads can find them.
+    clone_vars(copy, g);
     copy->doodads = clone_doodads(g->doodads);
     copy->clickChain = clone_doodads(g->clickChain);
     if (g->shown) {
@@ -654,10 +711,17 @@ static Gel *clone_gel(const Gel *g) {
         if (copy->frames) memcpy(copy->frames, g->frames, (size_t)g->frameCount * sizeof(char *));
     }
     for (int i = 0; i < g->childCount; i++) {
-        Gel *child = clone_gel(g->children[i]);
+        Gel *child = clone_tree(g->children[i]);
         if (child) add_child(copy, child);
     }
     return copy;
+}
+
+// A deep copy of the gel and its children (InstantiateHierarchy). Each copy
+// has its own variables, with the values of the model.
+static Gel *clone_gel(const Gel *g) {
+    cloneVars.count = 0;
+    return clone_tree(g);
 }
 
 static void append_doodad(Doodad **list, Doodad *d) {
@@ -851,6 +915,252 @@ static void ensure_colour(Gel *g) {
     }
 }
 
+/* ------------------------------------------------------- expressions */
+
+static const char *ex_localise(void *context, const char *tag) {
+    SSRScene *s = context;
+    return s->env && s->env->text ? s->env->text(s->env->context, tag) : NULL;
+}
+
+// The variable with the name, from the gel of the parse up through its
+// parents. The newest declaration in a gel wins.
+static SSRExVar *ex_find_var(void *context, const char *name) {
+    SSRScene *s = context;
+    for (Gel *g = s->parseGel; g; g = g->parent) {
+        for (int i = g->varCount - 1; i >= 0; i--) {
+            if (strcmp(g->vars[i]->name, name) == 0) return g->vars[i];
+        }
+    }
+    return NULL;
+}
+
+static float ex_simple_var(void *context, char letter) {
+    SSRScene *s = context;
+    return (float)s->vars[(unsigned char)letter & 127];
+}
+
+static float ex_get(void *context, void *gel, SSRGelProperty property) {
+    (void)context;
+    Gel *g = gel;
+    switch (property) {
+    case SSR_GEL_VIS:
+        return g->hidden ? 0.0f : 1.0f;
+    case SSR_GEL_X:
+        return g->x;
+    case SSR_GEL_Y:
+        return g->y;
+    case SSR_GEL_W:
+        return g->w;
+    case SSR_GEL_H:
+        return g->h;
+    case SSR_GEL_HX:
+        return g->hx;
+    case SSR_GEL_HY:
+        return g->hy;
+    case SSR_GEL_GX:
+        return g->baked.tx;
+    case SSR_GEL_GY:
+        return g->baked.ty;
+    case SSR_GEL_ANGLE:
+        return g->angle;
+    case SSR_GEL_ALPHA:
+        return g->hasColour ? g->colour.a : 1.0f;
+    case SSR_GEL_SCALE:
+    case SSR_GEL_SCALEX:
+        return g->sx;
+    case SSR_GEL_SCALEY:
+        return g->sy;
+    case SSR_GEL_DEPTH:
+        return (float)g->depth;
+    case SSR_GEL_ANIM_SPEED:
+        return g->speed;
+    case SSR_GEL_ANIM_TIME:
+        return g->frame;
+    case SSR_GEL_ANIM_NORMTIME:
+        return g->animation && g->animation->length > 0 ? g->frame / g->animation->length : 0;
+    case SSR_GEL_ANIM_PLAYING:
+        return g->state != 0 ? 1.0f : 0.0f;
+    default:
+        return 0;
+    }
+}
+
+static void ex_set(void *context, void *gel, SSRGelProperty property, float value) {
+    (void)context;
+    Gel *g = gel;
+    switch (property) {
+    case SSR_GEL_VIS:
+        g->hidden = value == 0;
+        break;
+    case SSR_GEL_X:
+        g->x = value;
+        break;
+    case SSR_GEL_Y:
+        g->y = value;
+        break;
+    case SSR_GEL_W:
+        g->w = value;
+        break;
+    case SSR_GEL_H:
+        g->h = value;
+        break;
+    case SSR_GEL_HX:
+        g->hx = value;
+        break;
+    case SSR_GEL_HY:
+        g->hy = value;
+        break;
+    case SSR_GEL_ANGLE:
+        g->angle = value;
+        break;
+    case SSR_GEL_ALPHA:
+        ensure_colour(g);
+        g->colour.a = value;
+        break;
+    case SSR_GEL_SCALE:
+        g->sx = g->sy = value;
+        break;
+    case SSR_GEL_SCALEX:
+        g->sx = value;
+        break;
+    case SSR_GEL_SCALEY:
+        g->sy = value;
+        break;
+    case SSR_GEL_DEPTH:
+        g->depth = (int)value;
+        break;
+    case SSR_GEL_ANIM_SPEED:
+        g->speed = value;
+        break;
+    case SSR_GEL_ANIM_TIME:
+        // The time and the speed go to the value and 0 (c_EX_Gel_AnimTime).
+        g->frame = value;
+        g->speed = 0;
+        break;
+    case SSR_GEL_ANIM_PLAYING:
+        g->state = value != 0;
+        break;
+    default:
+        break;
+    }
+}
+
+static const char *ex_get_text(void *context, void *gel, SSRGelProperty property) {
+    (void)context;
+    Gel *g = gel;
+    if (property == SSR_GEL_IMG) return g->image ? g->image : "";
+    if (property == SSR_GEL_ANIM) return g->animName ? g->animName : "";
+    return g->shown ? g->shown : g->text ? g->text : "";
+}
+
+static void set_shown(Gel *g, const char *text);
+static void set_animation(Gel *anim, const char *name);
+
+static void ex_set_text(void *context, void *gel, SSRGelProperty property, const char *text) {
+    SSRScene *s = context;
+    Gel *g = gel;
+    if (property == SSR_GEL_IMG) {
+        if (!g->image || strcmp(g->image, text) != 0) g->image = keep(s, text);
+    } else if (property == SSR_GEL_ANIM) {
+        if (!g->animName || strcmp(g->animName, text) != 0) set_animation(g, keep(s, text));
+    } else {
+        set_shown(g, text);
+    }
+}
+
+static SSRExColour ex_get_colour(void *context, void *gel) {
+    (void)context;
+    Gel *g = gel;
+    Colour c = g->hasColour ? g->colour : colour_white();
+    return (SSRExColour){c.r, c.g, c.b, c.a, c.mr, c.mg, c.mb, c.ma};
+}
+
+static void ex_set_colour(void *context, void *gel, SSRGelProperty property, const char *slot, SSRExColour c,
+                          int mask) {
+    (void)context;
+    (void)slot;
+    (void)mask;
+    Gel *g = gel;
+    // The colours of the slots of a Spine gel and of the text shadow are
+    // not in the remake yet.
+    if (property != SSR_GEL_COLOUR) return;
+    g->hasColour = 1;
+    g->colour = (Colour){c.r, c.g, c.b, c.a, c.mr, c.mg, c.mb, c.ma};
+}
+
+// shell(Name) is the screen of the shell. The app reads the tweak Shell,Name.
+static const char *ex_get_shell(void *context, const char *shell) {
+    SSRScene *s = context;
+    return s->env && s->env->tweaks ? ssr_tweaks_get(s->env->tweaks, "Shell", shell) : "";
+}
+
+static void ex_set_shell(void *context, const char *shell, const char *screen) {
+    SSRScene *s = context;
+    if (s->env && s->env->tweaks) ssr_tweaks_set(s->env->tweaks, "Shell", shell, screen);
+}
+
+static SSRExHost ex_host(SSRScene *s, Gel *g) {
+    SSRExHost host = {0};
+    host.tweaks = s->env ? s->env->tweaks : NULL;
+    host.context = s;
+    host.localise = ex_localise;
+    host.find_var = ex_find_var;
+    host.simple_var = ex_simple_var;
+    host.gel = g;
+    host.get = ex_get;
+    host.set = ex_set;
+    host.get_text = ex_get_text;
+    host.set_text = ex_set_text;
+    host.get_colour = ex_get_colour;
+    host.set_colour = ex_set_colour;
+    host.get_shell = ex_get_shell;
+    host.set_shell = ex_set_shell;
+    host.frameTime = s->frameDelta > 0 ? s->frameDelta : 1;
+    host.touchX = s->touchX;
+    host.touchY = s->touchY;
+    host.touchDown = s->touchDown;
+    host.touchHit = s->touchDown && !s->touchWasDown;
+    host.touchReleased = !s->touchDown && s->touchWasDown;
+    return host;
+}
+
+// Reads the phrase of the line into the items of the doodad.
+static void parse_phrase(SSRScene *s, Gel *g, const SSRUiNode *m, Doodad *d) {
+    char phrase[1024];
+    snprintf(phrase, sizeof(phrase), "(%s)", m->raw ? m->raw : "");
+    s->parseGel = g;
+    SSRExHost host = ex_host(s, g);
+    d->exCount = ssr_ex_parse(phrase, &host, d->ex, 3);
+    s->parseGel = NULL;
+}
+
+// float(%a,%b), strvar(%c), and colvar(%d) make variables in the gel.
+static void declare_vars(Gel *g, const SSRUiNode *m, SSRExVarKind kind) {
+    for (int i = 0; i < m->argCount; i++) {
+        if (m->args[i][0] != '%') continue;
+        SSRExVar *v = calloc(1, sizeof(SSRExVar));
+        if (!v) return;
+        SSRExVar **grown = realloc(g->vars, (size_t)(g->varCount + 1) * sizeof(SSRExVar *));
+        if (!grown) {
+            free(v);
+            return;
+        }
+        g->vars = grown;
+        snprintf(v->name, sizeof(v->name), "%s", m->args[i]);
+        v->kind = kind;
+        v->c = (SSRExColour){255, 255, 255, 1, 0, 0, 0, 0};
+        g->vars[g->varCount++] = v;
+    }
+}
+
+static int is_ex_op(const char *n) {
+    static const char *OPS[] = {"set", "add", "sub", "mul", "div", "fmod", "lerp", "frlerp", "collerp", "init"};
+    for (size_t i = 0; i < sizeof(OPS) / sizeof(OPS[0]); i++) {
+        if (strcmp(n, OPS[i]) == 0) return 1;
+    }
+    return 0;
+}
+
 // The rate arguments of the Converge doodads from index i: a number, Soft,
 // or Instant, then the most rate and the acceleration.
 static void converge_rates(SSRScene *s, const SSRUiNode *m, int i, Doodad *d) {
@@ -885,8 +1195,7 @@ static Doodad *make_doodads(SSRScene *s, Gel *g, const SSRUiNode *const *mods, i
 static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
     const char *n = m->name;
     Doodad *d = NULL;
-    if (is(n, "ShowIf") || is(n, "ShowIfNot") || is(n, "AndShowIf") || is(n, "OrShowIf") ||
-        (is(n, "set") && is(arg(m, 0), "gel.vis"))) {
+    if (is(n, "ShowIf") || is(n, "ShowIfNot") || is(n, "AndShowIf") || is(n, "OrShowIf")) {
         // One doodad tests all the conditions of the gel, in order.
         if (*show) return NULL;
         *show = 1;
@@ -894,7 +1203,27 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         if (d) d->node = g->node;
         return d;
     }
-    if (is(n, "Handle")) {
+    if (is(n, "float") || is(n, "flt")) {
+        declare_vars(g, m, SSR_VAR_FLOAT);
+    } else if (is(n, "strvar") || is(n, "stv")) {
+        declare_vars(g, m, SSR_VAR_STRING);
+    } else if (is(n, "colvar") || is(n, "clv")) {
+        declare_vars(g, m, SSR_VAR_COLOUR);
+    } else if (is_ex_op(n)) {
+        d = new_doodad(D_EX, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, n);
+        parse_phrase(s, g, m, d);
+        if (is(n, "init")) {
+            // init(T,V) runs once, at the parse (c_InitHelper).
+            if (d->exCount >= 2) {
+                SSRExHost host = ex_host(s, g);
+                ssr_ex_assign(d->ex[0], d->ex[1], &host);
+            }
+            free_doodads(d);
+            return NULL;
+        }
+    } else if (is(n, "Handle")) {
         float hx = (float)number(s, m, 0, 0), hy = (float)number(s, m, 1, 0);
         // A handle of 1 or less is a part of the size.
         if (fabsf(hx) <= 1) hx *= g->w;
@@ -1022,12 +1351,9 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
     } else if (is(n, "if")) {
         d = new_doodad(D_IF, m);
         if (!d) return NULL;
-        d->text[0] = keep(s, arg(m, 0));
+        parse_phrase(s, g, m, d);
         int innerShow = 0;
         d->chain = make_doodads(s, g, (const SSRUiNode *const *)m->children, m->childCount, &innerShow);
-    } else if (is(n, "set") && is(arg(m, 0), "gel.text")) {
-        g->text = keep(s, arg(m, 1));
-        g->localise = 0;
     } else if (is(n, "SetTweak")) {
         d = new_doodad(D_SET_TWEAK, m);
         if (d) {
@@ -1623,10 +1949,6 @@ static int shown(SSRScene *s, const SSRUiNode *node) {
     int result = 1, any = 0;
     for (int i = 0; i < node->modifierCount; i++) {
         const SSRUiNode *m = node->modifiers[i];
-        if (is(m->name, "set") && is(arg(m, 0), "gel.vis")) {
-            if (number(s, m, 1, 1) == 0) return 0;
-            continue;
-        }
         int show = is(m->name, "ShowIf"), not = is(m->name, "ShowIfNot");
         int and = is(m->name, "AndShowIf"), or = is(m->name, "OrShowIf");
         if (!show && !not && !and && !or) continue;
@@ -1894,10 +2216,17 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         ssr_tweaks_set_number(s->env->tweaks, d->text[0], d->text[1], value);
         break;
     }
+    case D_EX: {
+        SSRExHost host = ex_host(s, g);
+        if (d->exCount >= 1) {
+            ssr_ex_operate(d->text[0], d->ex[0], d->exCount >= 2 ? d->ex[1] : NULL, d->exCount >= 3 ? d->ex[2] : NULL,
+                           &host);
+        }
+        break;
+    }
     case D_IF: {
-        SSRExprScope scope = {variable, tweak, s};
-        int ok = 0;
-        int on = ssr_expr_eval(d->text[0], &scope, &ok) != 0 && ok;
+        SSRExHost host = ex_host(s, g);
+        int on = d->exCount >= 1 && ssr_ex_bool(d->ex[0], &host);
         // The other block runs again when the condition changes (c_Iff).
         if (on) {
             if (!(d->flags & F_FIRED)) rearm(d->other);
@@ -1906,6 +2235,8 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         } else {
             if (d->flags & F_FIRED) rearm(d->chain);
             pump(s, g, d->other);
+            // "!if" stops for good when the condition is false.
+            if (d->flags & F_BANG) d->flags &= ~F_ACTIVE;
             d->flags &= ~F_FIRED;
         }
         break;
