@@ -153,6 +153,8 @@ struct SSRGame {
     SSRNames *names;
     int nextWorldSeed;
     int peopleDate;
+    // The turn of the news of the world in the ticker.
+    int worldTurn;
     SSRHorses horses;
     char *horseNames;
     int horsesLoaded;
@@ -9197,6 +9199,37 @@ static const SSRShopItem *worn_item(const SSRCareer *c) {
     return NULL;
 }
 
+// A rival of the player at a club. turn picks one in turn.
+static SSRPerson *world_rival(SSRGame *game, int turn) {
+    SSRPerson *rivals[8];
+    int n = 0;
+    for (int i = 0; game->people && i < game->people->count && n < 8; i++) {
+        SSRPerson *p = &game->people->list[i];
+        if (p->rival && !p->retired && p->club) rivals[n++] = p;
+    }
+    return n ? rivals[(turn < 0 ? 0 : turn) % n] : NULL;
+}
+
+// The top scorer of the league of the player.
+static SSRPerson *world_scorer(SSRGame *game) {
+    if (!game->people || !game->season) return NULL;
+    SSRSeasonComp *comp = ssr_season_comp(game->season, ssr_season_actual_league(game->season, game->career.clubId));
+    if (!comp || comp->poolCount == 0 || comp->data->level != 0) return NULL;
+    int clubs[64], n = 0;
+    for (int i = 0; i < comp->pools[0].count && n < 64; i++) clubs[n++] = game->season->rows[comp->pools[0].rows[i]].teamId;
+    SSRPerson *top = NULL;
+    return ssr_people_top_scorers(game->people, clubs, n, &top, 1) ? top : NULL;
+}
+
+static void person_name(const SSRPerson *p, char *out, size_t capacity) {
+    snprintf(out, capacity, "%s %s", p->first, p->last);
+}
+
+static const char *club_name(SSRGame *game, int id) {
+    const SSRClub *club = game->world ? ssr_world_club(game->world, id) : NULL;
+    return club ? club->name : "";
+}
+
 int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
     if (!game || !count || !game->hasPlayer) return -1;
     const SSRCareer *c = &game->career;
@@ -9254,6 +9287,12 @@ int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
         }
         return ticker_counter(count);
     }
+    case SSR_TICKER_WORLD_RIVAL:
+        return club && world_rival(game, *count) ? ticker_counter(count) : -1;
+    case SSR_TICKER_WORLD_SCORER:
+        return club && world_scorer(game) ? ticker_counter(count) : -1;
+    case SSR_TICKER_WORLD_MOVE:
+        return club && game->people && game->people->moveCount > 0 ? ticker_counter(count) : -1;
     default:
         return -1;
     }
@@ -9372,6 +9411,38 @@ void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_
     case SSR_TICKER_AGENT_HINT:
         snprintf(text, capacity, "%s", loc(game, "TICKER_CONTRACT"));
         break;
+    case SSR_TICKER_WORLD_RIVAL:
+    case SSR_TICKER_WORLD_SCORER: {
+        int rival = kind == SSR_TICKER_WORLD_RIVAL;
+        const SSRPerson *p = rival ? world_rival(game, game->worldTurn++) : world_scorer(game);
+        if (!p) return;
+        char name[64], value[16];
+        person_name(p, name, sizeof(name));
+        snprintf(text, capacity, "%s", loc(game, rival ? "SSR_TICKER_RIVAL" : "SSR_TICKER_TOPSCORER"));
+        replace_all(text, capacity, "$name", name);
+        replace_all(text, capacity, "$club", club_name(game, p->club));
+        snprintf(value, sizeof(value), "%d", p->seasonGoals);
+        replace_all(text, capacity, "$goals", value);
+        snprintf(value, sizeof(value), "%d", p->seasonApps);
+        replace_all(text, capacity, "$apps", value);
+        SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, ssr_season_actual_league(game->season, c->clubId)) : NULL;
+        replace_all(text, capacity, "$league", comp ? comp->data->tla : "");
+        break;
+    }
+    case SSR_TICKER_WORLD_MOVE: {
+        SSRPeople *people = game->people;
+        if (!people || people->moveCount == 0) return;
+        const int *move = people->moves[game->worldTurn++ % people->moveCount];
+        const SSRPerson *p = ssr_people_find(people, move[0]);
+        if (!p) return;
+        char name[64];
+        person_name(p, name, sizeof(name));
+        snprintf(text, capacity, "%s", loc(game, "SSR_TICKER_MOVE"));
+        replace_all(text, capacity, "$name", name);
+        replace_all(text, capacity, "$from", club_name(game, move[1]));
+        replace_all(text, capacity, "$club", club_name(game, move[2]));
+        break;
+    }
     default:
         break;
     }

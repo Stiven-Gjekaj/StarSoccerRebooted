@@ -114,6 +114,7 @@ static const char *nationTag;
 static const char *localise(void *context, const char *tag) {
     (void)context;
     if (strcmp(tag, "Tag_NationId") == 0) return nationTag;
+    if (strcmp(tag, "SSR_TICKER_RIVAL") == 0) return "Rival $name of $club: $goals in $apps.";
     if (strcmp(tag, "CMESSAGE_TRIALSUCCESSMOBILE") == 0) return "Signed by $clubname ($labelname) in $leaguename.";
     if (strcmp(tag, "CMESSAGE_TRIALMOBILE1") == 0) return "Trial one.";
     if (strcmp(tag, "CMESSAGE_TRIALMOBILEFAIL4_DRIBBLING") == 0) return "Failed. Now dribble.";
@@ -2520,6 +2521,15 @@ static void test_starts_a_new_career(void) {
     // with no other news.
     for (int i = 0; i < 40 && ssr_game_career(game)->tipCount == 0; i++) play_a_match(game, tweaks);
     CHECK(newsSeen > 0 && ssr_game_career(game)->tipCount > 0);
+    // In a season, the ticker tells of a rival and of the top scorer of the league.
+    int turns = 0;
+    char news[256];
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_WORLD_RIVAL, &turns) > 0);
+    ssr_game_ticker_text(game, SSR_TICKER_WORLD_RIVAL, &turns, news, sizeof(news));
+    CHECK(strncmp(news, "Rival ", 6) == 0 && strchr(news, '$') == NULL);
+    CHECK(strstr(news, "Ann ") || strstr(news, "Bob ") || strstr(news, "Cid "));
+    turns = 0;
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_WORLD_SCORER, &turns) > 0);
     CHECK(interviews >= 2 && interviewsWon >= 1);
     // A pass of the first match is a record of the career.
     CHECK(records >= 1 && squadSeen);

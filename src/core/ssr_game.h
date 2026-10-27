@@ -148,6 +148,11 @@ typedef enum {
     SSR_TICKER_HIGH_PARTNER,
     SSR_TICKER_HIGH_SPONSORS,
     SSR_TICKER_AGENT_HINT,
+    // The news of the world of the remake: a rival of the player, the top
+    // scorer of the league, and a transfer of the new season.
+    SSR_TICKER_WORLD_RIVAL,
+    SSR_TICKER_WORLD_SCORER,
+    SSR_TICKER_WORLD_MOVE,
     SSR_TICKER_KINDS,
 } SSRTickerKind;
 
