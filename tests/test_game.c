@@ -70,6 +70,7 @@ static const char *localise(void *context, const char *tag) {
     if (strcmp(tag, "CNEWS_FIRSTCONTRACTMOBILE") == 0) return "$clubname have signed $playername.";
     if (strcmp(tag, "help_newplayer") == 0) return "Welcome.";
     if (strcmp(tag, "CMESSAGE_DELETESLOT") == 0) return "Delete?";
+    if (strcmp(tag, "sla_versus_RESKIN") == 0) return "vs.";
     return NULL;
 }
 
@@ -175,13 +176,24 @@ static void watch_a_replay(SSRGame *game, SSRTweaks *tweaks) {
 }
 
 static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
-    SSRUiOp ops[64];
+    SSRUiOp ops[256];
     int apps = ssr_game_career(game)->apps, bank = ssr_game_career(game)->bank;
     float ratings[10];
     memcpy(ratings, ssr_game_career(game)->ratings, sizeof(ratings));
+    // Play shows the fixtures of the round of the player first.
     ssr_game_message(game, "gamemenu.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "leaguefixtures") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "LeagueFixturesResults") == 0);
+    int rows = take_ops(game, ops, 256);
+    CHECK(has_op(ops, rows, SSR_OP_LIST_ADD, "FixtureList", ""));
+    CHECK(has_op(ops, rows, SSR_OP_LIST_TEXT, "FixtureList", "vs."));
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Match", "LeagueName"), "PRM") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "LeagueType") == 1);
+    ssr_game_message(game, "leaguefixtures.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "match") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 1);
+    CHECK(ssr_tweaks_number(tweaks, "Match", "MatchCompetition") == 1);
+    CHECK(strlen(ssr_tweaks_get(tweaks, "MatchColours", "Badge1Col1")) == 8);
     CHECK(ssr_tweaks_kind(tweaks, "MatchColours", "MyTeamShirt1") == SSR_TWEAK_COLOUR);
     CHECK(strlen(ssr_tweaks_get(tweaks, "MatchColours", "OppTeamPants")) == 8);
     CHECK(strlen(ssr_tweaks_get(tweaks, "MatchColours", "NameplateHomeCol1")) == 8);
@@ -278,7 +290,8 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(ssr_tweaks_number(tweaks, "Match", "Outcome") == 0);
     ssr_game_update(game, 1);
     CHECK(ssr_tweaks_number(tweaks, "MatchStats", "StatStage") == 1);
-    CHECK(ssr_tweaks_number(tweaks, "MatchStats", "Chances") >= 2);
+    // One chance can hold two mini-games: a pass, then a shot.
+    CHECK(ssr_tweaks_number(tweaks, "MatchStats", "Chances") >= 1);
     CHECK(ssr_tweaks_number(tweaks, "MatchStats", "Goals") == -1);
     // 750 ms is 47 ticks of 16 ms.
     ssr_game_update(game, 48);
@@ -308,11 +321,22 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     ssr_game_message(game, "ratings.btn_Back");
     CHECK(strcmp(ssr_game_screen(game), "matchstats") == 0);
 
-    // The weekly update: the energy, then the pay. Continue waits for
-    // stage 14.
+    // The other matches of the round play, and the results show. Then the
+    // table, and Continue gives the weekly update.
     int date = c->sdate;
     ssr_game_message(game, "matchstats.btn_Play");
-    CHECK(strcmp(ssr_game_screen(game), "matchreview") == 0 && c->sdate == date + 1);
+    CHECK(strcmp(ssr_game_screen(game), "leaguefixtures") == 0 && c->sdate == date + 1);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "LeagueFixturesResults") == 1);
+    rows = take_ops(game, ops, 256);
+    CHECK(has_op(ops, rows, SSR_OP_LIST_ADD, "FixtureList", "") && !has_op(ops, rows, SSR_OP_LIST_TEXT, "FixtureList", "vs."));
+    ssr_game_message(game, "leaguefixtures.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "league") == 0 && ssr_tweaks_number(tweaks, "Menu", "ShowLeaguePlay") == 1);
+    rows = take_ops(game, ops, 256);
+    int entries = 0;
+    for (int i = 0; i < rows; i++) entries += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "TeamList") == 0;
+    CHECK(entries == 4 && has_op(ops, rows, SSR_OP_LIST_SUB, "TeamList", NULL));
+    ssr_game_message(game, "league.btn_Continue");
+    CHECK(strcmp(ssr_game_screen(game), "matchreview") == 0);
     CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal") == -1);
     ssr_game_update(game, 26);
     CHECK(ssr_tweaks_number(tweaks, "Player", "Recovery") == 100 && c->energy == 100);
