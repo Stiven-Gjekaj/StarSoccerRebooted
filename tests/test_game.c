@@ -87,6 +87,8 @@ static int has_op(const SSRUiOp *ops, int count, SSRUiOpKind kind, const char *r
 static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     SSRUiOp ops[64];
     int apps = ssr_game_career(game)->apps, bank = ssr_game_career(game)->bank;
+    float ratings[10];
+    memcpy(ratings, ssr_game_career(game)->ratings, sizeof(ratings));
     ssr_game_message(game, "gamemenu.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "match") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 1);
@@ -163,6 +165,8 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     // The commentary scrolled to its last rows.
     CHECK(ssr_tweaks_number(tweaks, "Menu", "CommentaryWindowScroll") < -400);
     CHECK(chances >= 2 && ssr_game_career(game)->apps == apps + 1);
+    // Each chance changes the rating of a skill.
+    CHECK(memcmp(ratings, ssr_game_career(game)->ratings, sizeof(ratings)) != 0);
 
     // The match stats: the result overlay shows for 270 frames, then the
     // stats come one at a time.

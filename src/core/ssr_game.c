@@ -973,6 +973,8 @@ static void end_match(SSRGame *game) {
     c->assists += m->assists;
     c->passes += m->passes;
     c->energy = m->energy;
+    // UpdateRating: one change of a skill rating for each chance.
+    for (int i = 0; i < m->ratingCount; i++) ssr_career_update_rating(c, m->ratingIndex[i], m->ratingSuccess[i]);
     free(game->match);
     game->match = NULL;
 
