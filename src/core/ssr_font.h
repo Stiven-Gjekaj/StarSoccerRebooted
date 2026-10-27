@@ -35,9 +35,10 @@ void ssr_font_free(SSRFont *font);
 int ssr_font_load_kerning(SSRFont *font, const char *path);
 
 // Adds a font for the characters that the font does not have, at the same
-// em size. The first fallback font that has a character draws it. Returns
-// 0 when the file is not a font. ssr_font_clear_fallbacks takes them away.
-int ssr_font_add_fallback(SSRFont *font, const char *path);
+// em size. data holds the font file, and the font keeps a copy. The first
+// fallback font that has a character draws it. Returns 0 when the data is
+// not a font. ssr_font_clear_fallbacks takes them away.
+int ssr_font_add_fallback(SSRFont *font, const void *data, size_t size);
 void ssr_font_clear_fallbacks(SSRFont *font);
 
 // The glyph table of the game for the face and the size of this font

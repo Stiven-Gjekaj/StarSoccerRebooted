@@ -1,6 +1,7 @@
 // Tests ssr_font. The UTF-8 tests need nothing. The font tests need a TTF
-// font of the system, because the repository holds no font. When there is
-// no such font, the test reports that it skipped them.
+// font of the system, so that they do not hold on to the fonts of the
+// repository. When there is no such font, the test reports that it skipped
+// them.
 
 #include <math.h>
 #include <stdio.h>
@@ -269,8 +270,16 @@ static void test_draws_with_a_fallback_font(const char *path) {
     const char *kana = "\xE3\x81\x82";
     SSRGlyphQuad quads[4];
     CHECK(ssr_font_layout(font, kana, 0, 0, quads, 4) == 0);
-    CHECK(!ssr_font_add_fallback(font, "/nonexistent/font.ttf"));
-    CHECK(ssr_font_add_fallback(font, cjk));
+    CHECK(!ssr_font_add_fallback(font, "not a font file", 15));
+    FILE *file = fopen(cjk, "rb");
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    unsigned char *data = malloc((size_t)size);
+    CHECK(data && fread(data, 1, (size_t)size, file) == (size_t)size);
+    fclose(file);
+    CHECK(ssr_font_add_fallback(font, data, (size_t)size));
+    free(data);
     CHECK(ssr_font_layout(font, kana, 0, 0, quads, 4) == 1);
     CHECK(quads[0].x1 - quads[0].x0 > 10 && ssr_font_measure(font, kana) > 20);
     // The font keeps its own characters.

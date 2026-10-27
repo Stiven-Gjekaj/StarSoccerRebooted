@@ -245,23 +245,34 @@ int ssr_font_read_set(const char *text, const char *set, SSRFontSlot *slots, int
     return count;
 }
 
+// Starts a face on the bytes of a font file, which the face then owns.
+// Returns 0 and frees the bytes when they are not a font.
+static int start_face(Face *face, unsigned char *file, float emSize) {
+    int offset = file ? stbtt_GetFontOffsetForIndex(file, 0) : -1;
+    if (offset < 0 || !stbtt_InitFont(&face->info, file, offset)) {
+        free(file);
+        return 0;
+    }
+    face->file = file;
+    face->scale = stbtt_ScaleForMappingEmToPixels(&face->info, emSize);
+    return 1;
+}
+
 // Reads a font file. Returns 0 when it cannot.
 static int load_face(Face *face, const char *path, float emSize) {
     FILE *file = ssr_fs_open(path, "rb");
     if (!file) return 0;
     long length = -1;
+    unsigned char *bytes = NULL;
     if (fseek(file, 0, SEEK_END) == 0) length = ftell(file);
-    if (length > 0) face->file = malloc((size_t)length);
-    int ok = face->file && fseek(file, 0, SEEK_SET) == 0 && fread(face->file, 1, (size_t)length, file) == (size_t)length;
+    if (length > 0) bytes = malloc((size_t)length);
+    int ok = bytes && fseek(file, 0, SEEK_SET) == 0 && fread(bytes, 1, (size_t)length, file) == (size_t)length;
     fclose(file);
-    if (ok) ok = stbtt_InitFont(&face->info, face->file, stbtt_GetFontOffsetForIndex(face->file, 0));
     if (!ok) {
-        free(face->file);
-        face->file = NULL;
+        free(bytes);
         return 0;
     }
-    face->scale = stbtt_ScaleForMappingEmToPixels(&face->info, emSize);
-    return 1;
+    return start_face(face, bytes, emSize);
 }
 
 SSRFont *ssr_font_load(const char *path, float emSize) {
@@ -299,9 +310,12 @@ static void clear_glyphs(SSRFont *font) {
     font->version++;
 }
 
-int ssr_font_add_fallback(SSRFont *font, const char *path) {
-    if (!font || !path || font->faceCount >= MAX_FACES) return 0;
-    if (!load_face(&font->faces[font->faceCount], path, font->emSize)) return 0;
+int ssr_font_add_fallback(SSRFont *font, const void *data, size_t size) {
+    if (!font || !data || size < 12 || font->faceCount >= MAX_FACES) return 0;
+    unsigned char *copy = malloc(size);
+    if (!copy) return 0;
+    memcpy(copy, data, size);
+    if (!start_face(&font->faces[font->faceCount], copy, font->emSize)) return 0;
     font->faceCount++;
     clear_glyphs(font);
     return 1;
