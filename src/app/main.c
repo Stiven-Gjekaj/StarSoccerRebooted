@@ -13,8 +13,10 @@
 // drag of (dx, dy) from the ball. Set SSR_SHOT_TAP to save the frame of
 // the first tap ball, and SSR_SHOT_DRIBBLE for the first dribble.
 // Set SSR_AUTOMATCH to 1 to press Play each time that the match waits, to 2
-// to also go on from the match stats, or to 3 to open the ratings from them. Set SSR_SHOT_SCREEN to a screen
-// name to save the frame SSR_SHOT_MS after that screen opens.
+// to also go on from the match stats, or to 3 to open the ratings from
+// them. Each of them also watches the replay of a goal. Set SSR_SHOT_SCREEN
+// to a screen name to save the frame SSR_SHOT_MS after that screen opens,
+// or SSR_SHOT_REPLAY to save it 1.5 s after the first replay starts.
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -66,6 +68,9 @@ typedef struct {
     // it, and the copies of the players and of the ball on the screen.
     SSRUiTree *pitchScreen, *tapScreen, *bannerScreen, *stadiumScreen, *stadiumStaticScreen;
     SSRScene *pitchScene, *tapScene, *bannerScene, *stadiumScene, *stadiumStaticScene;
+    // The HUD of a chance (minigamehud.uis): the replay offer and controls.
+    SSRScene *hudScene;
+    SSRUiTree *hudScreen;
     char pitchName[64];
     SSRScene *viewScene;
     int playerCopies[SSR_PLAYERS_MAX];
@@ -218,6 +223,10 @@ static void free_chance_view(SSRApp *app) {
     ssr_ui_free(app->stadiumScreen);
     ssr_scene_free(app->stadiumStaticScene);
     ssr_ui_free(app->stadiumStaticScreen);
+    ssr_scene_free(app->hudScene);
+    ssr_ui_free(app->hudScreen);
+    app->hudScene = NULL;
+    app->hudScreen = NULL;
     app->pitchScene = app->tapScene = app->bannerScene = app->stadiumScene = app->stadiumStaticScene = NULL;
     app->pitchScreen = app->tapScreen = app->bannerScreen = app->stadiumScreen = app->stadiumStaticScreen = NULL;
     app->pitchName[0] = 0;
@@ -372,6 +381,10 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         SDL_snprintf(stadium, sizeof(stadium), "Stadium%dAM.uis", match ? match->stadiumSize : 0);
         app->stadiumScene = open_layer(app, stadium, &app->stadiumScreen, env);
         app->tapScene = open_layer(app, "tapball.uis", &app->tapScreen, env);
+        // The HUD of a career chance has no training part (MinigameHud
+        // HideTraining).
+        app->hudScene = open_layer(app, "minigamehud.uis", &app->hudScreen, env);
+        if (app->hudScene) ssr_scene_set_visible(app->hudScene, "TrainingHUD", 0);
     }
     if (app->viewScene != app->scene) {
         // A new screen: the copies of the players and of the ball.
@@ -432,6 +445,7 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     update_ball_view(app, chance);
     update_trail(app, chance);
     ssr_scene_update(app->pitchScene, env, ms);
+    if (app->hudScene) ssr_scene_update(app->hudScene, env, ms);
     // The banner of the result (c_TQuickMessage "scoreanim") starts again
     // for each chance.
     if (ssr_game_banner(app->game)) {
@@ -463,6 +477,7 @@ static void apply_ops(SSRApp *app) {
         case SSR_OP_SHOW:
         case SSR_OP_HIDE:
             ssr_scene_set_visible(app->scene, op.ref, op.kind == SSR_OP_SHOW);
+            if (app->hudScene) ssr_scene_set_visible(app->hudScene, op.ref, op.kind == SSR_OP_SHOW);
             break;
         case SSR_OP_LIST_CLEAR:
             ssr_scene_list_clear(app->scene, op.ref);
@@ -488,14 +503,18 @@ static void apply_ops(SSRApp *app) {
 
 // A click: the actions of the block of the Click() run, its sounds play,
 // and the logic gets the message.
-static void click(SSRApp *app, const SSRSceneItem *item) {
+static void click_in(SSRApp *app, SSRScene *scene, const SSRSceneItem *item) {
     SSRSceneEnv env = scene_env(app);
-    const char *message = ssr_scene_click(app->scene, &env, item);
+    const char *message = ssr_scene_click(scene, &env, item);
     SDL_Log("Pressed %s (%s)", item->ref ? item->ref : "-", message ? message : "-");
     const char *sound;
-    while ((sound = ssr_scene_take_sound(app->scene)) != NULL) ssr_audio_play(app->audio, sound);
+    while ((sound = ssr_scene_take_sound(scene)) != NULL) ssr_audio_play(app->audio, sound);
     if (message && *message && !ssr_game_message(app->game, message)) SDL_Log("No logic for %s yet.", message);
     follow_game(app);
+}
+
+static void click(SSRApp *app, const SSRSceneItem *item) {
+    click_in(app, app->scene, item);
 }
 
 static float ticker_measure(void *context, const char *text) {
@@ -727,12 +746,18 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
             down = event->type != SDL_EVENT_FINGER_UP;
         }
         ssr_scene_touch(app->scene, down, x + app->left, y + app->top);
+        if (app->hudScene) ssr_scene_touch(app->hudScene, down, x + app->left, y + app->top);
         ssr_game_touch(app->game, down, x + app->left, y + app->top);
         // A click is when the touch goes up on the element, as in the game.
         // A touch that moved a list is a swipe, not a click.
         int up = (event->type == SDL_EVENT_MOUSE_BUTTON_UP || event->type == SDL_EVENT_FINGER_UP) &&
                  !ssr_scene_dragged(app->scene);
-        const SSRSceneItem *item = up ? ssr_scene_hit_item(app->scene, x + app->left, y + app->top) : NULL;
+        // The HUD of a chance is on top, so it takes the click first.
+        const SSRSceneItem *hud = up && app->hudScene && ssr_game_chance(app->game)
+                                      ? ssr_scene_hit_item(app->hudScene, x + app->left, y + app->top)
+                                      : NULL;
+        const SSRSceneItem *item = up && !hud ? ssr_scene_hit_item(app->scene, x + app->left, y + app->top) : NULL;
+        if (hud) click_in(app, app->hudScene, hud);
         if (item) click(app, item);
     }
     return SDL_APP_CONTINUE;
@@ -835,7 +860,9 @@ static void auto_match(SSRApp *app) {
     const char *screen = ssr_game_screen(app->game);
     const char *message = NULL;
     int state = (int)ssr_tweaks_number(app->tweaks, "Match", "MatchState");
-    if (strcmp(screen, "match") == 0 && state >= 1 && state <= 3) {
+    if (ssr_game_replaying(app->game) == 1) {
+        message = "matchchance.btn_WatchReplay";
+    } else if (strcmp(screen, "match") == 0 && state >= 1 && state <= 3) {
         message = "match.btn_Play";
     } else if (strcmp(screen, "matchstats") == 0 && SDL_atoi(setting) == 2 &&
                ssr_tweaks_number(app->tweaks, "MatchStats", "StatStage") >= 10) {
@@ -896,6 +923,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
             ssr_gfx_draw_scene(app->gfx, app->scene);
         }
         if (app->bannerScene) ssr_gfx_draw_scene(app->gfx, app->bannerScene);
+        if (app->hudScene && chance) ssr_gfx_draw_scene(app->gfx, app->hudScene);
         draw_ticker(app, &env);
     }
     if (!app->gfx) {
@@ -945,6 +973,11 @@ SDL_AppResult SDL_AppIterate(void *state) {
     if (shotChance && (int)shotChance->state == wanted && !stateSeen) stateSeen = SDL_GetTicks();
     int stateReady = stateSeen && SDL_GetTicks() - stateSeen >= 1000;
     if (wanted >= 0) wait = stateReady ? 0 : 1 << 30;
+    static Uint64 replaySeen = 0;
+    if (SDL_getenv("SSR_SHOT_REPLAY")) {
+        if (!replaySeen && ssr_game_replaying(app->game) == 2) replaySeen = SDL_GetTicks();
+        wait = replaySeen && SDL_GetTicks() - replaySeen >= 1500 ? 0 : 1 << 30;
+    }
     const char *shotScreen = SDL_getenv("SSR_SHOT_SCREEN");
     static Uint64 screenSeen = 0;
     if (shotScreen && *shotScreen) {
