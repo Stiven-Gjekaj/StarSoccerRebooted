@@ -69,6 +69,8 @@ typedef struct {
     char pitchName[64];
     SSRScene *viewScene;
     int playerCopies[SSR_PLAYERS_MAX];
+    // The run arrow of each team-mate (c_MatchCaptainArrow).
+    int runArrows[SSR_PLAYERS_MAX];
     int ballCopy, arrowCopy;
     SSRAudio *audio;
     // The Spine files that the screens use, and when the screen opened.
@@ -284,6 +286,24 @@ static void update_ball_view(SSRApp *app, const SSRChance *chance) {
     }
 }
 
+// The circle of a team-mate that the captain can send on a run, and the
+// arrow of its run (c_MatchCaptainArrow.Update). They show until the kick.
+static void update_run_arrow(SSRApp *app, const SSRChance *chance, int i) {
+    const SSRMatchPlayer *p = &chance->players.list[i];
+    int before = chance->state == SSR_CHANCE_AIM && chance->kicking == 0;
+    ssr_scene_spawn_show(app->scene, app->playerCopies[i], "PlayerCircle", p->canMakeRun && before);
+    float dx = (float)p->makeRunX - p->x, dy = (float)p->makeRunY - p->y, d2 = dx * dx + dy * dy;
+    int shown = p->canMakeRun && before && p->makeRunDistance > 0 && d2 >= 1;
+    int id = app->runArrows[i];
+    ssr_scene_spawn_show(app->scene, id, NULL, shown);
+    if (!shown) return;
+    float most = (float)SSR_MAKE_RUN_MAX;
+    float length = SDL_clamp((d2 / most + SDL_sqrtf(d2)) * 0.3f * 1.3f, 10, most);
+    ssr_scene_spawn_place(app->scene, id, NULL, p->x, p->y);
+    ssr_scene_spawn_set(app->scene, id, NULL, SSR_GEL_ANGLE, -SDL_atan2f(dy, dx) * 180 / SDL_PI_F);
+    ssr_scene_spawn_set(app->scene, id, "TacticArrow#1", SSR_GEL_W, length + 20);
+}
+
 static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     const SSRChance *chance = ssr_game_chance(app->game);
     if (!chance || SDL_strcmp(ssr_game_screen(app->game), "matchminigame") != 0 || !app->scene) {
@@ -332,6 +352,7 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
             ssr_scene_spawn_clone(app->scene, id, "Stripes", "MatchColours", shirt);
             ssr_scene_spawn_clone(app->scene, id, "Hoops", "MatchColours", shirt);
             ssr_scene_spawn_clone(app->scene, id, "Pants", "MatchColours", pants);
+            app->runArrows[i] = ssr_scene_spawn(app->scene, "MatchPitch", "TacticArrow", 0, NULL, 0);
         }
         app->ballCopy = ssr_scene_spawn(app->scene, "MatchPitch", "Ball", 0, NULL, 0);
         ssr_scene_spawn_show(app->scene, app->ballCopy, "BallTip", 0);
@@ -346,6 +367,7 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         ssr_scene_spawn_place(app->scene, app->playerCopies[i], NULL, p->x, p->y + p->z);
         if (chance->info.chanceType == 11) ssr_scene_spawn_set(app->scene, app->playerCopies[i], NULL, SSR_GEL_SCALE, 1.5f);
         ssr_scene_spawn_anim(app->scene, app->playerCopies[i], "PlayerAnim", anim);
+        update_run_arrow(app, chance, i);
         // The run plays at the speed of the player (c_AMatchPlayer): half the
         // speed times Match.RunSpeedFactor.
         SSRPlayerBall view = ssr_chance_player_ball(chance);
