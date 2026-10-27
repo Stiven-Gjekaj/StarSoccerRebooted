@@ -26,6 +26,7 @@ static void test_keeps_the_honours(void) {
     CHECK(ssr_honours_add(&h, &a) && ssr_honours_add(&h, &b) && ssr_honours_add(&h, &c));
     // The same season and league again takes the place of the first.
     SSRHonour again = honour(2, "LG1", 12, "Cid Moor", 19);
+    again.lastDay = 1;
     CHECK(ssr_honours_add(&h, &again) && h.count == 3);
     CHECK(ssr_honours_titles(&h, 10) == 1 && ssr_honours_titles(&h, 12) == 1);
     char path[1200];
@@ -35,6 +36,7 @@ static void test_keeps_the_honours(void) {
     CHECK(ssr_honours_load(&back, path) && back.count == 3);
     CHECK(memcmp(&back.list[0], &h.list[0], sizeof(SSRHonour)) == 0);
     CHECK(back.list[1].scorer[0] == 0 && back.list[2].goals == 19 && strcmp(back.list[2].scorer, "Cid Moor") == 0);
+    CHECK(back.list[2].lastDay == 1 && back.list[0].lastDay == 0);
     CHECK(!ssr_honours_load(&back, "/no/such/file") && back.count == 0);
     ssr_honours_clear(&h);
     ssr_honours_clear(&back);

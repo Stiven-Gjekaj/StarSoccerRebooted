@@ -47,3 +47,4 @@ SSR_ChallengeNone	No challenge	Keine	Aucun défi	Sin reto	Nessuna sfida	Sem desa
 SSR_ChallengePace	Pace at the maximum	Tempo am Maximum	Vitesse au maximum	Velocidad al máximo	Velocità al massimo	Velocidade no máximo	Velocidade no máximo		
 SSR_ChallengeBroke	No Bux and no NRG	Keine Bux und kein NRG	Ni Bux ni NRG	Sin Bux ni NRG	Niente Bux e niente NRG	Sem Bux e sem NRG	Sem Bux e sem NRG		
 SSR_WorldSeedOf	Season (world seed $seed)	Saison (Seed der Welt $seed)	Saison (graine du monde $seed)	Temporada (semilla del mundo $seed)	Stagione (seme del mondo $seed)	Temporada (semente do mundo $seed)	Época (semente do mundo $seed)		
+SSR_LastDay	(on the last day!)	(am letzten Spieltag!)	(lors de la dernière journée !)	(¡en la última jornada!)	(all'ultima giornata!)	(na última rodada!)	(na última jornada!)		

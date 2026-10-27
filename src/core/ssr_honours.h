@@ -17,6 +17,8 @@ typedef struct {
     char scorer[64];
     char scorerClub[64];
     int goals;
+    // 1 when the champion was not first before the last round.
+    int lastDay;
 } SSRHonour;
 
 // The rivalry of two clubs. It grows when the clubs race for a title or

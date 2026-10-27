@@ -89,8 +89,8 @@ int ssr_honours_save(const SSRHonours *h, const char *path) {
         clean(e.clubName);
         clean(e.scorer);
         clean(e.scorerClub);
-        ok = fprintf(file, "%d\t%s\t%d\t%s\t%s\t%s\t%d\n", e.year, e.league, e.club, e.clubName, e.scorer[0] ? e.scorer : "-",
-                     e.scorerClub[0] ? e.scorerClub : "-", e.goals) > 0;
+        ok = fprintf(file, "%d\t%s\t%d\t%s\t%s\t%s\t%d\t%d\n", e.year, e.league, e.club, e.clubName,
+                     e.scorer[0] ? e.scorer : "-", e.scorerClub[0] ? e.scorerClub : "-", e.goals, e.lastDay) > 0;
     }
     for (int i = 0; ok && i < h->rivalryCount; i++) {
         ok = fprintf(file, "R\t%d\t%d\t%d\n", h->rivalries[i].a, h->rivalries[i].b, h->rivalries[i].points) > 0;
@@ -121,8 +121,9 @@ int ssr_honours_load(SSRHonours *h, const char *path) {
         }
         SSRHonour e;
         memset(&e, 0, sizeof(e));
-        if (sscanf(line, "%d\t%15[^\t]\t%d\t%63[^\t]\t%63[^\t]\t%63[^\t]\t%d", &e.year, e.league, &e.club, e.clubName,
-                   e.scorer, e.scorerClub, &e.goals) != 7) {
+        // A file from before the last day has 7 columns.
+        if (sscanf(line, "%d\t%15[^\t]\t%d\t%63[^\t]\t%63[^\t]\t%63[^\t]\t%d\t%d", &e.year, e.league, &e.club, e.clubName,
+                   e.scorer, e.scorerClub, &e.goals, &e.lastDay) < 7) {
             continue;
         }
         if (strcmp(e.scorer, "-") == 0) e.scorer[0] = 0;

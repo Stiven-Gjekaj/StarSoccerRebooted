@@ -3523,6 +3523,10 @@ static void honours_fill(SSRGame *game) {
         replace_all(title, sizeof(title), "$year", number);
         replace_all(title, sizeof(title), "$league", h->league);
         replace_all(title, sizeof(title), "$club", h->clubName);
+        if (h->lastDay) {
+            size_t n = strlen(title);
+            snprintf(title + n, sizeof(title) - n, " %s", loc(game, "SSR_LastDay"));
+        }
         scorer[0] = 0;
         if (h->scorer[0]) {
             snprintf(scorer, sizeof(scorer), "%s", loc(game, "SSR_HonourScorer"));
@@ -3748,6 +3752,8 @@ static void keep_honours(SSRGame *game) {
         h.year = year;
         snprintf(h.league, sizeof(h.league), "%s", comp->data->tla);
         h.club = s->rows[pool->rows[0]].teamId;
+        int before = s->rows[pool->rows[0]].prevPosition;
+        h.lastDay = before > 1;
         const SSRClub *club = ssr_world_club(game->world, h.club);
         snprintf(h.clubName, sizeof(h.clubName), "%s", club ? club->name : "");
         int clubs[64], n = 0;
