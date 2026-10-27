@@ -119,11 +119,36 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 - **The screen is portrait, 640 x 960 logical pixels.** Reason: the game is
   portrait, and its 2x images fill 640 x 960. The 1x images are 320 x 480.
 
+## The screens
+
+- **A screen runs as a tree of elements, as the game does (`c_Gel`).** The
+  scene makes the tree once when the screen opens, then each frame runs
+  the modifiers of each element and makes the list of draws. Reason: the
+  converges, the movers, the delays, and the emitters keep state from one
+  frame to the next, so a list that the app makes again each frame cannot
+  move as the game does.
+- **The time base is the one of the game:** frames of 60 a second, from 1
+  to 5 frames a draw, and 16 to 80 ms a draw. Reason: the layouts count in
+  frames, and a mover moves the same distance each draw.
+- **The logic of the screens (`ssr_game`) sets tweaks and chooses the next
+  screen.** It does not touch the elements. Reason: the modern layouts of
+  the game read the state of the game from the tweaks (`ShowIf`, `twk()`,
+  `ColReadout`), so the logic needs no link to the elements.
+- **The remake keeps its settings in its own file**, `settings.txt` in the
+  data directory, with one `name=value` a line. Reason: the app cannot
+  read the saves of the original game on a phone, so the format of the
+  game gives nothing.
+- **A reference capture of the original is good only from a fresh start.**
+  The original stops the screen under a popup (the onboarding), and an
+  emulator can leave the game stuck. Reason: a capture of a stuck game
+  showed a ball and clouds that did not move.
+
 ## Releases
 
 - Each part of the roadmap is one minor release, as in Balatro4S. A release
   gets a git tag `vX.Y.Z`, a changelog entry, and a GitHub release with the
-  macOS app.
+  macOS app and, from 0.3.0, the Android APK. The APK has the debug key,
+  so a phone can install it.
 - **An agent may make a full release with no review.** The owner asked for
   this on 2026-10-26. When a part of the roadmap is complete and its tests
   pass, the agent runs `scripts/release.sh`.
