@@ -79,6 +79,10 @@ struct SSRGame {
     // and the kit choice of the kit button.
     Team homeTeam, awayTeam;
     int kitNum;
+    // The competition of the table that shows, the row that the player
+    // chose in it (0 none), and the team of the club fixtures screen.
+    int leagueComp, leagueSelected;
+    int fixturesTeam, fixturesLevel;
     // c_TScreen_League.m_flagContinueButton: the table shows Continue.
     int leagueContinue;
     // c_TPlayer.lastmatchclub >= 0: the match review waits.
@@ -1822,6 +1826,7 @@ static void leaguefixtures_screen(SSRGame *game, int results) {
 
 static void league_screen(SSRGame *game, int compId);
 static void league_home(SSRGame *game);
+static void league_fixtures_button(SSRGame *game);
 
 // The end of a PlayToDate: the season review at the new year, else the
 // results.
@@ -2011,6 +2016,8 @@ static void league_table(SSRGame *game, int compId) {
     if (compId == 0) compId = ssr_season_actual_league(s, game->career.clubId);
     SSRSeasonComp *comp = ssr_season_comp(s, compId);
     add_op(game, SSR_OP_LIST_CLEAR, "TeamList", NULL, NULL, 0);
+    game->leagueComp = compId;
+    game->leagueSelected = 0;
     if (!comp || comp->poolCount == 0) return;
     ssr_tweaks_set(game->tweaks, "Match", "LeagueName", comp->data->tla);
     ssr_tweaks_set_number(game->tweaks, "Menu", "LeagueType", ssr_season_comp_type(s, comp));
@@ -2041,7 +2048,10 @@ static void league_table(SSRGame *game, int compId) {
             add_op(game, SSR_OP_LIST_SUB, "TeamList", "Promotion", NULL, 1);
         else if (ssr_season_is_relegation_place(s, comp, position))
             add_op(game, SSR_OP_LIST_SUB, "TeamList", "Relegation", NULL, 1);
-        if (player) add_op(game, SSR_OP_LIST_SUB, "TeamList", "Highlight", NULL, 1);
+        if (player) {
+            add_op(game, SSR_OP_LIST_SUB, "TeamList", "Highlight", NULL, 1);
+            game->leagueSelected = position;
+        }
         if (row->prevPosition >= 0) {
             const char *arrow = position < row->prevPosition ? "PosUp" : position > row->prevPosition ? "PosDown"
                                                                                                     : "PosSame";
@@ -2102,6 +2112,153 @@ static void league_screen(SSRGame *game, int compId) {
     season_in(game);
     league_list(game);
     league_table(game, compId);
+}
+
+// The fixtures of a team in the competitions of its level, in the order of
+// a fixture list (c_TClub.GetFixtureList and c_TNation.GetFixtureList).
+static int team_fixtures(SSRGame *game, int teamId, int level, const SSRFixture **out, int max) {
+    SSRSeason *s = game->season;
+    int n = 0;
+    const SSRClub *club = level == 0 ? ssr_world_club(game->world, teamId) : NULL;
+    for (int i = 0; i < s->compCount; i++) {
+        SSRSeasonComp *c = &s->comps[i];
+        const SSRCompetition *d = c->data;
+        if (d->level != level) continue;
+        if (level == 0 && !((d->locale == 0 && club && d->based == club->nation) || d->locale == 1)) continue;
+        int group = ssr_season_group_of(s, c, teamId);
+        if (group == 0) continue;
+        SSRPool *pool = &c->pools[group - 1];
+        int id = 0;
+        for (int r = 0; r < pool->count; r++) {
+            if (s->rows[pool->rows[r]].teamId == teamId) id = s->rows[pool->rows[r]].id;
+        }
+        for (int k = 0; k < c->fixtureCount && n < max; k++) {
+            const SSRFixture *f = &c->fixtures[k];
+            if (f->group == group && (f->home == id || f->away == id)) out[n++] = f;
+        }
+    }
+    qsort(out, (size_t)n, sizeof(*out), compare_rows_of_list);
+    return n;
+}
+
+// c_TFixture.GetStringArrayForTeamId: the week, the competition, the other
+// team, the result, and home or away.
+static void team_fixture_strings(SSRGame *game, const SSRFixture *f, int teamId, char out[5][64]) {
+    SSRSeason *s = game->season;
+    for (int i = 0; i < 5; i++) out[i][0] = 0;
+    int year = ssr_date_year(f->sdate);
+    if (year != ssr_career_year(&game->career)) {
+        snprintf(out[0], 64, "%.1s%d", loc(game, "Year"), year);
+    } else {
+        snprintf(out[0], 64, "%d", ssr_date_week(f->sdate));
+    }
+    SSRSeasonComp *comp = ssr_season_comp(s, f->compId);
+    if (!comp) return;
+    snprintf(out[1], 64, "%s", comp->data->tla);
+    snprintf(out[2], 64, "-");
+    SSRPool *pool = f->group >= 1 && f->group <= comp->poolCount ? &comp->pools[f->group - 1] : NULL;
+    SSRTableRow *home = ssr_season_row(s, pool, f->home), *away = ssr_season_row(s, pool, f->away);
+    int atHome = home && home->teamId == teamId;
+    SSRTableRow *other = atHome ? away : home;
+    if (other && other->teamId != teamId) snprintf(out[2], 64, "%s", other->name);
+    if (comp->data->type == 1 && !ssr_season_all_populated(s, comp)) snprintf(out[2], 64, "-");
+    snprintf(out[4], 64, "%s", loc(game, atHome ? "sla_Home" : "sla_Away"));
+    if (f->result == 0) {
+        if (f->matchType == SSR_FIXTURE_EXTRA_TIME && f->round == 2) snprintf(out[3], 64, "%s", loc(game, "Replay"));
+        else if (f->leg > 0) snprintf(out[3], 64, "%s %d", loc(game, "Leg"), f->leg);
+        return;
+    }
+    if (strcmp(out[2], "-") == 0) {
+        snprintf(out[3], 64, "%s", loc(game, "fixture_Bye"));
+        return;
+    }
+    char texts[5][64];
+    fixture_strings(game, comp, f, texts);
+    snprintf(out[3], 64, "%s", texts[2]);
+}
+
+// c_TScreen_ClubFixtures.SetUpScreen: the fixtures and results of a team.
+static void club_fixtures(SSRGame *game, int teamId, int level) {
+    set_screen(game, "clubfixtures");
+    game->fixturesTeam = teamId;
+    game->fixturesLevel = level;
+    Team team;
+    if (team_of(game, level, teamId, 0, &team)) {
+        set_colour_tweak(game, "Badge1Col1", team.badge1, 1);
+        set_colour_tweak(game, "Badge1Col2", team.badge2, 1);
+        ssr_tweaks_set_number(game->tweaks, "MatchColours", "BadgeStyle1", team.badgeStyle);
+        add_op(game, SSR_OP_TEXT, "FixtureTeamName", NULL, team.tla, 0);
+    }
+    add_op(game, SSR_OP_LIST_CLEAR, "FixtureList", NULL, NULL, 0);
+    const SSRFixture *list[256];
+    int n = team_fixtures(game, teamId, level, list, 256);
+    int year = ssr_career_year(&game->career), rows = 0, lastPlayed = -1;
+    for (int i = 0; i < n; i++) {
+        const SSRFixture *f = list[i];
+        if (ssr_date_year(f->sdate) > year + 1) continue;
+        char texts[5][64];
+        team_fixture_strings(game, f, teamId, texts);
+        SSRSeasonComp *comp = ssr_season_comp(game->season, f->compId);
+        int result = 0;
+        if (f->result != 0 && comp) {
+            int winner = ssr_fixture_winner(game->season, f);
+            SSRPool *pool = &comp->pools[f->group - 1];
+            SSRTableRow *row = ssr_season_row(game->season, pool, winner);
+            result = winner == 0 ? 2 : row && row->teamId == teamId ? 1 : 3;
+            lastPlayed = rows;
+        }
+        static const char *const TEMPLATES[4] = {"PendingFixture", "WonFixture", "DrawnFixture", "LostFixture"};
+        add_op(game, SSR_OP_LIST_ADD, "FixtureList", TEMPLATES[result], "", 0);
+        for (int k = 0; k < 5; k++) add_op(game, SSR_OP_LIST_TEXT, "FixtureList", NULL, texts[k], k + 1);
+        rows++;
+    }
+    int start = lastPlayed - 5 > 0 ? lastPlayed - 5 : 0;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "LeagueFixturesScroll", -(float)(start * 52));
+    if (lastPlayed < rows - 1) {
+        char entry[64];
+        snprintf(entry, sizeof(entry), "FixtureList@%d", lastPlayed + 1);
+        add_op(game, SSR_OP_LIST_SUB, entry, "Highlight", NULL, 1);
+    }
+}
+
+// league.row_team: a tap chooses a row; a second tap opens its fixtures.
+static void league_row(SSRGame *game) {
+    int row = game->messageParam;
+    if (row == game->leagueSelected) {
+        league_fixtures_button(game);
+        return;
+    }
+    char entry[64];
+    if (game->leagueSelected > 0) {
+        snprintf(entry, sizeof(entry), "TeamList@%d", game->leagueSelected - 1);
+        add_op(game, SSR_OP_LIST_SUB, entry, "Highlight", NULL, 0);
+    }
+    snprintf(entry, sizeof(entry), "TeamList@%d", row - 1);
+    add_op(game, SSR_OP_LIST_SUB, entry, "Highlight", NULL, 1);
+    game->leagueSelected = row;
+}
+
+// league.btn_Fixtures: the fixtures of the chosen team of the table, or of
+// the club of the player.
+static void league_fixtures_button(SSRGame *game) {
+    SSRSeasonComp *comp = ssr_season_comp(game->season, game->leagueComp);
+    int team = game->career.clubId, level = 0;
+    if (comp && comp->data->type != 1 && comp->poolCount > 0) {
+        int mine = comp->data->level == 1 ? game->career.nationId : game->career.clubId;
+        int group = comp->poolCount > 1 ? ssr_season_group_of(game->season, comp, mine) : 1;
+        SSRPool *pool = &comp->pools[group > 0 ? group - 1 : 0];
+        int row = game->leagueSelected > 0 ? game->leagueSelected : 1;
+        if (row <= pool->count) {
+            team = game->season->rows[pool->rows[row - 1]].teamId;
+            level = comp->data->level;
+        }
+    }
+    club_fixtures(game, team, level);
+}
+
+// league.btn_League on the club fixtures: the table again.
+static void fixtures_league(SSRGame *game) {
+    league_screen(game, game->leagueComp);
 }
 
 static void game_league(SSRGame *game) {
@@ -2847,7 +3004,9 @@ static const Route ROUTES[] = {
     {"leaguefixtures.btn_Back", league_home},
     {"league.btn_Continue", league_home},
     {"league.btn_Home", league_home},
-    {"league.btn_League", game_league},
+    {"league.btn_League", fixtures_league},
+    {"league.btn_Fixtures", league_fixtures_button},
+    {"league.row_team", league_row},
     {"league.cmb_League", league_combo},
     {"seasonreview.btn_League", season_review_league},
     {"seasonreview.btn_Play", player_of_the_year},

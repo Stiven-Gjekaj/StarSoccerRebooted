@@ -409,6 +409,21 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     int entries = 0;
     for (int i = 0; i < rows; i++) entries += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "TeamList") == 0;
     CHECK(entries == 4 && has_op(ops, rows, SSR_OP_LIST_SUB, "TeamList", NULL));
+    // A row of the table, tapped two times, opens the fixtures of its team:
+    // the six matches of the season, one of them played at least.
+    ssr_game_message(game, "league.row_team 1");
+    ssr_game_message(game, "league.row_team 1");
+    CHECK(strcmp(ssr_game_screen(game), "clubfixtures") == 0);
+    rows = take_ops(game, ops, 256);
+    int fixtures = 0, played = 0;
+    for (int i = 0; i < rows; i++) {
+        if (ops[i].kind != SSR_OP_LIST_ADD || strcmp(ops[i].ref, "FixtureList") != 0) continue;
+        fixtures++;
+        played += strcmp(ops[i].ref2, "PendingFixture") != 0;
+    }
+    CHECK(fixtures >= 6 && played >= 1 && has_op(ops, rows, SSR_OP_TEXT, "FixtureTeamName", NULL));
+    ssr_game_message(game, "league.btn_League");
+    CHECK(strcmp(ssr_game_screen(game), "league") == 0);
     ssr_game_message(game, "league.btn_Continue");
     CHECK(strcmp(ssr_game_screen(game), "matchreview") == 0);
     CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal") == -1);
