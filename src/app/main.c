@@ -81,6 +81,12 @@ typedef struct {
     int trail[40];
     Uint64 trailTime[40];
     float trailScale[40];
+    // The views of the objects of a drill (c_ATraining).
+    int objectCopies[SSR_TRAINING_OBJECTS];
+    int objectCount;
+    // The splash message of a drill (splashmessage.uis).
+    SSRScene *splashScene;
+    SSRUiTree *splashScreen;
     int ballCopy, arrowCopy;
     SSRAudio *audio;
     // The Spine files that the screens use, and when the screen opened.
@@ -193,6 +199,24 @@ static SSRSceneEnv scene_env(SSRApp *app);
 // cross is "c", in a mirror at an odd minute.
 static void pitch_name(const SSRChance *chance, char *out, size_t capacity) {
     int type = chance->info.chanceType, side = chance->info.pitchSide;
+    // A drill has its own pitch (c_TMatch.m_LoadPitchImages in training).
+    switch (chance->info.training) {
+    case 2:
+        SDL_snprintf(out, capacity, "Pitch_Ma_AM.uis");
+        return;
+    case 3:
+    case 4:
+        SDL_snprintf(out, capacity, "Pitch_Ab_AM.uis");
+        return;
+    case 6:
+        SDL_snprintf(out, capacity, "Pitch_Mb_AM.uis");
+        return;
+    case 8:
+        SDL_snprintf(out, capacity, "Pitch_Prac_AM.uis");
+        return;
+    default:
+        break;
+    }
     if (type == 4) {
         SDL_snprintf(out, capacity, "Pitch_Pen_AM.uis");
         return;
@@ -227,6 +251,10 @@ static void free_chance_view(SSRApp *app) {
     ssr_ui_free(app->hudScreen);
     app->hudScene = NULL;
     app->hudScreen = NULL;
+    ssr_scene_free(app->splashScene);
+    ssr_ui_free(app->splashScreen);
+    app->splashScene = NULL;
+    app->splashScreen = NULL;
     app->pitchScene = app->tapScene = app->bannerScene = app->stadiumScene = app->stadiumStaticScene = NULL;
     app->pitchScreen = app->tapScreen = app->bannerScreen = app->stadiumScreen = app->stadiumStaticScreen = NULL;
     app->pitchName[0] = 0;
@@ -338,6 +366,38 @@ static void update_trail(SSRApp *app, const SSRChance *chance) {
     ssr_scene_spawn_set(app->scene, id, "BallAnim", SSR_GEL_ANIM_SPEED, 0);
 }
 
+// The objects of a drill at their places. A line goes when the ball cuts
+// it, a hit pole and a hit dummy change colour, and a cone that falls goes
+// [I: the remake does not play the fall of a cone].
+static void update_objects_view(SSRApp *app) {
+    const SSRTraining *drill = ssr_game_training(app->game);
+    if (!drill) return;
+    for (int i = 0; i < app->objectCount && i < drill->objectCount; i++) {
+        const SSRTrainingObject *o = &drill->objects[i];
+        int id = app->objectCopies[i];
+        ssr_scene_spawn_place(app->scene, id, NULL, o->x, o->y);
+        switch (o->type) {
+        case SSR_OBJECT_LINE:
+            // c_ALine: the template is one unit wide.
+            ssr_scene_spawn_set(app->scene, id, NULL, SSR_GEL_SCALEX, (float)o->x2 - o->x);
+            ssr_scene_spawn_show(app->scene, id, NULL, o->alive);
+            break;
+        case SSR_OBJECT_CONE:
+            ssr_scene_spawn_show(app->scene, id, NULL, o->alive);
+            break;
+        case SSR_OBJECT_POLE:
+            ssr_scene_spawn_colour(app->scene, id, "Colour", o->alive ? "FFFFFFFF" : "FF0000FF");
+            break;
+        case SSR_OBJECT_DUMMY:
+            if (!o->alive) {
+                const char *name = drill->training == 6 ? "ColHittedDummyPositive" : "ColHittedDummyNegative";
+                ssr_scene_spawn_colour(app->scene, id, "DummyColour", ssr_tweaks_get(app->tweaks, "Training", name));
+            }
+            break;
+        }
+    }
+}
+
 // The circle of a team-mate that the captain can send on a run, and the
 // arrow of its run (c_MatchCaptainArrow.Update). They show until the kick.
 static void update_run_arrow(SSRApp *app, const SSRChance *chance, int i) {
@@ -384,7 +444,10 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         // The HUD of a career chance has no training part (MinigameHud
         // HideTraining).
         app->hudScene = open_layer(app, "minigamehud.uis", &app->hudScreen, env);
-        if (app->hudScene) ssr_scene_set_visible(app->hudScene, "TrainingHUD", 0);
+        // A drill shows its lives, with no quit button (ShowTraining).
+        int training = ssr_game_training(app->game) != NULL;
+        if (app->hudScene) ssr_scene_set_visible(app->hudScene, "TrainingHUD", training);
+        if (app->hudScene) ssr_scene_set_visible(app->hudScene, "QuitButton", 0);
     }
     if (app->viewScene != app->scene) {
         // A new screen: the copies of the players and of the ball.
@@ -417,6 +480,19 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
             ssr_scene_spawn_show(app->scene, app->trail[i], "Ball", 0);
             ssr_scene_spawn_show(app->scene, app->trail[i], "BallTip", 0);
         }
+        // The objects of a drill (c_ATraining.m_CreateItems).
+        const SSRTraining *drill = ssr_game_training(app->game);
+        app->objectCount = drill ? drill->objectCount : 0;
+        for (int i = 0; i < app->objectCount; i++) {
+            const SSRTrainingObject *o = &drill->objects[i];
+            const char *name = o->type == SSR_OBJECT_POLE    ? "Pole"
+                               : o->type == SSR_OBJECT_CONE  ? "ConeOneStripe"
+                               : o->type == SSR_OBJECT_DUMMY ? "Dummy"
+                               : o->finishLine               ? "Line"
+                               : o->tall                     ? "HoloLineTall"
+                                                             : "HoloLine";
+            app->objectCopies[i] = ssr_scene_spawn(app->scene, "MatchPitch", name, 0, NULL, 0);
+        }
         app->ballCopy = ssr_scene_spawn(app->scene, "MatchPitch", "Ball", 0, NULL, 0);
         ssr_scene_spawn_show(app->scene, app->ballCopy, "BallTip", 0);
         app->arrowCopy = ssr_scene_spawn(app->scene, "MatchPitch", "Arrow", 0, NULL, 0);
@@ -444,6 +520,7 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     }
     update_ball_view(app, chance);
     update_trail(app, chance);
+    update_objects_view(app);
     ssr_scene_update(app->pitchScene, env, ms);
     if (app->hudScene) ssr_scene_update(app->hudScene, env, ms);
     // The banner of the result (c_TQuickMessage "scoreanim") starts again
@@ -456,6 +533,16 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         ssr_ui_free(app->bannerScreen);
         app->bannerScene = NULL;
         app->bannerScreen = NULL;
+    }
+    // The splash message of a drill (TQuickMessage "splashmessage").
+    if (ssr_game_splash(app->game)) {
+        if (!app->splashScene) app->splashScene = open_layer(app, "splashmessage.uis", &app->splashScreen, env);
+        ssr_scene_update(app->splashScene, env, ms);
+    } else if (app->splashScene) {
+        ssr_scene_free(app->splashScene);
+        ssr_ui_free(app->splashScreen);
+        app->splashScene = NULL;
+        app->splashScreen = NULL;
     }
     if (app->tapScene) {
         const SSRTapBall *tap = &chance->tap;
@@ -923,6 +1010,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
             ssr_gfx_draw_scene(app->gfx, app->scene);
         }
         if (app->bannerScene) ssr_gfx_draw_scene(app->gfx, app->bannerScene);
+        if (app->splashScene) ssr_gfx_draw_scene(app->gfx, app->splashScene);
         if (app->hudScene && chance) ssr_gfx_draw_scene(app->gfx, app->hudScene);
         draw_ticker(app, &env);
     }
