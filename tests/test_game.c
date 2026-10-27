@@ -926,10 +926,20 @@ static void spend_time(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     ssr_game_update(game, 90);
     ssr_game_update(game, 70);
     CHECK(strcmp(ssr_game_screen(game), "relationships") == 0 && c->relationTeam == team);
-    // The energy is too low for a third activity.
+    // The energy is too low for a third activity. With no can, the NRG
+    // shop opens (GSPlayerNotEnoughEnergy).
+    SSRCareer *own = (SSRCareer *)c;
+    for (int i = 0; i < 5; i++) own->nrg[i] = 0;
     ssr_game_message(game, "relationships.btn_Fans");
-    CHECK(strcmp(ssr_game_screen(game), "message") == 0 && c->spentTime == 2);
-    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0 && c->spentTime == 2);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ShopTab"), "NRG") == 0);
+    ssr_game_message(game, "UpsellMsg.Close");
+    // With a can, the overlay offers it, and the can fills the energy.
+    own->nrg[0] = 1;
+    ssr_game_message(game, "relationships.btn_Fans");
+    CHECK(strcmp(ssr_game_overlay(game), "upsellnrg") == 0);
+    ssr_game_message(game, "UpsellMsg.DrinkNRG");
+    CHECK(ssr_game_overlay(game)[0] == 0 && c->nrg[0] == 0 && c->energy == 100);
     ssr_game_message(game, "relationships.btn_Home");
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }

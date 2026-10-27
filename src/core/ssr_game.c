@@ -3763,16 +3763,22 @@ static void spent_too_much_time(SSRGame *game) {
     message(game, "message", text, 0, 1, NULL);
 }
 
-// GSPlayerNotEnoughEnergy: the remake has no adverts, so the NRG overlay
-// offers only the cans.
+static void nrg_shop(SSRGame *game);
+
+// GSPlayerNotEnoughEnergy: the NRG shop when the player has no can, else
+// the overlay "upsellnrg" that offers the next can. The remake has no
+// adverts, so the button of the free NRG stays hidden.
 static void not_enough_energy(SSRGame *game, const char *activity, float need) {
     play_sound(game, "CError");
     float v = need - game->career.energy;
     ssr_tweaks_set_number(game->tweaks, "WatchAdNRG", "RefillAmount", v < 1 ? 1 : v);
     ssr_tweaks_set_number(game->tweaks, "WatchAdNRG", "ShowNRGAdReward", 0);
     ssr_tweaks_set(game->tweaks, "WatchAdNRG", "AdShowedFor", activity);
-    // [I: the NRG overlay comes with the shops of section 3.]
-    message(game, "message", loc(game, "CMESSAGE_NOTENOUGHENERGY"), 0, 1, NULL);
+    if (next_can(&game->career) < 0) {
+        nrg_shop(game);
+    } else {
+        snprintf(game->overlay, sizeof(game->overlay), "upsellnrg");
+    }
 }
 
 static void start_pairs(SSRGame *game, int relation);
@@ -5694,6 +5700,12 @@ static void shop_close(SSRGame *game) {
 
 // UpsellMsg.DrinkNRG: ShopOverlay.ButtonDrinkNRG.
 static void shop_drink(SSRGame *game) {
+    if (strcmp(game->overlay, "upsellnrg") == 0) {
+        int next = next_can(&game->career);
+        shop_close(game);
+        drink(game, next);
+        return;
+    }
     int id = 0, kind = product_kind(ssr_tweaks_get(game->tweaks, "Menu", "ItemString"), &id);
     int can = kind == PRODUCT_NRG ? (id >= 1 && id <= 4 ? id - 1 : 4) : 0;
     SSRCareer *c = &game->career;
