@@ -853,6 +853,8 @@ static void start_match(SSRGame *game) {
     s.vision = ssr_career_skill(c->vision);
     s.careerApps = c->apps;
     s.starLevel = 1;
+    // c_TPlayer sets m_dodribbling to 1 for each career, new or loaded.
+    s.dribbling = 1;
     ssr_match_start(game->match, &s, game->localise, game->context, &game->random);
     game->commentaryCount = 0;
     SSRTweaks *t = game->tweaks;
