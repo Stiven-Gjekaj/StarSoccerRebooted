@@ -777,6 +777,19 @@ void ssr_match_chance_done(SSRMatch *m, const SSRChance *c, int now, SSRRandom *
     m->stage = 0;
     m->shotsOnTarget += c->shotsOnTarget;
     int pass = m->chanceType == 1 || m->chanceType == 9;
+    // UpdateYardage: a goal measures from the start to the centre of the
+    // goal, a pass from the start to the ball. A chance of type 9 or 10 is
+    // a header.
+    int header = c->info.chanceType == 9 || c->info.chanceType == 10;
+    if (c->result == SSR_RESULT_GOAL) {
+        float dist = distance_to_goal_yards(c) * YARD;
+        if (dist > m->furthest[0]) m->furthest[0] = dist;
+        if (header && dist > m->furthest[2]) m->furthest[2] = dist;
+    } else if (c->result == SSR_RESULT_PASS || c->result == SSR_RESULT_ASSIST) {
+        float dist = c->kickYards * YARD;
+        if (dist > m->furthest[1]) m->furthest[1] = dist;
+        if (header && dist > m->furthest[3]) m->furthest[3] = dist;
+    }
     switch (c->result) {
     case SSR_RESULT_GOAL:
         m->goals++;

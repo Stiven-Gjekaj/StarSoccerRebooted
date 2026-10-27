@@ -1,5 +1,6 @@
 // Tests ssr_match with matches that the test makes and plays.
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -183,6 +184,37 @@ static void test_a_dribble_leads_to_an_attack(void) {
     CHECK(event == SSR_MATCH_EVENT_CHANCE && (m.chanceType == 2 || m.chanceType == 8));
 }
 
+// The match keeps the furthest goal and pass, and the headed ones apart.
+static void test_keeps_the_furthest_goal_and_pass(void) {
+    SSRMatch m;
+    SSRRandom random = {11};
+    SSRMatchSetup s = setup_for();
+    ssr_match_start(&m, &s, localise, NULL, &random);
+    ssr_match_play(&m, 0);
+    SSRChance chance;
+    memset(&chance, 0, sizeof(chance));
+    m.state = SSR_MATCH_PLAYER_CHANCE;
+    m.chanceType = 1;
+    chance.info.chanceType = 1;
+    chance.result = SSR_RESULT_PASS;
+    chance.kickYards = 40;
+    ssr_match_chance_done(&m, &chance, 1000, &random);
+    m.state = SSR_MATCH_PLAYER_CHANCE;
+    chance.kickYards = 10;
+    ssr_match_chance_done(&m, &chance, 2000, &random);
+    CHECK(m.furthest[1] == 600 && m.furthest[3] == 0);
+    // A header 300 pixels in front of the centre of the goal.
+    m.state = SSR_MATCH_PLAYER_CHANCE;
+    m.chanceType = 9;
+    chance.info.chanceType = 9;
+    chance.info.pitchSide = 1;
+    chance.info.startX = ssr_goal_centre(1);
+    chance.info.startY = SSR_GOAL_LINE + 300;
+    chance.result = SSR_RESULT_GOAL;
+    ssr_match_chance_done(&m, &chance, 3000, &random);
+    CHECK(fabsf(m.furthest[0] - 300) < 0.01f && fabsf(m.furthest[2] - 300) < 0.01f && m.furthest[1] == 600);
+}
+
 static void test_the_captain_draws_runs(void) {
     SSRMatch m;
     SSRRandom random = {11};
@@ -203,6 +235,7 @@ static void test_the_captain_draws_runs(void) {
 int main(void) {
     test_the_captain_draws_runs();
     test_a_dribble_leads_to_an_attack();
+    test_keeps_the_furthest_goal_and_pass();
     test_plays_a_match();
     test_a_cup_tie_goes_to_extra_time_and_penalties();
     test_counts_the_goals_of_the_player();

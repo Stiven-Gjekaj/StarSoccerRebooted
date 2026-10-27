@@ -95,6 +95,9 @@ typedef struct {
     int playerChance[120];
     // The stats of the player in this match.
     int goals, assists, passes, chances, shotChances, dribbles, shotsOnTarget;
+    // UpdateYardage: the furthest goal, pass, headed goal, and headed pass
+    // of the match in pixels.
+    float furthest[4];
     int playerInBuildup;
     int lastGoalTime;
     float energy;
