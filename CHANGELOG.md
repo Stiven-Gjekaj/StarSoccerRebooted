@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.6.0 (2026-10-27)
+
+- The season runs as in the original. Your nation sets up its leagues
+  and cups, the continental competitions, and every fourth year the
+  competitions of the nations. The other teams play their matches by the
+  rules of the original.
+- Play shows the fixtures of your round first. After the match the
+  results of the round show, then the table, then the weekly update.
+- The League button shows the tables, with the colours of promotion and
+  relegation and the arrows of the last round. Tap a team two times to
+  see its fixtures and results. You can choose another competition.
+- A cup tie that is level goes to extra time and a penalty shoot-out. You
+  can take one of the penalties.
+- The boss can make you a substitute or leave you out, by your energy,
+  your form, and your relation with the boss. The nation picks you only
+  when its boss likes you.
+- At the end of the season the clubs go up and down. The season review
+  shows your place and your counts, and the awards of the player of the
+  year come one at a time. Then the next season starts.
+- The text of the game has the size, the place, and the shadow of the
+  original.
+- The prematch screen shows the badges and the plates of the clubs, the
+  shield of the competition, the sponsor bar, and the kits. The kit button
+  changes the kits.
+- The light behind the badges and other gloss images draws as in the
+  original.
+
 ## 0.5.0 (2026-10-27)
 
 - You can play a match. Press Play on the game menu: the commentary runs,
