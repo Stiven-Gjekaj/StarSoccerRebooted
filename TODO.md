@@ -148,7 +148,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] Money, the lifestyle shop, and boots (`ShopLifestyle`, `BootShop`,
       `BuyItem`)
 - [ ] Match balls (`MatchBalls`)
-- [ ] The warning of the trainer and the loss of skills with no training
+- [x] The warning of the trainer and the loss of skills with no training
 - [x] The agent, transfers, and contract talks (`AgentDetails`,
       `DesiredTransfer`, `Negotiate`)
 - [ ] The digits of the cards of the negotiate game (`MechDigit`)
