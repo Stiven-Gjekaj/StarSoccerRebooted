@@ -1,5 +1,6 @@
 // Tests ssr_game: the messages of the screens and the settings file.
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -194,6 +195,22 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     int mod = (int)ssr_tweaks_number(tweaks, "RelationshipMods", "Boss");
     CHECK(c->relationBoss == (boss + mod < 1 ? 1 : boss + mod > 100 ? 100 : boss + mod));
     CHECK(ssr_tweaks_number(tweaks, "Player", "StarRating") == c->starRating / 100 + 1);
+
+    // The ratings screen opens over the stats, and Back comes back to them.
+    ssr_game_message(game, "skills.btn_Ratings");
+    CHECK(strcmp(ssr_game_screen(game), "ratings") == 0);
+    for (int i = 0; i < 8; i++) {
+        char name[40];
+        snprintf(name, sizeof(name), "ShiftedRating%d", i + 1);
+        double up = ssr_tweaks_number(tweaks, "Player", name);
+        snprintf(name, sizeof(name), "NegativeShiftedRating%d", i + 1);
+        double down = ssr_tweaks_number(tweaks, "Player", name);
+        CHECK(fabs(5 + up - down - c->ratings[i]) < 1e-4 && (up == 0 || down == 0));
+    }
+    double type = ssr_tweaks_number(tweaks, "Player", "PlayerType");
+    CHECK(type >= 0 && type <= 20 && strlen(ssr_tweaks_get(tweaks, "Player", "PlayerTypeString")) > 0);
+    ssr_game_message(game, "ratings.btn_Back");
+    CHECK(strcmp(ssr_game_screen(game), "matchstats") == 0);
 
     // The weekly update: the energy, then the pay. Continue waits for
     // stage 14.

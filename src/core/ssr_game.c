@@ -98,6 +98,8 @@ struct SSRGame {
     int oldStarLevel;
     // The energy that the rest days give, and the pay of the match.
     int recovery, payWage, payGoals, payAssists;
+    // The screen under the ratings screen (c_TScreen_Ratings.m_prevscreen).
+    char ratingsReturn[64];
 };
 
 typedef void (*Handler)(SSRGame *game);
@@ -292,6 +294,7 @@ static void choose_club(SSRGame *game);
 static void star_transition(SSRGame *game, const char *after);
 static void player_tweaks(SSRGame *game);
 static void reset_progress(SSRGame *game);
+static void rating_tweaks(SSRGame *game);
 
 static void open_slot(SSRGame *game, int slot) {
     game->slot = slot;
@@ -903,15 +906,21 @@ static void star_tweaks(SSRGame *game) {
 static void reset_progress(SSRGame *game) {
     skill_tweaks(game);
     star_tweaks(game);
+    rating_tweaks(game);
     static const char *NAMES[10] = {"Energy",    "BossRelationship", "TeamRelationship", "FansRelationship",
                                     "StarRatingProgress", "Technique", "Power", "Pace", "Vision", "SetPieces"};
-    char name[64];
-    for (int i = 0; i < 10; i++) {
-        double value = ssr_tweaks_number(game->tweaks, "Player", NAMES[i]);
-        snprintf(name, sizeof(name), "%s_Displayed", NAMES[i]);
-        ssr_tweaks_set_number(game->tweaks, "Player", name, value);
-        snprintf(name, sizeof(name), "%s_Before", NAMES[i]);
-        ssr_tweaks_set_number(game->tweaks, "Player", name, value);
+    char name[64], shown[80];
+    for (int i = 0; i < 26; i++) {
+        if (i < 10) {
+            snprintf(name, sizeof(name), "%s", NAMES[i]);
+        } else {
+            snprintf(name, sizeof(name), "%sShiftedRating%d", i < 18 ? "" : "Negative", (i - 10) % 8 + 1);
+        }
+        double value = ssr_tweaks_number(game->tweaks, "Player", name);
+        snprintf(shown, sizeof(shown), "%s_Displayed", name);
+        ssr_tweaks_set_number(game->tweaks, "Player", shown, value);
+        snprintf(shown, sizeof(shown), "%s_Before", name);
+        ssr_tweaks_set_number(game->tweaks, "Player", shown, value);
     }
 }
 
@@ -1126,6 +1135,42 @@ static void after_tick(SSRGame *game) {
             review_stage(game);
         }
     }
+}
+
+// UpdatePlayerRatings and UpdatePlayerType: each of the first eight
+// ratings as the part over 5 and the part under 5, and the type of the
+// player.
+static void rating_tweaks(SSRGame *game) {
+    const SSRCareer *c = &game->career;
+    char name[64];
+    for (int i = 0; i < 8; i++) {
+        float r = c->ratings[i];
+        snprintf(name, sizeof(name), "ShiftedRating%d", i + 1);
+        ssr_tweaks_set_number(game->tweaks, "Player", name, r > 5 ? r - 5 : 0);
+        snprintf(name, sizeof(name), "NegativeShiftedRating%d", i + 1);
+        ssr_tweaks_set_number(game->tweaks, "Player", name, r < 5 ? 5 - r : 0);
+    }
+    const char *type = ssr_career_player_type(c);
+    // GetRatingIndex: the last type that the news named, or 0 or 1
+    // [I: the type now, as the remake has no rating news yet].
+    int index = ssr_career_player_type_index(type);
+    if (index < 0) index = c->ratings[0] + c->ratings[1] > c->ratings[2] + c->ratings[3] ? 0 : 1;
+    ssr_tweaks_set_number(game->tweaks, "Player", "PlayerType", index);
+    ssr_tweaks_set(game->tweaks, "Player", "PlayerTypeString", loc(game, type));
+}
+
+// skills.btn_Ratings: the ratings screen over the screen that is open
+// (c_TScreen_Ratings.SetUpScreen).
+static void ratings_open(SSRGame *game) {
+    snprintf(game->ratingsReturn, sizeof(game->ratingsReturn), "%s", game->screen);
+    rating_tweaks(game);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "RatingsScroll", 0);
+    set_screen(game, "ratings");
+}
+
+// ratings.btn_Back: the screen under it comes back.
+static void ratings_back(SSRGame *game) {
+    set_screen(game, game->ratingsReturn[0] ? game->ratingsReturn : "gamemenu");
 }
 
 // matchstats.dismissanim: a tap ends the result overlay.
@@ -1606,6 +1651,8 @@ static const Route ROUTES[] = {
     {"matchstats.dismissanim", stats_dismiss},
     {"matchstats.btn_Play", stats_continue},
     {"matchreview.btn_Play", review_continue},
+    {"skills.btn_Ratings", ratings_open},
+    {"ratings.btn_Back", ratings_back},
     {"gamemenu.btn_DrinkNRG", drink_button},
     {"chooseboost.btn_1", boost1},
     {"chooseboost.btn_2", boost2},
