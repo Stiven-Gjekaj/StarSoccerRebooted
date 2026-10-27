@@ -3092,9 +3092,7 @@ static void retirement_score(SSRGame *game, int score) {
 }
 
 // c_TScreen_Retirement.SetUpScreen: the stats of the career and the New
-// Star Soccer score. [I: the remake keeps no trophy log and no history of
-// the seasons, so the medals are 0 and the history sums are empty. The
-// achievements are not in the remake.]
+// Star Soccer score. [I: the achievements are not in the remake yet.]
 static void retirement_screen(SSRGame *game) {
     SSRCareer *c = &game->career;
     set_screen(game, "retirement");
@@ -3106,7 +3104,35 @@ static void retirement_screen(SSRGame *game) {
     if (assists > 0) assists /= apps;
     float average = c->apps > 0 ? c->totalRating / c->apps : 0;
     int star = ssr_career_star_level(c), medals = 0, achievements = 0;
-    float bonus = 0, history = 1, historyGoals = 0, historyAssists = 0, historyStarMan = 0;
+    float bonus = 0, history = 0, historyGoals = 0, historyAssists = 0, historyStarMan = 0;
+    // The medals: a league title, a trophy with a medal, or a final that
+    // was won. A medal before the year 25 and a medal of the nation give a
+    // bonus each.
+    char first[64], winner[64], winnerCaps[64];
+    snprintf(first, sizeof(first), " %s", loc(game, "position_1"));
+    snprintf(winner, sizeof(winner), "%s", loc(game, "Winner"));
+    snprintf(winnerCaps, sizeof(winnerCaps), "%s", winner);
+    for (char *p = winnerCaps; *p; p++) *p = (char)toupper((unsigned char)*p);
+    const SSRNation *nation = ssr_world_nation(game->world, c->nationId);
+    for (int i = 0; i < c->trophyCount; i++) {
+        const SSRTrophy *t = &c->trophies[i];
+        size_t n = strlen(t->tournament), k = strlen(first);
+        int title = n >= k && strcmp(t->tournament + n - k, first) == 0;
+        if (!(title || t->medal > 0 || strstr(t->tournament, winnerCaps) || strstr(t->tournament, winner))) continue;
+        medals++;
+        if (t->year < 25) bonus += 1;
+        if (nation && nation->tla && strcmp(t->team, nation->tla) == 0) bonus += 1;
+    }
+    // The sums of the history before the year 25.
+    for (int i = 0; i < c->historyCount; i++) {
+        const SSRStatRow *h = &c->history[i];
+        if (h->year >= 25) continue;
+        history += (float)h->apps;
+        historyGoals += (float)h->goals;
+        historyAssists += (float)h->assists;
+        historyStarMan += (float)h->starMan;
+    }
+    if (history < 1) history = 1;
     float stats[9] = {(float)apps, goals, assists, (float)(c->starMan + c->intStarMan), average, (float)medals,
                       (float)c->potyAwards, (float)achievements, (float)star};
     memcpy(game->retireStats, stats, sizeof(stats));

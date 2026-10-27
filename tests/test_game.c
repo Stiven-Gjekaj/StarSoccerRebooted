@@ -318,10 +318,27 @@ static void retire(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "CareerStarMan") == c->starMan + c->intStarMan);
     CHECK(fabs(ssr_tweaks_number(tweaks, "PlayerStats", "CareerAverageRating") - c->totalRating / c->apps) < 1e-4);
     CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "StarRating") == c->starRating / 100 + 1);
-    // The score: 3 * (average + 1) * 200, the star level, and the bars.
+    // The score: the history of the seasons, the average, the medals, the
+    // star level, and the bars. Each trophy of this career is a league
+    // place (the test localise gives tags, so no place is "position_1").
     float skills = (ssr_career_skill(c->pace) + ssr_career_skill(c->power) + ssr_career_skill(c->technique) +
                     ssr_career_skill(c->vision) + ssr_career_skill(c->setPieces)) / 3.0f;
-    int score = (int)(3 * (c->totalRating / c->apps + 1.0f) * 200.0f);
+    float h = 0, hg = 0, ha = 0, hs = 0;
+    for (int i = 0; i < c->historyCount; i++) {
+        h += c->history[i].apps;
+        hg += c->history[i].goals;
+        ha += c->history[i].assists;
+        hs += c->history[i].starMan;
+    }
+    CHECK(c->historyCount > 0 && h == c->apps);
+    int medals = 0;
+    for (int i = 0; i < c->trophyCount; i++) medals += c->trophies[i].medal > 0;
+    CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "CareerMedals") == medals);
+    int score = (int)(hg / h * 100.0f + 1.0f);
+    score = (int)(score + ha / h * 50.0f + 1.0f);
+    score = (int)(score + hs / h * 200.0f + 1.0f);
+    score = (int)(score * (c->totalRating / c->apps + 1.0f) * 200.0f);
+    score = (int)(score + medals * 250.0f);
     score += c->potyAwards * 250 + (c->starRating / 100 + 1) * 200;
     float bars = skills / 100.0f + 1.0f + ssr_career_happiness(c) / 100.0f + ssr_career_lifestyle(c) / 100.0f;
     score = (int)(score * bars) * 10;
