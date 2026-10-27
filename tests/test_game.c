@@ -1024,6 +1024,41 @@ static void choose_a_dilemma(SSRGame *game, const char *path) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
+// The achievements: the stats of the career, the trophy log with the
+// newest first, and the clubs with the part of the season first.
+static void look_at_achievements(SSRGame *game, SSRTweaks *tweaks) {
+    const SSRCareer *c = ssr_game_career(game);
+    ssr_game_message(game, "gamemenu.btn_Life");
+    SSRUiOp drop;
+    while (ssr_game_take_op(game, &drop)) {
+    }
+    ssr_game_message(game, "relationships.btn_Achievements");
+    CHECK(strcmp(ssr_game_screen(game), "achievements") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "CareerMatches") == c->apps);
+    CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "InternationalGoals") == c->intGoals);
+    static SSRUiOp ops[2048];
+    int count = take_ops(game, ops, 2048), trophies = 0, clubs = 0, first = -1, firstClub = -1;
+    for (int i = 0; i < count; i++) {
+        if (ops[i].kind != SSR_OP_LIST_ADD) continue;
+        if (strcmp(ops[i].ref, "TrophyHook") == 0 && trophies++ == 0) first = i;
+        if (strcmp(ops[i].ref, "ClubStats") == 0 && clubs++ == 0) firstClub = i;
+    }
+    CHECK(c->trophyCount > 0 && trophies == c->trophyCount);
+    char year[16];
+    snprintf(year, sizeof(year), "%d", c->trophies[c->trophyCount - 1].year);
+    CHECK(first >= 0 && ops[first + 1].kind == SSR_OP_LIST_TEXT && strcmp(ops[first + 1].text, year) == 0);
+    CHECK(strcmp(ops[first + 3].text, c->trophies[c->trophyCount - 1].tournament) == 0);
+    int rows = 0;
+    for (int i = 0; i < c->historyCount; i++) rows += c->history[i].year > 0;
+    CHECK(clubs == rows + 1);
+    snprintf(year, sizeof(year), "%d", ssr_career_year(c));
+    CHECK(firstClub >= 0 && strcmp(ops[firstClub + 1].text, year) == 0);
+    ssr_game_message(game, "achievements.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "relationships") == 0);
+    ssr_game_message(game, "relationships.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+}
+
 // An accident after a dilemma takes the top level of a skill. The message
 // shows the bar of the skill out of 60, with the loss (SetUpSkillBar).
 static void an_accident_costs_a_skill(SSRGame *game, const char *path) {
@@ -2019,6 +2054,7 @@ static void test_starts_a_new_career(void) {
     spend_time(game, tweaks, path);
     choose_a_dilemma(game, path);
     an_accident_costs_a_skill(game, path);
+    look_at_achievements(game, tweaks);
     go_to_the_casino(game, tweaks, path);
     play_roulette(game, tweaks, path);
     play_blackjack(game, tweaks, path);

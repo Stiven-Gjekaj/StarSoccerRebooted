@@ -22,7 +22,7 @@
 #include "ssr_sort.h"
 #include "ssr_training.h"
 
-#define MAX_OPS 512
+#define MAX_OPS 2048
 // The game takes 11 letters for a name from the keyboard (c_TInputBox).
 #define NAME_LIMIT 11
 // England, the nation that the English game chooses first.
@@ -3808,6 +3808,123 @@ static void webpage_ok(SSRGame *game) {
 }
 
 static void relationships(SSRGame *game) {
+    relationships_screen(game, 1, 0);
+}
+
+/* ---------------------------------------------------- the achievements */
+
+// Player.GetStringForm: the ratings of the last matches, the oldest first,
+// with "-" between them.
+static void form_string(const int *form, int apps, char *out, size_t capacity) {
+    size_t n = 0;
+    out[0] = 0;
+    for (int i = apps < 5 ? 5 - apps : 0; i <= 4 && n < capacity; i++) {
+        n += (size_t)snprintf(out + n, capacity - n, "%s%d", n ? "-" : "", form[i]);
+    }
+}
+
+static void player_stat(SSRGame *game, const char *name, float season, float career, float international) {
+    char key[64];
+    snprintf(key, sizeof(key), "Season%s", name);
+    ssr_tweaks_set_number(game->tweaks, "PlayerStats", key, season);
+    snprintf(key, sizeof(key), "Career%s", name);
+    ssr_tweaks_set_number(game->tweaks, "PlayerStats", key, career);
+    snprintf(key, sizeof(key), "International%s", name);
+    ssr_tweaks_set_number(game->tweaks, "PlayerStats", key, international);
+}
+
+static void player_string_stat(SSRGame *game, const char *name, const char *season, const char *career,
+                               const char *international) {
+    char key[64];
+    snprintf(key, sizeof(key), "Season%s", name);
+    ssr_tweaks_set(game->tweaks, "PlayerStats", key, season);
+    snprintf(key, sizeof(key), "Career%s", name);
+    ssr_tweaks_set(game->tweaks, "PlayerStats", key, career);
+    snprintf(key, sizeof(key), "International%s", name);
+    ssr_tweaks_set(game->tweaks, "PlayerStats", key, international);
+}
+
+// TweakInterface.UpdatePlayerStats. [I: the remake keeps no hat tricks of
+// the career, no form of the career, and no furthest goals and passes, so
+// these show 0 or nothing.]
+static void update_player_stats(SSRGame *game) {
+    const SSRCareer *c = &game->career;
+    player_stat(game, "Matches", c->seasonApps, c->apps, c->intApps);
+    player_stat(game, "Goals", c->seasonGoals, c->goals, c->intGoals);
+    player_stat(game, "HatTricks", c->seasonHatTricks, 0, c->intHatTricks);
+    player_stat(game, "Passes", c->seasonPasses, c->passes, c->intPasses);
+    player_stat(game, "Assists", c->seasonAssists, c->assists, c->intAssists);
+    player_stat(game, "StarMan", c->seasonStarMan, c->starMan, c->intStarMan);
+    static const char *const FURTHEST[4] = {"FurthestGoal", "FurthestPass", "FurthestHeadedGoal", "FurthestHeadedPass"};
+    for (int i = 0; i < 4; i++) player_string_stat(game, FURTHEST[i], "", "", "");
+    player_stat(game, "AverageRating", c->seasonApps > 0 ? c->seasonTotalRating / (float)c->seasonApps : 0,
+                c->apps > 0 ? c->totalRating / (float)c->apps : 0,
+                c->intApps > 0 ? c->intTotalRating / (float)c->intApps : 0);
+    char season[64], international[64];
+    form_string(c->form, c->seasonApps, season, sizeof(season));
+    form_string(c->intForm, c->intApps, international, sizeof(international));
+    player_string_stat(game, "Form", season, "", international);
+}
+
+// c_TScreen_Achievements.SetUpScreen and c_AScreen_Achievements.OnActive:
+// the stats of the career, the trophies, the clubs, and the awards.
+static void achievements_screen(SSRGame *game) {
+    const SSRCareer *c = &game->career;
+    set_screen(game, "achievements");
+    update_player_stats(game);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "ShowGamecenter", 0);
+    // c_ASection_Awards: the share of the awards that the player has.
+    // [I: the awards are not in the remake yet, so the share is 0.]
+    char text[128];
+    ssr_tweaks_set_number(game->tweaks, "Player", "AchievementsComplete", 0);
+    snprintf(text, sizeof(text), "%s0%%", loc(game, "ACHIEVEMENTS_CAPS_SPACEAFTER"));
+    ssr_tweaks_set(game->tweaks, "Player", "AchievementsCompleteString", text);
+    // c_ASection_Trophies: the newest first.
+    add_op(game, SSR_OP_LIST_CLEAR, "TrophyHook", NULL, NULL, 0);
+    if (c->trophyCount == 0) add_op(game, SSR_OP_LIST_ADD, "TrophyHook", "NoRecords", "", 0);
+    for (int i = c->trophyCount - 1; i >= 0; i--) {
+        const SSRTrophy *t = &c->trophies[i];
+        char year[16];
+        snprintf(year, sizeof(year), "%d", t->year);
+        add_op(game, SSR_OP_LIST_ADD, "TrophyHook", "TrophiesStatsListItem", "", 0);
+        add_op(game, SSR_OP_LIST_TEXT, "TrophyHook", NULL, year, 1);
+        add_op(game, SSR_OP_LIST_TEXT, "TrophyHook", NULL, t->team, 2);
+        add_op(game, SSR_OP_LIST_TEXT, "TrophyHook", NULL, t->tournament, 3);
+    }
+    // c_ASection_ClubStats: the part of the season now, then the history,
+    // the newest first. A row of year 0 does not show.
+    add_op(game, SSR_OP_LIST_CLEAR, "ClubStats", NULL, NULL, 0);
+    int apps, goals, assists;
+    ssr_career_history_totals(c, &apps, &goals, &assists, NULL);
+    for (int i = c->historyCount; i >= 0; i--) {
+        SSRStatRow row;
+        if (i == c->historyCount) {
+            memset(&row, 0, sizeof(row));
+            row.year = ssr_career_year(c);
+            snprintf(row.club, sizeof(row.club), "%s", my_club_tla(game));
+            row.apps = c->apps - apps;
+            row.goals = c->goals - goals;
+            row.assists = c->assists - assists;
+        } else {
+            row = c->history[i];
+            if (row.year == 0) continue;
+        }
+        char numbers[4][16];
+        snprintf(numbers[0], sizeof(numbers[0]), "%d", row.year);
+        snprintf(numbers[1], sizeof(numbers[1]), "%d", row.apps);
+        snprintf(numbers[2], sizeof(numbers[2]), "%d", row.assists);
+        snprintf(numbers[3], sizeof(numbers[3]), "%d", row.goals);
+        add_op(game, SSR_OP_LIST_ADD, "ClubStats", "ClubStatsListItem", "", 0);
+        add_op(game, SSR_OP_LIST_TEXT, "ClubStats", NULL, numbers[0], 1);
+        add_op(game, SSR_OP_LIST_TEXT, "ClubStats", NULL, row.club, 2);
+        add_op(game, SSR_OP_LIST_TEXT, "ClubStats", NULL, numbers[1], 3);
+        add_op(game, SSR_OP_LIST_TEXT, "ClubStats", NULL, numbers[2], 4);
+        add_op(game, SSR_OP_LIST_TEXT, "ClubStats", NULL, numbers[3], 5);
+    }
+}
+
+// c_TScreen_Achievements.ButtonHome: back to the relationships.
+static void achievements_home(SSRGame *game) {
     relationships_screen(game, 1, 0);
 }
 
@@ -7983,6 +8100,8 @@ static void quit_career(SSRGame *game) {
 static const Route ROUTES[] = {
     {"gamemenu.btn_Life", relationships},
     {"relationships.btn_Home", relationships_home},
+    {"relationships.btn_Achievements", achievements_screen},
+    {"achievements.btn_Home", achievements_home},
     {"relationships.btn_International", relationships_international},
     {"relationships.btn_Boss", activity_boss},
     {"relationships.btn_Team", activity_team},
