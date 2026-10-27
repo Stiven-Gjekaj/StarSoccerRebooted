@@ -35,6 +35,7 @@ add_library(ssr_core STATIC
     src/core/ssr_tsv.c
     src/core/ssr_world.c
     src/core/ssr_pack.c
+    src/core/ssr_sha256.c
     src/core/ssr_people.c
     src/core/ssr_honours.c
     src/core/ssr_text.c
@@ -179,6 +180,7 @@ ssr_add_test(test_image)
 ssr_add_test(test_tsv)
 ssr_add_test(test_world)
 ssr_add_test(test_pack)
+ssr_add_test(test_sha256)
 ssr_add_test(test_people)
 ssr_add_test(test_honours)
 ssr_add_test(test_text)
