@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.22.0 (2026-10-27)
+
+- The editor: a tap on the name of the club on the squad screen renames
+  the club. The edit goes into a data pack "custom", so it stays, and a
+  zip file of it can go to other players.
+- The world loads again only when the player chooses another pack.
+
 ## 0.21.0 (2026-10-27)
 
 - The fans care more about a derby or a rivalry match: the change of
