@@ -852,6 +852,44 @@ static void test_moves_copies_and_sorts_by_y(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// DoIf runs its block while the tweak is in its range, or has its text.
+static void test_runs_a_block_by_a_tweak(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Menu", "Maximise", 0);
+    ssr_tweaks_set_kind(tweaks, "Menu", "Tab", "Shop", SSR_TWEAK_STRING);
+    SSRUiTree *tree;
+    layout = "Draw:(Box,0,0,10,10)\n"
+             "\tDoIf(Menu,Maximise,1)\n"
+             "\t<\n"
+             "\t\tConvergeTo(0,-100,Instant)\n"
+             "\t>\n"
+             "\tDoIf(Menu,Maximise,0)\n"
+             "\t<\n"
+             "\t\tConvergeTo(0,0,Instant)\n"
+             "\t>\n"
+             "Draw:(Tab,0,0,10,10)\n"
+             "\tDoIfNot(Menu,Tab,Shop)\n"
+             "\t<\n"
+             "\t\tConvergeTo(50,0,Instant)\n"
+             "\t>\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(near(find_image(scene, "Box")->y, 0) && near(find_image(scene, "Tab")->x, 0));
+    ssr_tweaks_set_number(tweaks, "Menu", "Maximise", 1);
+    ssr_tweaks_set(tweaks, "Menu", "Tab", "Kits");
+    ssr_scene_update(scene, &env, 16);
+    CHECK(near(find_image(scene, "Box")->y, -100) && near(find_image(scene, "Tab")->x, 50));
+    ssr_tweaks_set_number(tweaks, "Menu", "Maximise", 0);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(near(find_image(scene, "Box")->y, 0));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // A drag on a swipe panel scrolls the list under it, and the list keeps
 // the speed of the drag, then slows down and stops at its ends.
 static void test_scrolls_a_list_by_a_swipe(void) {
@@ -935,6 +973,7 @@ int main(void) {
     test_fills_lists_and_changes_elements();
     test_readouts_conditions_and_click_actions();
     test_converges_after_a_delay_and_on_press();
+    test_runs_a_block_by_a_tweak();
     test_moves_copies_and_sorts_by_y();
     test_runs_expressions();
     test_plays_an_animation();

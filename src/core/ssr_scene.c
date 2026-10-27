@@ -95,6 +95,8 @@ typedef enum {
     D_EMIT_SIZE,
     // set, add, lerp, and the other doodads of the expression language.
     D_EX,
+    // DoIf(Cat,Name,min,max) < >: the block runs while the tweak is in range.
+    D_DOIF,
 } DoodadKind;
 
 // The flags of a doodad, as c_Doodad has them.
@@ -1359,6 +1361,19 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         char velocity[160];
         snprintf(velocity, sizeof(velocity), "%s\x1f%s", arg(m, 2), arg(m, 3));
         d->text[2] = keep(s, velocity);
+    } else if (is(n, "DoIf") || is(n, "DoIfNot")) {
+        // c_DoIf: a number tweak from min to max, or a text tweak that is the
+        // same as the text.
+        d = new_doodad(D_DOIF, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+        d->text[2] = keep(s, arg(m, 2));
+        d->v[0] = (float)number(s, m, 2, 0);
+        d->v[1] = (float)number(s, m, 3, d->v[0]);
+        d->v[2] = is(n, "DoIf");
+        int innerShow = 0;
+        d->chain = make_doodads(s, g, (const SSRUiNode *const *)m->children, m->childCount, &innerShow);
     } else if (is(n, "if")) {
         d = new_doodad(D_IF, m);
         if (!d) return NULL;
@@ -2240,6 +2255,26 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         if (d->exCount >= 1) {
             ssr_ex_operate(d->text[0], d->ex[0], d->exCount >= 2 ? d->ex[1] : NULL, d->exCount >= 3 ? d->ex[2] : NULL,
                            &host);
+        }
+        break;
+    }
+    case D_DOIF: {
+        SSRTweaks *t = s->env->tweaks;
+        int on;
+        if (ssr_tweaks_kind(t, d->text[0], d->text[1]) == SSR_TWEAK_STRING) {
+            on = strcmp(ssr_tweaks_get(t, d->text[0], d->text[1]), d->text[2]) == 0;
+        } else {
+            float v = (float)ssr_tweaks_number(t, d->text[0], d->text[1]);
+            on = v >= d->v[0] && v <= d->v[1];
+        }
+        if (on == (d->v[2] != 0)) {
+            d->flags |= F_FIRED;
+            pump(s, g, d->chain);
+        } else {
+            // The block runs again from its start the next time.
+            rearm(d->chain);
+            if (d->flags & F_BANG) d->flags &= ~F_ACTIVE;
+            d->flags &= ~F_FIRED;
         }
         break;
     }
