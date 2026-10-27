@@ -1,6 +1,7 @@
 #include "ssr_world.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -374,4 +375,22 @@ int ssr_world_league_clubs(const SSRWorld *world, int league, const SSRClub **cl
         found++;
     }
     return found;
+}
+
+double ssr_world_club_distance(const SSRWorld *world, int a, int b) {
+    const SSRClub *x = ssr_world_club(world, a), *y = ssr_world_club(world, b);
+    if (!x || !y) return -1;
+    // The haversine rule on a sphere of 6371 km.
+    const double rad = 3.14159265358979323846 / 180.0;
+    double dLat = (y->latitude - x->latitude) * rad, dLon = (y->longitude - x->longitude) * rad;
+    double h = sin(dLat / 2) * sin(dLat / 2) + cos(x->latitude * rad) * cos(y->latitude * rad) * sin(dLon / 2) * sin(dLon / 2);
+    return 2 * 6371.0 * asin(sqrt(h < 1 ? h : 1));
+}
+
+int ssr_world_is_derby(const SSRWorld *world, int a, int b) {
+    const SSRClub *x = ssr_world_club(world, a), *y = ssr_world_club(world, b);
+    if (!x || !y || a == b || x->nation != y->nation) return 0;
+    // A club with no place in the data has 0 and 0.
+    if ((x->latitude == 0 && x->longitude == 0) || (y->latitude == 0 && y->longitude == 0)) return 0;
+    return ssr_world_club_distance(world, a, b) < SSR_DERBY_KM;
 }

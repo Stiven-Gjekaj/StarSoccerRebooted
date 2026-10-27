@@ -138,6 +138,14 @@ int ssr_world_league_clubs(const SSRWorld *world, int league, const SSRClub **cl
 // number of records that changed.
 int ssr_world_set_language(SSRWorld *world, const char *nations, const char *continents, const char *code);
 
+// The distance between the stadiums of two clubs in km, or -1 when a club
+// is not there.
+double ssr_world_club_distance(const SSRWorld *world, int a, int b);
+// 1 when two clubs of the same nation have their stadiums nearer than
+// SSR_DERBY_KM (a derby).
+#define SSR_DERBY_KM 30.0
+int ssr_world_is_derby(const SSRWorld *world, int a, int b);
+
 // Reads "#FFF" or "#FF0000". Returns fallback for other text.
 SSRColor ssr_color_parse(const char *text, SSRColor fallback);
 

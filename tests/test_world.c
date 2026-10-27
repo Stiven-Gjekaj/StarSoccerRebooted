@@ -68,6 +68,12 @@ static void test_loads_a_data_set(void) {
     CHECK(ssr_world_league_clubs(world, 2270, clubs, 4) == 2);
     CHECK(clubs[0]->id == 810 && clubs[1]->id == 915);
     CHECK(ssr_world_league_clubs(world, 2270, clubs, 1) == 2);
+    // North Club is in London and West Club in Liverpool: about 280 km. A
+    // B team plays at the same stadium as its first team: a derby.
+    double far = ssr_world_club_distance(world, 810, 915);
+    CHECK(far > 250 && far < 320 && !ssr_world_is_derby(world, 810, 915));
+    CHECK(ssr_world_club_distance(world, 915, 916) < 1 && ssr_world_is_derby(world, 915, 916));
+    CHECK(ssr_world_club_distance(world, 810, 1) < 0 && !ssr_world_is_derby(world, 915, 915));
     ssr_world_free(world);
 }
 
