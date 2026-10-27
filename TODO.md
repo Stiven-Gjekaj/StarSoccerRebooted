@@ -151,6 +151,23 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [ ] All the features in this file
 - [ ] A test harness that compares the rules with the original code
 
+## Gaps in the layout language
+
+The app logs each modifier of a layout that the scene skips. A run over
+all the layouts of 4.32 found these. The number is the count of layouts
+that use the modifier.
+
+- [ ] `Blend` (81): the blend factors of an image
+- [ ] `FontShadow` (65) and `ShadowCol` (62): the shadow of a text
+- [ ] `DownloadImage` (56): an image from the web of the game
+- [ ] `ScrollIndicator` (29): the bar that shows the place in a list
+- [ ] `Message` (18), `SetMessage` (1): a message box from a layout
+- [ ] `Spawn` (5), `Slot` (1), `SortByRef` (1): copies made by a layout
+- [ ] `ReadoutConcat` (5): a readout of two values in one text
+- [ ] `FontStyle` (5), `LineSpacing` (4), `Padding` (3): text layout
+- [ ] `func` (2), `call` (2): functions of the expression language
+- [ ] `Touch` (1), `RandomTweak` (1), `ModifyTweak` (1), `MechDigit` (1)
+
 ## Not in the remake
 
 - Advertisements (`FakeInterstitial`, `NSS5Ad`, `RewardedAdStaffSelector`,
