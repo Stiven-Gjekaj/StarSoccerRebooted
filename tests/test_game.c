@@ -977,6 +977,7 @@ static void go_to_the_casino(SSRGame *game, SSRTweaks *tweaks, const char *path)
         if (win > 0) {
             wins++;
             CHECK(strncmp(ssr_tweaks_get(tweaks, "Menu", "QuickMessage"), "BET_YOUWON \xE2\x98\x85", 14) == 0);
+            CHECK(strcmp(ssr_game_splash_layout(game), "splashmessagebux") == 0);
         }
         bank = bank - 5 + win;
         CHECK(now->bank == bank);
@@ -1078,6 +1079,7 @@ static void play_roulette(SSRGame *game, SSRTweaks *tweaks, const char *path) {
         CHECK(win == 0 || win == 20);
         const char *text = ssr_tweaks_get(tweaks, "Menu", "QuickMessage");
         CHECK(strncmp(text, win ? "BET_YOUWON" : "BET_YOULOST", win ? 10 : 11) == 0);
+        CHECK(strcmp(ssr_game_splash_layout(game), win ? "splashmessagebux" : "splashmessage") == 0);
         bank = bank - 10 + win;
         CHECK(now->bank == bank && ssr_tweaks_number(tweaks, "Menu", "HomeButtonDisabled") == 0);
     }

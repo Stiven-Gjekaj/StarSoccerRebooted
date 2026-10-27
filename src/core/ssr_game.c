@@ -6740,7 +6740,8 @@ static void casino_message(SSRGame *game, const char *tag, int amount) {
     size_t n = strlen(text);
     snprintf(text + n, sizeof(text) - n, " \xE2\x98\x85%s", cash);
     ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
-    show_splash(game, "splashmessage", 1500);
+    // A win shows in the layout with the bux.
+    show_splash(game, strcmp(tag, "bet_YouWon") == 0 ? "splashmessagebux" : "splashmessage", 1500);
 }
 
 /* --------------------------------------------------------- the roulette */
