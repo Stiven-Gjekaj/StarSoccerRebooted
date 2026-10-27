@@ -268,6 +268,29 @@ static void premultiply(SSRImage *pixels) {
     }
 }
 
+// The patches of the remake (art/<name>.patch.png) change only some pixels
+// of an atlas image. They go on the PNG page before it goes to the GPU.
+static void patch_page(SSRGfx *gfx, int page, SSRImage *pixels) {
+    static const char SUFFIX[] = ".patch.png";
+    const size_t suffix = sizeof(SUFFIX) - 1;
+    for (int i = 0; i < gfx->artCount; i++) {
+        const char *file = gfx->art[i];
+        size_t length = SDL_strlen(file);
+        if (length <= suffix || SDL_strcmp(file + length - suffix, SUFFIX) != 0) continue;
+        char name[256];
+        SDL_snprintf(name, sizeof(name), "%.*s", (int)(length - suffix), file);
+        const SSRAtlasImage *image = ssr_atlas_find(gfx->atlases, name);
+        if (!image || image->page != page) continue;
+        char path[2400];
+        const char *base = SDL_GetBasePath();
+        SDL_snprintf(path, sizeof(path), "%sart/%s", base ? base : "", file);
+        SSRImage patch;
+        if (!ssr_image_load(path, &patch)) continue;
+        if (!ssr_atlas_patch(pixels, image, &patch)) SDL_Log("The patch %s does not fit its image.", file);
+        ssr_image_free(&patch);
+    }
+}
+
 // The texture of a PNG page, or of the frame of a RLE page that holds the
 // image. With premultiplied, the copy with premultiplied alpha.
 static SDL_Texture *atlas_texture_kind(SSRGfx *gfx, const SSRAtlasImage *image, int premultiplied) {
@@ -287,6 +310,7 @@ static SDL_Texture *atlas_texture_kind(SSRGfx *gfx, const SSRAtlasImage *image, 
     SDL_Texture **slot = premultiplied ? &gfx->glossPages[image->page] : &gfx->pageTextures[image->page];
     if (*slot) return *slot;
     if (!ssr_atlas_page_pixels(gfx->atlases, image->page, &pixels)) return NULL;
+    patch_page(gfx, image->page, &pixels);
     if (premultiplied) premultiply(&pixels);
     *slot = texture_from_pixels(gfx->renderer, pixels.width, pixels.height, pixels.pixels);
     ssr_image_free(&pixels);
