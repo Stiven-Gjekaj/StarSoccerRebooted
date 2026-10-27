@@ -93,6 +93,12 @@ if(SSR_LAYOUTS)
     target_sources(ssr PRIVATE ${SSR_LAYOUTS})
     set_source_files_properties(${SSR_LAYOUTS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/layouts)
 endif()
+# The art of the remake replaces atlas images of the same name.
+file(GLOB SSR_ART ${CMAKE_SOURCE_DIR}/art/*.png)
+if(SSR_ART)
+    target_sources(ssr PRIVATE ${SSR_ART})
+    set_source_files_properties(${SSR_ART} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/art)
+endif()
 set_target_properties(ssr PROPERTIES
     OUTPUT_NAME "Star Soccer Rebooted"
     MACOSX_BUNDLE_BUNDLE_NAME "Star Soccer Rebooted"

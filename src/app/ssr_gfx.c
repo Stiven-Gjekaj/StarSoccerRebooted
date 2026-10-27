@@ -57,6 +57,9 @@ struct SSRGfx {
     } hooks[4];
     int hasOuter;
     SDL_Rect outer;
+    // The names of the art of the remake (art/<name>.png).
+    char **art;
+    int artCount;
 };
 
 SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
@@ -93,6 +96,9 @@ SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
     } else {
         SDL_Log("The atlases of the import are not there.");
     }
+    const char *base = SDL_GetBasePath();
+    SDL_snprintf(path, sizeof(path), "%sart", base ? base : "");
+    gfx->art = SDL_GlobDirectory(path, "*.png", 0, &gfx->artCount);
     return gfx;
 }
 
@@ -114,6 +120,7 @@ void ssr_gfx_free(SSRGfx *gfx) {
     SDL_free(gfx->glossPages);
     SDL_free(gfx->glossFrames);
     ssr_atlas_free(gfx->atlases);
+    SDL_free(gfx->art);
     SDL_free(gfx);
 }
 
@@ -124,13 +131,11 @@ static SDL_Texture *texture_from_pixels(SDL_Renderer *renderer, int width, int h
     return texture;
 }
 
-SDL_Texture *ssr_gfx_texture(SSRGfx *gfx, const char *name) {
-    if (!gfx || !name) return NULL;
+// Loads the image at the path once, and keeps it by the key.
+static SDL_Texture *cached_texture(SSRGfx *gfx, const char *key, const char *path) {
     for (int i = 0; i < gfx->textureCount; i++) {
-        if (SDL_strcmp(gfx->textures[i].name, name) == 0) return gfx->textures[i].texture;
+        if (SDL_strcmp(gfx->textures[i].name, key) == 0) return gfx->textures[i].texture;
     }
-    char path[2400];
-    SDL_snprintf(path, sizeof(path), "%s/%s", gfx->gameDirectory, name);
     SSRImage image;
     SDL_Texture *texture = NULL;
     if (ssr_image_load(path, &image)) {
@@ -141,10 +146,33 @@ SDL_Texture *ssr_gfx_texture(SSRGfx *gfx, const char *name) {
     // again each frame.
     if (gfx->textureCount < MAX_TEXTURES) {
         NamedTexture *slot = &gfx->textures[gfx->textureCount++];
-        SDL_strlcpy(slot->name, name, sizeof(slot->name));
+        SDL_strlcpy(slot->name, key, sizeof(slot->name));
         slot->texture = texture;
     }
     return texture;
+}
+
+SDL_Texture *ssr_gfx_texture(SSRGfx *gfx, const char *name) {
+    if (!gfx || !name) return NULL;
+    char path[2400];
+    SDL_snprintf(path, sizeof(path), "%s/%s", gfx->gameDirectory, name);
+    return cached_texture(gfx, name, path);
+}
+
+// The art of the remake (art/<name>.png) takes the place of the atlas
+// image with the name. It fills the full box of the original image.
+static SDL_Texture *own_art(SSRGfx *gfx, const char *name) {
+    if (!name || !name[0]) return NULL;
+    char file[256];
+    SDL_snprintf(file, sizeof(file), "%s.png", name);
+    int found = 0;
+    for (int i = 0; i < gfx->artCount && !found; i++) found = SDL_strcmp(gfx->art[i], file) == 0;
+    if (!found) return NULL;
+    char key[256], path[2400];
+    SDL_snprintf(key, sizeof(key), "art:%s", name);
+    const char *base = SDL_GetBasePath();
+    SDL_snprintf(path, sizeof(path), "%sart/%s", base ? base : "", file);
+    return cached_texture(gfx, key, path);
 }
 
 // Uploads the atlas of the font when it has new glyphs. The atlas becomes
@@ -444,8 +472,10 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     p.fadeY1 = 1;
 
     const SSRAtlasImage *image = ssr_atlas_find(gfx->atlases, item->image);
-    const char *file = image || !gfx->scene ? NULL : ssr_scene_image_file(gfx->scene, item->image);
-    SDL_Texture *texture = file ? ssr_gfx_texture(gfx, file) : NULL;
+    SDL_Texture *texture = own_art(gfx, item->image);
+    if (texture) image = NULL;
+    const char *file = image || texture || !gfx->scene ? NULL : ssr_scene_image_file(gfx->scene, item->image);
+    if (file) texture = ssr_gfx_texture(gfx, file);
     if (!texture && !image) return;
     SDL_BlendMode mode = SDL_BLENDMODE_BLEND;
     if (item->blend == SSR_BLEND_ADD) mode = SDL_BLENDMODE_ADD;
