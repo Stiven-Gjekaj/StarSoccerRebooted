@@ -17,7 +17,37 @@ int ssr_aftermatch_work_rate(const int t[3]) {
 }
 
 // The match rating (c_TScreen_MatchStats.SetUpScreen).
+// The fair rating of the remake. A quiet match is 6, a goal is about one
+// point, and a defeat costs a little. A star man has 9 or more in a win.
+static void fair_rating(const SSRAfterMatchFacts *f, SSRAfterMatch *out) {
+    float misses = (float)(f->chances - f->passes - f->goals);
+    float r = 6.0f + (float)f->goals * 1.1f + (float)f->assists * 0.7f;
+    r += clampf((float)f->passes * 0.35f, 0, 1.4f);
+    r += (float)f->intercepts * 0.1f + (float)f->dribbles * 0.1f;
+    r += (float)clampi(f->shotsOnTarget, 0, 3) * 0.15f - 0.12f * misses;
+    if (f->opponentScore > f->myScore) {
+        out->result = -1;
+        out->outcome = 3;
+        r -= 0.3f + 0.1f * (float)(f->opponentScore - f->myScore);
+    } else if (f->opponentScore == f->myScore) {
+        out->result = 0;
+        out->outcome = 2;
+    } else {
+        out->result = 1;
+        out->outcome = 1;
+        r += 0.3f;
+    }
+    if (f->subTime > 0) r -= 0.3f;
+    r = clampf(r, 3, 10);
+    out->starMan = r >= 9 && out->result == 1;
+    out->rating = r;
+}
+
 static void rating(const SSRAfterMatchFacts *f, SSRAfterMatch *out) {
+    if (f->fair) {
+        fair_rating(f, out);
+        return;
+    }
     float misses = (float)(f->chances - f->passes - f->goals);
     float r;
     if (f->hardMode) {

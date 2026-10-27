@@ -49,6 +49,36 @@ static void test_rates_a_match(void) {
     CHECK(out.boss == -4 && out.fans == -4);
 }
 
+// The fair rating: a quiet draw is 6, a goal and a pass in a win is near
+// 7.9, a hat-trick in a win makes the star man, and a heavy defeat stays
+// above 3.
+static void test_rates_a_match_fairly(void) {
+    SSRAfterMatch out;
+    SSRAfterMatchFacts f = facts();
+    f.fair = 1;
+    ssr_aftermatch_rate(&f, &out);
+    CHECK(near(out.rating, 6) && out.result == 0 && !out.starMan);
+    f.goals = 1;
+    f.passes = 1;
+    f.chances = 3;
+    f.shotsOnTarget = 1;
+    f.score1 = f.myScore = 2;
+    f.score2 = f.opponentScore = 1;
+    ssr_aftermatch_rate(&f, &out);
+    // 6 + 1.1 + 0.35 + 0.15 - 0.12 + 0.3 = 7.78.
+    CHECK(near(out.rating, 7.78f) && out.result == 1 && !out.starMan);
+    f.goals = 3;
+    f.score1 = f.myScore = 3;
+    ssr_aftermatch_rate(&f, &out);
+    CHECK(out.rating >= 9 && out.starMan);
+    f = facts();
+    f.fair = 1;
+    f.chances = 8;
+    f.score2 = f.opponentScore = 5;
+    ssr_aftermatch_rate(&f, &out);
+    CHECK(out.rating >= 3 && out.rating < 5 && out.result == -1);
+}
+
 static void test_work_rate_and_stars(void) {
     int light[3] = {80, 5, 5}, hard[3] = {5, 5, 80}, even[3] = {30, 30, 30};
     CHECK(ssr_aftermatch_work_rate(light) == -2 && ssr_aftermatch_work_rate(hard) == 2);
@@ -62,6 +92,7 @@ static void test_work_rate_and_stars(void) {
 
 int main(void) {
     test_rates_a_match();
+    test_rates_a_match_fairly();
     test_work_rate_and_stars();
     return TEST_RESULT();
 }

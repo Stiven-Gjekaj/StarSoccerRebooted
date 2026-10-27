@@ -23,6 +23,10 @@ typedef struct {
     // c_TPlayer.GetOverallWorkRate: -2 to 2 from the minutes at each work
     // rate.
     int workRate;
+    // 1 for the fair ratings of the remake: a rating starts at 6 and the
+    // goals, the passes, and the result move it a little, as the ratings
+    // of real matches do. 0 is the rating of 4.32.
+    int fair;
 } SSRAfterMatchFacts;
 
 typedef struct {
