@@ -1,0 +1,205 @@
+// The custom career: the age and the skills of the player at the start.
+// A screen of the remake. It comes after the choice of the nation, before
+// the trials. The minus and the plus buttons change each value, and a tap
+// on a value also goes up.
+
+UnsortedLayer:(AfterGloss,1)
+
+Import:(ButtonDefs.uis)
+Import:(ButtonMacros.uis)
+Import:(JDButtonDefs.uis)
+Import:(JDButtonMacros.uis)
+
+Rect:(0,0,0,0)
+	ShowShell(Ticker,1)
+
+M_Background:()
+M_Footer:(OFF,,,)
+
+// The ribbon at the top.
+Rect:()
+{
+	M_Header:(-40,@T,ILife,32,36,88,198,14,YES)
+}
+
+// The top of the buttons at the bottom.
+Set:(@n=[@B-960]*0.7+744)
+
+// The title.
+PushOrigin:(60,128)
+	Rect:(0,0,500,76)
+	{
+		Draw:(ButtonShadow,18,8,500,76,,#FFFFFF80)
+		Draw:(GreenButton,10,0,500,76)
+		Draw:(Glint,0,15.5,42,,,#606060FFFFFFFFFF)
+			Handle(42,16)
+			Shine(0,480)
+			Additive()
+		Text:(Start,20,0,480,72)
+			FontSize(1)
+			Layer(AfterGloss)
+			StringReadout(Custom,Title)
+	}
+		ConvergeFrom(-640,0)
+PopOrigin
+
+PushOrigin:(13,230)
+	Rect:(0,0,614,120)
+	{
+		Draw:(GreyRecess,0,0,614,120)
+		Text:(LABEL,10,4,594,44,C,,#BBDDBBFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.45,0.45)
+			StringReadout(Custom,AgeLabel)
+	}
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(23,278)
+	Rect:(0,0,110,62)
+	{
+		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,62)
+		Text:(-,0,0,110,58,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_AgeDown)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(145,278)
+	Rect:(0,0,350,62)
+	{
+		Text:(00,0,0,350,58,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.6,0.6)
+			GS_CustomAge()
+	}
+		Click(customcareer.btn_Age)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(507,278)
+	Rect:(0,0,110,62)
+	{
+		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,62)
+		Text:(+,0,0,110,58,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_Age)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+
+PushOrigin:(13,370)
+	Rect:(0,0,614,120)
+	{
+		Draw:(GreyRecess,0,0,614,120)
+		Text:(LABEL,10,4,594,44,C,,#BBDDBBFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.45,0.45)
+			StringReadout(Custom,SkillLabel)
+	}
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(23,418)
+	Rect:(0,0,110,62)
+	{
+		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,62)
+		Text:(-,0,0,110,58,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_SkillDown)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(145,418)
+	Rect:(0,0,350,62)
+	{
+		Text:(00,0,0,350,58,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.6,0.6)
+			GS_CustomSkill()
+	}
+		Click(customcareer.btn_Skill)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(507,418)
+	Rect:(0,0,110,62)
+	{
+		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,62)
+		Text:(+,0,0,110,58,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_Skill)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+
+// The help.
+PushOrigin:(13,510)
+	Rect:(0,0,614,110)
+	{
+		Text:(HELP,20,0,574,110,C,,#BBDDBBFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.38,0.38)
+			StringReadout(Custom,Help)
+	}
+		ConvergeFrom(-640,0)
+PopOrigin
+
+// Back to the nation.
+PushOrigin:(12,@n)
+	M_NavButton:(0,0,navigate_Back,,)
+	{
+		Draw:(IBack,28,30,90,90)
+	}
+		Delay(0.2)
+		ConvergeFrom(-640,0)
+		Click(customcareer.btn_Back)
+		<
+			PlaySnd(UISelect)
+		>
+PopOrigin
+
+// On to the trials.
+PushOrigin:(480,@n)
+	M_NavButton:(0,0,SSR_CustomGo,,)
+	{
+		Draw:(IAccept,30,25,90,90)
+	}
+		Delay(0.1)
+		ConvergeFrom(640,0)
+		Click(customcareer.btn_Ok)
+		<
+			PlaySnd(UISelect)
+		>
+PopOrigin

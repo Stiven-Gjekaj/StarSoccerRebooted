@@ -193,6 +193,10 @@ struct SSRGame {
     char lastName[SSR_CAREER_NAME];
     int gender;
     int hardMode;
+    // The custom career: the age at the start, and the skill that each of
+    // the five skills has at the least at the start (0: the trials give
+    // the skills).
+    int customAge, customSkill;
     // 0 no name, 1 the first name, 2 the last name takes the keyboard.
     int typing;
     // The seed that the player types on the world screen.
@@ -1267,7 +1271,42 @@ static const SSRClub *first_club(SSRGame *game, int nation) {
 
 /* --------------------------------------------------------- the career */
 
+// The custom career (a screen of the remake): the age and the skills at
+// the start. The first values are a career of the game: 16, and the skills
+// of the trials.
+#define CUSTOM_AGE_MIN 16
+#define CUSTOM_AGE_MAX 32
+#define CUSTOM_SKILL_STEP 10
+#define CUSTOM_SKILL_MAX 70
+
 static void nation_ok(SSRGame *game) {
+    if (!game->canPlay || !game->world) return;
+    game->customAge = CUSTOM_AGE_MIN;
+    game->customSkill = 0;
+    set_screen(game, "customcareer");
+    ssr_tweaks_set(game->tweaks, "Custom", "Title", loc(game, "SSR_CustomTitle"));
+    ssr_tweaks_set(game->tweaks, "Custom", "AgeLabel", loc(game, "SSR_CustomAge"));
+    ssr_tweaks_set(game->tweaks, "Custom", "SkillLabel", loc(game, "SSR_CustomSkill"));
+    ssr_tweaks_set(game->tweaks, "Custom", "Help", loc(game, "SSR_CustomHelp"));
+}
+
+static void custom_age(SSRGame *game) {
+    game->customAge = game->customAge >= CUSTOM_AGE_MAX ? CUSTOM_AGE_MIN : game->customAge + 1;
+}
+
+static void custom_age_down(SSRGame *game) {
+    game->customAge = game->customAge <= CUSTOM_AGE_MIN ? CUSTOM_AGE_MAX : game->customAge - 1;
+}
+
+static void custom_skill(SSRGame *game) {
+    game->customSkill = game->customSkill >= CUSTOM_SKILL_MAX ? 0 : game->customSkill + CUSTOM_SKILL_STEP;
+}
+
+static void custom_skill_down(SSRGame *game) {
+    game->customSkill = game->customSkill <= 0 ? CUSTOM_SKILL_MAX : game->customSkill - CUSTOM_SKILL_STEP;
+}
+
+static void custom_ok(SSRGame *game) {
     if (!game->canPlay || !game->world) return;
     int league = chosen(game, "ChosenDesiredLeague");
     int wage = (int)ssr_tweaks_number(game->tweaks, "Player", "StartingWage");
@@ -1279,6 +1318,7 @@ static void nation_ok(SSRGame *game) {
     casino_new_player(game);
     horses_for_career(game);
     game->career.nationId = chosen(game, "ChosenDesiredNation");
+    game->career.startAge = game->customAge > CUSTOM_AGE_MIN ? game->customAge : 0;
     // LoadDataAndStartTrial: the game chooses the club.
     const SSRClub *club = first_club(game, league);
     if (!club) return;
@@ -1469,7 +1509,12 @@ static void call_start_career(SSRGame *game) {
     int *skills[5] = {c->technique, c->pace, c->vision, c->setPieces, c->power};
     for (int i = 0; i < 5; i++) {
         if (skills[i][0] == 0) skills[i][0] = 1;
+        // A custom career trains the first levels of each skill.
+        for (int level = 0; level < game->customSkill && level < SSR_CAREER_SKILL_LEVELS; level++) {
+            if (skills[i][level] == 0) skills[i][level] = 1;
+        }
     }
+    game->customSkill = 0;
     skip_to_first_match(game);
     c->worldSeed = game->settings.nextWorldSeed;
     ssr_honours_clear(&game->honours);
@@ -9650,6 +9695,12 @@ static const Route ROUTES[] = {
     {"choosenation.cmb_Nation", combo_nation},
     {"choosenation.cmb_League", combo_league},
     {"choosenation.btn_Ok", nation_ok},
+    {"customcareer.btn_Age", custom_age},
+    {"customcareer.btn_AgeDown", custom_age_down},
+    {"customcareer.btn_Skill", custom_skill},
+    {"customcareer.btn_SkillDown", custom_skill_down},
+    {"customcareer.btn_Ok", custom_ok},
+    {"customcareer.btn_Back", choose_nation},
     {"webpage.btn_Ok", webpage_ok},
     {"gamemenu.btn_Quit", quit_career},
     {"gamemenu.btn_Play", game_play},
@@ -10439,6 +10490,15 @@ const char *ssr_game_text(SSRGame *game, const char *name) {
     if (strcmp(name, "GS_PlayerClubName") == 0) {
         const SSRClub *club = game->world ? ssr_world_club(game->world, game->career.clubId) : NULL;
         return club ? club->tla : loc(game, "Club");
+    }
+    if (strcmp(name, "GS_CustomAge") == 0) {
+        snprintf(game->shown, sizeof(game->shown), "%d", game->customAge);
+        return game->shown;
+    }
+    if (strcmp(name, "GS_CustomSkill") == 0) {
+        if (game->customSkill == 0) return loc(game, "SSR_CustomSkillTrials");
+        snprintf(game->shown, sizeof(game->shown), "%d", game->customSkill);
+        return game->shown;
     }
     if (strcmp(name, "GS_WorldSeed") == 0) {
         if (game->typing == 3) return game->seedText;

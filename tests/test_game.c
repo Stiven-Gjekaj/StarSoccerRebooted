@@ -2450,6 +2450,11 @@ static void test_starts_a_new_career(void) {
     take_ops(game, ops, 64);
 
     ssr_game_message(game, "choosenation.btn_Ok");
+    // The custom career starts as a career of the game.
+    CHECK(strcmp(ssr_game_screen(game), "customcareer") == 0);
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomAge"), "16") == 0);
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomSkill"), "SSR_CustomSkillTrials") == 0);
+    ssr_game_message(game, "customcareer.btn_Ok");
     CHECK(strcmp(ssr_game_screen(game), "messagedefault") == 0);
     const SSRCareer *career = ssr_game_career(game);
     CHECK(career->nationId == 63 && career->clubNationId == 62 && career->gender == 1);
@@ -2651,6 +2656,34 @@ static void test_starts_a_new_career(void) {
     CHECK(seasonFile == NULL);
     if (seasonFile) fclose(seasonFile);
     CHECK(ssr_people_load(peoplePath) == NULL);
+
+    // A custom career: the player starts at 20, with 30 in each skill.
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_message(game, "message.btn_Ok");
+    ssr_game_message(game, "chooseclub.btn_Ok");
+    ssr_game_message(game, "chooseclub.btn_Ok");
+    ssr_game_message(game, "choosenation.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "customcareer") == 0);
+    // The values go round at each end.
+    ssr_game_message(game, "customcareer.btn_AgeDown");
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomAge"), "32") == 0);
+    ssr_game_message(game, "customcareer.btn_Age");
+    for (int i = 0; i < 4; i++) ssr_game_message(game, "customcareer.btn_Age");
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomAge"), "20") == 0);
+    ssr_game_message(game, "customcareer.btn_SkillDown");
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomSkill"), "70") == 0);
+    ssr_game_message(game, "customcareer.btn_Skill");
+    for (int i = 0; i < 3; i++) ssr_game_message(game, "customcareer.btn_Skill");
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomSkill"), "30") == 0);
+    ssr_game_message(game, "customcareer.btn_Ok");
+    fail_the_trials(game, tweaks);
+    ssr_game_message(game, "message.btn_Ok");
+    career = ssr_game_career(game);
+    CHECK(strcmp(ssr_game_screen(game), "startransition") == 0 && career->startAge == 20);
+    CHECK(ssr_career_age(career) == 20 && ssr_tweaks_number(tweaks, "Player", "Age") == 20);
+    CHECK(ssr_career_skill(career->technique) >= 30 && ssr_career_skill(career->power) >= 30);
+    CHECK(ssr_career_skill(career->pace) >= 30 && ssr_career_skill(career->vision) >= 30);
+    CHECK(ssr_career_skill(career->setPieces) >= 30);
     ssr_game_free(game);
     ssr_tweaks_free(tweaks);
 }
