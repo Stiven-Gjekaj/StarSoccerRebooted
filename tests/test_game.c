@@ -2548,6 +2548,10 @@ static void test_starts_a_new_career(void) {
     CHECK(strstr(news, "Ann ") || strstr(news, "Bob ") || strstr(news, "Cid "));
     turns = 0;
     CHECK(ssr_game_ticker_priority(game, SSR_TICKER_WORLD_SCORER, &turns) > 0);
+    turns = 0;
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_WORLD_TABLE, &turns) > 0);
+    ssr_game_ticker_text(game, SSR_TICKER_WORLD_TABLE, &turns, news, sizeof(news));
+    CHECK(strncmp(news, "SSR_TICKER_TITLE", 16) == 0);
     // The honours keep the champion of each past season of the league.
     ssr_game_message(game, "gamemenu.btn_League");
     ssr_game_message(game, "league.btn_Squad");

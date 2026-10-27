@@ -155,6 +155,9 @@ typedef enum {
     SSR_TICKER_WORLD_MOVE,
     // The next match of the player is a derby.
     SSR_TICKER_WORLD_DERBY,
+    // The race for the title and the fight against relegation in the
+    // league of the player.
+    SSR_TICKER_WORLD_TABLE,
     SSR_TICKER_KINDS,
 } SSRTickerKind;
 

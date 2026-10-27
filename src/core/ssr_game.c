@@ -9472,6 +9472,20 @@ static int next_derby(SSRGame *game, int *home, int *away) {
     return ssr_world_is_derby(game->world, *home, *away);
 }
 
+// The league table of the player after 3 matches or more: the first, the
+// second, and the last row. Returns the competition, or NULL.
+static SSRSeasonComp *table_story(SSRGame *game, const SSRTableRow **rows) {
+    SSRSeason *s = game->season;
+    SSRSeasonComp *comp = s ? ssr_season_comp(s, ssr_season_actual_league(s, game->career.clubId)) : NULL;
+    if (!comp || comp->data->type != 0 || comp->poolCount == 0 || comp->pools[0].count < 3) return NULL;
+    SSRPool *pool = &comp->pools[0];
+    ssr_season_sort_pool(s, pool, 4);
+    rows[0] = &s->rows[pool->rows[0]];
+    rows[1] = &s->rows[pool->rows[1]];
+    rows[2] = &s->rows[pool->rows[pool->count - 1]];
+    return rows[0]->played >= 3 ? comp : NULL;
+}
+
 static void person_name(const SSRPerson *p, char *out, size_t capacity) {
     snprintf(out, capacity, "%s %s", p->first, p->last);
 }
@@ -9548,6 +9562,11 @@ int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
         season_in(game);
         int home = 0, away = 0;
         return club && next_derby(game, &home, &away) ? ticker_counter(count) : -1;
+    }
+    case SSR_TICKER_WORLD_TABLE: {
+        season_in(game);
+        const SSRTableRow *rows[3];
+        return club && table_story(game, rows) ? ticker_counter(count) : -1;
     }
     default:
         return -1;
@@ -9683,6 +9702,23 @@ void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_
         replace_all(text, capacity, "$apps", value);
         SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, ssr_season_actual_league(game->season, c->clubId)) : NULL;
         replace_all(text, capacity, "$league", comp ? comp->data->tla : "");
+        break;
+    }
+    case SSR_TICKER_WORLD_TABLE: {
+        season_in(game);
+        const SSRTableRow *rows[3];
+        SSRSeasonComp *comp = table_story(game, rows);
+        if (!comp) return;
+        int gap = rows[0]->points - rows[1]->points;
+        snprintf(text, capacity, "%s", loc(game, gap > 0 ? "SSR_TICKER_TITLERACE" : "SSR_TICKER_TITLELEVEL"));
+        replace_all(text, capacity, "$leader", club_name(game, rows[0]->teamId));
+        replace_all(text, capacity, "$second", club_name(game, rows[1]->teamId));
+        replace_all(text, capacity, "$bottom", club_name(game, rows[2]->teamId));
+        replace_all(text, capacity, "$league", comp->data->tla);
+        snprintf(number, sizeof(number), "%d", gap);
+        replace_all(text, capacity, "$gap", number);
+        snprintf(number, sizeof(number), "%d", rows[0]->played);
+        replace_all(text, capacity, "$played", number);
         break;
     }
     case SSR_TICKER_WORLD_DERBY: {
