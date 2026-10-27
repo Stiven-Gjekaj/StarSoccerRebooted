@@ -401,9 +401,9 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       its Documents folder.
 - [x] Art packs: a pack can replace any image of the game, and any
       screen
-- [ ] The index repository of the packs, with a CI check for each pull
-      request
-- [ ] A pack browser in the app: read the index, download a pack, and
+- [x] The index repository of the packs, with a CI check for each pull
+      request (StarSoccerRebooted-Packs)
+- [x] A pack browser in the app: read the index, download a pack, and
       check its SHA-256. Not in the store builds.
 - [ ] A 2026 data pack: the leagues, the clubs, and the squads of the
       2025-26 season. It is a separate project, not in this repository.
@@ -416,7 +416,7 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] Choose the position of the player, and change it later (the list
       of the rivals). The position gives the focus at the kick-off.
 - [ ] More kinds of match moments: set pieces, defence, saves
-- [ ] Replays of goals and matches
+- [ ] Replays of whole matches: the owner chose not to add them
 
 ## After 1.0
 
