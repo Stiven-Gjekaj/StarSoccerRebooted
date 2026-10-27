@@ -325,10 +325,11 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 ### The match
 
-- [ ] Match context: a derby, a cup final, or a match that the club must
-      win changes the crowd, the pressure, and the stakes
-- [ ] Momentum: a goal changes the match, so a comeback from 2-0 is
-      possible
+- [x] Match context: the fans care more about a derby or a rivalry match
+- [ ] A cup final or a match that the club must win changes the crowd and
+      the pressure
+- [x] Momentum: from the hour, the team that is behind pushes, so a
+      comeback from 2-0 is possible
 - [ ] Weather and the pitch change how the ball moves
 - [ ] Fair ratings and real scores. Players of the original complained
       about harsh ratings and very high scores.
