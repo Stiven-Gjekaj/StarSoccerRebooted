@@ -592,9 +592,14 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
             if (clipped) SDL_GetRectIntersection(&rect, &outer, &rect);
             SDL_SetRenderClipRect(gfx->renderer, &rect);
         }
-        // draw_line takes the top of the line.
-        draw_line(gfx, slot, lines[i], x + gfx->offsetX, item->y + baseline - ascent + gfx->offsetY, scaleX, scaleY,
-                  item->colour, item->italic);
+        // draw_line takes the top of the line. The shadow draws first, in
+        // units of the font (c_CachedTextPacketFR).
+        float left = x + gfx->offsetX, top = item->y + baseline - ascent + gfx->offsetY;
+        if (item->shadow) {
+            draw_line(gfx, slot, lines[i], left + item->shadowX * scaleX, top + item->shadowY * scaleY, scaleX, scaleY,
+                      item->shadowColour, item->italic);
+        }
+        draw_line(gfx, slot, lines[i], left, top, scaleX, scaleY, item->colour, item->italic);
         if (scroll) SDL_SetRenderClipRect(gfx->renderer, clipped ? &outer : NULL);
     }
 }
