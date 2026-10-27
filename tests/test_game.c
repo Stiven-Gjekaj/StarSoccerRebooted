@@ -2930,6 +2930,34 @@ static void test_chooses_a_pack(void) {
     ssr_game_type(game, "45");
     ssr_game_key(game, SSR_KEY_ENTER);
     CHECK(!ssr_game_wants_text(game) && ssr_game_settings(game)->nextWorldSeed == 1245);
+    // The pack browser: no browser in a store build, then the index, a
+    // tap that asks for the download, and a failed download.
+    ssr_game_message(game, "packs.btn_Browse");
+    CHECK(strcmp(ssr_game_screen(game), "packbrowser") != 0);
+    ssr_game_set_can_browse(game, 1);
+    ssr_game_message(game, "packs.btn_Browse");
+    CHECK(strcmp(ssr_game_screen(game), "packbrowser") == 0);
+    CHECK(ssr_game_take_browse(game) && !ssr_game_take_browse(game));
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Browse", "Status"), "SSR_BrowseLoading") == 0);
+    ssr_game_set_pack_index(game, NULL);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Browse", "Status"), "SSR_BrowseFailed") == 0);
+    ssr_game_set_pack_index(game, "id\tname\tauthor\tversion\tformat\tsize\tsha256\turl\n"
+                                  "harbour\tHarbour\tA. Person\t1.0\t1\t3\t"
+                                  "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\thttps://example.com/h.zip\n");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Browse", "Status"), "SSR_BrowseChoose") == 0);
+    SSRPackEntry entry;
+    CHECK(!ssr_game_take_download(game, &entry));
+    ssr_game_message(game, "packbrowser.row_pack 0");
+    CHECK(ssr_game_take_download(game, &entry) && strcmp(entry.id, "harbour") == 0);
+    // The download is asked once, and a second tap waits for it.
+    ssr_game_message(game, "packbrowser.row_pack 0");
+    CHECK(!ssr_game_take_download(game, &entry));
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Browse", "Status"), "SSR_BrowseDownloading") == 0);
+    ssr_game_download_failed(game);
+    CHECK(!ssr_game_take_download(game, &entry));
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Browse", "Status"), "SSR_BrowseDownloadFailed") == 0);
+    ssr_game_message(game, "packbrowser.btn_Back");
+    CHECK(strcmp(ssr_game_screen(game), "packs") == 0);
     // The ratings and the scores: real first, then classic.
     CHECK(strcmp(ssr_game_text(game, "GS_Realism"), "SSR_RealismReal") == 0);
     ssr_game_message(game, "packs.btn_Realism");

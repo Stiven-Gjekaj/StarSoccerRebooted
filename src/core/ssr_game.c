@@ -71,6 +71,12 @@ struct SSRGame {
     char packsDirectory[2048];
     char packIds[33][48];
     int packCount, packRow, packInstallAsked, canInstallPacks;
+    // The pack browser: the rows of the index, the request of the index,
+    // the row of the download that the game asks for, and the row of the
+    // download that the app makes (each from 1).
+    int canBrowse, browseAsked, downloadAsked, downloading;
+    SSRPackEntry browse[64];
+    int browseCount;
     // 1 after the player chose another pack: the app loads the world again.
     int packChanged;
     SSRRandom random;
@@ -593,6 +599,7 @@ static void packs_fill(SSRGame *game) {
     ssr_tweaks_set(t, "Packs", "ContinueLabel", loc(game, "SSR_ContinueLabel"));
     ssr_tweaks_set(t, "Packs", "RealismLabel", loc(game, "SSR_RealismLabel"));
     ssr_tweaks_set_number(t, "Packs", "CanInstall", game->canInstallPacks);
+    ssr_tweaks_set_number(t, "Packs", "CanBrowse", game->canBrowse);
     ssr_tweaks_set_number(t, "Packs", "CanRemove", game->packRow > 0);
     ssr_tweaks_set_number(t, "Packs", "Scroll", 0);
 }
@@ -600,6 +607,35 @@ static void packs_fill(SSRGame *game) {
 static void packs_screen(SSRGame *game) {
     set_screen(game, "packs");
     packs_fill(game);
+}
+
+static void seed_done(SSRGame *game);
+
+static void browse_status(SSRGame *game, const char *tag, const char *name) {
+    char text[256];
+    snprintf(text, sizeof(text), "%s", loc(game, tag));
+    replace_all(text, sizeof(text), "$name", name ? name : "");
+    ssr_tweaks_set(game->tweaks, "Browse", "Status", text);
+}
+
+// packs.btn_Browse: the browser of the packs asks the app for the index.
+static void browse_screen(SSRGame *game) {
+    if (!game->canBrowse) return;
+    if (game->typing == 3) seed_done(game);
+    set_screen(game, "packbrowser");
+    ssr_tweaks_set(game->tweaks, "Browse", "Title", loc(game, "SSR_Browse"));
+    ssr_tweaks_set_number(game->tweaks, "Browse", "Scroll", 0);
+    add_op(game, SSR_OP_LIST_CLEAR, "BrowseList", NULL, NULL, 0);
+    browse_status(game, "SSR_BrowseLoading", NULL);
+    game->browseAsked = 1;
+}
+
+// packbrowser.row_pack: the app downloads the pack of the row.
+static void browse_row(SSRGame *game) {
+    int row = game->messageParam;
+    if (row < 0 || row >= game->browseCount || game->downloadAsked || game->downloading) return;
+    game->downloadAsked = row + 1;
+    browse_status(game, "SSR_BrowseDownloading", game->browse[row].name);
 }
 
 // packs.row_pack: the world reads the pack of the row. The app loads the
@@ -10368,6 +10404,9 @@ static const Route ROUTES[] = {
     {"packs.btn_Install", packs_install},
     {"packs.inp_Seed", seed_start},
     {"packs.btn_Continue", continue_next},
+    {"packs.btn_Browse", browse_screen},
+    {"packbrowser.row_pack", browse_row},
+    {"packbrowser.btn_Back", packs_screen},
     {"packs.btn_Realism", realism_next},
     {"about.btn_Ok", options},
     {"message.btn_Ok", message_ok},
@@ -11678,6 +11717,61 @@ int ssr_game_take_pack_install(SSRGame *game) {
 
 void ssr_game_show_packs(SSRGame *game) {
     if (game) packs_screen(game);
+}
+
+void ssr_game_set_can_browse(SSRGame *game, int can) {
+    if (game) game->canBrowse = can != 0;
+}
+
+int ssr_game_take_browse(SSRGame *game) {
+    if (!game || !game->browseAsked) return 0;
+    game->browseAsked = 0;
+    return 1;
+}
+
+void ssr_game_set_pack_index(SSRGame *game, const char *text) {
+    if (!game) return;
+    game->browseCount = text ? ssr_pack_index_parse(text, game->browse, 64) : 0;
+    add_op(game, SSR_OP_LIST_CLEAR, "BrowseList", NULL, NULL, 0);
+    if (!text) {
+        browse_status(game, "SSR_BrowseFailed", NULL);
+        return;
+    }
+    add_op(game, SSR_OP_LIST_START, "BrowseList", NULL, NULL, 82);
+    for (int i = 0; i < game->browseCount; i++) {
+        const SSRPackEntry *e = &game->browse[i];
+        char details[256], number[32];
+        snprintf(details, sizeof(details), "%s", loc(game, "SSR_PackBy"));
+        replace_all(details, sizeof(details), "$author", e->author);
+        replace_all(details, sizeof(details), "$version", e->version);
+        snprintf(number, sizeof(number), ", %ld KB", (e->size + 1023) / 1024);
+        size_t used = strlen(details);
+        snprintf(details + used, sizeof(details) - used, "%s", number);
+        add_op(game, SSR_OP_LIST_ADD, "BrowseList", "BrowseEntry", "", 0);
+        add_op(game, SSR_OP_LIST_TEXT, "BrowseList", NULL, e->name, 1);
+        add_op(game, SSR_OP_LIST_TEXT, "BrowseList", NULL, details, 2);
+        for (int k = 0; k < game->packCount; k++) {
+            if (strcmp(game->packIds[k], e->id) == 0) add_op(game, SSR_OP_LIST_SUB, "BrowseList", "Highlight", NULL, 1);
+        }
+        add_op(game, SSR_OP_LIST_PARAM, "BrowseList", NULL, NULL, i);
+    }
+    browse_status(game, game->browseCount ? "SSR_BrowseChoose" : "SSR_BrowseEmpty", NULL);
+}
+
+int ssr_game_take_download(SSRGame *game, SSRPackEntry *entry) {
+    if (!game || !game->downloadAsked) return 0;
+    int row = game->downloadAsked - 1;
+    game->downloading = game->downloadAsked;
+    game->downloadAsked = 0;
+    if (entry) *entry = game->browse[row];
+    return 1;
+}
+
+void ssr_game_download_failed(SSRGame *game) {
+    if (!game) return;
+    int row = game->downloading - 1;
+    game->downloading = 0;
+    browse_status(game, "SSR_BrowseDownloadFailed", row >= 0 && row < game->browseCount ? game->browse[row].name : "");
 }
 
 int ssr_game_take_settings_change(SSRGame *game) {

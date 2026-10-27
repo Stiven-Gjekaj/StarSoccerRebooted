@@ -247,3 +247,18 @@ PushOrigin:(324,@n)
 		>
 		ShowIf(Packs,CanRemove,1)
 PopOrigin
+
+// Get packs from the index of the packs (not in the store builds).
+PushOrigin:(480,@n)
+	M_NavButton:(0,0,SSR_Browse,,)
+	{
+		Draw:(IRestore,30,25,90,90)
+	}
+		Delay(0.2)
+		ConvergeFrom(640,0)
+		Click(packs.btn_Browse)
+		<
+			PlaySnd(UISelect)
+		>
+		ShowIf(Packs,CanBrowse,1)
+PopOrigin

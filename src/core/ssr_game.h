@@ -11,6 +11,7 @@
 #include "ssr_career.h"
 #include "ssr_honours.h"
 #include "ssr_match.h"
+#include "ssr_pack.h"
 #include "ssr_people.h"
 #include "ssr_training.h"
 #include "ssr_tweaks.h"
@@ -239,6 +240,18 @@ int ssr_game_take_pack_change(SSRGame *game);
 int ssr_game_take_pack_install(SSRGame *game);
 // Opens the packs screen with the list of the installed packs.
 void ssr_game_show_packs(SSRGame *game);
+
+// The pack browser: the app tells the game that it can download (not in
+// the store builds). The browser screen asks for the index once
+// (ssr_game_take_browse), and the app gives its text, or NULL when the
+// download failed. A tap on a pack asks for its download
+// (ssr_game_take_download); the app then checks it, installs it, and tells
+// the game of a failure (ssr_game_download_failed).
+void ssr_game_set_can_browse(SSRGame *game, int can);
+int ssr_game_take_browse(SSRGame *game);
+void ssr_game_set_pack_index(SSRGame *game, const char *text);
+int ssr_game_take_download(SSRGame *game, SSRPackEntry *entry);
+void ssr_game_download_failed(SSRGame *game);
 // Chooses the data pack of the world. "" or NULL chooses the world of the
 // game. The app loads the world again.
 void ssr_game_set_pack(SSRGame *game, const char *id);
