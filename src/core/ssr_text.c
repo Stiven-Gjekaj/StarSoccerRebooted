@@ -1,5 +1,6 @@
 #include "ssr_text.h"
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,6 +16,9 @@ struct SSRText {
     SSRTsv *table;
     SSRTextEntry *entries;
     int count;
+    // The texts that ssr_text_rebrand makes.
+    char **owned;
+    int ownedCount;
 };
 
 static int compare_entries(const void *a, const void *b) {
@@ -52,6 +56,8 @@ SSRText *ssr_text_load(const char *path) {
 
 void ssr_text_free(SSRText *text) {
     if (!text) return;
+    for (int i = 0; i < text->ownedCount; i++) free(text->owned[i]);
+    free(text->owned);
     free(text->entries);
     ssr_tsv_free(text->table);
     free(text);
@@ -69,6 +75,76 @@ const char *ssr_text_get(const SSRText *text, const char *tag, int female) {
     if (!entry) return tag;
     if (female && *entry->female) return entry->female;
     return entry->male;
+}
+
+static const struct {
+    const char *from, *to;
+    // 1 when the name must be at the start of a word.
+    int wordStart;
+} RENAMES[] = {{"New Star Soccer", "Star Soccer Rebooted", 0}, {"NS-", "SSR-", 1}};
+
+static const char *const KEEP[] = {"Credits_", "CMESSAGE_CREDITS", "GWL_"};
+
+// A copy of s with the names of the remake, or NULL when s does not change.
+static char *rename_text(const char *s) {
+    size_t length = strlen(s), capacity = length * 2 + 1;
+    char *out = malloc(capacity);
+    if (!out) return NULL;
+    size_t o = 0;
+    int changed = 0;
+    for (size_t i = 0; i < length;) {
+        int done = 0;
+        for (size_t r = 0; r < sizeof(RENAMES) / sizeof(RENAMES[0]) && !done; r++) {
+            size_t n = strlen(RENAMES[r].from);
+            if (strncmp(s + i, RENAMES[r].from, n) != 0) continue;
+            if (RENAMES[r].wordStart && i > 0 && isalnum((unsigned char)s[i - 1])) continue;
+            size_t m = strlen(RENAMES[r].to);
+            if (o + m + 1 > capacity) break;
+            memcpy(out + o, RENAMES[r].to, m);
+            o += m;
+            i += n;
+            changed = done = 1;
+        }
+        if (done) continue;
+        if (o + 2 > capacity) break;
+        out[o++] = s[i++];
+    }
+    out[o] = 0;
+    if (!changed) {
+        free(out);
+        return NULL;
+    }
+    return out;
+}
+
+int ssr_text_rebrand(SSRText *text) {
+    if (!text) return 0;
+    if (!text->owned) text->owned = calloc((size_t)text->count * 2 + 1, sizeof(char *));
+    if (!text->owned) return 0;
+    int changes = 0;
+    for (int i = 0; i < text->count; i++) {
+        SSRTextEntry *entry = &text->entries[i];
+        int keep = 0;
+        for (size_t k = 0; k < sizeof(KEEP) / sizeof(KEEP[0]); k++) {
+            keep |= strncmp(entry->tag, KEEP[k], strlen(KEEP[k])) == 0;
+        }
+        if (keep) continue;
+        const char **texts[2] = {&entry->male, &entry->female};
+        int entryChanged = 0;
+        for (int t = 0; t < 2; t++) {
+            char *renamed = rename_text(*texts[t]);
+            if (!renamed) continue;
+            if (text->ownedCount >= text->count * 2) {
+                free(renamed);
+                continue;
+            }
+            text->owned[text->ownedCount++] = renamed;
+            *texts[t] = renamed;
+            entryChanged = 1;
+        }
+        changes += entryChanged;
+    }
+    return changes;
 }
 
 size_t ssr_text_format(char *out, size_t capacity, const char *template, const char *const *names,

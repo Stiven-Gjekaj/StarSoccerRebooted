@@ -21,6 +21,13 @@ int ssr_text_count(const SSRText *text);
 // it gives the female text. When the tag is not there, it gives the tag.
 const char *ssr_text_get(const SSRText *text, const char *tag, int female);
 
+// Puts the names of the remake in the place of the names of New Star
+// Games: "New Star Soccer" becomes "Star Soccer Rebooted", and "NS-" at the
+// start of a word becomes "SSR-". The credits of the original and the
+// other games of New Star Games keep their names. Returns the number of
+// texts that change.
+int ssr_text_rebrand(SSRText *text);
+
 // Copies template into out and replaces each "$name" with the value of the
 // name. names and values have count items. A longer name wins, so "$teamname"
 // is not "$team" with "name" after it. Returns the length of the full
