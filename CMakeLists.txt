@@ -51,6 +51,7 @@ add_library(ssr_core STATIC
     src/core/ssr_ball.c
     src/core/ssr_ex.c
     src/core/ssr_tapball.c
+    src/core/ssr_players.c
 )
 target_include_directories(ssr_core PUBLIC src/core)
 target_include_directories(ssr_core PRIVATE src/third_party)
@@ -137,5 +138,6 @@ ssr_add_test(test_ticker)
 ssr_add_test(test_ball)
 ssr_add_test(test_ex)
 ssr_add_test(test_tapball)
+ssr_add_test(test_players)
 # The font test skips its layout checks when the system has no TTF font.
 set_tests_properties(test_font PROPERTIES SKIP_RETURN_CODE 77)
