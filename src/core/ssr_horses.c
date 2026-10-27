@@ -139,6 +139,10 @@ void ssr_horses_load_owned(SSRHorses *h, const char *text) {
     }
 }
 
+void ssr_horses_sort_by_id(SSRHorses *h) {
+    sort_list(h, h->list, h->count, 1, 0);
+}
+
 SSRHorse *ssr_horses_by_id(SSRHorses *h, int id) {
     return id >= 1 && id <= h->count ? &h->horses[id - 1] : NULL;
 }

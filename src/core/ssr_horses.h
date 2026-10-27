@@ -55,6 +55,9 @@ void ssr_horses_owned_text(const SSRHorses *horses, char *out, size_t capacity);
 // LoadHorsesOwned.
 void ssr_horses_load_owned(SSRHorses *horses, const char *text);
 
+// SORT(glist, 1): the list in id order, as UpdateHorseTweaks leaves it.
+void ssr_horses_sort_by_id(SSRHorses *horses);
+
 // The horse with the id, or NULL.
 SSRHorse *ssr_horses_by_id(SSRHorses *horses, int id);
 int ssr_horses_count_owned(const SSRHorses *horses);

@@ -124,6 +124,10 @@ static void test_runs_a_race(void) {
         ticks++;
     }
     CHECK(ticks == 429 && frozen);
+    // The draw left the list in the order of the draw numbers.
+    CHECK(horses.list[0] != 0 || horses.list[1] != 1);
+    ssr_horses_sort_by_id(&horses);
+    for (int i = 0; i < horses.count; i++) CHECK(horses.list[i] == i);
     int seen[7] = {0};
     for (int i = 0; i < 6; i++) {
         const SSRHorse *r = &horses.horses[horses.runners[i]];
