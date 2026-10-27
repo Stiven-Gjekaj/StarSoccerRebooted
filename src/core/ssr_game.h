@@ -129,6 +129,9 @@ typedef struct {
     int nextWorldSeed;
     // 1 when the next new career continues the world of the last career.
     int continueWorld;
+    // 1 for the ratings and the scores of 4.32, 0 for the fair ratings and
+    // the real scores of the remake.
+    int classicRealism;
 } SSRSettings;
 
 // The tickers of a career, in the order of the game

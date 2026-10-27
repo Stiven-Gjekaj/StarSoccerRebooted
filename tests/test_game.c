@@ -94,11 +94,13 @@ static void test_chooses_a_language(void) {
 
     char path[1200];
     snprintf(path, sizeof(path), "%s/settings.txt", ssr_test_directory("game_language"));
+    // The classic ratings and scores stay in the settings.
+    ssr_game_message(game, "packs.btn_Realism");
     CHECK(ssr_game_save_settings(game, path));
     ssr_game_free(game);
     game = ssr_game_create(tweaks);
     CHECK(ssr_game_load_settings(game, path));
-    CHECK(ssr_game_settings(game)->language == 10);
+    CHECK(ssr_game_settings(game)->language == 10 && ssr_game_settings(game)->classicRealism == 1);
     // With no language, the game asks for one in English.
     ssr_game_free(game);
     game = ssr_game_create(tweaks);
@@ -2417,6 +2419,10 @@ static void test_starts_a_new_career(void) {
     careerPath = path;
     SSRGame *game = ssr_game_create(tweaks);
     ssr_game_set_data(game, &world, localise, NULL, directory);
+    // This career checks the rules of 4.32: the classic ratings and scores.
+    CHECK(ssr_game_settings(game)->classicRealism == 0);
+    ssr_game_message(game, "packs.btn_Realism");
+    CHECK(ssr_game_settings(game)->classicRealism == 1);
     // The names of 210 race horses, after a header line.
     static char horses[4096];
     size_t used = (size_t)snprintf(horses, sizeof(horses), "Header\r\n");
@@ -2859,6 +2865,11 @@ static void test_chooses_a_pack(void) {
     ssr_game_type(game, "45");
     ssr_game_key(game, SSR_KEY_ENTER);
     CHECK(!ssr_game_wants_text(game) && ssr_game_settings(game)->nextWorldSeed == 1245);
+    // The ratings and the scores: real first, then classic.
+    CHECK(strcmp(ssr_game_text(game, "GS_Realism"), "SSR_RealismReal") == 0);
+    ssr_game_message(game, "packs.btn_Realism");
+    CHECK(strcmp(ssr_game_text(game, "GS_Realism"), "SSR_RealismClassic") == 0);
+    ssr_game_message(game, "packs.btn_Realism");
     ssr_game_message(game, "packs.btn_Back");
     CHECK(strcmp(ssr_game_screen(game), "options") == 0);
     ssr_game_free(game);

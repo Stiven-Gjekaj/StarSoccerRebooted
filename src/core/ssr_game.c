@@ -588,6 +588,7 @@ static void packs_fill(SSRGame *game) {
     ssr_tweaks_set(t, "Packs", "Title", loc(game, "SSR_World"));
     ssr_tweaks_set(t, "Packs", "SeedLabel", loc(game, "SSR_SeedLabel"));
     ssr_tweaks_set(t, "Packs", "ContinueLabel", loc(game, "SSR_ContinueLabel"));
+    ssr_tweaks_set(t, "Packs", "RealismLabel", loc(game, "SSR_RealismLabel"));
     ssr_tweaks_set_number(t, "Packs", "CanInstall", game->canInstallPacks);
     ssr_tweaks_set_number(t, "Packs", "CanRemove", game->packRow > 0);
     ssr_tweaks_set_number(t, "Packs", "Scroll", 0);
@@ -650,6 +651,13 @@ static void seed_done(SSRGame *game) {
 static void continue_next(SSRGame *game) {
     if (game->typing == 3) seed_done(game);
     game->settings.continueWorld = !game->settings.continueWorld;
+    settings_changed(game);
+}
+
+static void realism_next(SSRGame *game) {
+    if (game->typing == 3) seed_done(game);
+    game->settings.classicRealism = !game->settings.classicRealism;
+    if (game->season) game->season->realScores = !game->settings.classicRealism;
     settings_changed(game);
 }
 
@@ -862,6 +870,7 @@ static void new_season_state(SSRGame *game) {
     if (game->season) {
         game->season->played = people_played;
         game->season->playedContext = game;
+        game->season->realScores = !game->settings.classicRealism;
     }
     season_in(game);
 }
@@ -2458,6 +2467,7 @@ static void end_match(SSRGame *game) {
     // The game never adds to m_workratetally, so GetOverallWorkRate is
     // always 0 in 4.32.
     f.workRate = 0;
+    f.fair = !game->settings.classicRealism;
     game->facts = f;
     ssr_aftermatch_rate(&f, &game->after);
     // Match context: the fans care more about a derby or a match of a big
@@ -10232,6 +10242,7 @@ static const Route ROUTES[] = {
     {"packs.btn_Install", packs_install},
     {"packs.inp_Seed", seed_start},
     {"packs.btn_Continue", continue_next},
+    {"packs.btn_Realism", realism_next},
     {"about.btn_Ok", options},
     {"message.btn_Ok", message_ok},
     {"message.btn_Cancel", message_cancel},
@@ -10451,6 +10462,7 @@ int ssr_game_load_settings(SSRGame *game, const char *path) {
         if (strcmp(key, "language") == 0 && value >= -1 && value <= 12) game->settings.language = value;
         if (strcmp(key, "worldseed") == 0 && value >= 0) game->settings.nextWorldSeed = value;
         if (strcmp(key, "continueworld") == 0) game->settings.continueWorld = value != 0;
+        if (strcmp(key, "classicrealism") == 0) game->settings.classicRealism = value != 0;
     }
     fclose(file);
     set_option_tweaks(game);
@@ -10468,6 +10480,7 @@ int ssr_game_save_settings(const SSRGame *game, const char *path) {
                      game->settings.volume, game->settings.distance, game->settings.replays,
                      game->settings.doneLoseSkills, game->settings.hardModeUnlocked, game->settings.language) > 0;
     ok = fprintf(file, "pack=%s\n", game->settings.pack) > 0 && ok;
+    ok = fprintf(file, "classicrealism=%d\n", game->settings.classicRealism) > 0 && ok;
     ok = fprintf(file, "worldseed=%d\ncontinueworld=%d\n", game->settings.nextWorldSeed,
                  game->settings.continueWorld) > 0 && ok;
     ok = fclose(file) == 0 && ok;
@@ -11257,6 +11270,7 @@ const char *ssr_game_text(SSRGame *game, const char *name) {
         if (game->typing == 4) return game->editText;
         return ssr_tweaks_get(game->tweaks, "Squad", "Title");
     }
+    if (strcmp(name, "GS_Realism") == 0) return loc(game, game->settings.classicRealism ? "SSR_RealismClassic" : "SSR_RealismReal");
     if (strcmp(name, "GS_ContinueWorld") == 0) return loc(game, game->settings.continueWorld ? "SSR_ContinueYes" : "SSR_ContinueNo");
     if (strcmp(name, "GS_PlayerFullName") == 0) {
         snprintf(game->shown, sizeof(game->shown), "%s", game->career.fullName);

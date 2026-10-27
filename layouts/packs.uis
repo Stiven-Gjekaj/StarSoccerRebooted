@@ -149,26 +149,55 @@ PopOrigin
 // The next new career starts a new world, or continues the world of the
 // last career.
 PushOrigin:(13,648)
-	Rect:(0,0,614,84)
+	Rect:(0,0,300,84)
 	{
-		Draw:(ButtonShadow,8,8,614,84,,#FFFFFF80)
-		Draw:(GreenButton,0,0,614,84)
+		Draw:(ButtonShadow,8,8,300,84,,#FFFFFF80)
+		Draw:(GreenButton,0,0,300,84)
 		Draw:(Glint,0,15.5,42,,,#606060FFFFFFFFFF)
 			Handle(42,16)
-			Shine(0,590)
+			Shine(0,280)
 			Additive()
-		Text:(WORLD,10,0,594,36,C,,#FFFFFFFF)
+		Text:(LABEL,10,0,280,36,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
-			FontScale(0.4,0.4)
+			FontScale(0.36,0.36)
 			StringReadout(Packs,ContinueLabel)
-		Text:(NEW,10,34,594,46,C,,#FFFFFFFF)
+		Text:(VALUE,10,34,280,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.5,0.5)
 			GS_ContinueWorld()
 	}
 		Click(packs.btn_Continue)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+
+// The fair ratings and the real scores of the remake, or the classic ones
+// of 4.32.
+PushOrigin:(327,648)
+	Rect:(0,0,300,84)
+	{
+		Draw:(ButtonShadow,8,8,300,84,,#FFFFFF80)
+		Draw:(GreenButton,0,0,300,84)
+		Draw:(Glint,0,15.5,42,,,#606060FFFFFFFFFF)
+			Handle(42,16)
+			Shine(0,280)
+			Additive()
+		Text:(LABEL,10,0,280,36,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.36,0.36)
+			StringReadout(Packs,RealismLabel)
+		Text:(VALUE,10,34,280,46,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.5,0.5)
+			GS_Realism()
+	}
+		Click(packs.btn_Realism)
 		<
 			PlaySnd(UISelect)
 		>
