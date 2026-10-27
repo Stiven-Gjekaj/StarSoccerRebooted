@@ -887,10 +887,14 @@ static void end_match(SSRGame *game) {
 
 static void match_play(SSRGame *game) {
     if (!game->match) return;
+    int kickOff = game->match->state == SSR_MATCH_PREMATCH;
     if (ssr_match_play(game->match, game->now)) {
         end_match(game);
         return;
     }
+    // The name plates slide together and show the score
+    // (c_AScreen_Match.m_ButtonPlay).
+    if (kickOff) add_op(game, SSR_OP_ANIM, "NameBar", NULL, "1", 0);
     match_state(game);
 }
 
@@ -1010,6 +1014,7 @@ static void match_tick(SSRGame *game) {
                 set_screen(game, "match");
                 for (int i = 0; i < game->commentaryCount; i++) show_line(game, &game->commentary[i]);
                 scroll_commentary(game);
+                add_op(game, SSR_OP_ANIM, "NameBar", NULL, "1", 1);
                 match_state(game);
                 match_tweaks(game);
             }

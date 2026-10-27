@@ -34,6 +34,9 @@ typedef enum {
     // The elements ref2 of the last entry of the list ref show when id is 1,
     // and take the text when it is not "".
     SSR_OP_LIST_SUB,
+    // The AnimInstance elements ref play at the speed in text, and jump to
+    // their end when id is 1.
+    SSR_OP_ANIM,
 } SSRUiOpKind;
 
 typedef struct {

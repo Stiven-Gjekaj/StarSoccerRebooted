@@ -100,6 +100,8 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     ssr_game_message(game, "match.btn_Play");
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MaximiseScreen") == 1);
+    int kick = take_ops(game, ops, 64);
+    CHECK(has_op(ops, kick, SSR_OP_ANIM, "NameBar", "1"));
     ssr_game_update(game, 1);
     int count = take_ops(game, ops, 64);
     CHECK(count >= 1 && has_op(ops, count, SSR_OP_LIST_ADD, "CommentaryTable", "Kick Off"));
