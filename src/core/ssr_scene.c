@@ -110,6 +110,8 @@ struct Doodad {
     float v[8];
     Colour from, to;
     const char *text[3];
+    // The ref of the line, for the code that changes a doodad (ACombo).
+    const char *ref;
 };
 
 typedef struct Gel Gel;
@@ -155,6 +157,8 @@ struct Gel {
     Doodad *clickChain;
     // The text that a readout gives, in place of the text of the line.
     char *shown;
+    // The place of the next entry that the code adds to this list.
+    float listY;
 
     // GEL_ANIM: the name of the animation, and its state.
     const char *animName;
@@ -1190,6 +1194,7 @@ static Doodad *make_doodads(SSRScene *s, Gel *g, const SSRUiNode *const *mods, i
     for (int i = 0; i < count; i++) {
         if (attach_else(s, g, list, mods[i])) continue;
         Doodad *d = make_doodad(s, g, mods[i], show);
+        if (d && mods[i]->ref) d->ref = keep(s, mods[i]->ref);
         if (d) append_doodad(&list, d);
     }
     return list;
@@ -2510,4 +2515,90 @@ const char *ssr_scene_take_sound(SSRScene *scene) {
 const char *ssr_scene_hit(const SSRScene *scene, float x, float y) {
     const SSRSceneItem *item = hit(scene, x, y, 0);
     return item ? item->ref : NULL;
+}
+
+// The first gel with the ref, in the order of the file: the outer gel of a
+// template, not a line inside it with the same ref.
+static Gel *find_ref_first(const SSRScene *s, const char *ref) {
+    for (int i = 0; i < s->refCount; i++) {
+        if (strcmp(s->refs[i]->ref, ref) == 0) return s->refs[i];
+    }
+    return NULL;
+}
+
+static Gel *first_text(Gel *g) {
+    if (g->kind == GEL_TEXT) return g;
+    for (int i = 0; i < g->childCount; i++) {
+        Gel *found = first_text(g->children[i]);
+        if (found) return found;
+    }
+    return NULL;
+}
+
+int ssr_scene_set_text(SSRScene *scene, const char *ref, const char *text) {
+    if (!scene || !ref || !text) return 0;
+    int count = 0;
+    for (int i = 0; i < scene->refCount; i++) {
+        if (strcmp(scene->refs[i]->ref, ref) != 0) continue;
+        Gel *g = first_text(scene->refs[i]);
+        if (g) {
+            set_shown(g, text);
+            count++;
+        }
+    }
+    return count;
+}
+
+int ssr_scene_set_visible(SSRScene *scene, const char *ref, int visible) {
+    if (!scene || !ref) return 0;
+    int count = 0;
+    for (int i = 0; i < scene->refCount; i++) {
+        if (strcmp(scene->refs[i]->ref, ref) != 0) continue;
+        scene->refs[i]->hidden = !visible;
+        count++;
+    }
+    return count;
+}
+
+void ssr_scene_list_clear(SSRScene *scene, const char *list) {
+    Gel *g = scene && list ? find_ref_first(scene, list) : NULL;
+    if (!g) return;
+    for (int i = 0; i < g->childCount; i++) free_gel(g->children[i]);
+    g->childCount = 0;
+    g->listY = 0;
+}
+
+static Doodad *find_doodad_ref(Doodad *d, const char *ref) {
+    for (; d; d = d->next) {
+        if (d->ref && strcmp(d->ref, ref) == 0) return d;
+        Doodad *inner = find_doodad_ref(d->chain, ref);
+        if (!inner) inner = find_doodad_ref(d->other, ref);
+        if (inner) return inner;
+    }
+    return NULL;
+}
+
+int ssr_scene_list_add(SSRScene *scene, const char *list, const char *template_, const char *text, int id) {
+    Gel *g = scene && list ? find_ref_first(scene, list) : NULL;
+    Gel *model = scene && template_ ? find_ref_first(scene, template_) : NULL;
+    if (!g || !model) return 0;
+    Gel *entry = clone_gel(model);
+    if (!entry) return 0;
+    // An entry goes below the one before it (c_ACombo.Add).
+    entry->x = 10;
+    entry->y = g->listY;
+    entry->hidden = 0;
+    g->listY += entry->h;
+    add_child(g, entry);
+    Gel *label = first_text(entry);
+    if (label && text) set_shown(label, text);
+    // The SetTweak with the ref ID gives the id to the tweak of the list.
+    Doodad *d = find_doodad_ref(entry->clickChain, "ID");
+    if (!d) d = find_doodad_ref(entry->doodads, "ID");
+    if (d && d->kind == D_SET_TWEAK) {
+        char value[32];
+        snprintf(value, sizeof(value), "%d", id);
+        d->text[2] = keep(scene, value);
+    }
+    return 1;
 }

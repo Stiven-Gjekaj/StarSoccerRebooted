@@ -140,4 +140,20 @@ const char *ssr_scene_click(SSRScene *scene, const SSRSceneEnv *env, const SSRSc
 // The next sound that a click asked for, or NULL when there is none.
 const char *ssr_scene_take_sound(SSRScene *scene);
 
+// Gives the first text of each element with the ref this text, as the code
+// of the game does with the gadgets of a screen. Returns the number of
+// elements.
+int ssr_scene_set_text(SSRScene *scene, const char *ref, const char *text);
+
+// Shows or hides each element with the ref. Returns the number of
+// elements.
+int ssr_scene_set_visible(SSRScene *scene, const char *ref, int visible);
+
+// The lists that the code fills (c_ACombo). list is the ref of the element
+// that holds the entries. An entry is a copy of the template with the ref
+// template_: it goes below the entry before it, shows the text, and its
+// SetTweak with the ref ID gives the id. Returns 1 when it worked.
+void ssr_scene_list_clear(SSRScene *scene, const char *list);
+int ssr_scene_list_add(SSRScene *scene, const char *list, const char *template_, const char *text, int id);
+
 #endif

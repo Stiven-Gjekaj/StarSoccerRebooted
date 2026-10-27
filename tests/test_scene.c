@@ -671,7 +671,52 @@ static void test_readouts_conditions_and_click_actions(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The code fills a list from a template, as c_ACombo does, and changes
+// the text and the visibility of the elements with a ref.
+static void test_fills_lists_and_changes_elements(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    layout = "Rect:(0,0,410,100) ref:NationTemplate\n"
+             "\tClick(choosenation.cmb_Nation)\n"
+             "\t<\n"
+             "\t\tSetTweak(Combo,ChosenDesiredNation,0) ref:ID\n"
+             "\t>\n"
+             "{\n"
+             "\tDraw:(GreenButton,0,0,410,100)\n"
+             "\tTextLoc:(Nation,0,0,410,100) ref:NationTemplate\n"
+             "} Template\n"
+             "PushOrigin:(100,200)\n"
+             "Rect:(0,0,0,0) ref:NationCombo\n"
+             "PopOrigin\n"
+             "Text:(Choose,0,0,100,20) ref:NationText\n"
+             "Draw:(PlayBall,0,0,10,10) ref:PlayButton $HIDE\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    CHECK(ssr_scene_list_add(scene, "NationCombo", "NationTemplate", "ENGLAND", 62));
+    CHECK(ssr_scene_list_add(scene, "NationCombo", "NationTemplate", "WALES", 63));
+    CHECK(ssr_scene_set_text(scene, "NationText", "England") == 1);
+    CHECK(ssr_scene_set_visible(scene, "PlayButton", 1) == 1);
+    CHECK(!ssr_scene_list_add(scene, "NoList", "NationTemplate", "X", 1));
+    ssr_scene_update(scene, &env, 0);
+    CHECK(find_text(scene, "England") && find_image(scene, "PlayBall"));
+    const SSRSceneItem *wales = find_text(scene, "WALES");
+    CHECK(wales && near(wales->x, 110) && near(wales->y, 300));
+    CHECK(find_text(scene, "ENGLAND") && near(find_text(scene, "ENGLAND")->y, 200));
+    const SSRSceneItem *hit = ssr_scene_hit_item(scene, 150, 350);
+    CHECK(hit && strcmp(ssr_scene_click(scene, &env, hit), "choosenation.cmb_Nation") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Combo", "ChosenDesiredNation") == 63);
+    ssr_scene_list_clear(scene, "NationCombo");
+    ssr_scene_update(scene, &env, 16);
+    CHECK(!find_text(scene, "WALES"));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_fills_lists_and_changes_elements();
     test_readouts_conditions_and_click_actions();
     test_converges_after_a_delay_and_on_press();
     test_plays_an_animation();
