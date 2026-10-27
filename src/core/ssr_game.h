@@ -70,6 +70,9 @@ typedef enum {
     SSR_OP_ENTRY_BAR,
     // The first element ref goes to the x in id, in its parent.
     SSR_OP_SET_X,
+    // The AnimInstance number id of the elements ref stops at the frame in
+    // text.
+    SSR_OP_ANIM_FRAME,
 } SSRUiOpKind;
 
 typedef struct {

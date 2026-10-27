@@ -777,6 +777,9 @@ static void apply_op(SSRApp *app, SSRScene *s, const SSRUiOp *o) {
     case SSR_OP_ELEMENT_COLOUR:
         ssr_scene_set_element_colour(s, op.ref, op.id, op.text);
         break;
+    case SSR_OP_ANIM_FRAME:
+        ssr_scene_anim_frame(s, op.ref, op.id, (float)SDL_atof(op.text));
+        break;
     case SSR_OP_ANIM_PLAY:
         ssr_scene_anim_play(s, op.ref, op.ref2[0] ? op.ref2 : NULL, (float)op.id, (float)SDL_atof(op.text));
         break;
