@@ -892,6 +892,33 @@ static void test_runs_a_block_by_a_tweak(void) {
 
 // A drag on a swipe panel scrolls the list under it, and the list keeps
 // the speed of the drag, then slows down and stops at its ends.
+// The rows of a list can be in a child of the list: they count too.
+static void test_scrolls_rows_in_a_child(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Combo", "Scroll", -2000);
+    SSRUiTree *tree;
+    layout = "Rect:(0,0,0,0)\n"
+             "\tScrollingList(Combo,Scroll,300,Combo,ScrollVel)\n"
+             "{\n"
+             "\tRect:(0,0,400,72) ref:Table\n"
+             "\t{\n"
+             "\t\tDraw:(Row,0,0,400,72)\n"
+             "\t\tDraw:(Row,0,928,400,72)\n"
+             "\t}\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    // The lowest place is 300 - 1000, and the list may go 64 past it.
+    float scroll = (float)ssr_tweaks_number(tweaks, "Combo", "Scroll");
+    CHECK(scroll < -700 && scroll > -764);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -970,6 +997,7 @@ static void test_draws_embedded_content(void) {
 int main(void) {
     test_draws_embedded_content();
     test_scrolls_a_list_by_a_swipe();
+    test_scrolls_rows_in_a_child();
     test_fills_lists_and_changes_elements();
     test_readouts_conditions_and_click_actions();
     test_converges_after_a_delay_and_on_press();

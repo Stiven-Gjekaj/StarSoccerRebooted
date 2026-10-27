@@ -2095,6 +2095,19 @@ static void set_tweak_pair(const SSRScene *s, const char *pair, double value) {
     ssr_tweaks_set_number(s->env->tweaks, group, split + 1, value);
 }
 
+// The bottom of the children of g and of their children, in g.
+static float content_bottom(const Gel *g) {
+    float bottom = 0;
+    for (int i = 0; i < g->childCount; i++) {
+        const Gel *child = g->children[i];
+        if (child->hidden) continue;
+        float inner = content_bottom(child);
+        float b = child->y + (inner > child->h ? inner : child->h);
+        if (b > bottom) bottom = b;
+    }
+    return bottom;
+}
+
 static void update(SSRScene *s, Gel *g, Doodad *d) {
     float t = s->tweenT;
     switch (d->kind) {
@@ -2300,11 +2313,7 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         break;
     case D_SCROLLING_LIST: {
         float at = (float)ssr_tweaks_number(s->env->tweaks, d->text[0], d->text[1]);
-        float contents = 0;
-        for (int i = 0; i < g->childCount; i++) {
-            const Gel *child = g->children[i];
-            if (!child->hidden && child->y + child->h > contents) contents = child->y + child->h;
-        }
+        float contents = content_bottom(g);
         float lowest = d->v[0] - contents;
         if (lowest > 0) lowest = 0;
         float velocity = (float)tweak_pair(s, d->text[2]);
