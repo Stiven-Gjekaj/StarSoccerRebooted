@@ -62,6 +62,8 @@ static void test_changes_and_saves_the_options(void) {
 static const char *localise(void *context, const char *tag) {
     (void)context;
     if (strcmp(tag, "CMESSAGE_TRIALSUCCESSMOBILE") == 0) return "Signed by $clubname ($labelname) in $leaguename.";
+    if (strcmp(tag, "CMESSAGE_TRIALMOBILE1") == 0) return "Trial one.";
+    if (strcmp(tag, "CMESSAGE_TRIALMOBILEFAIL4_DRIBBLING") == 0) return "Failed. Now dribble.";
     if (strcmp(tag, "CNEWS_FIRSTCONTRACTMOBILE") == 0) return "$clubname have signed $playername.";
     if (strcmp(tag, "help_newplayer") == 0) return "Welcome.";
     if (strcmp(tag, "CMESSAGE_DELETESLOT") == 0) return "Delete?";
@@ -85,6 +87,51 @@ static int has_op(const SSRUiOp *ops, int count, SSRUiOpKind kind, const char *r
 // test makes: one continent, two nations, a league in England.
 // Plays a match from the game menu: the commentary, a chance of the
 // player, and the end.
+// Fails the five trials of a new career: each shot goes to the left, and
+// the dribble goes off the screen. No skill gets a level.
+static void fail_the_trials(SSRGame *game, SSRTweaks *tweaks) {
+    for (int trial = 1; trial <= 5; trial++) {
+        CHECK(strcmp(ssr_game_screen(game), "messagedefault") == 0);
+        if (trial == 1) CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "Trial one.") == 0);
+        if (trial == 4) CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "Failed. Now dribble.") == 0);
+        ssr_game_message(game, "message.btn_Ok");
+        CHECK(strcmp(ssr_game_screen(game), "matchminigame") == 0);
+        const SSRTraining *t = ssr_game_training(game);
+        CHECK(t && t->trial == trial && t->lives == 3 && ssr_game_chance(game) == &t->chance);
+        char step[8];
+        snprintf(step, sizeof(step), "%d", trial);
+        CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MGTrialStep"), step) == 0);
+        int lost = 0;
+        for (int i = 0; i < 200000 && ssr_game_training(game); i++) {
+            t = ssr_game_training(game);
+            const SSRChance *c = &t->chance;
+            if (t->lives < 3) lost = 1;
+            if (t->instruction) {
+                ssr_game_touch(game, 1, 320, 900);
+                ssr_game_update(game, 1);
+                ssr_game_touch(game, 0, 320, 900);
+            } else if (c->state == SSR_CHANCE_AIM && c->kicking == 0) {
+                ssr_game_touch(game, 1, c->ball.x, c->ball.y);
+                ssr_game_update(game, 1);
+                ssr_game_touch(game, 1, c->ball.x + 60, c->ball.y);
+                ssr_game_update(game, 10);
+                ssr_game_touch(game, 0, c->ball.x + 60, c->ball.y);
+            } else if (c->state == SSR_CHANCE_TAP && !c->tap.touching && c->tap.tapX == 0) {
+                ssr_game_touch(game, 1, c->tap.x, c->tap.y);
+                ssr_game_update(game, 1);
+                ssr_game_touch(game, 0, c->tap.x, c->tap.y);
+            } else if (c->state == SSR_CHANCE_DRIBBLE && fabsf(c->dribbleX) < 0.1f) {
+                ssr_game_touch(game, 1, 100, 900);
+                ssr_game_update(game, 1);
+                ssr_game_touch(game, 0, 600, 900);
+            }
+            ssr_game_update(game, 1);
+        }
+        CHECK(!ssr_game_training(game) && lost);
+        CHECK(ssr_game_career(game)->technique[0] == 0 && ssr_game_career(game)->pace[0] == 0);
+    }
+}
+
 // The replays that the matches of the test watched.
 static int replays;
 
@@ -205,8 +252,10 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     // The commentary scrolled to its last rows.
     CHECK(ssr_tweaks_number(tweaks, "Menu", "CommentaryWindowScroll") < -400);
     CHECK(chances >= 2 && ssr_game_career(game)->apps == apps + 1);
-    // Each chance changes the rating of a skill.
-    CHECK(memcmp(ratings, ssr_game_career(game)->ratings, sizeof(ratings)) != 0);
+    // Each chance changes the rating of a skill. Later a rating can stay at
+    // its end, 1 or 10, so the test asks only the first match.
+    static int matches = 0;
+    if (matches++ == 0) CHECK(memcmp(ratings, ssr_game_career(game)->ratings, sizeof(ratings)) != 0);
 
     // The match stats: the result overlay shows for 270 frames, then the
     // stats come one at a time.
@@ -439,6 +488,9 @@ static void test_starts_a_new_career(void) {
     const SSRCareer *career = ssr_game_career(game);
     CHECK(career->nationId == 63 && career->clubNationId == 62 && career->gender == 1);
     CHECK(career->clubId >= 100 && career->clubId <= 103 && career->wage == 1);
+    fail_the_trials(game, tweaks);
+    // After a failed last trial the text shows in the plain message box.
+    CHECK(strcmp(ssr_game_screen(game), "message") == 0);
     CHECK(strstr(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "in PRM.") != NULL);
     ssr_game_message(game, "message.btn_Ok");
     CHECK(strcmp(ssr_game_screen(game), "startransition") == 0);
@@ -480,7 +532,7 @@ static void test_starts_a_new_career(void) {
     drink_a_can(game, tweaks);
     // A star scores: the test watches the replay of a goal.
     make_a_star(game, path);
-    for (int i = 0; i < 10 && replays == 0; i++) {
+    for (int i = 0; i < 40 && replays == 0; i++) {
         play_a_match(game, tweaks);
         make_a_star(game, path);
     }

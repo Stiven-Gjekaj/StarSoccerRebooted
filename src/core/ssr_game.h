@@ -8,6 +8,7 @@
 
 #include "ssr_career.h"
 #include "ssr_match.h"
+#include "ssr_training.h"
 #include "ssr_tweaks.h"
 #include "ssr_world.h"
 
@@ -124,6 +125,10 @@ int ssr_game_take_settings_change(SSRGame *game);
 // or NULL. The screen "matchminigame" shows the chance.
 const SSRMatch *ssr_game_match(const SSRGame *game);
 const SSRChance *ssr_game_chance(const SSRGame *game);
+
+// The drill of a trial of a new career, or NULL. ssr_game_chance gives its
+// ball while it runs.
+const SSRTraining *ssr_game_training(const SSRGame *game);
 
 // The goal replay: 0 none, 1 the offer shows, 2 the replay plays. While it
 // plays, ssr_game_chance gives the recorded frame (WatchReplay.Frame).

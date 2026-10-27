@@ -10,6 +10,7 @@
 #include "ssr_fs.h"
 #include "ssr_match.h"
 #include "ssr_random.h"
+#include "ssr_training.h"
 
 #define MAX_OPS 512
 // The game takes 11 letters for a name from the keyboard (c_TInputBox).
@@ -108,6 +109,11 @@ struct SSRGame {
     int replayCount, replayCapacity;
     int replayMode;
     int offerEnd;
+
+    // The drill of a trial of a new career, and the last banner that it
+    // showed.
+    SSRTraining *training;
+    const char *trainingMessage;
 };
 
 enum { REPLAY_NONE, REPLAY_OFFER, REPLAY_PLAY };
@@ -641,18 +647,113 @@ static void nation_ok(SSRGame *game) {
     const SSRClub *club = first_club(game, league);
     if (!club) return;
     game->career.clubId = club->id;
-    // The trials need the match (0.5). Until then the player goes through
-    // them with no score, so the skills start at 1.
-    const SSRCompetition *comp = ssr_world_competition(game->world, club->league);
+    // The first of the five trials.
+    message(game, "messagedefault", loc(game, "CMESSAGE_TRIALMOBILE1"), 0, 1, "DoTrial1");
+}
+
+// The text at the end of the trials, with the club and its league.
+static void trial_success_text(SSRGame *game, char *text, size_t capacity) {
+    const SSRClub *club = game->world ? ssr_world_club(game->world, game->career.clubId) : NULL;
+    const SSRCompetition *comp = club ? ssr_world_competition(game->world, club->league) : NULL;
+    snprintf(text, capacity, "%s", loc(game, "CMESSAGE_TRIALSUCCESSMOBILE"));
+    replace_all(text, capacity, "$clubname", club ? club->name : "");
+    replace_all(text, capacity, "$labelname", club ? club->tla : "");
+    replace_all(text, capacity, "$leaguename", comp ? comp->tla : "");
+}
+
+// DoTrial1 to DoTrial5 (c_TScreen_Message): the hint of the trial, then the
+// drill (SetUpTraining(type, 1, 3, trial)).
+static void do_trial(SSRGame *game, int trial) {
+    static const int TYPES[5] = {2, 3, 4, 5, 6};
+    char step[8];
+    snprintf(step, sizeof(step), "%d", trial);
+    ssr_tweaks_set(game->tweaks, "Menu", "MGTrialStep", step);
+    if (trial == 1) ssr_tweaks_set_number(game->tweaks, "Pitch", "TrialsLogo", 1);
+    if (!game->training) game->training = calloc(1, sizeof(SSRTraining));
+    if (!game->training) return;
+    const SSRCareer *c = &game->career;
+    SSRTrainingPlayer player = {.power = ssr_career_skill(c->power),
+                                .technique = ssr_career_skill(c->technique),
+                                .pace = ssr_career_skill(c->pace),
+                                .starLevel = ssr_career_star_level(c)};
+    ssr_training_start(game->training, TYPES[trial - 1], 1, 3, trial, &player, &game->random);
+    game->trainingMessage = NULL;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "Lifecount", game->training->lives);
+    ssr_tweaks_set_number(game->tweaks, "Training", "TrainingType", game->training->training);
+    set_screen(game, "matchminigame");
+}
+
+static void call_do_trial1(SSRGame *game) {
+    do_trial(game, 1);
+}
+
+static void call_do_trial2(SSRGame *game) {
+    do_trial(game, 2);
+}
+
+static void call_do_trial3(SSRGame *game) {
+    do_trial(game, 3);
+}
+
+static void call_do_trial4(SSRGame *game) {
+    do_trial(game, 4);
+}
+
+static void call_do_trial5(SSRGame *game) {
+    do_trial(game, 5);
+}
+
+// TrainingSuccess and TrainingFailure: a success writes the lives that are
+// left into the first level of the skill. Then the next trial, or the end.
+static void end_trial(SSRGame *game) {
+    SSRTraining *t = game->training;
+    int trial = t->trial, won = t->over == 1;
+    if (won) {
+        SSRCareer *c = &game->career;
+        int *skills[5] = {c->technique, c->setPieces, c->power, c->pace, c->vision};
+        int skill = ssr_training_skill(t->training);
+        if (skill >= 0) skills[skill][0] = t->lives;
+    }
+    free(game->training);
+    game->training = NULL;
     char text[1024];
-    snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_TRIALSUCCESSMOBILE"));
-    replace_all(text, sizeof(text), "$clubname", club->name);
-    replace_all(text, sizeof(text), "$labelname", club->tla);
-    replace_all(text, sizeof(text), "$leaguename", comp ? comp->tla : "");
-    message(game, "messagedefault", text, 0, 1, "TrialDone");
+    if (trial >= 5) {
+        trial_success_text(game, text, sizeof(text));
+        message(game, won ? "messagedefault" : "message", text, 0, 1, "TrialDone");
+        return;
+    }
+    // The dribble drill has its own text (dodribbling is 1).
+    char key[64], call[16];
+    snprintf(key, sizeof(key), "CMESSAGE_TRIALMOBILE%s%d%s", won ? "" : "FAIL", trial + 1,
+             trial + 1 == 4 ? "_DRIBBLING" : "");
+    snprintf(call, sizeof(call), "DoTrial%d", trial + 1);
+    message(game, "messagedefault", loc(game, key), 0, 1, call);
+}
+
+// One tick of a trial: the drill, its hint, its lives, and its banners.
+static void trial_tick(SSRGame *game) {
+    SSRTraining *t = game->training;
+    SSRTapTouch touch = game->touch;
+    touch.hit = touch.down && !game->touchWasDown;
+    game->touchWasDown = touch.down;
+    ssr_training_update(t, game->now, &touch, &game->random);
+    // c_TrialHud.m_Update: the hint goes after the first aim.
+    if (t->chance.kicking == 1) ssr_tweaks_set(game->tweaks, "Menu", "MGTrialStep", "1aim");
+    ssr_tweaks_set_number(game->tweaks, "Menu", "Lifecount", t->lives);
+    if (t->message && t->message != game->trainingMessage) {
+        // The banner of the result (scoreanim.uis) for the time of the
+        // message.
+        ssr_tweaks_set_number(game->tweaks, "Minigames", "Outcome", t->outcome);
+        ssr_tweaks_set_number(game->tweaks, "Chance", "IsHead", 0);
+        game->bannerEnd = t->messageEnd;
+    }
+    game->trainingMessage = t->message;
+    if (t->over) end_trial(game);
 }
 
 static void call_trial_done(SSRGame *game) {
+    ssr_tweaks_set(game->tweaks, "Menu", "MGTrialStep", "0");
+    ssr_tweaks_set_number(game->tweaks, "Pitch", "TrialsLogo", 0);
     ssr_tweaks_set_number(game->tweaks, "Menu", "TrialCompleteIncrement", 1);
     message(game, "message", "", 0, 1, "StartCareer");
 }
@@ -696,6 +797,11 @@ static void run_call(SSRGame *game, const char *name) {
     } CALLS[] = {
         {"DeleteCareer", call_delete_career},
         {"TrialDone", call_trial_done},
+        {"DoTrial1", call_do_trial1},
+        {"DoTrial2", call_do_trial2},
+        {"DoTrial3", call_do_trial3},
+        {"DoTrial4", call_do_trial4},
+        {"DoTrial5", call_do_trial5},
         {"StartCareer", call_start_career},
         {"DrinkNRG", call_drink},
     };
@@ -1809,6 +1915,7 @@ void ssr_game_free(SSRGame *game) {
     free(game->match);
     free(game->chance);
     free(game->replay);
+    free(game->training);
     free(game);
 }
 
@@ -1948,6 +2055,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->now += 16;
             match_tick(game);
         }
+    } else if (game->training && strcmp(game->screen, "matchminigame") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1 && game->training) {
+            game->ticks -= 1;
+            game->now += 16;
+            trial_tick(game);
+        }
     } else if (strcmp(game->screen, "matchstats") == 0 || strcmp(game->screen, "matchreview") == 0) {
         game->ticks += frames;
         while (game->ticks >= 1) {
@@ -1998,8 +2112,13 @@ const SSRMatch *ssr_game_match(const SSRGame *game) {
     return game ? game->match : NULL;
 }
 
+const SSRTraining *ssr_game_training(const SSRGame *game) {
+    return game ? game->training : NULL;
+}
+
 const SSRChance *ssr_game_chance(const SSRGame *game) {
     if (!game) return NULL;
+    if (game->training) return &game->training->chance;
     // The playback shows the copy of the frame (int)WatchReplay.Frame.
     if (game->replayMode == REPLAY_PLAY && game->replayCount > 0) {
         int i = (int)ssr_tweaks_number(game->tweaks, "WatchReplay", "Frame");
