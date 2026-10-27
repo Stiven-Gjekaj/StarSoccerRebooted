@@ -111,6 +111,11 @@ typedef struct {
     SSRScene *splashScene;
     SSRUiTree *splashScreen;
     char splashName[48];
+    // The alert at the bottom of the screen (the shell Overlay2), and the
+    // id of its alert.
+    SSRScene *alertScene;
+    SSRUiTree *alertScreen;
+    int alertId;
     int ballCopy, arrowCopy;
     SSRAudio *audio;
     // The Spine files that the screens use, and when the screen opened.
@@ -602,6 +607,30 @@ static void update_splash(SSRApp *app, SSRSceneEnv *env, int ms) {
     ssr_scene_update(app->splashScene, env, ms);
 }
 
+// The alerts at the bottom of the screen. Each alert opens its layout
+// again, so that its animation starts.
+static void free_alert(SSRApp *app) {
+    ssr_scene_free(app->alertScene);
+    ssr_ui_free(app->alertScreen);
+    app->alertScene = NULL;
+    app->alertScreen = NULL;
+    app->alertId = 0;
+}
+
+static void update_alert(SSRApp *app, SSRSceneEnv *env, int ms) {
+    int id = 0;
+    const char *layout = ssr_game_alert(app->game, &id);
+    if (!layout || id != app->alertId) free_alert(app);
+    if (!layout) return;
+    if (!app->alertScene) {
+        char file[64];
+        SDL_snprintf(file, sizeof(file), "%s.uis", layout);
+        app->alertScene = open_layer(app, file, &app->alertScreen, env);
+        app->alertId = id;
+    }
+    ssr_scene_update(app->alertScene, env, ms);
+}
+
 static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     const SSRChance *chance = ssr_game_chance(app->game);
     if (!chance || SDL_strcmp(ssr_game_screen(app->game), "matchminigame") != 0 || !app->scene) {
@@ -946,6 +975,7 @@ static int language_from_device(SSRApp *app) {
 static void load_game(SSRApp *app) {
     free_overlay(app);
     free_splash(app);
+    free_alert(app);
     free_backdrop(app);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
@@ -1196,6 +1226,15 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
             if (hit) click_in(app, top, hit);
             return SDL_APP_CONTINUE;
         }
+        // An alert takes a click on it first, for example the tap that
+        // dismisses it (M_Dismisser).
+        int released = event->type == SDL_EVENT_MOUSE_BUTTON_UP || event->type == SDL_EVENT_FINGER_UP;
+        const SSRSceneItem *alertHit =
+            released && app->alertScene ? ssr_scene_hit_item(app->alertScene, x + app->left, y + app->top) : NULL;
+        if (alertHit) {
+            click_in(app, app->alertScene, alertHit);
+            return SDL_APP_CONTINUE;
+        }
         ssr_scene_touch(app->scene, down, x + app->left, y + app->top);
         if (app->hudScene) ssr_scene_touch(app->hudScene, down, x + app->left, y + app->top);
         ssr_game_touch(app->game, down, x + app->left, y + app->top);
@@ -1392,6 +1431,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         }
         update_chance_view(app, &env, ms);
         update_splash(app, &env, ms);
+        update_alert(app, &env, ms);
         update_backdrop(app, &env, ms);
         if (app->overlayScene) ssr_scene_update(app->overlayScene, &env, ms);
         if (app->modalScene) ssr_scene_update(app->modalScene, &env, ms);
@@ -1408,6 +1448,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         }
         if (app->bannerScene) ssr_gfx_draw_scene(app->gfx, app->bannerScene);
         if (app->splashScene) ssr_gfx_draw_scene(app->gfx, app->splashScene);
+        if (app->alertScene) ssr_gfx_draw_scene(app->gfx, app->alertScene);
         if (app->hudScene && chance) ssr_gfx_draw_scene(app->gfx, app->hudScene);
         if (app->overlayScene) ssr_gfx_draw_scene(app->gfx, app->overlayScene);
         if (app->modalScene) ssr_gfx_draw_scene(app->gfx, app->modalScene);
@@ -1518,6 +1559,7 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     ssr_audio_free(app->audio);
     free_overlay(app);
     free_splash(app);
+    free_alert(app);
     free_backdrop(app);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
