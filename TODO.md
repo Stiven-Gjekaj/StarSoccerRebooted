@@ -38,8 +38,11 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] Embedded draws (`Embed:`, `DrawEmbedded:`), readouts, selectors,
       `if` and `else`, the actions of a click, lists that scroll with a
       swipe, and lists that the code fills from a template
-- [ ] The expression language of the layouts: `set(...)`, `fmt()`,
-      `oneof()`, `lerp()`, `rgba()`, `slotcol()`, and `%` variables
+- [x] The expression language of the layouts: `set(...)`, `fmt()`,
+      `oneof()`, `lerp()`, `if`, and `%` variables
+- [ ] The colours of the slots of a Spine gel (`gel.slotcol.rgba()`) and
+      of the text shadow (`gel.text.shadcol`). The language reads them,
+      but the scene does not draw them yet.
 - [x] The news ticker shell (`ShowShell(Ticker)`, `ticker.uis`) with the
       welcome texts
 - [ ] The texts of the ticker that tell of the career (low energy, the
