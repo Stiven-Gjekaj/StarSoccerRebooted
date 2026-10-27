@@ -858,6 +858,7 @@ static void load_game(SSRApp *app) {
     app->text = NULL;
     SDL_snprintf(path, sizeof(path), "%s/MyData/Languages/en.txt", app->gameDirectory);
     app->text = ssr_text_load(path);
+    ssr_text_rebrand(app->text);
     ssr_game_free(app->game);
     app->game = ssr_game_create(app->tweaks);
     ssr_game_set_data(app->game, app->world, translate, app, app->saveDirectory);
