@@ -1,0 +1,47 @@
+id	tla
+2270	Premier League
+2280	Championship
+2290	League One
+2300	League Two
+2310	National League
+2320	National League North
+2330	National League South
+2351	FA Trophy Q3
+2352	FA Trophy R1
+2353	FA Trophy R2
+2354	FA Trophy R3
+2355	FA Trophy QF
+2356	FA Trophy SF
+2357	FA Trophy Final
+2360	EFL Cup R1
+2370	EFL Cup R2
+2380	FA Cup Q3
+2390	EFL Cup R3
+2400	FA Cup Q4
+2410	EFL Cup R4
+2420	FA Cup R1
+2430	FA Cup R2
+2440	EFL Cup QF
+2450	FA Cup R3
+2460	EFL Cup SF
+2470	FA Cup R4
+2480	FA Cup R5
+2490	EFL Cup Final
+2500	FA Cup QF
+2510	FA Cup SF
+2520	Championship Play-off SF
+2530	League One Play-off SF
+2540	League Two Play-off SF
+2549	National League Play-off QF
+2550	National League Play-off SF
+2551	NL North Play-off QF
+2552	NL South Play-off QF
+2553	NL North Play-off SF
+2554	NL South Play-off SF
+2560	FA Cup Final
+2570	Championship Play-off Final
+2580	League One Play-off Final
+2590	League Two Play-off Final
+2600	National League Play-off Final
+2601	NL North Play-off Final
+2602	NL South Play-off Final

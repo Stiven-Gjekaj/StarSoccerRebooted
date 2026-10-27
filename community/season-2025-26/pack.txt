@@ -1,0 +1,5 @@
+id=season-2025-26
+name=Season 2025/26
+author=Star Soccer Rebooted community
+version=1.0
+format=1
