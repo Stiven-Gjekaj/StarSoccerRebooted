@@ -58,8 +58,8 @@ typedef struct {
     Uint64 tickerFrame;
     // A chance of the player: the pitch under the screen, the tap ball over
     // it, and the copies of the players and of the ball on the screen.
-    SSRUiTree *pitchScreen, *tapScreen;
-    SSRScene *pitchScene, *tapScene;
+    SSRUiTree *pitchScreen, *tapScreen, *bannerScreen;
+    SSRScene *pitchScene, *tapScene, *bannerScene;
     char pitchName[64];
     SSRScene *viewScene;
     int playerCopies[SSR_PLAYERS_MAX];
@@ -194,8 +194,10 @@ static void free_chance_view(SSRApp *app) {
     ssr_ui_free(app->pitchScreen);
     ssr_scene_free(app->tapScene);
     ssr_ui_free(app->tapScreen);
-    app->pitchScene = app->tapScene = NULL;
-    app->pitchScreen = app->tapScreen = NULL;
+    ssr_scene_free(app->bannerScene);
+    ssr_ui_free(app->bannerScreen);
+    app->pitchScene = app->tapScene = app->bannerScene = NULL;
+    app->pitchScreen = app->tapScreen = app->bannerScreen = NULL;
     app->pitchName[0] = 0;
     app->viewScene = NULL;
 }
@@ -279,6 +281,17 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     ssr_scene_spawn_place(app->scene, app->ballCopy, NULL, chance->ball.x, chance->ball.y);
     ssr_scene_spawn_place(app->scene, app->ballCopy, "BallHook", 0, -chance->ball.z);
     ssr_scene_update(app->pitchScene, env, ms);
+    // The banner of the result (c_TQuickMessage "scoreanim") starts again
+    // for each chance.
+    if (ssr_game_banner(app->game)) {
+        if (!app->bannerScene) app->bannerScene = open_layer(app, "scoreanim.uis", &app->bannerScreen, env);
+        ssr_scene_update(app->bannerScene, env, ms);
+    } else if (app->bannerScene) {
+        ssr_scene_free(app->bannerScene);
+        ssr_ui_free(app->bannerScreen);
+        app->bannerScene = NULL;
+        app->bannerScreen = NULL;
+    }
     if (app->tapScene) {
         const SSRTapBall *tap = &chance->tap;
         ssr_scene_place(app->tapScene, "TapBall", tap->x, tap->y, tap->depth);
@@ -637,6 +650,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         ssr_gfx_draw_scene(app->gfx, app->scene);
         const SSRChance *chance = ssr_game_chance(app->game);
         if (app->tapScene && chance && chance->state == SSR_CHANCE_TAP) ssr_gfx_draw_scene(app->gfx, app->tapScene);
+        if (app->bannerScene) ssr_gfx_draw_scene(app->gfx, app->bannerScene);
         draw_ticker(app, &env);
     }
     if (!app->gfx) {
