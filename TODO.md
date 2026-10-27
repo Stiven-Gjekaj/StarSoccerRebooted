@@ -303,10 +303,13 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 ### Stories and events
 
-- [ ] A news feed: form, transfer rumours, crises at other clubs, records.
-      The ticker tells of the rivals, the top scorer, and the transfers.
-- [ ] Press and fans: the opinion of the fans is a stat. The answers in
-      interviews change the headlines and the rivals.
+- [x] A news feed: form, transfer rumours, crises at other clubs, records.
+      The ticker tells of the rivals, the top scorer, the transfers, a
+      big club low in the table, a young player linked with a big club,
+      and the chase of the scoring record of a season.
+- [x] Press and fans: the opinion of the fans is a stat. The answers in
+      interviews make the headline of the press, and good words before a
+      derby or a rivalry match make the rivalry grow.
 - [x] Season stories: the title race and the fight against relegation in
       the ticker
 - [x] More season stories: a cup run of a small club in the ticker, and
@@ -317,7 +320,7 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] Derbies from the distance between stadiums (under 30 km), in the
       ticker
 - [x] Rivalries that grow from title races and transfers, in the ticker
-- [ ] Rivalries that grow from cup finals
+- [x] Rivalries that grow from cup finals
 - [x] Form: a club in a run of wins or defeats, in the ticker
 - [x] Comebacks: the player returns from an injury, with an alert
 
@@ -326,7 +329,7 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] The champions and the top scorers of each league in each season
       (the Honours screen)
 - [x] A hall of fame of the scorers of the world (Honours)
-- [ ] The records of each club, league, and nation
+- [x] The records of each club, league, and nation (Honours, Records)
 - [x] A career timeline: the clubs, the titles, the awards, and the
       moments (Honours, Career)
 - [x] A legacy after retirement: the old player stays in the hall of fame
@@ -335,14 +338,16 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 ### The match
 
 - [x] Match context: the fans care more about a derby or a rivalry match
-- [ ] A cup final or a match that the club must win changes the crowd and
-      the pressure
+- [x] A cup final or a match that the club must win changes the crowd and
+      the pressure: a full stadium, a stronger opponent, and two times the
+      change of the fans and the boss in a final
 - [x] Momentum: from the hour, the team that is behind pushes, so a
       comeback from 2-0 is possible
 - [x] Weather: some matches are in the rain (more often far from the
       equator), and the ball rolls further on the wet pitch. In 4.32 a
       career match is always dry; only the training has weather.
-- [ ] Snow, and the pitch of each club
+- [x] Snow in the winter far from the equator, and the worn pitch of a
+      small club in the winter
 - [ ] Fair ratings and real scores. Players of the original complained
       about harsh ratings and very high scores.
 
@@ -351,8 +356,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] Rest and fitness: a match can injure the player, who misses the
       matches until the injury heals
 - [x] The player can choose to play with pain, at a risk
-- [ ] Contract drama: release clauses, loans, a club that refuses to sell
-- [ ] Business and charity, with effects on fame and on the world
+- [x] Contract drama: release clauses, loans, a club that refuses to sell
+- [x] Business and charity, with effects on fame and on the world
 
 ### Replay value
 
@@ -361,7 +366,7 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       of the career.
 - [x] A custom career: after the nation, the screen "Your start" chooses
       the age (16 to 32) and the least value of each skill (up to 70)
-- [ ] More choices for the custom career: the position, the first club,
+- [x] More choices for the custom career: the position, the first club,
       and the Bux
 - [x] Many careers in one world: Options, World can make the next new
       career continue the world of the last career
@@ -402,7 +407,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 ## More features
 
-- [ ] Choose the position of the player, and change it later
+- [x] Choose the position of the player, and change it later (the list
+      of the rivals). The position gives the focus at the kick-off.
 - [ ] More kinds of match moments: set pieces, defence, saves
 - [ ] Replays of goals and matches
 
