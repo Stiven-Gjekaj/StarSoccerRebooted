@@ -43,6 +43,10 @@
 #include "ssr_ui.h"
 #include "ssr_world.h"
 
+#ifdef SSR_PACK_BROWSER
+#include <curl/curl.h>
+#endif
+
 // The layouts are for a portrait box of 640 x 960. The game fits the box
 // in the screen and centres it (c_VirtualDisplay). The rest of the screen
 // is outside the box: a tall screen has a negative top.
@@ -325,6 +329,134 @@ static void install_chosen_pack(SSRApp *app, const char *chosen) {
     SDL_RemovePath(copy);
 }
 
+/* -------------------------------------------------------- pack browser */
+
+// The pack browser downloads on a thread. The thread pushes the event of
+// its kind with the data (or NULL after a fault), the size, and a copy of
+// the entry.
+static Uint32 browseEvent;
+
+typedef struct {
+    int download;
+    SSRPackEntry entry;
+    char url[512];
+} BrowseJob;
+
+typedef struct {
+    char *data;
+    size_t size;
+    int full;
+} Downloaded;
+
+// The largest download: the pack and its files have 16 MB each at most.
+#define BROWSE_MAX (64 * 1024 * 1024)
+
+#ifdef SSR_PACK_BROWSER
+static size_t browse_write(char *in, size_t size, size_t count, void *context) {
+    Downloaded *d = context;
+    size_t n = size * count;
+    if (d->size + n > BROWSE_MAX) {
+        d->full = 1;
+        return 0;
+    }
+    char *grown = SDL_realloc(d->data, d->size + n + 1);
+    if (!grown) return 0;
+    d->data = grown;
+    SDL_memcpy(d->data + d->size, in, n);
+    d->size += n;
+    d->data[d->size] = 0;
+    return n;
+}
+
+static int SDLCALL browse_thread(void *data) {
+    BrowseJob *job = data;
+    Downloaded d = {0};
+    CURL *curl = curl_easy_init();
+    int ok = 0;
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, job->url);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "https");
+        curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "https");
+        curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "StarSoccerRebooted/" SSR_VERSION);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, browse_write);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &d);
+        CURLcode code = curl_easy_perform(curl);
+        ok = code == CURLE_OK && d.data;
+        if (!ok) SDL_Log("The download of %s failed: %s.", job->url, curl_easy_strerror(code));
+        curl_easy_cleanup(curl);
+    }
+    SDL_Event event;
+    SDL_zero(event);
+    event.type = browseEvent;
+    event.user.code = job->download;
+    event.user.data1 = job;
+    Downloaded *result = SDL_malloc(sizeof(Downloaded));
+    if (result) {
+        result->data = ok ? d.data : NULL;
+        result->size = ok ? d.size : 0;
+        if (!ok) SDL_free(d.data);
+    } else {
+        SDL_free(d.data);
+    }
+    event.user.data2 = result;
+    if (!SDL_PushEvent(&event)) {
+        if (result) SDL_free(result->data);
+        SDL_free(result);
+        SDL_free(job);
+    }
+    return 0;
+}
+#endif
+
+// Starts a download of the index (download 0) or of a pack (download 1).
+static void browse_start(int download, const SSRPackEntry *entry) {
+#ifdef SSR_PACK_BROWSER
+    if (!browseEvent) browseEvent = SDL_RegisterEvents(1);
+    BrowseJob *job = SDL_calloc(1, sizeof(BrowseJob));
+    if (!job) return;
+    job->download = download;
+    if (entry) job->entry = *entry;
+    SDL_strlcpy(job->url, download ? entry->url : SSR_PACK_INDEX_URL, sizeof(job->url));
+    SDL_Thread *thread = SDL_CreateThread(browse_thread, "browse", job);
+    if (thread) SDL_DetachThread(thread);
+    else SDL_free(job);
+#else
+    (void)download;
+    (void)entry;
+#endif
+}
+
+// The end of a download: the index goes to the game, and a pack that
+// passes the check of its size and its SHA-256 goes into the packs.
+static void browse_done(SSRApp *app, const SDL_Event *event) {
+    BrowseJob *job = event->user.data1;
+    Downloaded *d = event->user.data2;
+    const char *data = d ? d->data : NULL;
+    if (!event->user.code) {
+        if (app->game) ssr_game_set_pack_index(app->game, data);
+    } else if (data && ssr_pack_check_download(&job->entry, data, d->size)) {
+        char copy[2200];
+        SDL_snprintf(copy, sizeof(copy), "%s/.incoming.zip", app->packsDirectory);
+        SDL_CreateDirectory(app->packsDirectory);
+        if (SDL_SaveFile(copy, data, d->size) && install_pack(app, copy) && app->game) {
+            ssr_game_show_packs(app->game);
+            app->gameScreen = -1;
+        } else if (app->game) {
+            ssr_game_download_failed(app->game);
+        }
+        SDL_RemovePath(copy);
+    } else if (app->game) {
+        if (data) SDL_Log("The download of %s did not pass its check.", job->entry.id);
+        ssr_game_download_failed(app->game);
+    }
+    if (d) SDL_free(d->data);
+    SDL_free(d);
+    SDL_free(job);
+}
+
 static void follow_game(SSRApp *app) {
     if (!app->game) return;
     const char *sound;
@@ -348,6 +480,9 @@ static void follow_game(SSRApp *app) {
         }
     }
     if (ssr_game_take_pack_install(app->game)) ask_for_pack(app);
+    if (ssr_game_take_browse(app->game)) browse_start(0, NULL);
+    SSRPackEntry entry;
+    if (ssr_game_take_download(app->game, &entry)) browse_start(1, &entry);
     follow_overlay(app);
     int version = ssr_game_screen_version(app->game);
     if (version == app->gameScreen) return;
@@ -1105,6 +1240,9 @@ static void load_game(SSRApp *app) {
 #else
     ssr_game_set_packs_directory(app->game, app->packsDirectory, 1);
 #endif
+#ifdef SSR_PACK_BROWSER
+    ssr_game_set_can_browse(app->game, 1);
+#endif
     // The names of the race horses.
     char resolved[2300];
     SDL_snprintf(path, sizeof(path), "%s/MyData/Horse.txt", app->gameDirectory);
@@ -1351,6 +1489,7 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
     if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) fit_screen(app);
     if (event->type == SDL_EVENT_DROP_FILE && event->drop.data) import_copy(app, event->drop.data);
+    if (browseEvent && event->type == browseEvent) browse_done(app, event);
     if (packEvent && event->type == packEvent) {
         install_chosen_pack(app, event->user.data1);
         SDL_free(event->user.data1);
