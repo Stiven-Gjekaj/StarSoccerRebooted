@@ -107,7 +107,8 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [ ] Extra time and the penalty shoot-out of a cup match
 - [ ] Before and after the match (`Prematch`, `MatchReview`, `MatchStats`,
       `Ratings`)
-- [ ] Energy and boosts (`ChooseBoost`)
+- [x] Energy drinks and boosts (`ChooseBoost`): the five kinds of can, the
+      skill and the relation boosts, and the bolts
 - [ ] The five trials of a new career (they need the chance view)
 - [ ] A test harness that compares the rules with the original code
 
