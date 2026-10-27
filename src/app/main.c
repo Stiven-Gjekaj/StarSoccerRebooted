@@ -12,6 +12,9 @@
 // Set SSR_AUTOCHANCE to "dx,dy" to play each chance of the player with a
 // drag of (dx, dy) from the ball. Set SSR_SHOT_TAP to save the frame of
 // the first tap ball, and SSR_SHOT_DRIBBLE for the first dribble.
+// Set SSR_MESSAGES to messages of the game, for example
+// "mainmenu.btn_Career;saveslot.btn_Slot1", to send them 1.5 seconds apart
+// as the presses go.
 // Set SSR_AUTOMATCH to 1 to press Play each time that the match waits, to 2
 // to also go on from the match stats, or to 3 to open the ratings from
 // them. Each of them also watches the replay of a goal. Set SSR_SHOT_SCREEN
@@ -1044,6 +1047,25 @@ SDL_AppResult SDL_AppIterate(void *state) {
             const SSRSceneItem *item = ssr_scene_hit_item(app->scene, x + app->left, y + app->top);
             if (item) click(app, item);
             if (!item) SDL_Log("Pressed nothing at %g,%g", x, y);
+        }
+    }
+
+    // The messages go 1.5 s apart, as the presses do.
+    const char *messages = SDL_getenv("SSR_MESSAGES");
+    static int sent = 0;
+    if (messages && *messages && app->scene && SDL_GetTicks() - firstFrame >= (Uint64)(sent + 1) * 1500) {
+        const char *at = messages;
+        for (int i = 0; i < sent && at; i++) {
+            at = SDL_strchr(at, ';');
+            if (at) at++;
+        }
+        sent++;
+        if (at && *at) {
+            char message[96];
+            SDL_snprintf(message, sizeof(message), "%.*s", (int)strcspn(at, ";"), at);
+            SDL_Log("Message %s", message);
+            if (!ssr_game_message(app->game, message)) SDL_Log("No logic for %s.", message);
+            follow_game(app);
         }
     }
 
