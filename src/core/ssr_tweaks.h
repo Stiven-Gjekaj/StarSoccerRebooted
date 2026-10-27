@@ -48,6 +48,9 @@ void ssr_tweaks_set_kind(SSRTweaks *tweaks, const char *group, const char *name,
 // scale. Returns 0 when the tweak is not a range.
 int ssr_tweaks_range(const SSRTweaks *tweaks, const char *group, const char *name, double *min, double *max);
 
+// Makes the tweak a range with these ends. The value is min.
+void ssr_tweaks_set_range(SSRTweaks *tweaks, const char *group, const char *name, double min, double max);
+
 unsigned int ssr_tweaks_colour(const SSRTweaks *tweaks, const char *group, const char *name, unsigned int fallback);
 
 // 1 when the value is the same as the text, or the same number. "1" and

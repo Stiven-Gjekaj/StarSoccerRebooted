@@ -85,8 +85,21 @@ static void test_loads_the_start_values(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static void test_sets_a_range(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    double min = 0, max = 0;
+    ssr_tweaks_set_range(tweaks, "Shower", "Count", 4, 9);
+    CHECK(ssr_tweaks_kind(tweaks, "Shower", "Count") == SSR_TWEAK_RANGE);
+    CHECK(ssr_tweaks_range(tweaks, "Shower", "Count", &min, &max) && min == 4 && max == 9);
+    CHECK(ssr_tweaks_number(tweaks, "Shower", "Count") == 4);
+    ssr_tweaks_set_range(tweaks, "Shower", "Count", 15, 15);
+    CHECK(ssr_tweaks_range(tweaks, "Shower", "Count", &min, &max) && min == 15 && max == 15);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
     test_loads_the_start_values();
+    test_sets_a_range();
     test_sets_and_gets_values();
     test_compares_values();
     return TEST_RESULT();

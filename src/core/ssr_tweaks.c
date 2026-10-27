@@ -242,14 +242,7 @@ int ssr_tweaks_load(SSRTweaks *tweaks, const char *path) {
             if (n < 3) continue;
             double scale = n >= 5 ? strtod(parts[4], NULL) : 1;
             double min = strtod(parts[2], NULL) * scale, max = n >= 4 ? strtod(parts[3], NULL) * scale : min;
-            ssr_tweaks_set_number(tweaks, group, parts[0], min);
-            Entry *entry = find(tweaks, group, parts[0]);
-            if (entry) {
-                entry->kind = SSR_TWEAK_RANGE;
-                entry->range = 1;
-                entry->min = min;
-                entry->max = max;
-            }
+            ssr_tweaks_set_range(tweaks, group, parts[0], min, max);
             count++;
         } else if (strncmp(p, "Colour:(", 8) == 0 || strncmp(p, "String:(", 8) == 0) {
             int n = split_args(p, parts, 16);
@@ -269,6 +262,16 @@ int ssr_tweaks_range(const SSRTweaks *tweaks, const char *group, const char *nam
     *min = entry->min;
     *max = entry->max;
     return 1;
+}
+
+void ssr_tweaks_set_range(SSRTweaks *tweaks, const char *group, const char *name, double min, double max) {
+    ssr_tweaks_set_number(tweaks, group, name, min);
+    Entry *entry = find(tweaks, group, name);
+    if (!entry) return;
+    entry->kind = SSR_TWEAK_RANGE;
+    entry->range = 1;
+    entry->min = min;
+    entry->max = max;
 }
 
 unsigned int ssr_tweaks_colour(const SSRTweaks *tweaks, const char *group, const char *name, unsigned int fallback) {
