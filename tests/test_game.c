@@ -372,6 +372,8 @@ static void retire(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     // Play keeps the score, and the career goes one day back.
     ssr_game_message(game, "retirement.btn_Play");
     CHECK(c->retired == score && c->sdate == sdate - 1);
+    // The timeline ends with the testimonial match.
+    CHECK(c->momentCount > 0 && strcmp(c->moments[c->momentCount - 1].text, "SSR_MomentTestimonial") == 0);
     CHECK(at_game_menu(game, tweaks));
     CHECK(ssr_tweaks_number(tweaks, "Menu", "DisableQuitButton") == 0);
     SSRCareer saved;

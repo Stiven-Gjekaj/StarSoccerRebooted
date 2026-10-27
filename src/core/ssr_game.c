@@ -4184,6 +4184,14 @@ static void retirement_play(SSRGame *game) {
     SSRCareer *c = &game->career;
     if (!c->retired) {
         ssr_tweaks_set_number(game->tweaks, "Menu", "CanSavePlayer", 1);
+        // The testimonial match: the fans of the last club say goodbye. A
+        // star with good fans fills more seats.
+        char text[256], number[16];
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentTestimonial"));
+        replace_all(text, sizeof(text), "$club", club_name(game, c->clubId));
+        snprintf(number, sizeof(number), "%d", 500 * ssr_career_star_level(c) + (int)c->relationFans * 100);
+        replace_all(text, sizeof(text), "$num", number);
+        moment(game, text);
         c->retired = game->retireScore;
         c->sdate--;
         save_career(game);
