@@ -196,6 +196,8 @@ int ssr_game_banner(const SSRGame *game);
 // 1 while the splash message of a drill shows (splashmessage.uis, with the
 // tweak Menu:QuickMessage).
 int ssr_game_splash(const SSRGame *game);
+// The next sound that the logic asks for (a name of Sounds.txt), or NULL.
+const char *ssr_game_take_sound(SSRGame *game);
 // The layout of the splash message, for example "splashmessagebux".
 const char *ssr_game_splash_layout(const SSRGame *game);
 

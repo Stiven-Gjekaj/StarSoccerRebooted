@@ -955,6 +955,8 @@ static void go_to_the_casino(SSRGame *game, SSRTweaks *tweaks, const char *path)
     ssr_game_message(game, "casino.btn_StakeUp");
     ssr_game_message(game, "casino.btn_StakeUp");
     CHECK(ssr_tweaks_number(tweaks, "Casino", "Stake") == 5);
+    while (ssr_game_take_sound(game)) {
+    }
     int bank = 100, wins = 0;
     for (int spin = 1; spin <= 11; spin++) {
         float energy = now->energy;
@@ -973,6 +975,15 @@ static void go_to_the_casino(SSRGame *game, SSRTweaks *tweaks, const char *path)
             outcome = ssr_tweaks_number(tweaks, "Casino", "CasinoOutcome");
         }
         CHECK(outcome == 1 || outcome == -1);
+        // The sounds: the arm, a stop for each reel, then the result.
+        const char *sounds[8] = {0};
+        int heard = 0;
+        for (const char *sound; (sound = ssr_game_take_sound(game)) != NULL;) {
+            if (heard < 8) sounds[heard] = sound;
+            heard++;
+        }
+        CHECK(heard >= 5 && strcmp(sounds[0], "SlotsPlay") == 0 && strcmp(sounds[3], "SlotsItemLock") == 0);
+        CHECK(strcmp(sounds[4], outcome == 1 ? "SlotsYouWin" : "SlotsYouLose") == 0);
         int win = (int)ssr_tweaks_number(tweaks, "Casino", "Winnings");
         CHECK(outcome == 1 ? win == 15 || win == 35 : win == 0);
         if (win > 0) {

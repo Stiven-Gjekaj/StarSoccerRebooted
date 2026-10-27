@@ -143,7 +143,7 @@ struct SSRGame {
     int horsesLoaded;
     int ownedHorses[SSR_STABLE_SLOTS], saleHorses[SSR_STABLE_SLOTS];
     float raceFrame;
-    int standingsReady, ownRace;
+    int standingsReady, ownRace, gallopNext;
     float horseX[SSR_RUNNERS], horseY[SSR_RUNNERS];
     int badgePlace[SSR_RUNNERS];
     int myHorse, commentaryNext, commentaryPrev;
@@ -227,6 +227,10 @@ struct SSRGame {
     // showed.
     SSRTraining *training;
     const char *trainingMessage;
+    // The sounds that the logic asks for, by their names in Sounds.txt
+    // (AudioManager.Play).
+    const char *sounds[16];
+    int soundCount;
     // The splash message ("Success!", "Fail!") shows until this time, in
     // its layout (TQuickMessage).
     int splashEnd;
@@ -304,6 +308,13 @@ static void add_op(SSRGame *game, SSRUiOpKind kind, const char *ref, const char 
     snprintf(op->ref2, sizeof(op->ref2), "%s", ref2 ? ref2 : "");
     snprintf(op->text, sizeof(op->text), "%s", text ? text : "");
     op->id = id;
+}
+
+// AudioManager.Play: the app plays the sound.
+static void play_sound(SSRGame *game, const char *name) {
+    if (game->soundCount < (int)(sizeof(game->sounds) / sizeof(game->sounds[0]))) {
+        game->sounds[game->soundCount++] = name;
+    }
 }
 
 // TQuickMessage.Create: the text of Menu.QuickMessage shows in the layout
@@ -3034,7 +3045,6 @@ static void retirement_screen(SSRGame *game) {
 }
 
 // c_TScreen_Retirement.Update: one stat each stage, then the score.
-// [I: the sounds come with the sounds of the game.]
 static void retirement_tick(SSRGame *game) {
     int step = game->touchWasDown ? 100 : 1000;
     if (game->retireStage >= 20 || game->now <= game->retireTime + step) return;
@@ -3043,10 +3053,12 @@ static void retirement_tick(SSRGame *game) {
     if (stage >= 1 && stage <= 9) {
         const char *name = RETIRE_STATS[stage - 1];
         ssr_tweaks_set_number(game->tweaks, "PlayerStats", name, game->retireStats[stage - 1]);
+        play_sound(game, "CStat");
         add_op(game, SSR_OP_SHOW, retire_ref(name), NULL, NULL, 0);
         // The modern look has no bars 10 to 12.
         if (stage == 9) game->retireStage = 12;
     } else if (stage == 13) {
+        play_sound(game, "AudienceCheer");
         retirement_score(game, game->retireScore);
     }
 }
@@ -5049,6 +5061,7 @@ static void shop_tab_property(SSRGame *game) {
 // NotEnoughCash: the remake has no bux shop, so the splash of the classic
 // look shows.
 static void not_enough_cash(SSRGame *game, int shortBy) {
+    play_sound(game, "CError");
     ssr_tweaks_set_number(game->tweaks, "Menu", "ItemInfoHelpIncrement", 0);
     if (shortBy <= 0) return;
     ssr_tweaks_set_number(game->tweaks, "Menu", "BuxShort", shortBy);
@@ -6969,6 +6982,7 @@ static void race_setup(SSRGame *game, int own) {
     game->raceFrame = 0;
     game->standingsReady = 0;
     game->ownRace = own;
+    game->gallopNext = 0;
     ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", 0);
     ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", 0);
     game->myHorse = -1;
@@ -7047,7 +7061,12 @@ static void race_result(SSRGame *game);
 static void race_tick(SSRGame *game) {
     SSRHorses *h = &game->horses;
     float moves[SSR_RUNNERS] = {0};
-    ssr_horses_race_step(h, &game->casinoRandom, moves);
+    if (ssr_horses_race_step(h, &game->casinoRandom, moves)) play_sound(game, "RacingSwitchPos");
+    // UpdateGallop: two gallop loops, 890 ms apart.
+    if (game->now > game->gallopNext) {
+        play_sound(game, "AmbRacing");
+        game->gallopNext = game->now + 890;
+    }
     float lead = 0;
     for (int i = 0; i < h->runnerCount; i++) {
         game->horseX[i] += moves[i] * 0.66f;
@@ -7142,6 +7161,8 @@ static void race_result(SSRGame *game) {
     if (win > 0) {
         update_bank(game, win);
         save_career(game);
+        play_sound(game, "CCashIn");
+        play_sound(game, "CSuccess");
         ssr_tweaks_set_number(t, "HorseRacing", "Winnings", win);
         snprintf(text, sizeof(text), "%d", win);
         ssr_tweaks_set(t, "HorseRacing", "WinningsStr", text);
@@ -7149,6 +7170,7 @@ static void race_result(SSRGame *game) {
         ssr_tweaks_set_number(t, "Casino", "Winnings", win);
         casino_message(game, "bet_YouWon", win);
     } else {
+        play_sound(game, "CError");
         ssr_tweaks_set_number(t, "HorseRacing", "Winnings", 0);
         if (own < 0) {
             ssr_tweaks_set_number(t, "Casino", "CasinoOutcome", -1);
@@ -7178,6 +7200,7 @@ static void racing_quit(SSRGame *game) {
 static void stable_buy(SSRGame *game) {
     SSRCareer *c = &game->career;
     if (ssr_horses_count_owned(&game->horses) > 49) {
+        play_sound(game, "CError");
         message(game, "message", loc(game, "CMESSAGE_OWN_TOO_MANY_HORSES"), 0, 1, NULL);
         return;
     }
@@ -7188,6 +7211,7 @@ static void stable_buy(SSRGame *game) {
         not_enough_cash(game, price - c->bank);
         return;
     }
+    play_sound(game, "CCashOut");
     update_bank(game, -price);
     h->owned = 1;
     h->forsale = 0;
@@ -7212,11 +7236,13 @@ static void stable_ask(SSRGame *game, const char *tag, int cash, int horse, cons
 static void stable_train(SSRGame *game) {
     SSRHorse *h = selected_horse(game, 0);
     if (ssr_horses_count_owned(&game->horses) == 0 || !h) {
+        play_sound(game, "CError");
         message(game, "message", loc(game, "CMESSAGE_NO_HORSE_AVAILABLE"), 0, 1, NULL);
         return;
     }
     int cost = ssr_horses_train_cost(h->strength);
     if (cost == 0) {
+        play_sound(game, "CError");
         message(game, "message", loc(game, "CMESSAGE_HORSE_FULLY_TRAINED"), 0, 1, NULL);
         return;
     }
@@ -7236,6 +7262,7 @@ static void call_train_horse(SSRGame *game) {
     SSRHorse *h = ssr_horses_by_id(&game->horses, game->messageData);
     if (!h) return;
     h->strength++;
+    play_sound(game, "CCashOut");
     update_bank(game, -cost);
     save_career(game);
     stable_screen(game);
@@ -7246,6 +7273,7 @@ static void call_train_horse(SSRGame *game) {
 static void stable_sell(SSRGame *game) {
     SSRHorse *h = selected_horse(game, 0);
     if (ssr_horses_count_owned(&game->horses) == 0 || !h) {
+        play_sound(game, "CError");
         message(game, "message", loc(game, "CMESSAGE_NO_HORSE_AVAILABLE_SELL"), 0, 1, NULL);
         return;
     }
@@ -7258,6 +7286,7 @@ static void call_sell_horse(SSRGame *game) {
     SSRHorse *h = ssr_horses_by_id(&game->horses, game->messageData);
     if (!h) return;
     h->owned = h->forsale = 0;
+    play_sound(game, "CCashIn");
     update_bank(game, game->messageCash);
     save_career(game);
     horse_tweaks(game, 1);
@@ -7268,6 +7297,7 @@ static void call_sell_horse(SSRGame *game) {
 static void stable_race(SSRGame *game) {
     SSRHorse *h = selected_horse(game, 0);
     if (ssr_horses_count_owned(&game->horses) == 0 || !h) {
+        play_sound(game, "CError");
         message(game, "message", loc(game, "CMESSAGE_NO_HORSE_AVAILABLE_RACE"), 0, 1, NULL);
         return;
     }
@@ -7328,10 +7358,12 @@ static void blackjack_banner(SSRGame *game, const char *tag) {
     show_splash(game, "splashmessagecards", 1500);
 }
 
-// Win, Lose, and Tie of TScreen_BlackJack. [I: the sounds come with the
-// sounds of the game.]
+// Win, Lose, and Tie of TScreen_BlackJack.
 static void blackjack_result(SSRGame *game, int result) {
     int back = result == 1 ? game->bet * 2 : result == 0 ? game->bet : 0;
+    if (result == 1) play_sound(game, "CSuccess");
+    if (back > 0) play_sound(game, "CCashIn");
+    if (result == 2) play_sound(game, "CError");
     if (back > 0) {
         update_bank(game, back);
         save_career(game);
@@ -7358,11 +7390,13 @@ static void blackjack_events(SSRGame *game) {
                      card->posinhand);
             add_op(game, SSR_OP_HOOK, slot, ref, NULL, 1);
             add_op(game, SSR_OP_ANIM_PLAY, slot, NULL, "1", 0);
+            play_sound(game, "DealCard");
             game->blackjackHitOff = 1;
             break;
         case SSR_BJ_FLIP:
             // FlipDealerCard: the face turns up over the hole card.
             playing_card_ref(card, ref, sizeof(ref));
+            play_sound(game, "DealCard");
             add_op(game, SSR_OP_HOOK, "DealerCardToFlip", ref, NULL, 1);
             add_op(game, SSR_OP_SHOW, "DealerCardToFlip", NULL, NULL, 0);
             add_op(game, SSR_OP_HIDE, "DealerCard2", NULL, NULL, 0);
@@ -7549,6 +7583,7 @@ static void roulette_bet(SSRGame *game, SSRRouletteBet bet) {
     disable_stake(game);
     roulette_buttons(game, 0);
     ssr_roulette_spin(&game->roulette, &game->casinoRandom);
+    play_sound(game, "RouletteSpin");
 }
 
 static void roulette_green(SSRGame *game) {
@@ -7575,16 +7610,18 @@ static void roulette_seg3(SSRGame *game) {
     roulette_bet(game, SSR_BET_25TO36);
 }
 
-// TRoulette.GetResult, then ResetGame. [I: the sounds come with the sounds
-// of the game.]
+// TRoulette.GetResult, then ResetGame.
 static void roulette_result(SSRGame *game) {
     int win = ssr_roulette_prize(game->roulette.ballNum, game->rouletteBet, game->bet);
     if (win > 0) {
+        play_sound(game, "CCashIn");
+        play_sound(game, "CSuccess");
         update_bank(game, win);
         save_career(game);
         casino_message(game, "bet_YouWon", win);
         add_op(game, SSR_OP_SHOW, "TickerTapeShower", NULL, NULL, 0);
     } else {
+        play_sound(game, "CError");
         casino_message(game, "bet_YouLost", game->bet);
     }
     ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", win > 0 ? 1 : -1);
@@ -7598,7 +7635,10 @@ static void roulette_result(SSRGame *game) {
 // TRoulette.Update: the wheel and the ball move in each update, also with
 // no spin.
 static void roulette_tick(SSRGame *game) {
-    if (ssr_roulette_update(&game->roulette, &game->casinoRandom)) roulette_result(game);
+    int result = ssr_roulette_update(&game->roulette, &game->casinoRandom);
+    if (game->roulette.hit) play_sound(game, "RouletteBallHit");
+    if (game->roulette.drop) play_sound(game, "RouletteBallDrop");
+    if (result) roulette_result(game);
     roulette_place(game);
 }
 
@@ -7649,6 +7689,7 @@ static void slots_screen(SSRGame *game) {
 static void slots_play(SSRGame *game) {
     if (game->slotsSpinning || !casino_bet(game, game->bet, 1)) return;
     disable_stake(game);
+    play_sound(game, "SlotsPlay");
     for (int r = 0; r < 3; r++) ssr_slots_spin(&game->reels[r], r + 1, game->now, &game->casinoRandom);
     game->slotsSpinning = 1;
     add_op(game, SSR_OP_HIDE, "PlayButton", NULL, NULL, 0);
@@ -7656,10 +7697,12 @@ static void slots_play(SSRGame *game) {
     ssr_tweaks_set_number(game->tweaks, "Menu", "HomeButtonDisabled", 1);
 }
 
-// TScreen_Slots.DoPrize. [I: the sounds come with the sounds of the game.]
+// TScreen_Slots.DoPrize.
 static void slots_prize(SSRGame *game) {
     int win = ssr_slots_prize(game->reels, game->bet);
+    play_sound(game, win > 0 ? "SlotsYouWin" : "SlotsYouLose");
     if (win > 0) {
+        play_sound(game, "CCashIn");
         update_bank(game, win);
         save_career(game);
         casino_message(game, "bet_YouWon", win);
@@ -7679,7 +7722,7 @@ static void slots_tick(SSRGame *game) {
     for (int r = 0; r < 3; r++) {
         SSRSlotReel *reel = &game->reels[r];
         int moves = reel->yVel > 0;
-        ssr_slots_update(reel, game->now);
+        if (ssr_slots_update(reel, game->now)) play_sound(game, "SlotsItemLock");
         if (moves) slots_reel_frames(game, r);
         all &= reel->stopped;
     }
@@ -8322,6 +8365,14 @@ int ssr_game_banner(const SSRGame *game) {
 
 int ssr_game_splash(const SSRGame *game) {
     return game && game->now < game->splashEnd;
+}
+
+const char *ssr_game_take_sound(SSRGame *game) {
+    if (!game || game->soundCount == 0) return NULL;
+    const char *sound = game->sounds[0];
+    memmove(game->sounds, game->sounds + 1, (size_t)(game->soundCount - 1) * sizeof(const char *));
+    game->soundCount--;
+    return sound;
 }
 
 const char *ssr_game_splash_layout(const SSRGame *game) {
