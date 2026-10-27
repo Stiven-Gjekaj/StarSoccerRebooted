@@ -273,22 +273,24 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 ### The world around the player
 
-- [ ] Other players with careers: age, skill, form, transfers, injuries,
-      and retirement
+- [x] Other players with careers: age, skill, form, transfers, injuries,
+      and retirement (`ssr_people`). Each club that plays gets a squad.
 - [ ] Clubs with squads, managers, finances, and histories
-- [ ] Rival players: players of the same age who start with the player
-      and follow their own careers. The game compares their stats with
-      the stats of the player.
+- [x] Rival players: players of the same age who start with the player
+      and follow their own careers. The squad screen and the ticker show
+      them.
+- [ ] Compare the stats of the rivals with the stats of the player
 - [ ] Teammates who matter: a strike partner, a captain, a young player
       that the player mentors
 - [ ] Managers with styles: a new manager can drop the player, change the
       role, or bring the player to a new club
-- [ ] New young players each season, so the world stays full after the
+- [x] New young players each season, so the world stays full after the
       real players retire
 
 ### Stories and events
 
-- [ ] A news feed: form, transfer rumours, crises at other clubs, records
+- [ ] A news feed: form, transfer rumours, crises at other clubs, records.
+      The ticker tells of the rivals, the top scorer, and the transfers.
 - [ ] Press and fans: the opinion of the fans is a stat. The answers in
       interviews change the headlines and the rivals.
 - [ ] Season stories: a fight against relegation, a cup run of a small
@@ -327,7 +329,9 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 ### Replay value
 
-- [ ] World seeds, so that friends can share a world
+- [ ] World seeds, so that friends can share a world. The career keeps
+      its seed (`SSR_WORLD_SEED` fixes it). A screen to type it is still
+      to do.
 - [ ] Challenge starts: the lowest league at age 30, or one stat at its
       maximum
 - [ ] Many careers in one world. The next player can play against the
@@ -335,13 +339,17 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 ## The database
 
-- [ ] A data format for the world: leagues, clubs, players, stadiums,
-      kits, and logos. The format is open text, so that people can change
-      it.
+- [x] A data format for the world: the files of the data set, the
+      names of the players, images, and screens, in a zip file with
+      `pack.txt` ([docs/packs.md](docs/packs.md))
+- [ ] Stadiums and logos in a pack
 - [ ] An editor in the app for the leagues, the clubs, and the players
-- [ ] Data packs: the player installs a pack from a file. A pack can
-      change the names, the squads, the kits, and the logos.
-- [ ] Art packs: a pack can replace any image of the game
+- [x] Data packs: the player installs a pack from a file (a drop on the
+      window, or the path at the start)
+- [ ] A screen to choose or remove a pack, and an install on iOS and
+      Android
+- [x] Art packs: a pack can replace any image of the game, and any
+      screen
 - [ ] The index repository of the packs, with a CI check for each pull
       request
 - [ ] A pack browser in the app: read the index, download a pack, and
