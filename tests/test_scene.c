@@ -140,9 +140,11 @@ static void test_text_areas_layers_and_clips(void) {
                             "Clip:(0,0,50,50)\n"
                             "{\n"
                             "\tDraw:(Inside,0,0,10,10)\n"
+                            "\tDraw:(Late,0,0,10,10)\n"
+                            "\t\tLayer(AfterGloss)\n"
                             "}\n",
                             tweaks, &tree);
-    CHECK(ssr_scene_count(scene) == 8);
+    CHECK(ssr_scene_count(scene) == 7);
     const SSRSceneItem *big = ssr_scene_item(scene, 0);
     CHECK(big && big->w == 100 && big->h == 50);
     const SSRSceneItem *area = ssr_scene_item(scene, 1);
@@ -151,9 +153,14 @@ static void test_text_areas_layers_and_clips(void) {
     CHECK(label && label->kind == SSR_ITEM_TEXT && strcmp(label->text, "Play") == 0);
     CHECK(label && label->font == 2 && label->alignX == 'L' && label->alignY == 'T' && label->colour == 0x00FF00FF);
     CHECK(strcmp(ssr_scene_item(scene, 3)->text, "0") == 0);
-    CHECK(ssr_scene_item(scene, 4)->kind == SSR_ITEM_CLIP && ssr_scene_item(scene, 6)->kind == SSR_ITEM_UNCLIP);
-    // The item of a later layer draws last.
-    CHECK(strcmp(ssr_scene_item(scene, 7)->image, "Front") == 0);
+    // The item in the clip keeps the box of the clip.
+    const SSRSceneItem *inside = ssr_scene_item(scene, 4);
+    CHECK(strcmp(inside->image, "Inside") == 0 && inside->clipped && inside->clipW == 50 && inside->clipH == 50);
+    CHECK(!ssr_scene_item(scene, 3)->clipped);
+    // The items of a later layer draw last. The sort keeps the clip.
+    CHECK(strcmp(ssr_scene_item(scene, 5)->image, "Front") == 0);
+    const SSRSceneItem *late = ssr_scene_item(scene, 6);
+    CHECK(strcmp(late->image, "Late") == 0 && late->clipped && late->clipW == 50);
 
     CHECK(strcmp(ssr_scene_image_file(scene, "Pitch"), "NewGUI/Pitch.png") == 0);
     CHECK(ssr_scene_image_file(scene, "Other") == NULL);

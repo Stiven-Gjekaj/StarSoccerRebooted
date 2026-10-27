@@ -512,30 +512,23 @@ void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene) {
     if (!gfx || !scene) return;
     gfx->scene = scene;
     gfx->gameMS = ssr_scene_time(scene);
-    SDL_Rect clips[32];
-    int clipCount = 0;
+    // The clip changes only when the next item has another clip.
+    int clipped = 0;
+    SDL_Rect clip = {0, 0, 0, 0};
     for (int i = 0; i < ssr_scene_count(scene); i++) {
         const SSRSceneItem *item = ssr_scene_item(scene, i);
-        switch (item->kind) {
-        case SSR_ITEM_IMAGE:
+        if (item->kind == SSR_ITEM_AREA) continue;
+        SDL_Rect rect = {(int)(item->clipX + gfx->offsetX), (int)(item->clipY + gfx->offsetY), (int)item->clipW,
+                         (int)item->clipH};
+        if (item->clipped != clipped || (item->clipped && SDL_memcmp(&rect, &clip, sizeof(rect)) != 0)) {
+            clipped = item->clipped;
+            clip = rect;
+            SDL_SetRenderClipRect(gfx->renderer, clipped ? &clip : NULL);
+        }
+        if (item->kind == SSR_ITEM_IMAGE) {
             draw_image_item(gfx, item);
-            break;
-        case SSR_ITEM_TEXT:
+        } else if (item->kind == SSR_ITEM_TEXT) {
             draw_text_item(gfx, item);
-            break;
-        case SSR_ITEM_CLIP:
-            if (clipCount < 32) {
-                SDL_Rect rect = {(int)(item->x + gfx->offsetX), (int)(item->y + gfx->offsetY), (int)item->w, (int)item->h};
-                clips[clipCount++] = rect;
-                SDL_SetRenderClipRect(gfx->renderer, &rect);
-            }
-            break;
-        case SSR_ITEM_UNCLIP:
-            if (clipCount > 0) clipCount--;
-            SDL_SetRenderClipRect(gfx->renderer, clipCount ? &clips[clipCount - 1] : NULL);
-            break;
-        case SSR_ITEM_AREA:
-            break;
         }
     }
     SDL_SetRenderClipRect(gfx->renderer, NULL);

@@ -18,8 +18,6 @@ typedef enum {
     SSR_ITEM_TEXT,
     // An area that the player can press. It draws nothing.
     SSR_ITEM_AREA,
-    SSR_ITEM_CLIP,
-    SSR_ITEM_UNCLIP,
 } SSRItemKind;
 
 typedef enum {
@@ -71,6 +69,10 @@ typedef struct {
     const char *clickSound;
     // The element of the item, for ssr_scene_click.
     const void *owner;
+    // 1 when a Clip: around the item cuts it to the box of the clip, on
+    // the screen.
+    int clipped;
+    float clipX, clipY, clipW, clipH;
 } SSRSceneItem;
 
 typedef struct {

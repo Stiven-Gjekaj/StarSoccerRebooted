@@ -274,6 +274,11 @@ struct SSRScene {
     float touchX, touchY;
     // The gel that the parse reads now, for the %variables.
     Gel *parseGel;
+    // The boxes of the Clip: gels around the gel that draws now.
+    struct {
+        float x, y, w, h;
+    } clips[32];
+    int clipCount;
     Gel *pressed;
     Gel *candidate;
     // The swipe (SwipePanel): the gel that the touch started on, and if the
@@ -1917,6 +1922,14 @@ static SSRSceneItem *add_item(SSRScene *s, SSRItemKind kind, const Gel *g, int l
         item->clickSound = g->clickSound;
         item->owner = g;
     }
+    // The item keeps its clip, so that the sort of the layers cannot lose it.
+    if (s->clipCount > 0) {
+        item->clipped = 1;
+        item->clipX = s->clips[s->clipCount - 1].x;
+        item->clipY = s->clips[s->clipCount - 1].y;
+        item->clipW = s->clips[s->clipCount - 1].w;
+        item->clipH = s->clips[s->clipCount - 1].h;
+    }
     return item;
 }
 
@@ -2790,13 +2803,27 @@ static void draw_gel(SSRScene *s, Gel *g, const Frame *parent) {
         }
         break;
     case GEL_CLIP: {
-        SSRSceneItem *item = add_item(s, SSR_ITEM_CLIP, g, f.layer, f.depth);
-        if (item) {
-            set_box(item, g, f.m, 0, 0);
-            item->quad = 0;
+        SSRSceneItem box;
+        memset(&box, 0, sizeof(box));
+        set_box(&box, g, f.m, 0, 0);
+        float x0 = box.x, y0 = box.y, x1 = box.x + box.w, y1 = box.y + box.h;
+        if (s->clipCount > 0) {
+            // A clip in a clip is the part that both boxes cover.
+            const float *o = &s->clips[s->clipCount - 1].x;
+            if (x0 < o[0]) x0 = o[0];
+            if (y0 < o[1]) y0 = o[1];
+            if (x1 > o[0] + o[2]) x1 = o[0] + o[2];
+            if (y1 > o[1] + o[3]) y1 = o[1] + o[3];
         }
-        draw_children(s, g, &f);
-        add_item(s, SSR_ITEM_UNCLIP, g, f.layer, f.depth);
+        if (s->clipCount < 32) {
+            s->clips[s->clipCount].x = x0;
+            s->clips[s->clipCount].y = y0;
+            s->clips[s->clipCount].w = x1 > x0 ? x1 - x0 : 0;
+            s->clips[s->clipCount].h = y1 > y0 ? y1 - y0 : 0;
+            s->clipCount++;
+            draw_children(s, g, &f);
+            s->clipCount--;
+        }
         return;
     }
     case GEL_CROWD:
@@ -2890,6 +2917,7 @@ void ssr_scene_update(SSRScene *s, const SSRSceneEnv *env, int ms) {
 
     free_frame_strings(s);
     s->count = 0;
+    s->clipCount = 0;
     s->order = 0;
     s->animFrame = 0;
     s->tweenT = 0;
@@ -2995,7 +3023,10 @@ static const SSRSceneItem *hit(const SSRScene *scene, float x, float y, int clic
     for (int i = scene->count - 1; i >= 0; i--) {
         const SSRSceneItem *item = &scene->items[i];
         if (clicksOnly ? !item->click : !item->ref) continue;
-        if (item->kind == SSR_ITEM_CLIP || item->kind == SSR_ITEM_UNCLIP) continue;
+        if (item->clipped && (x < item->clipX || x >= item->clipX + item->clipW || y < item->clipY ||
+                              y >= item->clipY + item->clipH)) {
+            continue;
+        }
         float x0 = item->w < 0 ? item->x + item->w : item->x, x1 = item->w < 0 ? item->x : item->x + item->w;
         float y0 = item->h < 0 ? item->y + item->h : item->y, y1 = item->h < 0 ? item->y : item->y + item->h;
         if (x >= x0 && x < x1 && y >= y0 && y < y1) return item;
