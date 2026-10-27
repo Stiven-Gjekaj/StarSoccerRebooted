@@ -1028,6 +1028,7 @@ static void test_readouts_conditions_and_click_actions(void) {
     ssr_tweaks_set_number(tweaks, "Player", "Cans", 3);
     ssr_tweaks_set_number(tweaks, "Menu", "OwnedBoot", 1);
     ssr_tweaks_set_number(tweaks, "Menu", "FocusedItem", 2);
+    ssr_tweaks_set(tweaks, "MatchColours", "ShieldFrame1", "Crest_810");
     SSRUiTree *tree;
     layout = "Text:(\"00\",0,0,100,20)\n"
              "\tReadout(Player,SponsorIncome1,* )\n"
@@ -1053,6 +1054,10 @@ static void test_readouts_conditions_and_click_actions(void) {
              "\tDraw:(Boot0,0,0,10,10)\n"
              "\tDraw:(Boot1,0,0,10,10)\n"
              "}\n"
+             "Draw:(Frame,0,400,10,10)\n"
+             "\tImageReadout(MatchColours,ShieldFrame1)\n"
+             "Draw:(Plain,0,410,10,10)\n"
+             "\tImageReadout(MatchColours,NoImage)\n"
              "Draw:(Focus,0,0,10,10,,#000000FF)\n"
              "\tif(twk(Menu,FocusedItem)=2)\n"
              "\t<\n"
@@ -1087,6 +1092,8 @@ static void test_readouts_conditions_and_click_actions(void) {
     CHECK(find_text(scene, "1 can"));
     CHECK(find_text(scene, "LEE"));
     CHECK(find_image(scene, "Boot1") && !find_image(scene, "Boot0"));
+    // A tweak with a text gives the image. An empty tweak keeps the image.
+    CHECK(find_image(scene, "Crest_810") && !find_image(scene, "Frame") && find_image(scene, "Plain"));
     CHECK(find_image(scene, "Focus")->colour == 0xFF0000FF);
     ssr_tweaks_set_number(tweaks, "Menu", "FocusedItem", 0);
     ssr_scene_update(scene, &env, 16);

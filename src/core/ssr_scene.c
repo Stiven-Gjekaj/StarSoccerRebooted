@@ -81,6 +81,7 @@ typedef enum {
     D_PLAY_ANIM,
     D_READOUT,
     D_STRING_READOUT,
+    D_IMAGE_READOUT,
     D_PROGRESS_BAR,
     D_SHADOW,
     D_ANIMATE_PROGRESS,
@@ -1639,6 +1640,13 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         if (!d) return NULL;
         d->text[0] = keep(s, arg(m, 0));
         d->text[1] = keep(s, arg(m, 1));
+    } else if (is(n, "ImageReadout")) {
+        // [I: a modifier of the remake. The image of the Draw is the text
+        // of the tweak, when the tweak has a text.]
+        d = new_doodad(D_IMAGE_READOUT, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
     } else if (strncmp(n, "GS_", 3) == 0) {
         // A text that the logic of the game gives, by its name.
         d = new_doodad(D_PROVIDER, m);
@@ -2842,6 +2850,11 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
     case D_STRING_READOUT:
         set_shown(g, ssr_tweaks_get(s->env->tweaks, d->text[0], d->text[1]));
         break;
+    case D_IMAGE_READOUT: {
+        const char *image = ssr_tweaks_get(s->env->tweaks, d->text[0], d->text[1]);
+        if (*image && (!g->image || strcmp(g->image, image) != 0)) g->image = keep(s, image);
+        break;
+    }
     case D_PROGRESS_BAR: {
         float lo = d->v[0], hi = d->v[1];
         if (d->text[2]) hi = (float)tweak_pair(s, d->text[2]);
