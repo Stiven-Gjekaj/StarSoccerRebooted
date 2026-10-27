@@ -1220,6 +1220,13 @@ static void ex_set_colour(void *context, void *gel, SSRGelProperty property, con
     SSRScene *s = context;
     Gel *g = gel;
     Colour to = {c.r, c.g, c.b, c.a, c.mr, c.mg, c.mb, c.ma};
+    if (property == SSR_GEL_TEXT_SHADCOL) {
+        // The colour of the shadow of a text (c_EX_Gel_TextShadCol).
+        if (g->kind != GEL_TEXT || !g->shadow) return;
+        g->hasShadowColour = 1;
+        g->shadowColour = to;
+        return;
+    }
     if (property == SSR_GEL_SLOTCOL) {
         // c_EX_Gel_SlotColour: the mask picks the channels that change, in
         // the order r, g, b, a, then the four mixes.

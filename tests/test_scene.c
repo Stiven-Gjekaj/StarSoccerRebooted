@@ -1840,6 +1840,20 @@ static void test_colours_a_spine_slot(void) {
     ssr_spine_free(testSpine);
 }
 
+// set(gel.text.shadcol, colour) gives the shadow of a text its colour.
+static void test_colours_the_shadow_of_a_text(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    SSRScene *scene = build("Text:(Home,0,0,200,40)\n"
+                            "\tset(gel.text.shadcol,#FF0000FF)\n",
+                            tweaks, &tree);
+    const SSRSceneItem *home = find_text(scene, "Home");
+    CHECK(home && home->shadow && home->shadowColour == 0xFF0000FFu);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -2231,6 +2245,7 @@ int main(void) {
     test_joins_tweaks_in_a_text();
     test_rolls_a_digit();
     test_colours_a_spine_slot();
+    test_colours_the_shadow_of_a_text();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
