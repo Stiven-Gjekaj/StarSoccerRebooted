@@ -149,6 +149,10 @@ const char *ssr_game_screen(const SSRGame *game);
 // "" when none shows. It takes the touches first.
 const char *ssr_game_overlay(const SSRGame *game);
 
+// The layout of the modal overlay over the overlay (c_ModalOverlay: the
+// repair box, the purchase animation), or "". It takes the touches first.
+const char *ssr_game_modal(const SSRGame *game);
+
 // Grows by 1 each time that the screen changes. A screen that opens again
 // counts too.
 int ssr_game_screen_version(const SSRGame *game);

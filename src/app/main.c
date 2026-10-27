@@ -86,6 +86,10 @@ typedef struct {
     SSRScene *overlayScene;
     SSRUiTree *overlayScreen;
     char overlayName[48];
+    // The modal overlay over it.
+    SSRScene *modalScene;
+    SSRUiTree *modalScreen;
+    char modalName[48];
     SSRUiTree *hudScreen;
     char pitchName[64];
     SSRScene *viewScene;
@@ -202,26 +206,38 @@ static void apply_settings(SSRApp *app) {
 static SSRScene *open_layer(SSRApp *app, const char *name, SSRUiTree **tree, SSRSceneEnv *env);
 static SSRSceneEnv scene_env(SSRApp *app);
 
-static void free_overlay(SSRApp *app) {
-    ssr_scene_free(app->overlayScene);
-    ssr_ui_free(app->overlayScreen);
-    app->overlayScene = NULL;
-    app->overlayScreen = NULL;
-    app->overlayName[0] = 0;
+static void free_layer(SSRScene **scene, SSRUiTree **screen, char *name) {
+    ssr_scene_free(*scene);
+    ssr_ui_free(*screen);
+    *scene = NULL;
+    *screen = NULL;
+    name[0] = 0;
 }
 
-// The overlay that the logic names opens over the screen, and goes when
-// the name is "".
-static void follow_overlay(SSRApp *app) {
-    const char *name = ssr_game_overlay(app->game);
-    if (SDL_strcmp(name, app->overlayName) == 0) return;
-    free_overlay(app);
+static void free_overlay(SSRApp *app) {
+    free_layer(&app->modalScene, &app->modalScreen, app->modalName);
+    free_layer(&app->overlayScene, &app->overlayScreen, app->overlayName);
+}
+
+// A layer that the logic names opens, and goes when the name is "".
+static void follow_layer(SSRApp *app, const char *name, SSRScene **scene, SSRUiTree **screen, char *loaded,
+                         size_t capacity) {
+    if (SDL_strcmp(name, loaded) == 0) return;
+    free_layer(scene, screen, loaded);
     if (!name[0]) return;
-    SDL_strlcpy(app->overlayName, name, sizeof(app->overlayName));
+    SDL_strlcpy(loaded, name, capacity);
     char file[80];
     SDL_snprintf(file, sizeof(file), "%s.uis", name);
     SSRSceneEnv env = scene_env(app);
-    app->overlayScene = open_layer(app, file, &app->overlayScreen, &env);
+    *scene = open_layer(app, file, screen, &env);
+}
+
+// The overlay over the screen and the modal overlay over it.
+static void follow_overlay(SSRApp *app) {
+    follow_layer(app, ssr_game_overlay(app->game), &app->overlayScene, &app->overlayScreen, app->overlayName,
+                 sizeof(app->overlayName));
+    follow_layer(app, ssr_game_modal(app->game), &app->modalScene, &app->modalScreen, app->modalName,
+                 sizeof(app->modalName));
 }
 
 static void follow_game(SSRApp *app) {
@@ -775,6 +791,7 @@ static void apply_ops(SSRApp *app) {
         apply_op(app, app->scene, &op);
         // An overlay over the screen takes the changes too.
         if (app->overlayScene) apply_op(app, app->overlayScene, &op);
+        if (app->modalScene) apply_op(app, app->modalScene, &op);
     }
 }
 
@@ -1025,14 +1042,15 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
             y = event->tfinger.y;
             down = event->type != SDL_EVENT_FINGER_UP;
         }
-        // An overlay takes all the touches while it shows.
-        if (app->overlayScene) {
-            ssr_scene_touch(app->overlayScene, down, x + app->left, y + app->top);
+        // An overlay takes all the touches while it shows, the modal one
+        // first.
+        SSRScene *top = app->modalScene ? app->modalScene : app->overlayScene;
+        if (top) {
+            ssr_scene_touch(top, down, x + app->left, y + app->top);
             int released = event->type == SDL_EVENT_MOUSE_BUTTON_UP || event->type == SDL_EVENT_FINGER_UP;
-            const SSRSceneItem *hit = released && !ssr_scene_dragged(app->overlayScene)
-                                          ? ssr_scene_hit_item(app->overlayScene, x + app->left, y + app->top)
-                                          : NULL;
-            if (hit) click_in(app, app->overlayScene, hit);
+            const SSRSceneItem *hit =
+                released && !ssr_scene_dragged(top) ? ssr_scene_hit_item(top, x + app->left, y + app->top) : NULL;
+            if (hit) click_in(app, top, hit);
             return SDL_APP_CONTINUE;
         }
         ssr_scene_touch(app->scene, down, x + app->left, y + app->top);
@@ -1210,6 +1228,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         update_backdrop(app, &env, ms);
         update_rebooted(app, &env, ms);
         if (app->overlayScene) ssr_scene_update(app->overlayScene, &env, ms);
+        if (app->modalScene) ssr_scene_update(app->modalScene, &env, ms);
         ssr_gfx_set_tweaks(app->gfx, app->tweaks);
         const SSRChance *chance = ssr_game_chance(app->game);
         if (app->tapScene && chance && chance->state == SSR_CHANCE_TAP) {
@@ -1225,6 +1244,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         if (app->splashScene) ssr_gfx_draw_scene(app->gfx, app->splashScene);
         if (app->hudScene && chance) ssr_gfx_draw_scene(app->gfx, app->hudScene);
         if (app->overlayScene) ssr_gfx_draw_scene(app->gfx, app->overlayScene);
+        if (app->modalScene) ssr_gfx_draw_scene(app->gfx, app->modalScene);
         draw_ticker(app, &env);
     }
     if (!app->gfx) {
