@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.0 (2026-10-27)
+
+- Each club has a manager with a style. A youth manager picks young
+  players, and an attacking manager plays three attackers.
+- At the end of a season the managers of the bottom clubs can go. The
+  ticker tells of the new managers. A new manager of the club of the
+  player starts the boss relation again, and the timeline keeps it.
+
 ## 0.15.0 (2026-10-27)
 
 - Career moments: the debut, the first goal, and the milestones of the
