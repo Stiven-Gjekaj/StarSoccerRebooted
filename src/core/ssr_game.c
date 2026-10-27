@@ -9,6 +9,7 @@
 
 #include "ssr_aftermatch.h"
 #include "ssr_career.h"
+#include "ssr_casino.h"
 #include "ssr_contract.h"
 #include "ssr_fs.h"
 #include "ssr_match.h"
@@ -111,6 +112,17 @@ struct SSRGame {
     // values that show, and the score.
     int retireStage, retireTime, retireScore;
     float retireStats[9];
+    // The casino: the stake level and the bet, the stake buttons that are
+    // off (c_TScreen_Casino), and the fields of TPlayer that a load does not
+    // keep: the bets of the visit, the matches until the next catch, the
+    // date of the trip with the team mates, and the bets of that trip (-1
+    // with no trip).
+    int stakeLevel, bet, stakeUpOff, stakeDownOff;
+    int betCount, caughtGambling, teammatesCasino, teammatesBetCount;
+    // The games seed their numbers from the clock.
+    SSRRandom casinoRandom;
+    SSRSlotReel reels[3];
+    int slotsSpinning;
     int slot;
     int slotExists[SSR_CAREER_SLOTS];
 
@@ -489,12 +501,14 @@ static void star_transition(SSRGame *game, const char *after);
 static void player_tweaks(SSRGame *game);
 static void reset_progress(SSRGame *game);
 static void rating_tweaks(SSRGame *game);
+static void casino_new_player(SSRGame *game);
 
 static void open_slot(SSRGame *game, int slot) {
     game->slot = slot;
     char path[2200];
     slot_path(game, slot, path, sizeof(path));
     if (game->slotExists[slot] && ssr_career_load(&game->career, path)) {
+        casino_new_player(game);
         new_season_state(game);
         season_path(game, slot, path, sizeof(path));
         if (game->season && !ssr_season_load(game->season, path)) {
@@ -840,6 +854,7 @@ static void nation_ok(SSRGame *game) {
     int assistBonus = (int)ssr_tweaks_number(game->tweaks, "Player", "StartingAssistBonus");
     ssr_career_create(&game->career, game->firstName, game->lastName, game->gender, game->hardMode, league, wage,
                       goalBonus, assistBonus);
+    casino_new_player(game);
     game->career.nationId = chosen(game, "ChosenDesiredNation");
     // LoadDataAndStartTrial: the game chooses the club.
     const SSRClub *club = first_club(game, league);
@@ -1033,6 +1048,7 @@ static void call_trainer_get(SSRGame *game);
 static void call_boots_expired(SSRGame *game);
 static void call_dump_partner(SSRGame *game);
 static void call_retirement(SSRGame *game);
+static void call_caught_gambling(SSRGame *game);
 
 static void run_call(SSRGame *game, const char *name) {
     static const struct {
@@ -1050,6 +1066,7 @@ static void run_call(SSRGame *game, const char *name) {
         {"DrinkNRG", call_drink},
         {"SeasonEndTransfer", call_season_end_transfer},
         {"Retirement", call_retirement},
+        {"CaughtGambling", call_caught_gambling},
         {"PlayToDate", call_play_to_date},
         {"SetUpFixture", call_set_up_fixture},
         {"DebutTired", call_debut_tired},
@@ -2233,6 +2250,8 @@ static void not_picked(SSRGame *game, const char *text) {
 // start again, and each sponsor takes a little of the relation.
 static void match_recovery(SSRGame *game) {
     SSRCareer *c = &game->career;
+    c->gambling = c->gambling - 5 < 0 ? 0 : c->gambling - 5;
+    if (game->caughtGambling > 0) game->caughtGambling--;
     c->spentTime = 0;
     int n = ssr_career_count_sponsors(c);
     if (n > 0) ssr_career_update_relation(c, SSR_RELATION_SPONSORS, (float)n * -0.65f);
@@ -6555,6 +6574,244 @@ CARD(14)
 CARD(15)
 #undef CARD
 
+/* ---------------------------------------------------------- the casino */
+
+// The fields of TPlayer that a new career or a load starts again, and the
+// stake of the casino (c_TScreen_MainMenu).
+static void casino_new_player(SSRGame *game) {
+    game->stakeLevel = game->bet = 1;
+    game->betCount = game->caughtGambling = game->teammatesCasino = 0;
+    game->teammatesBetCount = -1;
+}
+
+static void set_teammates_bet_count(SSRGame *game, int count) {
+    game->teammatesBetCount = count;
+    ssr_tweaks_set_number(game->tweaks, "Casino", "TeammatesBetCount", count);
+}
+
+static void add_energy(SSRCareer *c, float change) {
+    float e = c->energy + change;
+    c->energy = e < 0 ? 0 : e > 100 ? 100 : e;
+}
+
+// c_TScreen_Casino.UpdateTitlePanel: the stake, and the stake buttons on
+// at the levels that can change.
+static void update_title_panel(SSRGame *game) {
+    game->bet = ssr_casino_stake(game->stakeLevel);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "Stake", game->bet);
+    game->stakeDownOff = game->stakeLevel == 1;
+    game->stakeUpOff = game->stakeLevel == SSR_CASINO_STAKE_LEVELS;
+    add_op(game, SSR_OP_ELEMENT_COLOUR, "DecreaseBet", NULL, game->stakeDownOff ? "FFFFFF55" : "FFFFFFFF", 0);
+    add_op(game, SSR_OP_ELEMENT_COLOUR, "IncreaseBet", NULL, game->stakeUpOff ? "FFFFFF55" : "FFFFFFFF", 0);
+}
+
+// DisableStake: the stake cannot change while a game runs.
+static void disable_stake(SSRGame *game) {
+    game->stakeUpOff = game->stakeDownOff = 1;
+    add_op(game, SSR_OP_ELEMENT_COLOUR, "DecreaseBet", NULL, "FFFFFF55", 0);
+    add_op(game, SSR_OP_ELEMENT_COLOUR, "IncreaseBet", NULL, "FFFFFF55", 0);
+}
+
+// CheckStakeAmount (EnableStake): the stake goes down to the bank.
+static void check_stake(SSRGame *game) {
+    game->stakeLevel = ssr_casino_check_stake(game->stakeLevel, game->career.bank);
+    update_title_panel(game);
+}
+
+static void stake_up(SSRGame *game) {
+    if (game->stakeUpOff) return;
+    if (game->stakeLevel < SSR_CASINO_STAKE_LEVELS) game->stakeLevel++;
+    update_title_panel(game);
+}
+
+static void stake_down(SSRGame *game) {
+    if (game->stakeDownOff) return;
+    if (game->stakeLevel > 1) game->stakeLevel--;
+    update_title_panel(game);
+}
+
+// c_TScreen_Casino.SetUpScreen.
+static void casino_screen(SSRGame *game) {
+    set_screen(game, "casino");
+    ssr_tweaks_set_number(game->tweaks, "Casino", "TeammatesBetCount", game->teammatesBetCount);
+    update_title_panel(game);
+}
+
+// c_TScreen_Casino.ButtonBack: the end of a trip with the team mates, and
+// the energy that the bets of the visit cost. [I: the alerts of the energy
+// come with the alerts of the game.]
+static void casino_back(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int count = game->teammatesBetCount;
+    if (count == 0) {
+        game->teammatesCasino = 0;
+        ssr_career_update_relation(c, SSR_RELATION_TEAM, -10);
+    } else if (count > 0) {
+        int gain = (int)((float)count * 0.5f);
+        ssr_career_update_relation(c, SSR_RELATION_TEAM, (float)(gain < 1 ? 1 : gain > 5 ? 5 : gain));
+    }
+    set_teammates_bet_count(game, -1);
+    if (game->betCount > 0) add_energy(c, (float)-(game->betCount / 3 + 1));
+    game->betCount = 0;
+    player_tweaks(game);
+    relationships_screen(game, count == -1, 0);
+}
+
+// casino.btn_Home: ButtonBack, then the game menu.
+static void casino_home(SSRGame *game) {
+    casino_back(game);
+    game_menu(game);
+}
+
+// c_TPlayer.CatchGambling: a player under 18 can be caught.
+static void catch_gambling(SSRGame *game) {
+    message(game, "message", loc(game, "CMESSAGE_GAMBLINGTOOYOUNG"), 0, 1, "CaughtGambling");
+}
+
+// The call "CaughtGambling": the relations go down and the news tells it.
+static void call_caught_gambling(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    game->caughtGambling = 10;
+    c->gambling = (int)((float)c->gambling * 0.5f);
+    c->relationBoss = ssr_career_relation(c, SSR_RELATION_BOSS) * 0.75f;
+    c->relationFans = ssr_career_relation(c, SSR_RELATION_FANS) * 0.9f;
+    c->relationSponsors = ssr_career_relation(c, SSR_RELATION_SPONSORS) * 0.75f;
+    do_news(game, "CNEWS_GAMBLINGTOOYOUNG2", my_club_tla(game), NULL);
+    replace_number(c->headline, sizeof(c->headline), "$age", ssr_career_age(c));
+    webpage_to(game, "relationships", 0);
+}
+
+// c_TPlayer.Bet (GSPlayerBet): returns 1 when the bet is taken. weight is
+// what the bet adds to the gambling.
+static int casino_bet(SSRGame *game, int amount, int weight) {
+    SSRCareer *c = &game->career;
+    if (amount > c->bank) {
+        not_enough_cash(game, amount - c->bank);
+        check_stake(game);
+        return 0;
+    }
+    if (c->energy < 1.0f) {
+        not_enough_energy(game, "Casino", 1.0f);
+        return 0;
+    }
+    if (ssr_career_age(c) < 18 && c->gambling > 20 && game->caughtGambling == 0 &&
+        ssr_rand(&game->casinoRandom, 20) == 1) {
+        catch_gambling(game);
+        return 0;
+    }
+    // Each tenth bet costs energy. [I: the alert comes with the alerts.]
+    if (game->betCount > 9) {
+        game->betCount = 0;
+        add_energy(c, -5);
+    }
+    update_bank(game, -amount);
+    if (game->teammatesBetCount > -1) set_teammates_bet_count(game, game->teammatesBetCount + 1);
+    c->casinoCount++;
+    game->betCount += weight;
+    c->gambling = c->gambling + weight > 100 ? 100 : c->gambling + weight;
+    save_career(game);
+    return 1;
+}
+
+// The message of a win: "YOU WON" and the bux (TQuickMessage).
+static void casino_won(SSRGame *game, int win) {
+    char text[128], cash[24];
+    snprintf(text, sizeof(text), "%s", loc(game, "bet_YouWon"));
+    for (char *p = text; *p; p++) *p = (char)toupper((unsigned char)*p);
+    number_with_commas(win, cash, sizeof(cash));
+    size_t n = strlen(text);
+    snprintf(text + n, sizeof(text) - n, " \xE2\x98\x85%s", cash);
+    ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+    game->splashEnd = game->now + 1500;
+}
+
+/* ----------------------------------------------------------- the slots */
+
+// AScreen_Slots.SetByOldUIPos: the frames of the eight icons of a reel.
+// [I: the reel animation loops, so a frame goes round 96.]
+static void slots_reel_frames(SSRGame *game, int r) {
+    int f = ssr_slots_frame(&game->reels[r]);
+    char ref[16], frame[16];
+    snprintf(ref, sizeof(ref), "ReelAnims%d", r + 1);
+    for (int i = 0; i < SSR_SLOTS_SYMBOLS; i++) {
+        snprintf(frame, sizeof(frame), "%d", ((12 * i + f + 8) % 96 + 96) % 96);
+        add_op(game, SSR_OP_ANIM_FRAME, ref, NULL, frame, i);
+    }
+}
+
+// TScreen_Slots.Reset: the numbers take a new seed from the clock.
+static void slots_reset(SSRGame *game) {
+    game->slotsSpinning = 0;
+    game->casinoRandom.seed = game->now;
+    add_op(game, SSR_OP_SHOW, "PlayButton", NULL, NULL, 0);
+    add_op(game, SSR_OP_SHOW, "BackButton", NULL, NULL, 0);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "HomeButtonDisabled", 0);
+}
+
+// casino.btn_Slots: TScreen_Slots.SetUpScreen.
+static void slots_screen(SSRGame *game) {
+    set_screen(game, "slots");
+    add_op(game, SSR_OP_HIDE, "TickerTapeShower", NULL, NULL, 0);
+    slots_reset(game);
+    for (int r = 0; r < 3; r++) {
+        ssr_slots_create(&game->reels[r], r, &game->casinoRandom);
+        slots_reel_frames(game, r);
+    }
+    check_stake(game);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", 0);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", 0);
+}
+
+// slots.btn_Play: the bet, then the reels turn.
+static void slots_play(SSRGame *game) {
+    if (game->slotsSpinning || !casino_bet(game, game->bet, 1)) return;
+    disable_stake(game);
+    for (int r = 0; r < 3; r++) ssr_slots_spin(&game->reels[r], r + 1, game->now, &game->casinoRandom);
+    game->slotsSpinning = 1;
+    add_op(game, SSR_OP_HIDE, "PlayButton", NULL, NULL, 0);
+    add_op(game, SSR_OP_HIDE, "BackButton", NULL, NULL, 0);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "HomeButtonDisabled", 1);
+}
+
+// TScreen_Slots.DoPrize. [I: the sounds come with the sounds of the game.]
+static void slots_prize(SSRGame *game) {
+    int win = ssr_slots_prize(game->reels, game->bet);
+    if (win > 0) {
+        update_bank(game, win);
+        save_career(game);
+        casino_won(game, win);
+        // ShowPrizeAnim: the title flashes, and the ticker tape falls.
+        add_op(game, SSR_OP_SHOW, "TitleAnim", NULL, NULL, 0);
+        add_op(game, SSR_OP_ANIM_PLAY, "TitleAnim", NULL, "1", 0);
+        add_op(game, SSR_OP_SHOW, "TickerTapeShower", NULL, NULL, 0);
+    }
+    ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", win > 0 ? 1 : -1);
+    ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", win);
+    check_stake(game);
+}
+
+// TScreen_Slots.Update: the reels turn, and the prize comes when all stop.
+static void slots_tick(SSRGame *game) {
+    int all = 1;
+    for (int r = 0; r < 3; r++) {
+        SSRSlotReel *reel = &game->reels[r];
+        int moves = reel->yVel > 0;
+        ssr_slots_update(reel, game->now);
+        if (moves) slots_reel_frames(game, r);
+        all &= reel->stopped;
+    }
+    if (all && game->slotsSpinning) {
+        slots_prize(game);
+        slots_reset(game);
+    }
+}
+
+// slots.btn_Quit: the back button hides while the reels turn.
+static void slots_quit(SSRGame *game) {
+    if (game->slotsSpinning) return;
+    casino_screen(game);
+}
+
 // c_TScreen_GameMenu.ButtonQuit: the first retired career unlocks the
 // hard mode. The message shows over the main menu.
 static void quit_career(SSRGame *game) {
@@ -6688,6 +6945,14 @@ static const Route ROUTES[] = {
     {"seasonreview.btn_Play", player_of_the_year},
     {"playeroftheyear.btn_Play", poty_play},
     {"playeroftheyear.btn_Retire", poty_retire},
+    {"relationships.btn_Casino", casino_screen},
+    {"casino.btn_Back", casino_back},
+    {"casino.btn_Home", casino_home},
+    {"casino.btn_Slots", slots_screen},
+    {"casino.btn_StakeUp", stake_up},
+    {"casino.btn_StakeDown", stake_down},
+    {"slots.btn_Play", slots_play},
+    {"slots.btn_Quit", slots_quit},
     {"retirement.btn_Play", retirement_play},
     {"match.btn_Play", match_play},
     {"leaguefixtures.btn_Kits", kits_button},
@@ -6722,6 +6987,7 @@ SSRGame *ssr_game_create(SSRTweaks *tweaks) {
     game->settings.volume = 1;
     game->settings.replays = 1;
     game->random.seed = SSR_RANDOM_START;
+    casino_new_player(game);
     set_option_tweaks(game);
     set_screen(game, "mainmenu");
     return game;
@@ -6907,6 +7173,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->ticks -= 1;
             game->now += 16;
             if (strcmp(game->screen, "playeroftheyear") == 0) poty_tick(game);
+        }
+    } else if (strcmp(game->screen, "slots") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1) {
+            game->ticks -= 1;
+            game->now += 16;
+            slots_tick(game);
         }
     } else if (strcmp(game->screen, "retirement") == 0) {
         game->ticks += frames;

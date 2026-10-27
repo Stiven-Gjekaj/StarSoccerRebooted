@@ -923,6 +923,81 @@ static void choose_a_dilemma(SSRGame *game, const char *path) {
 
 // The lifestyle shop: a purchase, too little cash, the question of the
 // first property, a repair, and the end of a trip with the team-mates.
+// The casino: the stake, and eleven spins of the slots. Each tenth bet
+// costs 5 energy, and the bets of the visit cost energy at the end.
+static void go_to_the_casino(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.bank = 100;
+    c.energy = 100;
+    c.gambling = 0;
+    c.casinoCount = 0;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    const SSRCareer *now = ssr_game_career(game);
+    ssr_game_message(game, "gamemenu.btn_Life");
+    ssr_game_message(game, "relationships.btn_Casino");
+    CHECK(strcmp(ssr_game_screen(game), "casino") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Casino", "Stake") == 1);
+    CHECK(ssr_tweaks_number(tweaks, "Casino", "TeammatesBetCount") == -1);
+    ssr_game_message(game, "casino.btn_Slots");
+    CHECK(strcmp(ssr_game_screen(game), "slots") == 0);
+    SSRUiOp ops[256];
+    int count = take_ops(game, ops, 256), frames = 0;
+    for (int i = 0; i < count; i++) frames += ops[i].kind == SSR_OP_ANIM_FRAME;
+    CHECK(frames == 24 && has_op(ops, count, SSR_OP_ANIM_FRAME, "ReelAnims3", NULL));
+    // The stake does not go under level 1. Two levels up is 5 bux.
+    ssr_game_message(game, "casino.btn_StakeDown");
+    CHECK(ssr_tweaks_number(tweaks, "Casino", "Stake") == 1);
+    ssr_game_message(game, "casino.btn_StakeUp");
+    ssr_game_message(game, "casino.btn_StakeUp");
+    CHECK(ssr_tweaks_number(tweaks, "Casino", "Stake") == 5);
+    int bank = 100, wins = 0;
+    for (int spin = 1; spin <= 11; spin++) {
+        float energy = now->energy;
+        ssr_game_message(game, "slots.btn_Play");
+        CHECK(now->bank == bank - 5 && now->gambling == spin && now->casinoCount == spin);
+        // The eleventh bet comes after ten: it costs 5 energy.
+        CHECK(now->energy == (spin == 11 ? energy - 5 : energy));
+        // The stake cannot change, and a second press does nothing.
+        ssr_game_message(game, "casino.btn_StakeUp");
+        ssr_game_message(game, "slots.btn_Play");
+        CHECK(now->bank == bank - 5 && ssr_tweaks_number(tweaks, "Casino", "Stake") == 5);
+        double outcome = 0;
+        for (int f = 0; f < 4 * 60 && outcome == 0; f++) {
+            ssr_tweaks_set_number(tweaks, "Casino", "CasinoOutcome", 0);
+            ssr_game_update(game, 1);
+            outcome = ssr_tweaks_number(tweaks, "Casino", "CasinoOutcome");
+        }
+        CHECK(outcome == 1 || outcome == -1);
+        int win = (int)ssr_tweaks_number(tweaks, "Casino", "Winnings");
+        CHECK(outcome == 1 ? win == 15 || win == 35 : win == 0);
+        if (win > 0) {
+            wins++;
+            CHECK(strncmp(ssr_tweaks_get(tweaks, "Menu", "QuickMessage"), "BET_YOUWON \xE2\x98\x85", 14) == 0);
+        }
+        bank = bank - 5 + win;
+        CHECK(now->bank == bank);
+    }
+    CHECK(wins > 0);
+    // Back: the one bet after the reset costs 1 more energy.
+    float energy = now->energy;
+    ssr_game_message(game, "slots.btn_Quit");
+    CHECK(strcmp(ssr_game_screen(game), "casino") == 0);
+    ssr_game_message(game, "casino.btn_Back");
+    CHECK(strcmp(ssr_game_screen(game), "relationships") == 0 && now->energy == energy - 1);
+    // A low bank takes the stake down.
+    ssr_game_message(game, "relationships.btn_Casino");
+    ssr_game_message(game, "casino.btn_Slots");
+    CHECK(ssr_tweaks_number(tweaks, "Casino", "Stake") == (bank >= 5 ? 5 : bank >= 2 ? 2 : 1));
+    ssr_game_message(game, "slots.btn_Quit");
+    ssr_game_message(game, "casino.btn_Back");
+    ssr_game_message(game, "relationships.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+}
+
 static void go_shopping(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     SSRCareer c = *ssr_game_career(game);
     c.bank = 40;
@@ -1415,6 +1490,7 @@ static void test_starts_a_new_career(void) {
     CHECK(winnerPages == 1);
     spend_time(game, tweaks, path);
     choose_a_dilemma(game, path);
+    go_to_the_casino(game, tweaks, path);
     go_shopping(game, tweaks, path);
     hire_and_kit_out(game, tweaks, path);
     get_old_boots_and_a_sponsor(game, tweaks, path);
