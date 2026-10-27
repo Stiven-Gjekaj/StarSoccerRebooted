@@ -428,6 +428,15 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     if (seasons == 0) CHECK(c->awards[19] > 0 && c->awards[122] > 0 && c->awards[20] > 0 && c->awards[21] > 0);
     if (seasons == 0) CHECK(c->awards[22] == 0 && c->awards[17] == 0);
     if (year - 1 == 10) CHECK(c->awards[50] > 0);
+    // In the second season the player is the best player of the club.
+    SSRCareer *best = (SSRCareer *)c;
+    int fans = best->relationFans;
+    if (seasons == 1) {
+        best->seasonApps = 30;
+        best->seasonStarMan = 20;
+        best->seasonTotalRating = 30 * 8.0f;
+        best->relationFans = 90;
+    }
     // The awards come one at a time; the buttons show at the end.
     ssr_game_message(game, "seasonreview.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "playeroftheyear") == 0);
@@ -441,8 +450,11 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
         shown = has_op(ops, count, SSR_OP_SHOW, "PlayButton", NULL);
     }
     CHECK(shown);
-    // A player with few matches wins no award.
-    CHECK(ssr_tweaks_number(tweaks, "SeasonAwards", "TeamPlayerOfYear") == 0);
+    // A player with few matches wins no award. The best player of the club
+    // wins the award of the club.
+    CHECK((ssr_tweaks_number(tweaks, "SeasonAwards", "TeamPlayerOfYear") != 0) == (seasons == 1));
+    if (seasons == 1) CHECK(c->awards[69] > 0 && c->awards[72] == 0 && c->awards[114] == 0);
+    best->relationFans = fans;
     if (retireNow) {
         retire(game, tweaks, careerPath);
         retireNow = 2;

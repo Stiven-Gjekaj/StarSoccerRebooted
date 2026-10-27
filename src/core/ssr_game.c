@@ -3184,6 +3184,11 @@ static int award_poty(SSRGame *game, int type) {
         const SSRSeasonClub *mine = ssr_season_club(s, c->clubId, 0);
         const char *team = type == 1 ? (mine ? mine->data->tla : "") : comp ? comp->data->tla : "";
         ssr_career_add_trophy(c, ssr_career_year(c) - 1, team, loc(game, TAGS[kind]), 6 + kind);
+        // m_ach: the club 69, the young 68, the division 70 (and 71 in the
+        // top division), the world 72. Three world awards give 114.
+        award(game, type == 1 ? 69 : type == 2 ? 68 : type == 3 ? 70 : 72);
+        if (type == 3 && top) award(game, 71);
+        if (ssr_career_count_medals(c, 10, 0) >= 3) award(game, 114);
     }
     return won;
 }
