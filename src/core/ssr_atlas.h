@@ -84,10 +84,11 @@ int ssr_atlas_page_pixels(SSRAtlases *atlases, int page, SSRImage *out);
 // The pixels of one frame of a RLE page. Returns 1 on success.
 int ssr_atlas_frame_pixels(SSRAtlases *atlases, int page, int frame, SSRImage *out);
 
-// Puts a patch on a plain image of a PNG page. The patch has the size of
-// the box of the image (originalWidth x originalHeight). Each pixel of the
-// patch with an alpha above 0 takes the place of the page pixel under it.
-// The other page pixels stay. Returns 1 when the image can take a patch.
+// Puts a patch on a plain or a stripped image of a PNG page. The patch has
+// the size of the box of the image (originalWidth x originalHeight). Each
+// pixel of the patch with an alpha above 0 takes the place of the page
+// pixel under it. The other page pixels stay. Returns 1 when the image can
+// take a patch.
 int ssr_atlas_patch(SSRImage *page, const SSRAtlasImage *image, const SSRImage *patch);
 
 #endif

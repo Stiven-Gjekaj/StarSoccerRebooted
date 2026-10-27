@@ -261,9 +261,46 @@ static void test_patches_an_image(void) {
     CHECK(!ssr_atlas_patch(&page, &image, &patch));
 }
 
+// A stripped image: two triangles put the 4 x 4 box on the page at (2, 2),
+// turned a quarter. The x of the box goes down the page, and the y of the
+// box goes to the left.
+static void test_patches_a_stripped_image(void) {
+    unsigned char pagePixels[8 * 8 * 4];
+    memset(pagePixels, 7, sizeof(pagePixels));
+    SSRImage page = {8, 8, pagePixels};
+    float shapes[24] = {
+        0, 0, 0.75f, 0.25f, 1, 0, 0.75f, 0.75f, 1, 1, 0.25f, 0.75f,
+        0, 0, 0.75f, 0.25f, 1, 1, 0.25f, 0.75f, 0, 1, 0.25f, 0.25f,
+    };
+    SSRAtlasImage image = {0};
+    image.kind = SSR_ATLAS_STRIPPED;
+    image.originalWidth = image.originalHeight = 4;
+    image.shapes = shapes;
+    image.shapeCount = 2;
+    unsigned char patchPixels[4 * 4 * 4];
+    for (int y = 0; y < 4; y++) {
+        for (int x = 0; x < 4; x++) {
+            unsigned char *p = patchPixels + (y * 4 + x) * 4;
+            p[0] = (unsigned char)(x * 10 + y);
+            p[1] = p[2] = 0;
+            p[3] = x == 2 && y == 1 ? 0 : 255;
+        }
+    }
+    SSRImage patch = {4, 4, patchPixels};
+    CHECK(ssr_atlas_patch(&page, &image, &patch));
+    // The box pixel (1, 0) is at the page pixel (5, 3), and (3, 3) at (2, 5).
+    CHECK(pagePixels[(3 * 8 + 5) * 4] == 10 && pagePixels[(3 * 8 + 5) * 4 + 3] == 255);
+    CHECK(pagePixels[(5 * 8 + 2) * 4] == 33);
+    // The clear pixel (2, 1) of the patch keeps the page pixel (4, 4).
+    CHECK(pagePixels[(4 * 8 + 4) * 4] == 7);
+    // The pixels around the image stay.
+    CHECK(pagePixels[(2 * 8 + 1) * 4] == 7 && pagePixels[(6 * 8 + 6) * 4] == 7 && pagePixels[(1 * 8 + 3) * 4] == 7);
+}
+
 int main(void) {
     test_reads_the_key();
     test_patches_an_image();
+    test_patches_a_stripped_image();
     test_decodes_the_pages();
     test_refuses_a_damaged_key();
     return TEST_RESULT();

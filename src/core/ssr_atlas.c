@@ -515,9 +515,48 @@ int ssr_atlas_page_pixels(SSRAtlases *a, int page, SSRImage *out) {
     return 1;
 }
 
+// Copies the pixel of the patch at the place (bx, by) of the box, as parts
+// of the box, to the page pixel (px, py), when its alpha is above 0.
+static void patch_pixel(SSRImage *page, int px, int py, const SSRImage *patch, float bx, float by) {
+    int sx = (int)floorf(bx * patch->width), sy = (int)floorf(by * patch->height);
+    if (sx < 0 || sx >= patch->width || sy < 0 || sy >= patch->height) return;
+    const unsigned char *from = patch->pixels + ((size_t)sy * patch->width + sx) * 4;
+    if (from[3] > 0) memcpy(page->pixels + ((size_t)py * page->width + px) * 4, from, 4);
+}
+
+// A stripped image: each page pixel in a triangle takes the place in the
+// box that the triangle gives it.
+static void patch_stripped(SSRImage *page, const SSRAtlasImage *image, const SSRImage *patch) {
+    for (int i = 0; i < image->shapeCount; i++) {
+        const float *t = image->shapes + i * 12;
+        float ax = t[2] * page->width, ay = t[3] * page->height;
+        float bx = t[6] * page->width, by = t[7] * page->height;
+        float cx = t[10] * page->width, cy = t[11] * page->height;
+        float area = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay);
+        if (fabsf(area) < 1e-6f) continue;
+        int x0 = (int)floorf(fminf(ax, fminf(bx, cx))), x1 = (int)ceilf(fmaxf(ax, fmaxf(bx, cx)));
+        int y0 = (int)floorf(fminf(ay, fminf(by, cy))), y1 = (int)ceilf(fmaxf(ay, fmaxf(by, cy)));
+        for (int py = y0 < 0 ? 0 : y0; py < y1 && py < page->height; py++) {
+            for (int px = x0 < 0 ? 0 : x0; px < x1 && px < page->width; px++) {
+                float x = px + 0.5f, y = py + 0.5f;
+                float wb = ((x - ax) * (cy - ay) - (cx - ax) * (y - ay)) / area;
+                float wc = ((bx - ax) * (y - ay) - (x - ax) * (by - ay)) / area;
+                float wa = 1 - wb - wc;
+                if (wa < -1e-4f || wb < -1e-4f || wc < -1e-4f) continue;
+                patch_pixel(page, px, py, patch, wa * t[0] + wb * t[4] + wc * t[8], wa * t[1] + wb * t[5] + wc * t[9]);
+            }
+        }
+    }
+}
+
 int ssr_atlas_patch(SSRImage *page, const SSRAtlasImage *image, const SSRImage *patch) {
-    if (!page || !image || !patch || image->kind != SSR_ATLAS_PLAIN) return 0;
+    if (!page || !image || !patch) return 0;
+    if (image->kind != SSR_ATLAS_PLAIN && image->kind != SSR_ATLAS_STRIPPED) return 0;
     if (patch->width != image->originalWidth || patch->height != image->originalHeight) return 0;
+    if (image->kind == SSR_ATLAS_STRIPPED) {
+        patch_stripped(page, image, patch);
+        return 1;
+    }
     const float *r = image->rect;
     float u0 = r[2], v0 = r[3], u1 = r[6], v1 = r[7];
     if (u0 == u1 || v0 == v1) return 0;
