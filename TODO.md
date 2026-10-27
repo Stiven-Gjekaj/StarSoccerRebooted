@@ -204,8 +204,10 @@ place of the atlas image with the same name (`art/NewStarLogo.png`).
       `BannerFrontAbv`)
 - [ ] The other marks: `BannerFrontLogo`, `LogoStrip`, `CLNewStar`, the
       sponsor images of `Images/`, the shirt card of the pairs game
-      (`PShirt`), the back of the cards (`PCardBackPattern1`), and the
-      microphones of the interview (`InterviewMics`)
+      (`PShirt`), the back of the cards (`PCardBackPattern1`), the
+      microphones of the interview (`InterviewMics`), the background of
+      the scroll windows (`M_BGScrollWindow`), and the "NS-" names of the
+      boots and the balls
 
 ## Not in the remake
 
