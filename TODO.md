@@ -294,12 +294,16 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       The ticker tells of the rivals, the top scorer, and the transfers.
 - [ ] Press and fans: the opinion of the fans is a stat. The answers in
       interviews change the headlines and the rivals.
-- [ ] Season stories: a fight against relegation, a cup run of a small
-      club, a title on the last day
-- [ ] Career moments: the debut, the first goal, the 100th appearance,
-      the testimonial match
-- [ ] Rivalries: derbies from the distance between stadiums, and rivalries
-      that grow from cup finals, title races, and transfers
+- [x] Season stories: the title race and the fight against relegation in
+      the ticker
+- [ ] More season stories: a cup run of a small club, a title on the
+      last day
+- [x] Career moments: the debut, the first goal, the milestones of the
+      matches and the goals, with an alert
+- [ ] The testimonial match
+- [x] Derbies from the distance between stadiums (under 30 km), in the
+      ticker
+- [ ] Rivalries that grow from cup finals, title races, and transfers
 - [ ] Comebacks and form: a club in a bad run, a player who returns from
       an injury
 
@@ -308,7 +312,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] The champions and the top scorers of each league in each season
       (the Honours screen)
 - [ ] The records and a hall of fame for each club, league, and nation
-- [ ] A career timeline: the seasons, clubs, trophies, and big moments
+- [x] A career timeline: the clubs, the titles, the awards, and the
+      moments (Honours, Career)
 - [ ] A legacy after retirement: how the world remembers the player. The
       world continues in a manager career or with a new player.
 
