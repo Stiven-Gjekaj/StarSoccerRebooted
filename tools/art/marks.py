@@ -60,3 +60,21 @@ _, w = text('SPORT', 0, 0, 38, track=0.03)
 body += (f'<g transform="translate({90 + (160 - w) / 2:.1f} 13) skewX(-14)" filter="url(#sh)">'
          f'<path d="{text_path("SPORT", 0, 0, w, 38, track=0.03)}" fill="#fff"/></g>')
 save('CLHeaderNewsLogo', body, 256, 64)
+
+# WebAddressNS (224 x 13): the address bar of the news page. Dark grey
+# bold type on white. The address has no real domain.
+ARIAL_BOLD = '/System/Library/Fonts/Supplemental/Arial Bold.ttf'
+ADDRESS = 'http://news.ssr'
+w = natural_width(ADDRESS, 10, font=ARIAL_BOLD, track=0.02)
+d = text_path(ADDRESS, (224 - w) / 2, 1.5, w, 10, font=ARIAL_BOLD, track=0.02)
+save('WebAddressNS', f'<rect width="224" height="13" fill="#ffffff"/><path d="{d}" fill="#5a5a5a"/>', 224, 13)
+
+# CLNSS (82 x 34): the block of the classic stadium. Light grey slanted
+# type on grey.
+ARIAL_BOLD_ITALIC = '/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf'
+w = natural_width('SSR', 26, font=ARIAL_BOLD_ITALIC, track=0.08)
+d = text_path('SSR', (82 - w) / 2, 4, w, 26, font=ARIAL_BOLD_ITALIC, track=0.08)
+body = ('<linearGradient id="block" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#979797"/>'
+        '<stop offset="1" stop-color="#828282"/></linearGradient>'
+        f'<rect width="82" height="34" fill="url(#block)"/><path d="{d}" fill="#c1c1c1"/>')
+save('CLNSS', body, 82, 34)
