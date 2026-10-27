@@ -156,10 +156,13 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] Retirement (`Retirement`), the score, and the hard mode unlock
 - [x] The history of the seasons and the trophy log, with the medals and
       the seasons in the score of the retirement
-- [ ] The awards of the achievements screen (`CheckAchievement`, 108
-      awards, the alert `bottommessageachievement`)
-- [ ] The records of the career: the furthest goals and passes
+- [x] The awards of the achievements screen (`CheckAchievement`, 108
+      awards, the alert `bottommessageachievement`). The alerts wait in a
+      queue, and a tap closes one.
+- [x] The records of the career: the furthest goals and passes
       (`bottommessagerecord`), the hat tricks, and the form of the career
+- The award 79 (a winner in the last minute) of a second leg does not
+  check the away goals, as the game does in some cases.
 
 ## 0.8 Side games (done)
 
@@ -172,7 +175,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       (`MyStable`, `Racing`, `RacingResult`)
 - [x] The sounds of the casino and of the races. The gallop plays every
       890 ms on one channel; the original has two loops.
-- [ ] The alerts at the bottom of the screen: the energy of the bets
+- [x] The alerts at the bottom of the screen: the energy of the bets
 - [x] The coin shower and the ticker tape of a win (`Spawn`). Each win
       shows a new ticker tape. A tie of blackjack gives the bet back with
       no sound.
@@ -214,7 +217,7 @@ layouts that use the modifier.
 - [x] `Spawn` (5), `Slot` (1), `SortByRef` (1): copies made by a layout
 - [x] `ReadoutConcat` (5): a readout of two values in one text
 - [x] `FontStyle` (5), `LineSpacing` (4), `Padding` (3): text layout
-- [ ] `func` (2), `call` (2): functions of the expression language. Only
+- [x] `func` (2), `call` (2): functions of the expression language. Only
       the alerts of the achievements and the records use them
 - [x] `RandomTweak` (1), `MechDigit` (1)
 - `Touch` (1) is a stray word in a classic tutorial, and `ModifyTweak`
@@ -244,7 +247,8 @@ place of the atlas image with the same name (`art/NewStarLogo.png`).
 - [x] A patch on a stripped image, as on a plain image
 - [x] The marks of the casino: the title of the slots (`SlotsTitlePanel`),
       the table and the card backs of blackjack (`BlackJackLogo`,
-      `CardBack`), the icon of blackjack (`IBlackJackColour`), and the
+      `CardBack`), the icon of blackjack (`IBlackJackColour`), the ace of
+      the card banners (`CardAce1`), and the
       boards of the race tracks (`HorseBannerC`, `HorseBannerW`,
       `AdBoardColour`, `AdBoardWhite`)
 - The microphones of the interview (`InterviewMics`) have no mark. They
