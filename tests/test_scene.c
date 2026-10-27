@@ -548,6 +548,10 @@ static void test_copies_a_template_into_a_hook(void) {
              "\tDraw:(ButtonFrame,0,0,10,10) $HIDE ref:Selected\n"
              "\tText:(GIRLFRIEND,0,0,10,10) ref:BarName\n"
              "} Template\n"
+             "Rect:(5,7) ref:CardAt\n"
+             "{\n"
+             "\tDraw:(CardBack,0,0,10,10)\n"
+             "} Template\n"
              "Rect:(100,50,10,10) ref:TopHook\n";
     SSRUiFiles files = {read_layout, NULL};
     SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
@@ -578,6 +582,17 @@ static void test_copies_a_template_into_a_hook(void) {
     CHECK(ssr_scene_set_hook(scene, "TopHook", "") == 1);
     ssr_scene_update(scene, &env, 16);
     CHECK(!find_image(scene, "DilemmaBeach"));
+    // The image of CardAt is at (0, 0) of the screen, 5 and 7 before its
+    // Rect. A hook moves the Rect to (0, 0), so the image goes 5 and 7 back.
+    CHECK(ssr_scene_set_hook(scene, "TopHook", "CardAt") == 1);
+    ssr_scene_update(scene, &env, 16);
+    image = find_image(scene, "CardBack");
+    CHECK(image && near(image->x, 95) && near(image->y, 43));
+    // A child keeps the place of its Rect, so the image is at the hook.
+    CHECK(ssr_scene_set_child(scene, "TopHook", "CardAt") == 1);
+    ssr_scene_update(scene, &env, 16);
+    image = find_image(scene, "CardBack");
+    CHECK(image && near(image->x, 100) && near(image->y, 50));
     ssr_scene_free(scene);
     ssr_ui_free(tree);
     ssr_tweaks_free(tweaks);

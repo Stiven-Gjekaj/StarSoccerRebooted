@@ -3871,7 +3871,7 @@ int ssr_scene_entry_bar(SSRScene *scene, const char *list, const char *ref, cons
     return 0;
 }
 
-int ssr_scene_set_hook(SSRScene *scene, const char *hook, const char *template_) {
+static int copy_into(SSRScene *scene, const char *hook, const char *template_, int keepPlace) {
     Gel *g = scene && hook ? find_ref_first(scene, hook) : NULL;
     // No template clears the hook.
     if (g && (!template_ || !template_[0])) {
@@ -3885,10 +3885,18 @@ int ssr_scene_set_hook(SSRScene *scene, const char *hook, const char *template_)
     if (!entry) return 0;
     for (int i = 0; i < g->childCount; i++) free_gel(g->children[i]);
     g->childCount = 0;
-    entry->x = entry->y = 0;
+    if (!keepPlace) entry->x = entry->y = 0;
     entry->hidden = 0;
     add_child(g, entry);
     return 1;
+}
+
+int ssr_scene_set_hook(SSRScene *scene, const char *hook, const char *template_) {
+    return copy_into(scene, hook, template_, 0);
+}
+
+int ssr_scene_set_child(SSRScene *scene, const char *hook, const char *template_) {
+    return copy_into(scene, hook, template_, 1);
 }
 
 void ssr_scene_sub(SSRScene *scene, const char *ref, const char *sub, const char *text, int visible) {

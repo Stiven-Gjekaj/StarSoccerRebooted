@@ -245,6 +245,9 @@ int ssr_scene_entry_bar(SSRScene *scene, const char *list, const char *ref, cons
 // place of its children, at its origin (c_GGadget.Clone into a hook). An
 // empty template clears the hook. Returns 1 when both are there.
 int ssr_scene_set_hook(SSRScene *scene, const char *hook, const char *template_);
+// The same, but the copy keeps the place of the template in its new parent
+// (c_Gel.SetParent of the root of a copy).
+int ssr_scene_set_child(SSRScene *scene, const char *hook, const char *template_);
 // The elements with the ref sub inside the first element with the ref show
 // when visible is 1, and a text among them takes the text when it is not
 // NULL.
