@@ -157,6 +157,14 @@ static const SSRSpine *spine_file(void *context, const char *name) {
     return spine;
 }
 
+// Logs the modifiers of a layout that the scene skips, so that a missing
+// part of the layout language shows.
+static void log_unknown(const SSRScene *scene, const char *name) {
+    for (int i = 0; i < ssr_scene_unknown_count(scene); i++) {
+        SDL_Log("%s: the modifier %s is not in the remake yet.", name, ssr_scene_unknown(scene, i));
+    }
+}
+
 static void open_screen(SSRApp *app, const char *name) {
     ssr_scene_free(app->scene);
     app->scene = NULL;
@@ -268,7 +276,9 @@ static void free_chance_view(SSRApp *app) {
 static SSRScene *open_layer(SSRApp *app, const char *name, SSRUiTree **tree, SSRSceneEnv *env) {
     SSRUiFiles files = {read_screen_file, app};
     *tree = ssr_ui_parse(name, &files);
-    return *tree ? ssr_scene_open(*tree, env) : NULL;
+    SSRScene *scene = *tree ? ssr_scene_open(*tree, env) : NULL;
+    if (scene) log_unknown(scene, name);
+    return scene;
 }
 
 // The animation of a player: the kind, and one of 8 headings
@@ -1025,6 +1035,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         int ms = 0;
         if (!app->scene) {
             app->scene = ssr_scene_open(app->screen, &env);
+            if (app->scene) log_unknown(app->scene, ssr_game_screen(app->game));
         } else {
             ms = (int)(now - app->lastFrame);
         }
