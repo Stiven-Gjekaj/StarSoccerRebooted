@@ -126,8 +126,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       the player out
 - [x] The news of a cup winner and of the result (`headlineresult`)
 - [ ] The trophy log and the stat history (`Achievements`)
-- [ ] The transfer at the end of the season (`DesiredTransfer`). Yes
-      keeps the club for now.
+- [x] The transfer at the end of the season (`DesiredTransfer`)
 
 ## 0.7 The life of the player (done)
 
