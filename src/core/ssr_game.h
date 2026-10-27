@@ -50,6 +50,8 @@ typedef enum {
     // The AnimInstance elements ref play the animation ref2 (their own one
     // when ref2 is "") from the frame id at the speed in text.
     SSR_OP_ANIM_PLAY,
+    // The element number id of the elements ref takes the colour in text.
+    SSR_OP_ELEMENT_COLOUR,
 } SSRUiOpKind;
 
 typedef struct {
