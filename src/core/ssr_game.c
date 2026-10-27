@@ -7,6 +7,7 @@
 
 #include "ssr_career.h"
 #include "ssr_fs.h"
+#include "ssr_match.h"
 #include "ssr_random.h"
 
 #define MAX_OPS 512
@@ -59,6 +60,21 @@ struct SSRGame {
     // The headline that the news page shows.
     char news[512];
     char shown[256];
+
+    // The match that plays now, and the chance of the player in it.
+    SSRMatch *match;
+    SSRChance *chance;
+    // The milliseconds of the game, the ticks of 60 a second that are due,
+    // and the time when an ended chance goes back to the match.
+    int now;
+    float ticks;
+    int chanceEnd;
+    SSRTapTouch touch;
+    int touchWasDown;
+    // The rows of the commentary. The screen shows them again when it
+    // comes back after a chance (m_commentaryCache).
+    SSRMatchLine commentary[256];
+    int commentaryCount;
 };
 
 typedef void (*Handler)(SSRGame *game);
@@ -697,6 +713,192 @@ static void game_menu(SSRGame *game) {
     player_tweaks(game);
 }
 
+/* ------------------------------------------------------------ match */
+
+static const SSRClub *player_club(const SSRGame *game) {
+    return game->world ? ssr_world_club(game->world, game->career.clubId) : NULL;
+}
+
+// The other team: the clubs of the league in turn [I: the fixtures of the
+// season come in 0.6].
+static const SSRClub *opponent(const SSRGame *game, const SSRClub *mine) {
+    const SSRClub *clubs[64];
+    int count = ssr_world_league_clubs(game->world, mine->league, clubs, 64);
+    if (count > 64) count = 64;
+    int self = 0;
+    for (int i = 0; i < count; i++) {
+        if (clubs[i] == mine) self = i;
+    }
+    if (count < 2) return mine;
+    int next = (self + 1 + game->career.apps % (count - 1)) % count;
+    return clubs[next];
+}
+
+static void match_tweaks(SSRGame *game) {
+    const SSRMatch *m = game->match;
+    SSRTweaks *t = game->tweaks;
+    ssr_tweaks_set_number(t, "Match", "HomeScore", m->score[1]);
+    ssr_tweaks_set_number(t, "Match", "AwayScore", m->score[2]);
+    ssr_tweaks_set_number(t, "Match", "MatchTime", m->minute);
+    ssr_tweaks_set_number(t, "Match", "MatchSpeed", m->textSpeed);
+    ssr_tweaks_set_number(t, "Match", "WorkRate", m->setup.workRate);
+    ssr_tweaks_set_number(t, "Match", "Focus", m->setup.focus);
+    ssr_tweaks_set_number(t, "Match", "Substitute", m->setup.subTime < 0 ? 1 : 0);
+    ssr_tweaks_set_number(t, "Player", "Energy", m->energy);
+}
+
+// The Match.MatchState of the layout: 1 before the kick-off, 0 while the
+// clock runs, 2 at half time, 3 at the end.
+static void match_state(SSRGame *game) {
+    int state = 0;
+    if (game->match->state == SSR_MATCH_PREMATCH) state = 1;
+    if (game->match->state == SSR_MATCH_HALF_TIME) state = 2;
+    if (game->match->state == SSR_MATCH_FULL_TIME) state = 3;
+    ssr_tweaks_set_number(game->tweaks, "Match", "MatchState", state);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "MatchScreenFooter", state == 0 ? -1 : 0);
+}
+
+static void start_match(SSRGame *game) {
+    const SSRClub *mine = player_club(game);
+    if (!mine) return;
+    const SSRClub *other = opponent(game, mine);
+    int home = game->career.apps % 2 == 0;
+    free(game->match);
+    game->match = calloc(1, sizeof(SSRMatch));
+    if (!game->match) return;
+    const SSRCareer *c = &game->career;
+    SSRMatchSetup s = {0};
+    s.homeName = home ? mine->tla : other->tla;
+    s.awayName = home ? other->tla : mine->tla;
+    s.homeStrength = (float)(home ? mine->strength : other->strength);
+    s.awayStrength = (float)(home ? other->strength : mine->strength);
+    s.myTeam = home ? 1 : 2;
+    s.playerName = c->shortName;
+    s.focus = 2;
+    s.workRate = 2;
+    s.energy = c->energy;
+    s.age = ssr_career_year(c) + 15;
+    s.relationTeam = (int)c->relationTeam;
+    s.relationBoss = (int)c->relationBoss;
+    s.setPieces = ssr_career_skill(c->setPieces);
+    s.vision = ssr_career_skill(c->vision);
+    s.careerApps = c->apps;
+    s.starLevel = 1;
+    ssr_match_start(game->match, &s, game->localise, game->context, &game->random);
+    game->commentaryCount = 0;
+    SSRTweaks *t = game->tweaks;
+    ssr_tweaks_set(t, "Match", "HomeName", s.homeName);
+    ssr_tweaks_set(t, "Match", "AwayName", s.awayName);
+    ssr_tweaks_set_number(t, "Match", "AggHomeScore", -1);
+    ssr_tweaks_set_number(t, "Match", "AggAwayScore", -1);
+    ssr_tweaks_set_number(t, "Match", "MaximiseScreen", 0);
+    set_screen(game, "match");
+    match_tweaks(game);
+    match_state(game);
+}
+
+// The end of the match: the career keeps the stats, and the game menu
+// opens [I: the match stats and the ratings screens come later].
+static void end_match(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    const SSRMatch *m = game->match;
+    c->apps++;
+    c->goals += m->goals;
+    c->assists += m->assists;
+    c->passes += m->passes;
+    c->energy = m->energy;
+    free(game->match);
+    game->match = NULL;
+    save_career(game);
+    game_menu(game);
+}
+
+static void match_play(SSRGame *game) {
+    if (!game->match) return;
+    if (ssr_match_play(game->match, game->now)) {
+        end_match(game);
+        return;
+    }
+    match_state(game);
+}
+
+static void match_speed(SSRGame *game) {
+    if (!game->match) return;
+    int *speed = &game->match->textSpeed;
+    *speed = *speed == 1200 ? 800 : *speed == 800 ? 350 : 1200;
+    match_tweaks(game);
+}
+
+static void match_work_rate(SSRGame *game) {
+    if (!game->match) return;
+    SSRMatchSetup *s = &game->match->setup;
+    s->workRate = game->match->energy <= 1 ? 1 : s->workRate % 3 + 1;
+    match_tweaks(game);
+}
+
+static void match_focus(SSRGame *game) {
+    if (!game->match) return;
+    game->match->setup.focus = game->match->setup.focus % 3 + 1;
+    match_tweaks(game);
+}
+
+static void show_line(SSRGame *game, const SSRMatchLine *line) {
+    static const char *TEMPLATES[] = {"Comment", "HomeComment", "AwayComment"};
+    static const char *GOALS[] = {"Comment", "HomeGoalComment", "AwayGoalComment"};
+    int team = line->team >= 0 && line->team <= 2 ? line->team : 0;
+    add_op(game, SSR_OP_LIST_ADD, "CommentaryTable", line->goal ? GOALS[team] : TEMPLATES[team], line->text, 0);
+}
+
+// The commentary rows go into the table of the screen.
+static void match_lines(SSRGame *game) {
+    SSRMatchLine line;
+    while (ssr_match_take_line(game->match, &line)) {
+        show_line(game, &line);
+        if (game->commentaryCount < 256) game->commentary[game->commentaryCount++] = line;
+    }
+}
+
+static void start_chance(SSRGame *game) {
+    free(game->chance);
+    game->chance = calloc(1, sizeof(SSRChance));
+    if (!game->chance) return;
+    const SSRCareer *c = &game->career;
+    SSRChanceSetup s = ssr_match_chance_setup(game->match, ssr_career_skill(c->technique), ssr_career_skill(c->power), 1);
+    s.careerGoals = (float)c->goals;
+    s.careerPasses = (float)c->passes;
+    ssr_chance_start(game->chance, &s, &game->random);
+    game->chanceEnd = 0;
+    set_screen(game, "matchchance");
+}
+
+static void match_tick(SSRGame *game) {
+    if (game->chance) {
+        SSRTapTouch touch = game->touch;
+        touch.hit = touch.down && !game->touchWasDown;
+        game->touchWasDown = touch.down;
+        ssr_chance_update(game->chance, game->now, &touch, &game->random);
+        if (game->chance->state == SSR_CHANCE_OVER) {
+            // The result shows for a moment (SplashMessage.Delay*SplashMsg).
+            if (game->chanceEnd == 0) game->chanceEnd = game->now + 1500;
+            if (game->now >= game->chanceEnd) {
+                ssr_match_chance_done(game->match, game->chance, game->now, &game->random);
+                free(game->chance);
+                game->chance = NULL;
+                set_screen(game, "match");
+                for (int i = 0; i < game->commentaryCount; i++) show_line(game, &game->commentary[i]);
+                match_state(game);
+                match_tweaks(game);
+            }
+        }
+        return;
+    }
+    SSRMatchEvent event = ssr_match_update(game->match, game->now, &game->random);
+    match_lines(game);
+    match_tweaks(game);
+    if (event == SSR_MATCH_EVENT_CHANCE) start_chance(game);
+    if (event == SSR_MATCH_EVENT_HALF_TIME || event == SSR_MATCH_EVENT_FULL_TIME) match_state(game);
+}
+
 static void quit_career(SSRGame *game) {
     save_career(game);
     ssr_tweaks_set_number(game->tweaks, "Menu", "CanSavePlayer", 0);
@@ -733,6 +935,11 @@ static const Route ROUTES[] = {
     {"choosenation.btn_Ok", nation_ok},
     {"webpage.btn_Ok", game_menu},
     {"gamemenu.btn_Quit", quit_career},
+    {"gamemenu.btn_Play", start_match},
+    {"match.btn_Play", match_play},
+    {"match.btn_Time", match_speed},
+    {"match.btn_WorkRate", match_work_rate},
+    {"match.btn_Focus", match_focus},
 };
 
 /* -------------------------------------------------------------- the API */
@@ -750,6 +957,9 @@ SSRGame *ssr_game_create(SSRTweaks *tweaks) {
 }
 
 void ssr_game_free(SSRGame *game) {
+    if (!game) return;
+    free(game->match);
+    free(game->chance);
     free(game);
 }
 
@@ -881,6 +1091,15 @@ void ssr_game_key(SSRGame *game, SSRKey key) {
 
 void ssr_game_update(SSRGame *game, float frames) {
     if (!game) return;
+    if (game->match) {
+        // The match runs in ticks of 60 a second, as the game does.
+        game->ticks += frames;
+        while (game->ticks >= 1 && game->match) {
+            game->ticks -= 1;
+            game->now += 16;
+            match_tick(game);
+        }
+    }
     if (strcmp(game->screen, "startransition") == 0) {
         game->transitionFrames += frames;
         if (game->transitionFrames > 55) {
@@ -917,4 +1136,19 @@ int ssr_game_take_settings_change(SSRGame *game) {
     if (!game || !game->settingsChanged) return 0;
     game->settingsChanged = 0;
     return 1;
+}
+
+const SSRMatch *ssr_game_match(const SSRGame *game) {
+    return game ? game->match : NULL;
+}
+
+const SSRChance *ssr_game_chance(const SSRGame *game) {
+    return game ? game->chance : NULL;
+}
+
+void ssr_game_touch(SSRGame *game, int down, float x, float y) {
+    if (!game) return;
+    game->touch.down = down;
+    game->touch.x = x;
+    game->touch.y = y;
 }

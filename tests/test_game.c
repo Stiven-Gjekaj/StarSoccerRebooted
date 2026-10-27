@@ -82,6 +82,59 @@ static int has_op(const SSRUiOp *ops, int count, SSRUiOpKind kind, const char *r
 
 // A new career from the main menu to the game menu, with a world that the
 // test makes: one continent, two nations, a league in England.
+// Plays a match from the game menu: the commentary, a chance of the
+// player, and the end.
+static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
+    SSRUiOp ops[64];
+    int apps = ssr_game_career(game)->apps;
+    ssr_game_message(game, "gamemenu.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "match") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 1);
+    const char *home = ssr_tweaks_get(tweaks, "Match", "HomeName");
+    CHECK(strlen(home) == 3 && strcmp(home, ssr_tweaks_get(tweaks, "Match", "AwayName")) != 0);
+    ssr_game_message(game, "match.btn_Time");
+    CHECK(ssr_tweaks_number(tweaks, "Match", "MatchSpeed") == 350);
+    ssr_game_message(game, "match.btn_Play");
+    CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 0);
+    ssr_game_update(game, 1);
+    int count = take_ops(game, ops, 64);
+    CHECK(count >= 1 && has_op(ops, count, SSR_OP_LIST_ADD, "CommentaryTable", "Kick Off"));
+    int chances = 0, frames = 0;
+    while (strcmp(ssr_game_screen(game), "gamemenu") != 0 && frames < 200000) {
+        frames++;
+        ssr_game_update(game, 1);
+        take_ops(game, ops, 64);
+        const SSRChance *chance = ssr_game_chance(game);
+        if (chance && chance->state == SSR_CHANCE_AIM && chance->kicking == 0) {
+            chances++;
+            CHECK(strcmp(ssr_game_screen(game), "matchchance") == 0);
+            // Aim straight up, then tap the big ball at its centre.
+            ssr_game_touch(game, 1, chance->ball.x, chance->ball.y);
+            ssr_game_update(game, 1);
+            ssr_game_touch(game, 1, chance->ball.x, chance->ball.y + 60);
+            ssr_game_update(game, 10);
+            ssr_game_touch(game, 0, chance->ball.x, chance->ball.y + 60);
+            ssr_game_update(game, 1);
+            CHECK(chance->state == SSR_CHANCE_TAP);
+            // Wait for the tap ball to come near, then tap it.
+            for (int i = 0; i < 600 && chance->state == SSR_CHANCE_TAP; i++) {
+                ssr_game_touch(game, 0, 0, 0);
+                ssr_game_update(game, 1);
+                if (chance->tap.x > 100 && chance->tap.x < 540) {
+                    ssr_game_touch(game, 1, chance->tap.x, chance->tap.y);
+                    ssr_game_update(game, 1);
+                }
+            }
+            ssr_game_touch(game, 0, 0, 0);
+        }
+        if (ssr_tweaks_number(tweaks, "Match", "MatchState") == 2 || ssr_tweaks_number(tweaks, "Match", "MatchState") == 3) {
+            ssr_game_message(game, "match.btn_Play");
+        }
+    }
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && !ssr_game_match(game));
+    CHECK(chances >= 2 && ssr_game_career(game)->apps == apps + 1);
+}
+
 static void test_starts_a_new_career(void) {
     SSRContinent continents[1] = {{6, "Europe", "EUR", "UEFA", "UEFA", 1}};
     SSRNation nations[2] = {0};
@@ -206,6 +259,7 @@ static void test_starts_a_new_career(void) {
     ssr_game_message(game, "saveslot.btn_Slot0");
     ssr_game_update(game, 60);
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+    play_a_match(game, tweaks);
     ssr_game_message(game, "gamemenu.btn_Quit");
 
     // Delete: Cancel keeps it, Ok deletes it.

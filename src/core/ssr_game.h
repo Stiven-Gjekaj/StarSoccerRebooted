@@ -7,6 +7,7 @@
 #define SSR_GAME_H
 
 #include "ssr_career.h"
+#include "ssr_match.h"
 #include "ssr_tweaks.h"
 #include "ssr_world.h"
 
@@ -107,5 +108,13 @@ int ssr_game_screen_version(const SSRGame *game);
 
 // 1 when the settings changed since the last call. The app saves them then.
 int ssr_game_take_settings_change(SSRGame *game);
+
+// The match that plays now, or NULL, and the chance of the player in it,
+// or NULL. The screen "matchchance" shows the chance.
+const SSRMatch *ssr_game_match(const SSRGame *game);
+const SSRChance *ssr_game_chance(const SSRGame *game);
+
+// The touch of the player in the units of the layouts, for a chance.
+void ssr_game_touch(SSRGame *game, int down, float x, float y);
 
 #endif
