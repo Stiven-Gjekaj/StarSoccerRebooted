@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.19.0 (2026-10-27)
+
+- The honours mark a title won on the last day.
+- The ticker tells of a small club on a cup run.
+- The Honours screen has a third list: the hall of fame of the scorers
+  of the world, with the player and the rivals.
+- A career ends with a testimonial match in the timeline.
+
 ## 0.18.0 (2026-10-27)
 
 - An injured player chooses: play with pain, at a risk of a longer
