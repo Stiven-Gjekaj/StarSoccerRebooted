@@ -383,6 +383,9 @@ static void apply_ops(SSRApp *app) {
         case SSR_OP_LIST_CLEAR:
             ssr_scene_list_clear(app->scene, op.ref);
             break;
+        case SSR_OP_COLOUR:
+            ssr_scene_set_colour(app->scene, op.ref, op.text);
+            break;
         case SSR_OP_ANIM:
             ssr_scene_anim(app->scene, op.ref, (float)SDL_atof(op.text), op.id);
             break;
