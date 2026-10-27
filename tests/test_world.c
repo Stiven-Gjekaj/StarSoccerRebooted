@@ -135,6 +135,21 @@ static void test_merges_the_rows_of_a_pack(void) {
     ssr_world_free(world);
 }
 
+// A pack gives the stadiums of the clubs. A club with no row has none.
+static void test_reads_the_stadiums_of_a_pack(void) {
+    char set[1024];
+    snprintf(set, sizeof(set), "%s", write_set("stadiumbase"));
+    const char *pack = ssr_test_directory("stadiumpack");
+    write_text(pack, "Stadiums.txt", "club\tname\tcapacity\r\n915\tHarbour Park\t41000\r\n1\tNowhere\t5\r\n");
+    SSRWorld *world = ssr_world_load_pack(set, pack);
+    CHECK(world != NULL);
+    if (!world) return;
+    const SSRClub *west = ssr_world_club(world, 915), *north = ssr_world_club(world, 810);
+    CHECK(strcmp(west->stadium, "Harbour Park") == 0 && west->capacity == 41000);
+    CHECK(strcmp(north->stadium, "") == 0 && north->capacity == 0);
+    ssr_world_free(world);
+}
+
 // The editor renames a club, and the clubs go to a file that the world
 // reads again.
 static void test_edits_and_saves_the_clubs(void) {
@@ -203,6 +218,7 @@ int main(void) {
     test_parses_colours();
     test_reads_a_pack_over_the_data_set();
     test_merges_the_rows_of_a_pack();
+    test_reads_the_stadiums_of_a_pack();
     test_edits_and_saves_the_clubs();
     return TEST_RESULT();
 }

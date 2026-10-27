@@ -246,6 +246,24 @@ SSRWorld *ssr_world_load_pack(const char *directory, const char *pack) {
         ssr_world_free(world);
         return NULL;
     }
+    for (int i = 0; i < world->clubCount; i++) world->clubs[i].stadium = "";
+    // The stadiums of the remake: a file of the data set or of the pack
+    // that the game has not. The rows of the pack come last.
+    const char *sources[2] = {directory, pack};
+    for (int k = 0; k < 2; k++) {
+        SSRTsv *table = sources[k] ? open_table(sources[k], "Stadiums.txt") : NULL;
+        if (!table) continue;
+        int club = ssr_tsv_column(table, "club"), name = ssr_tsv_column(table, "name");
+        int seats = ssr_tsv_column(table, "capacity");
+        for (int row = 0; club >= 0 && row < ssr_tsv_rows(table); row++) {
+            SSRClub *c = (SSRClub *)ssr_world_club(world, ssr_tsv_int(table, row, club, 0));
+            if (!c) continue;
+            const char *text = ssr_tsv_cell(table, row, name);
+            if (*text) c->stadium = keep(world, text);
+            c->capacity = ssr_tsv_int(table, row, seats, c->capacity);
+        }
+        ssr_tsv_free(table);
+    }
     return world;
 }
 

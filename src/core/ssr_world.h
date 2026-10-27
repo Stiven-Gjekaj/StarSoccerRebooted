@@ -57,6 +57,10 @@ typedef struct {
     int continentalCompetition;
     // The id of the first team when this club is a B team, or 0.
     int bTeamOf;
+    // The stadium of a data pack (Stadiums.txt): the name, or "", and the
+    // seats, or 0.
+    const char *stadium;
+    int capacity;
 } SSRClub;
 
 // The columns of Competitions.txt, with the names of the file.
@@ -110,7 +114,9 @@ typedef struct {
 // Reads the data set in the directory. Returns NULL when a file is missing
 // or a file has no id column.
 SSRWorld *ssr_world_load(const char *directory);
-// Reads the data set with a data pack over it. Each file of the pack
+// Reads the data set with a data pack over it. A file "Stadiums.txt" of the
+// data set or the pack (the columns club, name, and capacity) gives the
+// stadiums of the clubs. Each file of the pack
 // directory, for example "Clubs.txt", takes the place of the file of the
 // data set. pack can be NULL.
 SSRWorld *ssr_world_load_pack(const char *directory, const char *pack);
