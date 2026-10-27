@@ -9,10 +9,10 @@
 // The Android "new" font set of Fonts.txt, for an import that has no
 // Fonts.txt.
 static const SSRFontSlot DEFAULT_FONTS[SSR_FONT_COUNT] = {
-    {"Veriox-Rg.ttf", 31, -1, 6, 5, 32, 28, -26},
-    {"Veriox-Rg.ttf", 44, -1, 6, 5, 45, 40, -40},
-    {"Veriox-Rg.ttf", 60, -1, 6, 5, 59, 50, -48},
-    {"Veriox-Rg.ttf", 18, -1, 6, 5, 18, 16, -14},
+    {"Veriox-Rg.ttf", 31, -1, 6, 5, 32, 28, -26, {{0}}, 0},
+    {"Veriox-Rg.ttf", 44, -1, 6, 5, 45, 40, -40, {{0}}, 0},
+    {"Veriox-Rg.ttf", 60, -1, 6, 5, 59, 50, -48, {{0}}, 0},
+    {"Veriox-Rg.ttf", 18, -1, 6, 5, 18, 16, -14, {{0}}, 0},
 };
 
 #define MAX_TEXTURES 512
@@ -30,6 +30,8 @@ typedef struct {
     SSRFontSlot config;
     SDL_Texture *atlas;
     int atlasVersion;
+    // The textures of the icons of the font, by their number from 1.
+    SDL_Texture *icons[8];
 } FontSlot;
 
 struct SSRGfx {
@@ -83,6 +85,18 @@ SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
         SDL_snprintf(path, sizeof(path), "%s/Fonts/%s", gameDirectory, slots[i].file);
         gfx->fonts[i].font = ssr_font_load(path, slots[i].size);
         ssr_font_set_spacing(gfx->fonts[i].font, slots[i].spacing);
+        // The images of Inject: lines, for example the star of the bux.
+        for (int k = 0; k < slots[i].iconCount; k++) {
+            char file[128];
+            SDL_snprintf(file, sizeof(file), "Fonts/%s", slots[i].icons[k].file);
+            float w = 0, h = 0;
+            SDL_Texture *icon = ssr_gfx_texture(gfx, file);
+            if (!icon || !SDL_GetTextureSize(icon, &w, &h)) continue;
+            int n = ssr_font_add_icon(gfx->fonts[i].font, slots[i].icons[k].code, (int)w, (int)h,
+                                      slots[i].icons[k].bearingX, slots[i].icons[k].bearingY,
+                                      slots[i].icons[k].advance);
+            if (n > 0 && n <= 8) gfx->fonts[i].icons[n - 1] = icon;
+        }
         gfx->fonts[i].config = slots[i];
         gfx->fonts[i].atlasVersion = -1;
     }
@@ -540,7 +554,7 @@ void ssr_gfx_set_tweaks(SSRGfx *gfx, const SSRTweaks *tweaks) {
 // Draws one line of text with its top left at (x, y), scaled. The glyphs
 // lean by italic: x += (y - baseline) * italic, as c_FontRenderer does.
 static void draw_line(SSRGfx *gfx, FontSlot *slot, const char *text, float x, float y, float scaleX, float scaleY,
-                      uint32_t colour, float italic) {
+                      uint32_t colour, float italic, int shadow) {
     static SSRGlyphQuad quads[MAX_QUADS];
     int count = ssr_font_layout(slot->font, text, 0, 0, quads, MAX_QUADS);
     if (count > MAX_QUADS) count = MAX_QUADS;
@@ -551,18 +565,28 @@ static void draw_line(SSRGfx *gfx, FontSlot *slot, const char *text, float x, fl
     float baseline = ssr_font_ascent(slot->font);
     for (int i = 0; i < count; i++) {
         const SSRGlyphQuad *q = &quads[i];
+        SDL_Texture *texture = atlas;
+        SDL_FColor tint = c;
+        if (q->icon) {
+            // An icon keeps its own colours. Its shadow takes the colour of
+            // the shadow.
+            texture = q->icon <= 8 ? slot->icons[q->icon - 1] : NULL;
+            if (!texture) continue;
+            SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+            if (!shadow) tint.r = tint.g = tint.b = 1;
+        }
         float xs[4] = {q->x0, q->x1, q->x1, q->x0}, ys[4] = {q->y0, q->y0, q->y1, q->y1};
         float us[4] = {q->u0, q->u1, q->u1, q->u0}, vs[4] = {q->v0, q->v0, q->v1, q->v1};
         SDL_Vertex v[4];
         for (int k = 0; k < 4; k++) {
             v[k].position.x = x + (xs[k] + (ys[k] - baseline) * italic) * scaleX;
             v[k].position.y = y + ys[k] * scaleY;
-            v[k].color = c;
+            v[k].color = tint;
             v[k].tex_coord.x = us[k];
             v[k].tex_coord.y = vs[k];
         }
         static const int indices[6] = {0, 1, 2, 0, 2, 3};
-        SDL_RenderGeometry(gfx->renderer, atlas, v, 4, indices, 6);
+        SDL_RenderGeometry(gfx->renderer, texture, v, 4, indices, 6);
     }
 }
 
@@ -680,9 +704,9 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
         float left = x + gfx->offsetX, top = item->y + baseline - ascent + gfx->offsetY;
         if (item->shadow) {
             draw_line(gfx, slot, lines[i], left + item->shadowX * scaleX, top + item->shadowY * scaleY, scaleX, scaleY,
-                      item->shadowColour, item->italic);
+                      item->shadowColour, item->italic, 1);
         }
-        draw_line(gfx, slot, lines[i], left, top, scaleX, scaleY, item->colour, item->italic);
+        draw_line(gfx, slot, lines[i], left, top, scaleX, scaleY, item->colour, item->italic, 0);
         if (scroll) SDL_SetRenderClipRect(gfx->renderer, clipped ? &outer : NULL);
     }
 }
