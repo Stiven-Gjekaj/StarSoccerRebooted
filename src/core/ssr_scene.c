@@ -1243,6 +1243,19 @@ static int is_ex_op(const char *n) {
 
 // The rate arguments of the Converge doodads from index i: a number, Soft,
 // or Instant, then the most rate and the acceleration.
+// 1 when the arguments i and i + 1 are the group and the name of a tweak:
+// two names, not numbers (GetTweakUsingParameters).
+static int names_tweak(const SSRUiNode *m, int i) {
+    const char *a = arg(m, i), *b = arg(m, i + 1);
+    for (const char *p = a; *p; p++) {
+        if (!isalnum((unsigned char)*p) && *p != '_') return 0;
+    }
+    for (const char *p = b; *p; p++) {
+        if (!isalnum((unsigned char)*p) && *p != '_') return 0;
+    }
+    return isalpha((unsigned char)a[0]) && isalpha((unsigned char)b[0]) && !is(a, "Soft") && !is(a, "Instant");
+}
+
 static void converge_rates(SSRScene *s, const SSRUiNode *m, int i, Doodad *d) {
     float rate = 0.2f, maxRate = 0.2f, accel = 0;
     const char *a = arg(m, i);
@@ -1585,6 +1598,27 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
             d->text[1] = keep(s, arg(m, 1));
         }
         ensure_colour(g);
+    } else if (is(n, "ConvergeTo") && names_tweak(m, 0)) {
+        // c_Converge2D with tweaks: a pair "Group,Name" in the place of a
+        // number makes that place follow the tweak each frame, as the
+        // tabs of a screen do.
+        d = new_doodad(D_CONVERGE_POS, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+        d->v[0] = g->x;
+        d->v[1] = g->y;
+        int at = 2;
+        if (names_tweak(m, 2)) {
+            char pair[160];
+            snprintf(pair, sizeof(pair), "%s\x1f%s", arg(m, 2), arg(m, 3));
+            d->text[2] = keep(s, pair);
+            at = 4;
+        } else {
+            d->v[1] += (float)number(s, m, 2, 0);
+            at = 3;
+        }
+        converge_rates(s, m, at, d);
     } else if (is(n, "ConvergeTo") || is(n, "ConvergeFrom")) {
         d = new_doodad(D_CONVERGE_POS, m);
         if (!d) return NULL;
@@ -2414,6 +2448,14 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         break;
     }
     case D_CONVERGE_POS:
+        if (d->text[0] && s->env->tweaks) d->v[0] = (float)ssr_tweaks_number(s->env->tweaks, d->text[0], d->text[1]);
+        if (d->text[2] && s->env->tweaks) {
+            char group[80];
+            const char *sep = strchr(d->text[2], '\x1f');
+            snprintf(group, sizeof(group), "%.*s", sep ? (int)(sep - d->text[2]) : 0, d->text[2]);
+            if (sep) d->v[1] = (float)ssr_tweaks_number(s->env->tweaks, group, sep + 1);
+        }
+        // fall through
     case D_CONVERGE_SCALE:
     case D_CONVERGE_SIZE: {
         float *a = d->kind == D_CONVERGE_POS ? &g->x : d->kind == D_CONVERGE_SCALE ? &g->sx : &g->w;

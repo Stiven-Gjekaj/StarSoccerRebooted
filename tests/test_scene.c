@@ -673,6 +673,32 @@ static void test_moves_the_target_of_a_converge(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// ConvergeTo(Menu,TabPos,0): the x follows the tweak, as the tabs of the
+// achievements screen move.
+static void test_converges_to_a_tweak(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Menu", "TabPos", 0);
+    layout = "Rect:(0,0,0,0)\n"
+             "\tConvergeTo(Menu,TabPos,40,Instant)\n"
+             "{\n"
+             "\tDraw:(Panel,0,0,10,10)\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 16);
+    const SSRSceneItem *panel = find_image(scene, "Panel");
+    CHECK(panel && near(panel->x, 0) && near(panel->y, 40));
+    ssr_tweaks_set_number(tweaks, "Menu", "TabPos", -640);
+    ssr_scene_update(scene, &env, 16);
+    panel = find_image(scene, "Panel");
+    CHECK(panel && near(panel->x, -640) && near(panel->y, 40));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_holds_one_instance_at_a_frame(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     layout = "Animation:(40,Loop) ref:RoseAnim\n"
@@ -1758,6 +1784,7 @@ int main(void) {
     test_plays_an_animation_from_a_frame();
     test_holds_one_instance_at_a_frame();
     test_moves_the_target_of_a_converge();
+    test_converges_to_a_tweak();
     test_shows_the_place_in_a_list();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
