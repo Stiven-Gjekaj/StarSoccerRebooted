@@ -7789,13 +7789,14 @@ static void blackjack_banner(SSRGame *game, const char *tag) {
 // Win, Lose, and Tie of TScreen_BlackJack.
 static void blackjack_result(SSRGame *game, int result) {
     int back = result == 1 ? game->bet * 2 : result == 0 ? game->bet : 0;
-    if (result == 1) play_sound(game, "CSuccess");
-    if (back > 0) play_sound(game, "CCashIn");
-    if (result == 2) play_sound(game, "CError");
-    if (back > 0) {
-        update_bank(game, back);
-        save_career(game);
+    // A tie gives the bet back with no sound and no save (Tie).
+    if (result == 1) {
+        play_sound(game, "CSuccess");
+        play_sound(game, "CCashIn");
     }
+    if (result == 2) play_sound(game, "CError");
+    if (back > 0) update_bank(game, back);
+    if (result == 1) save_career(game);
     check_stake(game);
     if (result == 1) add_op(game, SSR_OP_SHOW, "TickerTapeShower", NULL, NULL, 0);
     ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", result == 1 ? 1 : result == 0 ? 0 : -1);

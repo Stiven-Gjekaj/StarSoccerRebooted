@@ -1499,19 +1499,27 @@ static void play_blackjack(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     CHECK(ssr_tweaks_number(tweaks, "Casino", "Stake") == 10);
     int bank = 500, outcomes[3] = {0};
     SSRUiOp ops[512];
-    for (int hand = 1; hand <= 6; hand++) {
+    // Six hands, then more until a tie came, so that the sounds of each
+    // result get a check.
+    int hands = 0;
+    for (int hand = 1; hand <= 6 || (outcomes[1] == 0 && hand <= 60); hand++) {
+        hands = hand;
         float energy = now->energy;
         ssr_game_message(game, "blackjack.btn_Play");
-        CHECK(now->bank == bank - 10 && now->gambling == 3 * hand);
-        // The fifth bet comes after four of weight 3: it costs 5 energy.
-        CHECK(now->energy == (hand == 5 ? energy - 5 : energy));
+        CHECK(now->bank == bank - 10);
+        if (hand <= 6) {
+            CHECK(now->gambling == 3 * hand);
+            // The fifth bet comes after four of weight 3: it costs 5 energy.
+            CHECK(now->energy == (hand == 5 ? energy - 5 : energy));
+        }
         // Back does nothing during a hand.
         ssr_game_message(game, "blackjack.btn_Quit");
         CHECK(strcmp(ssr_game_screen(game), "blackjack") == 0);
         ssr_tweaks_set_number(tweaks, "Casino", "CasinoOutcome", 99);
-        int shown = 0, next = 0, dealt = 0;
+        int shown = 0, next = 0, dealt = 0, cashIn = 0;
         for (int f = 0; f < 20 * 60 && !next; f++) {
             ssr_game_update(game, 1);
+            for (const char *sound; (sound = ssr_game_take_sound(game)) != NULL;) cashIn |= strcmp(sound, "CCashIn") == 0;
             int count = take_ops(game, ops, 512);
             for (int i = 0; i < count; i++) {
                 if (ops[i].kind == SSR_OP_HOOK && ops[i].ref2[0]) {
@@ -1532,19 +1540,21 @@ static void play_blackjack(SSRGame *game, SSRTweaks *tweaks, const char *path) {
         double outcome = ssr_tweaks_number(tweaks, "Casino", "CasinoOutcome");
         int winnings = (int)ssr_tweaks_number(tweaks, "Casino", "Winnings");
         CHECK(outcome == 1 ? winnings == 20 : outcome == 0 ? winnings == 10 : outcome == -1 && winnings == 0);
+        // Only a win plays the cash sound. A tie gives the bet back quietly.
+        CHECK(cashIn == (outcome == 1));
         outcomes[(int)outcome + 1]++;
         bank = bank - 10 + winnings;
         CHECK(now->bank == bank);
         // The totals show a number now.
         CHECK(strcmp(ssr_tweaks_get(tweaks, "Casino", "PlayerBJTotal"), "?") != 0);
     }
-    CHECK(outcomes[0] + outcomes[1] + outcomes[2] == 6);
+    CHECK(outcomes[1] > 0 && outcomes[2] > 0);
     // Back: six bets of 3, with the reset at the fifth, leave 6: 3 energy.
     float energy = now->energy;
     ssr_game_message(game, "blackjack.btn_Quit");
     CHECK(strcmp(ssr_game_screen(game), "casino") == 0);
     ssr_game_message(game, "casino.btn_Back");
-    CHECK(now->energy == energy - 3);
+    if (hands == 6) CHECK(now->energy == energy - 3);
     ssr_game_message(game, "relationships.btn_Home");
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
