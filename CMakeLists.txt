@@ -91,7 +91,8 @@ if(IOS)
     )
 endif()
 # The layouts of the remake go into the app as resources.
-file(GLOB SSR_LAYOUTS ${CMAKE_SOURCE_DIR}/layouts/*.uis ${CMAKE_SOURCE_DIR}/layouts/*.uih)
+file(GLOB SSR_LAYOUTS ${CMAKE_SOURCE_DIR}/layouts/*.uis ${CMAKE_SOURCE_DIR}/layouts/*.uih
+     ${CMAKE_SOURCE_DIR}/layouts/*.patch)
 if(SSR_LAYOUTS)
     target_sources(ssr PRIVATE ${SSR_LAYOUTS})
     set_source_files_properties(${SSR_LAYOUTS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/layouts)

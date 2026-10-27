@@ -129,7 +129,8 @@ static char *read_screen_file(void *context, const char *name, size_t *size) {
     char asked[2400], path[2400];
     const char *base = SDL_GetBasePath();
     SDL_snprintf(asked, sizeof(asked), "%slayouts/%s", base ? base : "", name);
-    if (!ssr_fs_resolve(asked, path, sizeof(path))) {
+    int own = ssr_fs_resolve(asked, path, sizeof(path));
+    if (!own) {
         SDL_snprintf(asked, sizeof(asked), "%s/NewGUI/Screens/%s", app->gameDirectory, name);
         if (!ssr_fs_resolve(asked, path, sizeof(path))) return NULL;
     }
@@ -142,6 +143,15 @@ static char *read_screen_file(void *context, const char *name, size_t *size) {
         copy[*size] = 0;
     }
     SDL_free(data);
+    // A patch of the remake (layouts/<name>.patch) removes lines of a
+    // layout of the game.
+    SDL_snprintf(asked, sizeof(asked), "%slayouts/%s.patch", base ? base : "", name);
+    char *patch = !own && copy ? SDL_LoadFile(asked, NULL) : NULL;
+    if (patch) {
+        ssr_ui_patch(copy, patch);
+        *size = strlen(copy);
+        SDL_free(patch);
+    }
     return copy;
 }
 
