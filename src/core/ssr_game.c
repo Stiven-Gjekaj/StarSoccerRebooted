@@ -3123,17 +3123,15 @@ static int by_position(const void *a, const void *b) {
 
 // A row of the squad list: the position, the name, the age or the club,
 // the skill or the matches, and the goals.
-static void squad_row(SSRGame *game, const SSRPerson *p, const char *club, const char *third, int fourth) {
-    char texts[6][64];
-    snprintf(texts[0], 64, "%s", POSITIONS[p->position]);
-    if (club) snprintf(texts[1], 64, "%c. %s (%s)", p->first[0], p->last, club);
-    else snprintf(texts[1], 64, "%c. %s", p->first[0], p->last);
-    snprintf(texts[2], 64, "%s", third);
-    snprintf(texts[3], 64, "%d", fourth);
-    snprintf(texts[4], 64, "%d", p->seasonApps);
-    snprintf(texts[5], 64, "%d", p->seasonGoals);
+static void squad_row(SSRGame *game, const SSRPerson *p, const char *club, int year) {
+    char texts[7][96];
+    snprintf(texts[0], 96, "%s", POSITIONS[p->position]);
+    if (club) snprintf(texts[1], 96, "%c. %s, %s", p->first[0], p->last, club);
+    else snprintf(texts[1], 96, "%c. %s", p->first[0], p->last);
+    int values[5] = {year - p->born, p->skill, p->seasonApps, p->seasonGoals, p->seasonAssists};
+    for (int k = 0; k < 5; k++) snprintf(texts[k + 2], 96, "%d", values[k]);
     add_op(game, SSR_OP_LIST_ADD, "PlayerList", p->rival ? "RivalEntry" : "PlayerEntry", "", 0);
-    for (int k = 0; k < 6; k++) add_op(game, SSR_OP_LIST_TEXT, "PlayerList", NULL, texts[k], k + 1);
+    for (int k = 0; k < 7; k++) add_op(game, SSR_OP_LIST_TEXT, "PlayerList", NULL, texts[k], k + 1);
 }
 
 // The squad of the club, the best of each position first, or the top
@@ -3161,28 +3159,20 @@ static void squad_fill(SSRGame *game) {
         }
         n = ssr_people_top_scorers(game->people, clubs, count, list, 20);
         ssr_tweaks_set(t, "Squad", "Title", comp ? comp->data->tla : "");
-        ssr_tweaks_set(t, "Squad", "Column3", loc(game, "Age"));
-        ssr_tweaks_set(t, "Squad", "Column4", "A");
         ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "Team"));
     } else {
         n = ssr_people_squad(game->people, club ? club->id : 0, list, 64);
         if (n > 64) n = 64;
         qsort(list, (size_t)n, sizeof(list[0]), by_position);
         ssr_tweaks_set(t, "Squad", "Title", club ? club->name : "");
-        ssr_tweaks_set(t, "Squad", "Column3", loc(game, "Age"));
-        ssr_tweaks_set(t, "Squad", "Column4", "SKL");
         ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "Goals"));
     }
     add_op(game, SSR_OP_LIST_START, "PlayerList", NULL, NULL, 52);
     for (int i = 0; i < n; i++) {
-        char age[16];
-        snprintf(age, sizeof(age), "%d", year - list[i]->born);
-        if (game->squadScorers) {
-            const SSRClub *of = ssr_world_club(game->world, list[i]->club);
-            squad_row(game, list[i], of ? of->tla : "", age, list[i]->seasonAssists);
-        } else {
-            squad_row(game, list[i], NULL, age, list[i]->skill);
-        }
+        // The top scorers show the full name of the club. A long name moves
+        // from side to side in its box.
+        const SSRClub *of = game->squadScorers ? ssr_world_club(game->world, list[i]->club) : NULL;
+        squad_row(game, list[i], of ? of->name : NULL, year);
     }
 }
 

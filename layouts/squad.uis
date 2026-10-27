@@ -1,7 +1,8 @@
 // The squad of a club, or the top scorers of a league. A screen of the
 // remake. The code fills the list "PlayerList" from the templates
-// "PlayerEntry" and "RivalEntry". Each row has the texts 1 to 6: the
-// position, the name, the age, the skill, the matches, and the goals.
+// "PlayerEntry" and "RivalEntry". Each row has the texts 1 to 7: the
+// position, the name, the age, the skill, the matches, the goals, and the
+// assists.
 
 UnsortedLayer:(AfterGloss,1)
 
@@ -16,6 +17,19 @@ Rect:(0,0,0,0)
 
 M_Background:()
 M_Footer:(OFF,,,)
+
+// The ribbon at the top: the quit button, the Bux, and the help.
+Rect:()
+	ShowIf(Menu,DisableQuitButton,0)
+{
+	M_Header:(-40,@T,ILife,24,22,100,198,14)
+	Import:(quitmenu.uih)
+}
+Rect:()
+	ShowIf(Menu,DisableQuitButton,1)
+{
+	M_Header:(-40,@T,ILife,24,22,100,198,14,YES)
+}
 
 // The top of the buttons at the bottom.
 Set:(@n=[@B-960]*0.7+744)
@@ -44,33 +58,37 @@ Macro:(M_PlayerRow,?REF?,?COLOR?)
 	{
 		Draw:(GreyRecess,3,3,555,46,,?COLOR?)
 			Additive()
-		Draw:(White,6,7,62,40,,#30303070)
+		Draw:(White,6,7,52,40,,#30303070)
 			Additive()
-		Draw:(White,330,7,52,40,,#30303070)
+		Draw:(White,368,7,44,40,,#30303070)
 			Additive()
-		Draw:(White,444,7,52,40,,#30303070)
+		Draw:(White,460,7,44,40,,#30303070)
 			Additive()
-		Text:(POS,6,5,62,44,C,,#BBDDBBFF) ref:?REF?
+		Text:(POS,6,5,52,44,C,,#BBDDBBFF) ref:?REF?
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.45,0.45)
-		Text:(NAME,78,5,244,44,L,,#80BB80FF) ref:?REF?
+		Text:(NAME,66,5,252,44,L,,#80BB80FF) ref:?REF?
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
-		Text:("00",274,5,52,44,C,,#BBDDBBFF) ref:?REF?
+		Text:("00",322,5,44,44,C,,#BBDDBBFF) ref:?REF?
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.5,0.5)
-		Text:("00",330,5,52,44,C,,#80BB80FF) ref:?REF?
+		Text:("00",368,5,44,44,C,,#80BB80FF) ref:?REF?
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.5,0.5)
-		Text:("00",388,5,52,44,C,,#BBDDBBFF) ref:?REF?
+		Text:("00",414,5,44,44,C,,#BBDDBBFF) ref:?REF?
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.5,0.5)
-		Text:("00",444,5,52,44,C,,#80BB80FF) ref:?REF?
+		Text:("00",460,5,44,44,C,,#80BB80FF) ref:?REF?
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.5,0.5)
+		Text:("00",506,5,44,44,C,,#BBDDBBFF) ref:?REF?
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.5,0.5)
@@ -120,29 +138,31 @@ PushOrigin:(22,220)
 			Layer(AfterGloss)
 		Draw:(GreyReadout,-2,0,568,52,,#EEFFEEFF)
 			Layer(AfterGloss)
-		Text:(Pos,6,5,62,44,C,,#FFFFFFFF)
+		Text:(Pos,6,5,52,44,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
-		Text:(Name,78,5,244,44,L,,#FFFFFFFF)
+		Text:(Name,66,5,252,44,L,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
-		Text:(Age,274,5,52,44,C,,#FFFFFFFF)
+		Text:(Age,322,5,44,44,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
-			StringReadout(Squad,Column3)
-		Text:(Skl,330,5,52,44,C,,#FFFFFFFF)
+		Text:(SKL,368,5,44,44,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
-			StringReadout(Squad,Column4)
-		Text:(P,388,5,52,44,C,,#FFFFFFFF)
+		Text:(P,414,5,44,44,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
-		Text:(G,444,5,52,44,C,,#FFFFFFFF)
+		Text:(G,460,5,44,44,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.4,0.4)
+		Text:(A,506,5,44,44,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
