@@ -2771,6 +2771,39 @@ static void test_starts_a_new_career(void) {
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "SSR_RefuseToSell") == 0);
     ssr_game_message(game, "message.btn_Ok");
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "SSR_ClauseNoBux") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    ssr_game_update(game, 60);
+    // Charity: a rich player gives a fifth of the Bux, and the fans like it.
+    key->bank = 1000;
+    key->seasonApps = 7;
+    key->newsDone = 0;
+    float fansBefore = key->relationFans;
+    int found = 0;
+    for (int i = 0; i < 6 && !found; i++) {
+        ssr_game_message(game, "gamemenu.btn_Play");
+        found = strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "SSR_CharityAsk") == 0;
+        if (!found) ssr_game_message(game, "message.btn_Cancel");
+    }
+    CHECK(found);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(key->bank == 800 && key->relationFans > fansBefore && key->charityYear == ssr_career_year(key));
+    // Business: a quarter of the Bux buys a share that pays at the end of
+    // each season, from a loss of a fifth to a profit of two fifths.
+    key->bank = 4000;
+    key->seasonApps = 15;
+    key->newsDone = 0;
+    found = 0;
+    for (int i = 0; i < 6 && !found; i++) {
+        ssr_game_message(game, "gamemenu.btn_Play");
+        found = strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "SSR_BusinessOffer") == 0;
+        if (!found) ssr_game_message(game, "message.btn_Cancel");
+    }
+    CHECK(found);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(key->bank == 3000 && key->businessStake == 1000);
+    ssr_game_message(game, "playeroftheyear.btn_Play");
+    ssr_game_message(game, "message.btn_Cancel");
+    CHECK(key->bank >= 2800 && key->bank <= 3400 && key->businessStake == 1000);
     ssr_game_free(game);
     ssr_tweaks_free(tweaks);
 }

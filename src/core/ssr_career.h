@@ -83,6 +83,9 @@ typedef struct {
     int position;
     // The club that lent the player for a season, or 0.
     int loanFrom;
+    // Business and charity: the year of the last gift, and the Bux in a
+    // business that pays each season.
+    int charityYear, businessStake;
     // The nation of the player, the nation of the league, and the club.
     int nationId;
     int clubNationId;

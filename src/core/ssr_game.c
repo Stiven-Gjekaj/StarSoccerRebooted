@@ -1610,6 +1610,9 @@ static void call_season_end_transfer(SSRGame *game);
 static void call_loan_back(SSRGame *game);
 static void call_loan_offer(SSRGame *game);
 static void call_release_clause(SSRGame *game);
+static void call_charity_gift(SSRGame *game);
+static void call_business_offer(SSRGame *game);
+static void business_season(SSRGame *game);
 static void call_play_to_date(SSRGame *game);
 static void call_play_with_pain(SSRGame *game);
 static void call_set_up_fixture(SSRGame *game);
@@ -1666,6 +1669,8 @@ static void run_call(SSRGame *game, const char *name) {
         {"LoanBack", call_loan_back},
         {"LoanOffer", call_loan_offer},
         {"ReleaseClause", call_release_clause},
+        {"CharityGift", call_charity_gift},
+        {"BusinessOffer", call_business_offer},
         {"Retirement", call_retirement},
         {"CaughtGambling", call_caught_gambling},
         {"TeamMatesCasino", call_teammates_casino},
@@ -4453,6 +4458,7 @@ static void new_season(SSRGame *game) {
     // a week more or less from today.
     for (int r = 0; r < 5; r++) game->career.deplete[r] = game->career.sdate + ssr_rand2(&game->random, -7, 7);
     ssr_tweaks_set_number(t, "Menu", "CanSavePlayer", 1);
+    business_season(game);
     ssr_career_reset_season(&game->career);
     if (game->people) {
         ssr_people_new_season(game->people, game->world, game->names, ssr_career_year(&game->career));
@@ -6495,6 +6501,93 @@ static const char *sponsor_name(SSRGame *game, int i) {
     return i >= 0 && i < 10 ? loc(game, NAMES[i]) : "";
 }
 
+// Business and charity of the remake. A rich player gets one request of a
+// charity each season, and one offer of a business.
+#define CHARITY_BANK 500
+#define CHARITY_APPS 7
+#define BUSINESS_BANK 2000
+#define BUSINESS_APPS 15
+
+// A charity asks for a fifth of the Bux for a youth pitch near the club.
+static int news_charity(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int year = ssr_career_year(c);
+    if (c->bank < CHARITY_BANK || c->seasonApps != CHARITY_APPS || c->charityYear == year) return 0;
+    c->charityYear = year;
+    int gift = c->bank / 5;
+    game->messageData = gift;
+    char text[512], number[16];
+    snprintf(text, sizeof(text), "%s", loc(game, "SSR_CharityAsk"));
+    snprintf(number, sizeof(number), "%d", gift);
+    replace_all(text, sizeof(text), "$num", number);
+    message(game, "message", text, 1, 1, "CharityGift");
+    return 1;
+}
+
+// The call "CharityGift": the gift makes the fans and the fame grow, and
+// the young players of the club get better on the new pitch.
+static void call_charity_gift(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int gift = game->messageData;
+    if (game->returnState != 1 || gift <= 0 || c->bank < gift) return;
+    c->bank -= gift;
+    update_relation(game, SSR_RELATION_FANS, 5);
+    c->starRating = ssr_star_rating_add(c->starRating, gift / 20);
+    SSRPerson *squad[64];
+    int n = game->people ? ssr_people_squad(game->people, c->clubId, squad, 64) : 0;
+    int year = ssr_career_year(c);
+    for (int i = 0; i < n && i < 64; i++) {
+        if (year - squad[i]->born <= 19) squad[i]->skill = squad[i]->skill + 2 > squad[i]->potential ? squad[i]->potential : squad[i]->skill + 2;
+    }
+    char text[256], number[16];
+    snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentCharity"));
+    snprintf(number, sizeof(number), "%d", gift);
+    replace_all(text, sizeof(text), "$num", number);
+    ssr_career_add_moment(c, c->sdate, text);
+    player_tweaks(game);
+    save_career(game);
+}
+
+// A friend offers a share of a business for a quarter of the Bux.
+static int news_business(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->bank < BUSINESS_BANK || c->seasonApps != BUSINESS_APPS || c->businessStake > 0) return 0;
+    int stake = c->bank / 4;
+    game->messageData = stake;
+    char text[512], number[16];
+    snprintf(text, sizeof(text), "%s", loc(game, "SSR_BusinessOffer"));
+    snprintf(number, sizeof(number), "%d", stake);
+    replace_all(text, sizeof(text), "$num", number);
+    message(game, "message", text, 1, 1, "BusinessOffer");
+    return 1;
+}
+
+static void call_business_offer(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int stake = game->messageData;
+    if (game->returnState != 1 || stake <= 0 || c->bank < stake) return;
+    c->bank -= stake;
+    c->businessStake = stake;
+    c->starRating = ssr_star_rating_add(c->starRating, 5);
+    ssr_career_add_moment(c, c->sdate, loc(game, "SSR_MomentBusiness"));
+    player_tweaks(game);
+    save_career(game);
+}
+
+// The end of a season: the business pays from a fifth of the stake as a
+// loss up to two fifths as a profit.
+static void business_season(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->businessStake <= 0) return;
+    int profit = c->businessStake * ssr_rand2(&game->random, -20, 40) / 100;
+    c->bank = c->bank + profit < 0 ? 0 : c->bank + profit;
+    char text[256], number[16];
+    snprintf(text, sizeof(text), "%s", loc(game, profit >= 0 ? "SSR_BusinessProfit" : "SSR_BusinessLoss"));
+    snprintf(number, sizeof(number), "%d", abs(profit));
+    replace_all(text, sizeof(text), "$num", number);
+    alert(game, "bottommessagemoment", text, 4000);
+}
+
 // GSCheckSponsorship: a sponsor leaves, or a new one makes an offer.
 static int news_sponsorship(SSRGame *game) {
     SSRCareer *c = &game->career;
@@ -6596,7 +6689,8 @@ static int play_news(SSRGame *game, const SSRFixture *next) {
         return 1;
     }
     if (check_transfer_window(game) || news_captaincy(game, next) || news_sponsorship(game) || news_gambling(game) ||
-        news_get_dumped(game) || news_partner_unhappy(game) || news_item_expiry(game)) {
+        news_get_dumped(game) || news_partner_unhappy(game) || news_item_expiry(game) || news_charity(game) ||
+        news_business(game)) {
         c->newsDone = 1;
         return 1;
     }
