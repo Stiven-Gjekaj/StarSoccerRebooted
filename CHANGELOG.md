@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.25.0 (2026-10-27)
+
+- The score plates take the colours of the kit that each team wears. Two
+  clubs with the same home colours now have plates of two colours.
+- The address bar of the news page and the block of the classic stadium
+  have the marks of SSR.
+
 ## 0.24.0 (2026-10-27)
 
 - The scrolling boards of the pitch have the marks of SSR: the sponsor
