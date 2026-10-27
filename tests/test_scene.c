@@ -581,6 +581,38 @@ static void test_copies_a_template_into_a_hook(void) {
 
 // A card of the pairs game: the code chooses the face, and plays the flip
 // forward to the back or back to the face.
+static void test_holds_one_instance_at_a_frame(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "Animation:(40,Loop) ref:RoseAnim\n"
+             "{\n"
+             "\tDuring:(0,19)\n"
+             "\t{\n"
+             "\t\tDraw:(PRose,0,0,10,10)\n"
+             "\t}\n"
+             "\tDuring:(20,39)\n"
+             "\t{\n"
+             "\t\tDraw:(PCardBack,0,0,10,10)\n"
+             "\t}\n"
+             "}\n"
+             "AnimInstance:(0,0,RoseAnim,0,0) ref:Reel\n"
+             "AnimInstance:(20,0,RoseAnim,0,0) ref:Reel\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(find_image(scene, "PRose") && !find_image(scene, "PCardBack"));
+    // The second instance goes to frame 25; the first stays at 0.
+    CHECK(ssr_scene_anim_frame(scene, "Reel", 1, 25));
+    CHECK(!ssr_scene_anim_frame(scene, "Reel", 2, 25));
+    for (int i = 0; i < 10; i++) ssr_scene_update(scene, &env, 16);
+    const SSRSceneItem *back = find_image(scene, "PCardBack");
+    CHECK(find_image(scene, "PRose") && back && back->x == 20);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_plays_an_animation_from_a_frame(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     layout = "Animation:(40,Clamp,0) ref:RoseAnim\n"
@@ -1565,6 +1597,7 @@ int main(void) {
     test_runs_expressions();
     test_plays_an_animation();
     test_plays_an_animation_from_a_frame();
+    test_holds_one_instance_at_a_frame();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
     test_builds_a_shop_button();

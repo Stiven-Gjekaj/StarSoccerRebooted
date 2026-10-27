@@ -252,6 +252,10 @@ void ssr_scene_anim(SSRScene *scene, const char *ref, float speed, int toEnd);
 // one when anim is NULL) from the frame at the speed. A speed below 0 plays
 // the animation back to its start.
 void ssr_scene_anim_play(SSRScene *scene, const char *ref, const char *anim, float frame, float speed);
+// The AnimInstance number index (from 0) of the AnimInstance elements with
+// the ref stops at the frame (c_GelAnimInstance.SetFrame). Returns 1 when
+// the instance is there.
+int ssr_scene_anim_frame(SSRScene *scene, const char *ref, int index, float frame);
 
 // Moves the first element with the ref to (x, y) in its parent, at the
 // scale.

@@ -3949,6 +3949,28 @@ void ssr_scene_anim_play(SSRScene *scene, const char *ref, const char *anim, flo
     for (int i = 0; i < scene->detachedCount; i++) anim_play(scene, scene->detached[i], ref, anim, frame, speed);
 }
 
+// Finds the instance number *index with the ref. The count goes down as the
+// search finds instances.
+static Gel *nth_anim(Gel *g, const char *ref, int *index) {
+    if (g->kind == GEL_ANIM && g->ref && strcmp(g->ref, ref) == 0 && (*index)-- == 0) return g;
+    for (int i = 0; i < g->childCount; i++) {
+        Gel *found = nth_anim(g->children[i], ref, index);
+        if (found) return found;
+    }
+    return NULL;
+}
+
+int ssr_scene_anim_frame(SSRScene *scene, const char *ref, int index, float frame) {
+    if (!scene || !ref || index < 0) return 0;
+    Gel *g = scene->root ? nth_anim(scene->root, ref, &index) : NULL;
+    for (int i = 0; !g && i < scene->detachedCount; i++) g = nth_anim(scene->detached[i], ref, &index);
+    if (!g) return 0;
+    g->frame = frame;
+    g->speed = 0;
+    g->state = 1;
+    return 1;
+}
+
 void ssr_scene_anim(SSRScene *scene, const char *ref, float speed, int toEnd) {
     if (!scene || !ref) return;
     if (scene->root) anim_speed(scene->root, ref, speed, toEnd);
