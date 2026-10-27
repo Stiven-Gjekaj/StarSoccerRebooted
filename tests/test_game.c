@@ -232,7 +232,7 @@ static void watch_a_replay(SSRGame *game, SSRTweaks *tweaks) {
 
 // The end of a season: the review, the table, the awards, and the next
 // season.
-static int seasons = 0, notPicked = 0, substitutes = 0, records = 0, squadSeen = 0, moments = 0;
+static int seasons = 0, notPicked = 0, substitutes = 0, records = 0, squadSeen = 0, moments = 0, painAsked = 0;
 
 static int transfers = 0;
 
@@ -609,6 +609,12 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Match", "LeagueName"), "PRM") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Menu", "LeagueType") == 1);
     ssr_game_message(game, "leaguefixtures.btn_Play");
+    // An injured player rests in place of a match with pain.
+    if (strcmp(ssr_game_screen(game), "message") == 0 &&
+        strstr(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "SSR_PlayWithPain")) {
+        painAsked++;
+        ssr_game_message(game, "message.btn_Cancel");
+    }
     // The boss can make the player a substitute, or leave the player out.
     if (strcmp(ssr_game_screen(game), "messageboss") == 0) {
         CHECK(strlen(ssr_tweaks_get(tweaks, "Menu", "MessageBody")) > 0);
@@ -2541,7 +2547,7 @@ static void test_starts_a_new_career(void) {
     ((SSRCareer *)ssr_game_career(game))->injury = 2;
     int notPickedBefore = notPicked;
     play_a_match(game, tweaks);
-    CHECK(notPicked == notPickedBefore + 1 && ssr_game_career(game)->injury == 0);
+    CHECK(painAsked == 1 && notPicked == notPickedBefore + 1 && ssr_game_career(game)->injury == 0);
     // Each club of the league has a manager.
     CHECK(people && people->managerCount == 4 && ssr_people_manager(people, ssr_game_career(game)->clubId));
     char peoplePath[1200];

@@ -165,6 +165,8 @@ struct SSRGame {
     int peopleDate;
     // The turn of the news of the world in the ticker.
     int worldTurn;
+    // 1 while the player plays a match with an injury.
+    int inPain;
     // The champions and the top scorers of the past seasons.
     SSRHonours honours;
     SSRHorses horses;
@@ -1385,6 +1387,7 @@ static void call_start_career(SSRGame *game) {
 static void call_drink(SSRGame *game);
 static void call_season_end_transfer(SSRGame *game);
 static void call_play_to_date(SSRGame *game);
+static void call_play_with_pain(SSRGame *game);
 static void call_set_up_fixture(SSRGame *game);
 static void call_debut_tired(SSRGame *game);
 static void call_relation_screen(SSRGame *game);
@@ -1426,6 +1429,7 @@ static void run_call(SSRGame *game, const char *name) {
         CallFunction call;
     } CALLS[] = {
         {"DeleteCareer", call_delete_career},
+        {"PlayWithPain", call_play_with_pain},
         {"TrialDone", call_trial_done},
         {"DoTrial1", call_do_trial1},
         {"DoTrial2", call_do_trial2},
@@ -2040,10 +2044,18 @@ static void signed_moment(SSRGame *game) {
 // stream of the world, so the numbers of the career stay the same.
 static void player_injury(SSRGame *game, float energy) {
     SSRCareer *c = &game->career;
-    if (!game->people || c->injury > 0) return;
+    int pain = game->inPain;
+    game->inPain = 0;
+    if (!game->people) return;
     SSRRandom *r = &game->people->random;
-    if (ssr_rand(r, energy < 30 ? 15 : 60) != 1) return;
-    c->injury = ssr_rand2(r, 7, 42);
+    // A match with pain makes the injury worse one time in three.
+    if (pain) {
+        if (ssr_rand(r, 3) != 1) return;
+        c->injury += ssr_rand2(r, 7, 21);
+    } else {
+        if (c->injury > 0 || ssr_rand(r, energy < 30 ? 15 : 60) != 1) return;
+        c->injury = ssr_rand2(r, 7, 42);
+    }
     char text[256], number[16];
     snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentInjury"));
     snprintf(number, sizeof(number), "%d", c->injury);
@@ -2910,6 +2922,21 @@ static void call_play_to_date(SSRGame *game) {
     after_play_to(game, ssr_season_play_to(game->season, game->messageData));
 }
 
+// The call "PlayWithPain": Ok plays the match with the injury, and Cancel
+// rests.
+static void call_play_with_pain(SSRGame *game) {
+    if (game->returnState == 1) {
+        game->inPain = 1;
+        start_match(game);
+        return;
+    }
+    char text[256], number[16];
+    snprintf(text, sizeof(text), "%s", loc(game, "SSR_Injured"));
+    snprintf(number, sizeof(number), "%d", game->career.injury);
+    replace_all(text, sizeof(text), "$num", number);
+    not_picked(game, text);
+}
+
 // The call "SetUpFixture": the match of the next fixture.
 static void call_set_up_fixture(SSRGame *game) {
     start_match(game);
@@ -2944,11 +2971,12 @@ static void play_matches(SSRGame *game) {
     int status = selection_status(game, f->level == 1);
     SSRCareer *c = &game->career;
     if (c->injury > 0 && !c->retired) {
-        char injured[256], number[16];
-        snprintf(injured, sizeof(injured), "%s", loc(game, "SSR_Injured"));
+        // The player chooses: play with pain, or rest.
+        char text[256], number[16];
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_PlayWithPain"));
         snprintf(number, sizeof(number), "%d", c->injury);
-        replace_all(injured, sizeof(injured), "$num", number);
-        not_picked(game, injured);
+        replace_all(text, sizeof(text), "$num", number);
+        message(game, "message", text, 1, 1, "PlayWithPain");
         return;
     }
     int star = ssr_career_star_level(c);
