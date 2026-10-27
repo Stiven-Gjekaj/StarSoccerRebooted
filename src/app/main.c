@@ -256,6 +256,8 @@ static void follow_overlay(SSRApp *app) {
 
 static void follow_game(SSRApp *app) {
     if (!app->game) return;
+    const char *sound;
+    while ((sound = ssr_game_take_sound(app->game)) != NULL) ssr_audio_play(app->audio, sound);
     if (ssr_game_take_settings_change(app->game)) {
         if (!ssr_game_save_settings(app->game, app->settingsPath)) SDL_Log("The settings were not saved.");
         apply_settings(app);
