@@ -68,3 +68,32 @@ board('AdBoardWhite', 180,
       [0xd8, 0xd4, 0xd4, 0xd4, 0xd3, 0xd1, 0xce, 0xcb, 0xc7, 0xc6, 0xc3, 0xc1, 0xbe, 0xbc, 0xb8, 0xb7,
        0xb5, 0xba, 0x80, 0x1b],
       'SSR LEAGUES', 14, 2, '#868686', '#e0e0e0')
+
+
+# The green of the star box and the silver of the type on the table.
+TABLE = ('<linearGradient id="green" x1="0" y1="0" x2="0" y2="1">'
+         '<stop offset="0" stop-color="#2a8a6c"/><stop offset="1" stop-color="#14533f"/></linearGradient>'
+         '<linearGradient id="silver" x1="0" y1="0" x2="0" y2="1">'
+         '<stop offset="0" stop-color="#ffffff"/><stop offset="0.6" stop-color="#f2f2f2"/>'
+         '<stop offset="1" stop-color="#b8b8b8"/></linearGradient>')
+
+# BlackJackLogo.patch (481 x 123): the mark above the BLACKJACK banner. The
+# patch clears the old mark with pixels of alpha 1/255, then puts a green
+# star box and SSR there, a little turned with the arc of the banner.
+X0, X1 = 136, 338
+# The top of the banner under the mark: (x, the first row of the banner).
+EDGE = [(136, 47), (146, 48), (156, 50), (166, 52), (176, 53), (186, 54), (196, 55), (206, 56), (226, 57),
+        (246, 57), (276, 56), (286, 55), (296, 54), (306, 53), (316, 51), (326, 49), (338, 48)]
+clear = f'M{X0},0 ' + ' '.join(f'L{x},{y}' for x, y in EDGE) + f' L{X1},0Z'
+body = f'<path d="{clear}" fill="#000" fill-opacity="0.004"/>' + TABLE
+S = 38
+th = 36
+tw = natural_width('SSR', th, track=0.03)
+x0 = (X0 + X1 - (S + 6 + tw)) / 2
+body += f'<g transform="rotate(-3 {(X0 + X1) / 2} 24)">'
+cx, cy = x0 + S / 2, 5 + S * 0.53
+body += (f'<g filter="url(#sh)"><rect x="{x0}" y="5" width="{S}" height="{S}" fill="url(#green)"/>'
+         f'{bevel_star(cx, cy, S * 0.43, S * 0.175)}</g>')
+d = text_path('SSR', x0 + S + 6, 7, tw, th, track=0.03)
+body += f'<g filter="url(#sh)"><path d="{d}" fill="url(#silver)"/></g></g>'
+save('BlackJackLogo.patch', body, 481, 123)
