@@ -391,6 +391,9 @@ static void retire(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && c->retired == score);
 }
 
+// 1 after the test gave the first season great counts.
+static int greatSeason = 0;
+
 static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     const SSRCareer *c = ssr_game_career(game);
     int year = ssr_career_year(c);
@@ -419,6 +422,12 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     const SSRTrophy *place = c->trophyCount ? &c->trophies[c->trophyCount - 1] : NULL;
     CHECK(place && place->year == year - 1 && strncmp(place->tournament, "PRM ", 4) == 0);
     CHECK(place && place->medal == (position == 1 ? 1 : 0));
+    // The awards of the season: a title, the counts of the season, and
+    // the year 10.
+    if (position == 1) CHECK(c->awards[16] > 0);
+    if (seasons == 0) CHECK(c->awards[19] > 0 && c->awards[122] > 0 && c->awards[20] > 0 && c->awards[21] > 0);
+    if (seasons == 0) CHECK(c->awards[22] == 0 && c->awards[17] == 0);
+    if (year - 1 == 10) CHECK(c->awards[50] > 0);
     // The awards come one at a time; the buttons show at the end.
     ssr_game_message(game, "seasonreview.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "playeroftheyear") == 0);
@@ -561,6 +570,15 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     int passes = ssr_game_career(game)->passes;
     float ratings[10];
     memcpy(ratings, ssr_game_career(game)->ratings, sizeof(ratings));
+    // The first season has the counts of a great season, for the awards
+    // of the season review.
+    if (seasons == 0 && !greatSeason) {
+        SSRCareer *great = (SSRCareer *)ssr_game_career(game);
+        great->seasonGoals += 50;
+        great->seasonPasses += 200;
+        great->seasonAssists += 20;
+        greatSeason = 1;
+    }
     // Play shows the fixtures of the round of the player first.
     press_play(game);
     CHECK(strcmp(ssr_game_screen(game), "leaguefixtures") == 0);

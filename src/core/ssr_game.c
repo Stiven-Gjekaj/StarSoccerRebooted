@@ -3050,6 +3050,32 @@ static int is_top_division(SSRGame *game, const SSRSeasonComp *comp) {
 
 // c_TScreen_SeasonReview.SetUpScreen: the place in the league and the
 // counts of the season. The match review comes first after a match.
+// The awards of the season review (c_TScreen_SeasonReview.Update).
+static void season_awards(SSRGame *game, SSRSeasonComp *comp, SSRSeasonClub *club, int position, int year) {
+    SSRCareer *c = &game->career;
+    if (club->league < comp->data->id && comp->data->type != 4) award(game, 17);
+    if (position == 1 && club->league >= comp->data->id && comp->data->type != 4) {
+        award(game, 16);
+        if (c->captain == 1 || c->captain == 3) award(game, 82);
+        if (ssr_career_history_apps(c, club->data->tla) + c->seasonApps == c->apps) award(game, 123);
+    }
+    if (c->seasonGoals >= 20) award(game, 19);
+    if (c->seasonGoals >= 50) award(game, 122);
+    if (c->seasonPasses >= 200) award(game, 20);
+    if (c->seasonAssists >= 20) award(game, 21);
+    if (c->seasonStarMan >= 20) award(game, 22);
+    if (year + 1 == 10) award(game, 50);
+    const SSRTableRow *row = ssr_season_row(game->season, &comp->pools[0], c->clubId);
+    if (row) {
+        if (row->lost == 0) award(game, 120);
+        if (row->played == row->won) award(game, 121);
+    }
+    if (position == 1 && club->league >= comp->data->id) {
+        if (ssr_career_count_medal_teams(c, 1) >= 3) award(game, 113);
+        if (ssr_career_count_medals(c, 3, year) > 0) award(game, 125);
+    }
+}
+
 static void season_review(SSRGame *game) {
     SSRTweaks *t = game->tweaks;
     SSRCareer *c = &game->career;
@@ -3102,6 +3128,7 @@ static void season_review(SSRGame *game) {
     snprintf(trophy, sizeof(trophy), "%s %s", comp->data->tla, place);
     int medal = position != 1 ? 0 : club->league < comp->data->id ? 2 : 1;
     ssr_career_add_trophy(c, year, club->data->tla, trophy, medal);
+    season_awards(game, comp, club, position, year);
     // [I: the game adds a row each time that the screen opens. The remake
     // adds one row for the season.]
     const SSRStatRow *last = c->historyCount ? &c->history[c->historyCount - 1] : NULL;
