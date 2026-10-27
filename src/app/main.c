@@ -335,6 +335,16 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         // The game adds z to y here (c_AMatchPlayer.p_Update).
         ssr_scene_spawn_place(app->scene, app->playerCopies[i], NULL, p->x, p->y + p->z);
         ssr_scene_spawn_anim(app->scene, app->playerCopies[i], "PlayerAnim", anim);
+        // The run plays at the speed of the player (c_AMatchPlayer): half the
+        // speed times Match.RunSpeedFactor.
+        SSRPlayerBall view = ssr_chance_player_ball(chance);
+        float factor = (float)ssr_tweaks_number(app->tweaks, "Match", "RunSpeedFactor");
+        if (p->anim == SSR_ANIM_RUN || p->anim == SSR_ANIM_RUN_GK) {
+            ssr_scene_spawn_set(app->scene, app->playerCopies[i], "PlayerAnim", SSR_GEL_ANIM_SPEED,
+                                ssr_player_speed(p, &view) / 2 * (factor > 0 ? factor : 3.5f));
+        } else {
+            ssr_scene_spawn_set(app->scene, app->playerCopies[i], "PlayerAnim", SSR_GEL_ANIM_SPEED, 1);
+        }
     }
     update_ball_view(app, chance);
     ssr_scene_update(app->pitchScene, env, ms);
