@@ -230,6 +230,15 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   original: bold red type and a white star in a red box. The words are
   STAR SOCCER REBOOTED. The TV, the newspaper, the sponsor, and the
   stadium use the name SSR (SSR TV, SSR NEWS).
+- **The text of the game uses the names of the remake.** "New Star
+  Soccer" becomes "Star Soccer Rebooted", "NSS" becomes "SSR", and the
+  boots and balls are "SSR-" in the place of "NS-". The credits of the
+  original and the names of the other New Star games stay. Reason: the
+  credits tell who made the original.
+- **The remake does not keep the art or the layouts of the original.** A
+  mark that is part of a larger image gets a patch of new pixels
+  (`art/<name>.patch.png`). A layout line gets a patch that removes it
+  (`layouts/<name>.patch`).
 
 - Display name `Star Soccer Rebooted`. Bundle ID
   `io.github.stivengjekaj.starsoccerrebooted`.
