@@ -64,8 +64,31 @@ static void test_holds_a_slow_ball(void) {
     CHECK(!ball.alive && ball.outcome == SSR_BALL_STOPPED);
 }
 
+// The factors of a match ball: the speed moves the ball further, and the
+// bounce takes from the bounce, in the order of the game.
+static void test_uses_the_factors_of_a_ball(void) {
+    SSRBall ball;
+    ssr_ball_place(&ball, 320, 600);
+    ssr_ball_kick(&ball, 0, 10, 0, 0, 0, 0);
+    ball.speedFactor = 1.04f;
+    ball.bounceFactor = 0.9f;
+    float x = ball.x, power = ball.power * 0.99f;
+    if (power < 1) power *= 0.98f;
+    ball.z = 0.5f;
+    ball.zVelocity = -2;
+    ssr_ball_update(&ball, NULL, NULL);
+    float step = 1.0f * power;
+    step = step * 1.04f;
+    CHECK(fabsf(ball.x - (x + step)) < 1e-4f);
+    float zv = (-2.0f - 0.15f) * -1.0f;
+    zv = zv * 0.9f;
+    zv = zv * 0.725f;
+    CHECK(ball.bounces == 1 && fabsf(ball.zVelocity - zv) < 1e-5f);
+}
+
 int main(void) {
     test_holds_a_slow_ball();
+    test_uses_the_factors_of_a_ball();
     static const Sample centre[] = {
         {10, 320.0000f, 358.0110f, 21.7500f, 1.5000f, 6.8679f, 270.0000f},
         {20, 320.0000f, 289.7088f, 28.5000f, -0.0000f, 6.7995f, 270.0000f},

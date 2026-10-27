@@ -219,12 +219,13 @@ void ssr_ball_update(SSRBall *ball, const SSRGoal *goal, SSRRandom *random) {
     ball->power *= friction;
     if (ball->power < 1) ball->power *= 0.98f;
     ball->zVelocity = ball->zVelocity - ball->weightFactor * 0.15f + ball->dip;
-    ball->x += cos_degrees(ball->direction) * (ball->power * ball->speedFactor);
-    ball->y += sin_degrees(ball->direction) * (ball->power * ball->speedFactor);
+    // The game multiplies in this order: (cos * power) * speed.
+    ball->x += cos_degrees(ball->direction) * ball->power * ball->speedFactor;
+    ball->y += sin_degrees(ball->direction) * ball->power * ball->speedFactor;
     ball->z = ball->z + ball->zVelocity;
     if (ball->z < 0) {
         ball->bounces++;
-        ball->zVelocity = -ball->zVelocity * (ball->bounceFactor * 0.725f);
+        ball->zVelocity = -ball->zVelocity * ball->bounceFactor * 0.725f;
         ball->z = 0;
         if (ball->dip < 0) ball->dip = 0;
     }
