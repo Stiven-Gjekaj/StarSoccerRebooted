@@ -90,7 +90,24 @@ static void test_refuses_a_bad_pack(void) {
     CHECK(!ssr_pack_install(archive, packs, NULL));
 }
 
+// A pack of the editor: made once, with its folder of the world.
+static void test_makes_a_pack(void) {
+    char packs[1200];
+    snprintf(packs, sizeof(packs), "%s/packs", ssr_test_directory("pack_make"));
+    CHECK(ssr_pack_make(packs, "custom", "My edits") && ssr_pack_make(packs, "custom", "Other"));
+    SSRPackInfo info;
+    char dir[1300];
+    snprintf(dir, sizeof(dir), "%s/custom", packs);
+    CHECK(ssr_pack_info(dir, &info) && strcmp(info.name, "My edits") == 0);
+    snprintf(dir, sizeof(dir), "%s/custom/world/x.txt", packs);
+    FILE *file = fopen(dir, "wb");
+    CHECK(file != NULL);
+    if (file) fclose(file);
+    CHECK(!ssr_pack_make(packs, "Bad Id", "X"));
+}
+
 int main(void) {
+    test_makes_a_pack();
     test_reads_the_info();
     test_installs_and_replaces_a_pack();
     test_refuses_a_bad_pack();

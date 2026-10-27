@@ -195,6 +195,8 @@ struct SSRGame {
     int typing;
     // The seed that the player types on the world screen.
     char seedText[16];
+    // The name of a club that the player types in the editor.
+    char editText[64];
 
     // The nationality (c_TScreen_ChooseNation): 1 when the Ok shows full.
     int canPlay;
@@ -696,6 +698,7 @@ static void season_path(const SSRGame *game, int slot, char *out, size_t capacit
 }
 
 static SSRPerson *mentee(SSRGame *game);
+static void edit_done(SSRGame *game);
 
 static void people_path(const SSRGame *game, int slot, char *out, size_t capacity) {
     snprintf(out, capacity, "%s/people%d.txt", game->saveDirectory, slot + 1);
@@ -3560,6 +3563,7 @@ static void league_squad(SSRGame *game) {
 }
 
 static void squad_mode(SSRGame *game) {
+    if (game->typing == 4) edit_done(game);
     game->squadMode = (game->squadMode + 1) % 3;
     squad_fill(game);
 }
@@ -3696,7 +3700,39 @@ static void honours_back(SSRGame *game) {
     squad_fill(game);
 }
 
+// The editor: the name of the club of the squad screen goes into the
+// world now, and into the data pack "custom" for the next start. The world
+// reads the pack "custom" from then on.
+static void edit_done(SSRGame *game) {
+    game->typing = 0;
+    if (!game->editText[0] || !game->world) return;
+    // The world belongs to the app, but the editor changes it in place.
+    SSRWorld *world = (SSRWorld *)game->world;
+    if (!ssr_world_set_club_name(world, game->squadClub, game->editText, NULL)) return;
+    ssr_tweaks_set(game->tweaks, "Squad", "Title", game->editText);
+    if (!game->packsDirectory[0]) return;
+    if (!ssr_pack_make(game->packsDirectory, "custom", "My edits")) return;
+    char path[2300];
+    snprintf(path, sizeof(path), "%s/custom/world/Clubs.txt", game->packsDirectory);
+    if (ssr_world_save_clubs(world, path) && strcmp(game->settings.pack, "custom") != 0) {
+        ssr_game_set_pack(game, "custom");
+        settings_changed(game);
+    }
+}
+
+static void squad_edit(SSRGame *game) {
+    if (game->typing == 4) {
+        edit_done(game);
+        return;
+    }
+    const SSRClub *club = game->world ? ssr_world_club(game->world, game->squadClub) : NULL;
+    if (!club || game->squadMode != 0) return;
+    game->typing = 4;
+    snprintf(game->editText, sizeof(game->editText), "%s", club->name);
+}
+
 static void squad_back(SSRGame *game) {
+    if (game->typing == 4) edit_done(game);
     league_screen(game, game->leagueComp);
 }
 
@@ -9587,6 +9623,7 @@ static const Route ROUTES[] = {
     {"league.btn_Squad", league_squad},
     {"squad.btn_Mode", squad_mode},
     {"squad.btn_Back", squad_back},
+    {"squad.inp_Name", squad_edit},
     {"squad.btn_Honours", honours_screen},
     {"honours.btn_Back", honours_back},
     {"honours.btn_Mode", honours_mode},
@@ -10366,6 +10403,10 @@ const char *ssr_game_text(SSRGame *game, const char *name) {
         snprintf(game->shown, sizeof(game->shown), "%d", game->settings.nextWorldSeed);
         return game->shown;
     }
+    if (strcmp(name, "GS_SquadTitle") == 0) {
+        if (game->typing == 4) return game->editText;
+        return ssr_tweaks_get(game->tweaks, "Squad", "Title");
+    }
     if (strcmp(name, "GS_ContinueWorld") == 0) return loc(game, game->settings.continueWorld ? "SSR_ContinueYes" : "SSR_ContinueNo");
     if (strcmp(name, "GS_Challenge") == 0) {
         static const char *const NAMES[3] = {"SSR_ChallengeNone", "SSR_ChallengePace", "SSR_ChallengeBroke"};
@@ -10384,6 +10425,17 @@ int ssr_game_wants_text(const SSRGame *game) {
 
 void ssr_game_type(SSRGame *game, const char *text) {
     if (!game || !game->typing || !text) return;
+    if (game->typing == 4) {
+        // The name of a club: up to 30 bytes, with no tab.
+        for (const char *p = text; *p; p++) {
+            size_t length = strlen(game->editText);
+            if ((unsigned char)*p >= 32 && length < 30) {
+                game->editText[length] = *p;
+                game->editText[length + 1] = 0;
+            }
+        }
+        return;
+    }
     if (game->typing == 3) {
         // The seed of a world: up to 9 digits.
         for (const char *p = text; *p; p++) {
@@ -10414,6 +10466,13 @@ void ssr_game_type(SSRGame *game, const char *text) {
 
 void ssr_game_key(SSRGame *game, SSRKey key) {
     if (!game || !game->typing) return;
+    if (game->typing == 4) {
+        size_t length = strlen(game->editText);
+        while (length > 0 && ((unsigned char)game->editText[length - 1] & 0xC0) == 0x80) length--;
+        if (key == SSR_KEY_BACKSPACE && length > 0) game->editText[length - 1] = 0;
+        if (key == SSR_KEY_ENTER) edit_done(game);
+        return;
+    }
     if (game->typing == 3) {
         size_t length = strlen(game->seedText);
         if (key == SSR_KEY_BACKSPACE && length > 0) game->seedText[length - 1] = 0;

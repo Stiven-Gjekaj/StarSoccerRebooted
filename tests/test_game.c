@@ -879,6 +879,16 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         int players = 0, scorers = 0;
         for (int i = 0; i < rows; i++) players += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "PlayerList") == 0;
         CHECK(players >= SSR_SQUAD_SIZE);
+        // The editor: a tap on the name of the club, a new name, and Enter.
+        ssr_game_message(game, "squad.inp_Name");
+        CHECK(ssr_game_wants_text(game));
+        ssr_game_key(game, SSR_KEY_BACKSPACE);
+        ssr_game_type(game, "X");
+        char edited[64];
+        snprintf(edited, sizeof(edited), "%s", ssr_game_text(game, "GS_SquadTitle"));
+        ssr_game_key(game, SSR_KEY_ENTER);
+        CHECK(!ssr_game_wants_text(game) && strcmp(ssr_game_text(game, "GS_SquadTitle"), edited) == 0);
+        CHECK(edited[strlen(edited) - 1] == 'X');
         ssr_game_message(game, "squad.btn_Mode");
         rows = take_ops(game, ops, 256);
         for (int i = 0; i < rows; i++) scorers += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "PlayerList") == 0;

@@ -48,9 +48,14 @@ PushOrigin:(60,128)
 		Text:(Squad,20,0,480,72)
 			FontSize(1)
 			Layer(AfterGloss)
-			StringReadout(Squad,Title)
+			GS_SquadTitle()
 	}
 		ConvergeFrom(-640,0)
+		// A tap on the name of the club changes it (the editor).
+		Click(squad.inp_Name)
+		<
+			PlaySnd(UISelect)
+		>
 PopOrigin
 
 // A row of the list.

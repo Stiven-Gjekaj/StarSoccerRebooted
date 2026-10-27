@@ -223,6 +223,24 @@ int ssr_pack_install(const char *archive, const char *packs, SSRPackInfo *info) 
     return ok;
 }
 
+int ssr_pack_make(const char *packs, const char *id, const char *name) {
+    if (!packs || !id || !is_good_id(id)) return 0;
+    char path[4096];
+    snprintf(path, sizeof(path), "%s", packs);
+    ssr_mkdir(path);
+    snprintf(path, sizeof(path), "%s/%s", packs, id);
+    ssr_mkdir(path);
+    snprintf(path, sizeof(path), "%s/%s/world", packs, id);
+    ssr_mkdir(path);
+    SSRPackInfo info;
+    snprintf(path, sizeof(path), "%s/%s", packs, id);
+    if (ssr_pack_info(path, &info)) return 1;
+    snprintf(path, sizeof(path), "%s/%s/%s", packs, id, PACK_FILE);
+    char text[256];
+    int length = snprintf(text, sizeof(text), "id=%s\nname=%s\nauthor=You\nversion=1\nformat=1\n", id, name ? name : id);
+    return write_file(path, text, (size_t)length);
+}
+
 int ssr_pack_remove(const char *packs, const char *id) {
     if (!id || !is_good_id(id)) return 0;
     char path[4096];

@@ -50,6 +50,11 @@ int ssr_pack_info(const char *directory, SSRPackInfo *info);
 // the info of the pack. Returns 1 on success.
 int ssr_pack_install(const char *archive, const char *packs, SSRPackInfo *info);
 
+// Makes the pack with the id in packs when it is not there: its directory,
+// its folder "world", and a pack.txt with the name. Returns 1 when the
+// pack is there.
+int ssr_pack_make(const char *packs, const char *id, const char *name);
+
 // Removes the pack with the id from packs. Returns 1 when it was there.
 int ssr_pack_remove(const char *packs, const char *id);
 

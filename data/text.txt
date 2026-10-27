@@ -57,3 +57,4 @@ SSR_ContinueLabel	World of the next career	Welt der nächsten Karriere	Monde de 
 SSR_ContinueNo	A new world	Eine neue Welt	Un nouveau monde	Un mundo nuevo	Un mondo nuovo	Um mundo novo	Um mundo novo		
 SSR_ContinueYes	The world of the last career	Die Welt der letzten Karriere	Le monde de la dernière carrière	El mundo de la última carrera	Il mondo dell'ultima carriera	O mundo da última carreira	O mundo da última carreira		
 SSR_MomentLegend	A new career in the world of $name.	Eine neue Karriere in der Welt von $name.	Une nouvelle carrière dans le monde de $name.	Una nueva carrera en el mundo de $name.	Una nuova carriera nel mondo di $name.	Uma nova carreira no mundo de $name.	Uma nova carreira no mundo de $name.		
+SSR_EditHint	Tap the name to change it	Tippe auf den Namen, um ihn zu ändern	Touche le nom pour le changer	Toca el nombre para cambiarlo	Tocca il nome per cambiarlo	Toque no nome para mudá-lo	Toca no nome para o mudar		
