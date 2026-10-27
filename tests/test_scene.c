@@ -835,6 +835,11 @@ static void test_moves_copies_and_sorts_by_y(void) {
     a = find_image(scene, "ImageA");
     b = find_image(scene, "ImageB");
     CHECK(a && b && a < b);
+    // The code moves an element of the screen by its ref.
+    ssr_scene_place(scene, "Pitch", 10, 20, 2);
+    ssr_scene_update(scene, &env, 16);
+    b = find_image(scene, "ImageB");
+    CHECK(b && near(b->x, 10 + 2 * 200) && near(b->y, 20 + 2 * 670));
     ssr_scene_free(scene);
     ssr_ui_free(tree);
     ssr_tweaks_free(tweaks);

@@ -170,6 +170,10 @@ float ssr_scene_spawn_x(const SSRScene *scene, int id);
 void ssr_scene_spawn_remove(SSRScene *scene, int id);
 int ssr_scene_list_add(SSRScene *scene, const char *list, const char *template_, const char *text, int id);
 
+// Moves the first element with the ref to (x, y) in its parent, at the
+// scale.
+void ssr_scene_place(SSRScene *scene, const char *ref, float x, float y, float scale);
+
 // Moves the copy with the id, or the element with the ref inside it, to
 // (x, y) in its parent. ref can be NULL.
 void ssr_scene_spawn_place(SSRScene *scene, int id, const char *ref, float x, float y);

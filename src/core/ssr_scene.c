@@ -3206,3 +3206,11 @@ void ssr_scene_spawn_show(SSRScene *scene, int id, const char *ref, int visible)
     if (g && ref) g = find_below(g, ref);
     if (g) g->hidden = !visible;
 }
+
+void ssr_scene_place(SSRScene *scene, const char *ref, float x, float y, float scale) {
+    Gel *g = scene && ref ? find_ref_first(scene, ref) : NULL;
+    if (!g) return;
+    g->x = x;
+    g->y = y;
+    g->sx = g->sy = scale;
+}
