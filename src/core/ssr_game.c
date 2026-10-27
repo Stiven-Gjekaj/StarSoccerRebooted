@@ -648,6 +648,8 @@ static void season_path(const SSRGame *game, int slot, char *out, size_t capacit
     snprintf(out, capacity, "%s/season%d.txt", game->saveDirectory, slot + 1);
 }
 
+static SSRPerson *mentee(SSRGame *game);
+
 static void people_path(const SSRGame *game, int slot, char *out, size_t capacity) {
     snprintf(out, capacity, "%s/people%d.txt", game->saveDirectory, slot + 1);
 }
@@ -3892,6 +3894,12 @@ static void new_season(SSRGame *game) {
     ssr_career_reset_season(&game->career);
     if (game->people) {
         ssr_people_new_season(game->people, game->world, game->names, ssr_career_year(&game->career));
+        // A good team spirit helps the young player that the player
+        // mentors: 3 more skill points each season.
+        SSRPerson *young = mentee(game);
+        if (young && game->career.relationTeam >= 60) {
+            young->skill = young->skill + 3 > young->potential ? young->potential : young->skill + 3;
+        }
         // A transfer between two clubs makes their rivalry grow.
         for (int i = 0; i < game->people->moveCount; i++) {
             ssr_honours_add_rivalry(&game->honours, game->people->moves[i][1], game->people->moves[i][2], 1);
@@ -9670,6 +9678,26 @@ static int form_run(SSRGame *game, int *run) {
     return best;
 }
 
+// The team mate with the most goals of the season, or NULL.
+static SSRPerson *strike_partner(SSRGame *game) {
+    int club = game->career.clubId;
+    SSRPerson *top = NULL;
+    return game->people && ssr_people_top_scorers(game->people, &club, 1, &top, 1) ? top : NULL;
+}
+
+// The young player that the player mentors: the youngest team mate of 19
+// or less with a skill to reach of 70 or more.
+static SSRPerson *mentee(SSRGame *game) {
+    SSRPerson *squad[64], *best = NULL;
+    int n = game->people ? ssr_people_squad(game->people, game->career.clubId, squad, 64) : 0;
+    int year = ssr_career_year(&game->career);
+    for (int i = 0; i < n && i < 64; i++) {
+        if (year - squad[i]->born > 19 || squad[i]->potential < 70 || squad[i]->rival) continue;
+        if (!best || squad[i]->born > best->born) best = squad[i];
+    }
+    return best;
+}
+
 // 1 for a derby, 2 for a match of a big rivalry.
 static int next_derby(SSRGame *game, int *home, int *away) {
     SSRFixture *f = game->season ? ssr_season_next_fixture(game->season) : NULL;
@@ -9779,6 +9807,10 @@ int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
     }
     case SSR_TICKER_WORLD_MANAGER:
         return club && game->people && game->people->sackedCount > 0 ? ticker_counter(count) : -1;
+    case SSR_TICKER_WORLD_PARTNER:
+        return club && strike_partner(game) ? ticker_counter(count) : -1;
+    case SSR_TICKER_WORLD_MENTEE:
+        return club && mentee(game) ? ticker_counter(count) : -1;
     case SSR_TICKER_INJURY:
         // As the next match: first after one turn, then each time.
         return club && c->injury > 0 ? (++*count < 2 ? 0 : 1000) : -1;
@@ -9921,6 +9953,22 @@ void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_
         replace_all(text, capacity, "$apps", value);
         SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, ssr_season_actual_league(game->season, c->clubId)) : NULL;
         replace_all(text, capacity, "$league", comp ? comp->data->tla : "");
+        break;
+    }
+    case SSR_TICKER_WORLD_PARTNER:
+    case SSR_TICKER_WORLD_MENTEE: {
+        int partner = kind == SSR_TICKER_WORLD_PARTNER;
+        const SSRPerson *p = partner ? strike_partner(game) : mentee(game);
+        if (!p) return;
+        char name[64];
+        person_name(p, name, sizeof(name));
+        snprintf(text, capacity, "%s", loc(game, partner ? "SSR_TICKER_PARTNER" : "SSR_TICKER_MENTEE"));
+        replace_all(text, capacity, "$name", name);
+        replace_all(text, capacity, "$club", club_name(game, p->club));
+        snprintf(number, sizeof(number), "%d", p->seasonGoals);
+        replace_all(text, capacity, "$goals", number);
+        snprintf(number, sizeof(number), "%d", ssr_career_year(c) - p->born);
+        replace_all(text, capacity, "$age", number);
         break;
     }
     case SSR_TICKER_INJURY:

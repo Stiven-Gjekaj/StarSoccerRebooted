@@ -165,6 +165,10 @@ typedef enum {
     SSR_TICKER_WORLD_FORM,
     // The days of the injury of the player.
     SSR_TICKER_INJURY,
+    // The best scorer among the team mates, and the young player that the
+    // player mentors.
+    SSR_TICKER_WORLD_PARTNER,
+    SSR_TICKER_WORLD_MENTEE,
     SSR_TICKER_KINDS,
 } SSRTickerKind;
 

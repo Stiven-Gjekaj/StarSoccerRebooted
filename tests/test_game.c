@@ -2571,6 +2571,10 @@ static void test_starts_a_new_career(void) {
     turns = 0;
     CHECK(ssr_game_ticker_priority(game, SSR_TICKER_WORLD_SCORER, &turns) > 0);
     turns = 0;
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_WORLD_PARTNER, &turns) > 0);
+    ssr_game_ticker_text(game, SSR_TICKER_WORLD_PARTNER, &turns, news, sizeof(news));
+    CHECK(strcmp(news, "SSR_TICKER_PARTNER") == 0);
+    turns = 0;
     CHECK(ssr_game_ticker_priority(game, SSR_TICKER_WORLD_TABLE, &turns) > 0);
     ssr_game_ticker_text(game, SSR_TICKER_WORLD_TABLE, &turns, news, sizeof(news));
     CHECK(strncmp(news, "SSR_TICKER_TITLE", 16) == 0);
