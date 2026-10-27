@@ -147,14 +147,25 @@ static SDL_Texture *texture_from_pixels(SDL_Renderer *renderer, int width, int h
     return texture;
 }
 
-// Loads the image at the path once, and keeps it by the key.
-static SDL_Texture *cached_texture(SSRGfx *gfx, const char *key, const char *path) {
+// Loads an image of the remake. SDL reads the file, so that the app also
+// finds it in the assets of an Android APK.
+static int load_own_image(const char *path, SSRImage *image) {
+    size_t size = 0;
+    void *data = SDL_LoadFile(path, &size);
+    int ok = data && ssr_image_decode(data, size, image);
+    SDL_free(data);
+    return ok;
+}
+
+// Loads the image at the path once, and keeps it by the key. own is 1 for
+// an image of the remake.
+static SDL_Texture *cached_texture(SSRGfx *gfx, const char *key, const char *path, int own) {
     for (int i = 0; i < gfx->textureCount; i++) {
         if (SDL_strcmp(gfx->textures[i].name, key) == 0) return gfx->textures[i].texture;
     }
     SSRImage image;
     SDL_Texture *texture = NULL;
-    if (ssr_image_load(path, &image)) {
+    if (own ? load_own_image(path, &image) : ssr_image_load(path, &image)) {
         texture = texture_from_pixels(gfx->renderer, image.width, image.height, image.pixels);
         ssr_image_free(&image);
     }
@@ -172,7 +183,7 @@ SDL_Texture *ssr_gfx_texture(SSRGfx *gfx, const char *name) {
     if (!gfx || !name) return NULL;
     char path[2400];
     SDL_snprintf(path, sizeof(path), "%s/%s", gfx->gameDirectory, name);
-    return cached_texture(gfx, name, path);
+    return cached_texture(gfx, name, path, 0);
 }
 
 // The art of the remake (art/<name>.png) takes the place of the atlas
@@ -188,7 +199,7 @@ static SDL_Texture *own_art(SSRGfx *gfx, const char *name) {
     SDL_snprintf(key, sizeof(key), "art:%s", name);
     const char *base = SDL_GetBasePath();
     SDL_snprintf(path, sizeof(path), "%sart/%s", base ? base : "", file);
-    return cached_texture(gfx, key, path);
+    return cached_texture(gfx, key, path, 1);
 }
 
 // Uploads the atlas of the font when it has new glyphs. The atlas becomes
@@ -285,7 +296,7 @@ static void patch_page(SSRGfx *gfx, int page, SSRImage *pixels) {
         const char *base = SDL_GetBasePath();
         SDL_snprintf(path, sizeof(path), "%sart/%s", base ? base : "", file);
         SSRImage patch;
-        if (!ssr_image_load(path, &patch)) continue;
+        if (!load_own_image(path, &patch)) continue;
         if (!ssr_atlas_patch(pixels, image, &patch)) SDL_Log("The patch %s does not fit its image.", file);
         ssr_image_free(&patch);
     }

@@ -128,13 +128,16 @@ static char *read_screen_file(void *context, const char *name, size_t *size) {
     const SSRApp *app = context;
     char asked[2400], path[2400];
     const char *base = SDL_GetBasePath();
+    // A layout of the remake has the exact name. SDL reads it, so that the
+    // app also finds it in the assets of an Android APK.
     SDL_snprintf(asked, sizeof(asked), "%slayouts/%s", base ? base : "", name);
-    int own = ssr_fs_resolve(asked, path, sizeof(path));
+    char *data = SDL_LoadFile(asked, size);
+    int own = data != NULL;
     if (!own) {
         SDL_snprintf(asked, sizeof(asked), "%s/NewGUI/Screens/%s", app->gameDirectory, name);
         if (!ssr_fs_resolve(asked, path, sizeof(path))) return NULL;
+        data = SDL_LoadFile(path, size);
     }
-    char *data = SDL_LoadFile(path, size);
     if (!data) return NULL;
     // The parser frees the buffer with free(), so it gets a copy.
     char *copy = malloc(*size + 1);
