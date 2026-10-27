@@ -1819,8 +1819,12 @@ static void build_node(SSRScene *s, const SSRUiNode *node, Gel *parent) {
         g->localise = !is(name, "Text");
         g->w = (float)number(s, node, 3, 0);
         g->h = (float)number(s, node, 4, 0);
-        if (arg(node, 5)[0]) g->alignX = (char)toupper((unsigned char)arg(node, 5)[0]);
-        if (arg(node, 6)[0]) g->alignY = (char)toupper((unsigned char)arg(node, 6)[0]);
+        // The game knows L and R across, and T and B down. Each other
+        // letter puts the text in the middle (c_TextFR_Factory).
+        char across = (char)toupper((unsigned char)arg(node, 5)[0]);
+        char down = (char)toupper((unsigned char)arg(node, 6)[0]);
+        g->alignX = across == 'L' || across == 'R' ? across : 'C';
+        g->alignY = down == 'T' || down == 'B' ? down : 'M';
         g->hasColour = parse_colour(arg(node, 7), &g->colour);
         g->wrap = is(name, "TextBox");
         place_gel(s, g, parent, (float)number(s, node, 1, 0), (float)number(s, node, 2, 0), 0);

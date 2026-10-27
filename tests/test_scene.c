@@ -1254,6 +1254,28 @@ static void test_player_shadows(void) {
 }
 
 // The scene lists each modifier that it does not know, once.
+static void test_aligns_text_as_the_game(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "TextBox:(A,0,0,150,80,C,C)\n"
+             "Text:(B,0,0,150,80,R,B)\n"
+             "Text:(C,0,0,150,80,X,L)\n"
+             "Text:(D,0,0,150,80)\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(ssr_scene_count(scene) == 4);
+    const char want[4][2] = {{'C', 'M'}, {'R', 'B'}, {'C', 'M'}, {'C', 'M'}};
+    for (int i = 0; i < 4 && i < ssr_scene_count(scene); i++) {
+        const SSRSceneItem *item = ssr_scene_item(scene, i);
+        CHECK(item->alignX == want[i][0] && item->alignY == want[i][1]);
+    }
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_lists_unknown_modifiers(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     layout = "Draw:(A,0,0,10,10)\n"
@@ -1303,5 +1325,6 @@ int main(void) {
     test_table_rows();
     test_player_shadows();
     test_lists_unknown_modifiers();
+    test_aligns_text_as_the_game();
     return TEST_RESULT();
 }
