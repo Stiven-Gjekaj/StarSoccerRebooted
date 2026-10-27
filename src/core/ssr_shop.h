@@ -5,6 +5,8 @@
 #ifndef SSR_SHOP_H
 #define SSR_SHOP_H
 
+#include "ssr_random.h"
+
 #define SSR_SHOP_COUNT 60
 
 typedef enum {
@@ -44,5 +46,10 @@ int ssr_shop_count_by_type(SSRShopType type);
 // (GetRandomItemByType without the random number). NULL when there is
 // none.
 const SSRShopItem *ssr_shop_nth_of_type(SSRShopType type, int n);
+
+// c_TShopItem.UpdateLife after a match: each owned product that needs care
+// wears. The dearest product wears 1 a match, the cheapest about 15. The
+// arrays are the items, the vehicles, and the properties of the player.
+void ssr_shop_wear(SSRRandom *random, int *items, int *vehicles, int *properties);
 
 #endif

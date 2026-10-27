@@ -78,14 +78,39 @@ static int compare_price(void *context, int a, int b) {
     return PRODUCTS[a].id - PRODUCTS[b].id;
 }
 
+static void make_order(void) {
+    if (ordered) return;
+    for (int i = 0; i < SSR_SHOP_COUNT; i++) order[i] = i;
+    ssr_sort(order, SSR_SHOP_COUNT, compare_price, NULL, 0);
+    ordered = 1;
+}
+
 const SSRShopItem *ssr_shop_item(int index) {
     if (index < 0 || index >= SSR_SHOP_COUNT) return NULL;
-    if (!ordered) {
-        for (int i = 0; i < SSR_SHOP_COUNT; i++) order[i] = i;
-        ssr_sort(order, SSR_SHOP_COUNT, compare_price, NULL, 0);
-        ordered = 1;
-    }
+    make_order();
     return &PRODUCTS[order[index]];
+}
+
+static int *product_value(int *items, int *vehicles, int *properties, const SSRShopItem *item) {
+    int *a = item->type == SSR_SHOP_ITEM ? items : item->type == SSR_SHOP_VEHICLE ? vehicles : properties;
+    return &a[item->id - 1];
+}
+
+void ssr_shop_wear(SSRRandom *random, int *items, int *vehicles, int *properties) {
+    make_order();
+    // The list goes to the dearest first, then back. Each sort starts from
+    // the order before it, so two products of one price can change places.
+    ssr_sort(order, SSR_SHOP_COUNT, compare_price, NULL, 1);
+    float f = 0.9f;
+    for (int i = 0; i < SSR_SHOP_COUNT; i++) {
+        const SSRShopItem *item = &PRODUCTS[order[i]];
+        if (item->lifeType == SSR_LIFE_NONE) continue;
+        int *v = product_value(items, vehicles, properties, item);
+        // Rnd2(0.1, 0.5) is Rnd3(0.4) + 0.1.
+        if (*v > 0) *v += (int)(ssr_rnd(random) * (0.5f - 0.1f) + 0.1f + f);
+        f += 0.25f;
+    }
+    ssr_sort(order, SSR_SHOP_COUNT, compare_price, NULL, 0);
 }
 
 int ssr_shop_count_by_type(SSRShopType type) {
