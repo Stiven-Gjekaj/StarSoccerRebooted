@@ -72,6 +72,11 @@ typedef struct {
     // it, and the copies of the players and of the ball on the screen.
     SSRUiTree *pitchScreen, *tapScreen, *bannerScreen, *stadiumScreen, *stadiumStaticScreen;
     SSRScene *pitchScene, *tapScene, *bannerScene, *stadiumScene, *stadiumStaticScene;
+    // The stadium behind the TV of the match screen
+    // (c_AScreen_Match.SetUpStadium), and its size.
+    SSRScene *backdropScene, *backdropStaticScene;
+    SSRUiTree *backdropScreen, *backdropStaticScreen;
+    int backdropSize;
     // The HUD of a chance (minigamehud.uis): the replay offer and controls.
     SSRScene *hudScene;
     SSRUiTree *hudScreen;
@@ -455,6 +460,43 @@ static void update_run_arrow(SSRApp *app, const SSRChance *chance, int i) {
     ssr_scene_spawn_set(app->scene, id, "TacticArrow#1", SSR_GEL_W, length + 20);
 }
 
+static void free_backdrop(SSRApp *app) {
+    ssr_gfx_attach(app->gfx, "StadiumBgHook", NULL);
+    ssr_gfx_attach(app->gfx, "StaticStadiumBgHook", NULL);
+    ssr_scene_free(app->backdropScene);
+    ssr_scene_free(app->backdropStaticScene);
+    ssr_ui_free(app->backdropScreen);
+    ssr_ui_free(app->backdropStaticScreen);
+    app->backdropScene = app->backdropStaticScene = NULL;
+    app->backdropScreen = app->backdropStaticScreen = NULL;
+}
+
+// c_AScreen_Match.SetUpStadium: the stadium of the home team ("Stadium" +
+// size + "PM", and its Static part) shows in the TV of the match screen.
+static void update_backdrop(SSRApp *app, SSRSceneEnv *env, int ms) {
+    const SSRMatch *match = ssr_game_match(app->game);
+    if (!match || SDL_strcmp(ssr_game_screen(app->game), "match") != 0 || !app->scene) {
+        if (app->backdropScene || app->backdropStaticScene) free_backdrop(app);
+        return;
+    }
+    if (app->backdropSize != match->stadiumSize) free_backdrop(app);
+    if (!app->backdropScene && !app->backdropStaticScene) {
+        char name[64];
+        SDL_snprintf(name, sizeof(name), "Stadium%dPMStatic.uis", match->stadiumSize);
+        app->backdropStaticScene = open_layer(app, name, &app->backdropStaticScreen, env);
+        SDL_snprintf(name, sizeof(name), "Stadium%dPM.uis", match->stadiumSize);
+        app->backdropScene = open_layer(app, name, &app->backdropScreen, env);
+        app->backdropSize = match->stadiumSize;
+        // The game renders the Static part into a surface once
+        // (M_StadiumRTTOnce), and the stadium shows it in the TV. The
+        // remake draws the two parts in the TV, one on the other.
+        ssr_gfx_attach(app->gfx, "StadiumBgHook", app->backdropStaticScene);
+        ssr_gfx_attach(app->gfx, "StadiumBgHook", app->backdropScene);
+    }
+    ssr_scene_update(app->backdropStaticScene, env, ms);
+    ssr_scene_update(app->backdropScene, env, ms);
+}
+
 static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     const SSRChance *chance = ssr_game_chance(app->game);
     if (!chance || SDL_strcmp(ssr_game_screen(app->game), "matchminigame") != 0 || !app->scene) {
@@ -679,6 +721,7 @@ static void load_ticker(SSRApp *app) {
 }
 
 static void load_game(SSRApp *app) {
+    free_backdrop(app);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
     ssr_audio_free(app->audio);
@@ -1055,6 +1098,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
             }
         }
         update_chance_view(app, &env, ms);
+        update_backdrop(app, &env, ms);
         ssr_gfx_set_tweaks(app->gfx, app->tweaks);
         const SSRChance *chance = ssr_game_chance(app->game);
         if (app->tapScene && chance && chance->state == SSR_CHANCE_TAP) {
@@ -1174,6 +1218,7 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     ssr_ticker_free(app->ticker);
     ssr_tweaks_free(app->tweaks);
     ssr_audio_free(app->audio);
+    free_backdrop(app);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
     SDL_free(app);
