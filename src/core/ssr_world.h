@@ -146,6 +146,12 @@ double ssr_world_club_distance(const SSRWorld *world, int a, int b);
 #define SSR_DERBY_KM 30.0
 int ssr_world_is_derby(const SSRWorld *world, int a, int b);
 
+// The editor: a new name and a new tla for a club. A NULL keeps the old
+// text. Returns 1 when the club is there.
+int ssr_world_set_club_name(SSRWorld *world, int id, const char *name, const char *tla);
+// Writes the clubs as a Clubs.txt of the data set. Returns 1 on success.
+int ssr_world_save_clubs(const SSRWorld *world, const char *path);
+
 // Reads "#FFF" or "#FF0000". Returns fallback for other text.
 SSRColor ssr_color_parse(const char *text, SSRColor fallback);
 

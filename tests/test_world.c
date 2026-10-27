@@ -1,5 +1,6 @@
 // Tests ssr_world with a small data set that the test writes.
 
+#include <math.h>
 #include <string.h>
 
 #include "ssr_test.h"
@@ -103,6 +104,28 @@ static void test_reads_a_pack_over_the_data_set(void) {
     ssr_world_free(world);
 }
 
+// The editor renames a club, and the clubs go to a file that the world
+// reads again.
+static void test_edits_and_saves_the_clubs(void) {
+    char set[1024];
+    snprintf(set, sizeof(set), "%s", write_set("editbase"));
+    SSRWorld *world = ssr_world_load(set);
+    CHECK(world && ssr_world_set_club_name(world, 915, "Harbour Town", "HARBOR") && !ssr_world_set_club_name(world, 1, "X", NULL));
+    CHECK(strcmp(ssr_world_club(world, 915)->name, "Harbour Town") == 0);
+    const char *pack = ssr_test_directory("editpack");
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/Clubs.txt", pack);
+    CHECK(ssr_world_save_clubs(world, path));
+    SSRWorld *back = ssr_world_load_pack(set, pack);
+    CHECK(back && back->clubCount == 3);
+    const SSRClub *a = ssr_world_club(world, 915), *b = back ? ssr_world_club(back, 915) : NULL;
+    CHECK(b && strcmp(b->name, "Harbour Town") == 0 && strcmp(b->tla, "HARBOR") == 0);
+    CHECK(b && b->strength == a->strength && b->away.shirt1 == a->away.shirt1 && b->bTeamOf == a->bTeamOf);
+    CHECK(b && fabs(b->latitude - a->latitude) < 1e-6 && ssr_world_club(back, 916)->bTeamOf == 915);
+    ssr_world_free(back);
+    ssr_world_free(world);
+}
+
 static void test_parses_colours(void) {
     CHECK(ssr_color_parse("#FFF", 1) == 0xFFFFFF);
     CHECK(ssr_color_parse("#f80", 1) == 0xFF8800);
@@ -148,5 +171,6 @@ int main(void) {
     test_refuses_a_set_with_a_missing_file();
     test_parses_colours();
     test_reads_a_pack_over_the_data_set();
+    test_edits_and_saves_the_clubs();
     return TEST_RESULT();
 }

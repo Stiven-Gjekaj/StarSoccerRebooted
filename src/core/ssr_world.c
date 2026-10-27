@@ -394,3 +394,37 @@ int ssr_world_is_derby(const SSRWorld *world, int a, int b) {
     if ((x->latitude == 0 && x->longitude == 0) || (y->latitude == 0 && y->longitude == 0)) return 0;
     return ssr_world_club_distance(world, a, b) < SSR_DERBY_KM;
 }
+
+int ssr_world_set_club_name(SSRWorld *world, int id, const char *name, const char *tla) {
+    SSRClub *club = world ? (SSRClub *)ssr_world_club(world, id) : NULL;
+    if (!club) return 0;
+    if (name && *name) club->name = keep(world, name);
+    if (tla && *tla) club->tla = keep(world, tla);
+    return 1;
+}
+
+// A text of a cell has no tab and no line end.
+static void put_cell(FILE *file, const char *text) {
+    for (const char *p = text ? text : ""; *p; p++) fputc(*p == '\t' || *p == '\n' || *p == '\r' ? ' ' : *p, file);
+}
+
+int ssr_world_save_clubs(const SSRWorld *world, const char *path) {
+    FILE *file = world && path ? fopen(path, "wb") : NULL;
+    if (!file) return 0;
+    fputs("id\tshortname\ttla\tstrength\tstadiumlongitude\tstadiumlatitude\thomestyle\thomekitshirtcol1\t"
+          "homekitshirtcol2\thomekitshortscol\tawaykitshirtcol1\tawaykitshortscol\tnationid\tleagueid\t"
+          "continentalcompid\tbteamof\n",
+          file);
+    for (int i = 0; i < world->clubCount; i++) {
+        const SSRClub *c = &world->clubs[i];
+        fprintf(file, "%d\t", c->id);
+        put_cell(file, c->name);
+        fputc('\t', file);
+        put_cell(file, c->tla);
+        fprintf(file, "\t%d\t%.9g\t%.9g\t%d\t#%06X\t#%06X\t#%06X\t#%06X\t#%06X\t%d\t%d\t%d\t%d\n", c->strength,
+                c->longitude, c->latitude, c->homeStyle, (unsigned)c->home.shirt1, (unsigned)c->home.shirt2,
+                (unsigned)c->home.shorts, (unsigned)c->away.shirt1, (unsigned)c->away.shorts, c->nation, c->league,
+                c->continentalCompetition, c->bTeamOf);
+    }
+    return fclose(file) == 0;
+}
