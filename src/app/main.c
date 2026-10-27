@@ -65,7 +65,7 @@ typedef struct {
     char pitchName[64];
     SSRScene *viewScene;
     int playerCopies[SSR_PLAYERS_MAX];
-    int ballCopy;
+    int ballCopy, arrowCopy;
     SSRAudio *audio;
     // The Spine files that the screens use, and when the screen opened.
     struct {
@@ -231,6 +231,45 @@ static void player_anim(const SSRMatchPlayer *p, char *out, size_t capacity) {
     SDL_snprintf(out, capacity, "%s%s", kind, heading);
 }
 
+// The ball of a chance (c_ABall): the ball rises with z and grows, and it
+// rolls in one of 8 headings at a speed by its power.
+static void update_ball_view(SSRApp *app, const SSRChance *chance) {
+    const SSRBall *b = &chance->ball;
+    int id = app->ballCopy;
+    ssr_scene_spawn_place(app->scene, id, NULL, b->x, b->y);
+    ssr_scene_spawn_place(app->scene, id, "BallHook", 0, -b->z);
+    ssr_scene_spawn_set(app->scene, id, "BallHook", SSR_GEL_SCALE, 1 + b->z / 100);
+    // GetVelDir: a heading near an axis, or a diagonal.
+    float c = SDL_cosf(b->direction * SDL_PI_F / 180), s = SDL_sinf(b->direction * SDL_PI_F / 180);
+    const char *roll;
+    if (SDL_fabsf(c) - SDL_fabsf(s) > 0.5f) {
+        roll = c > 0 ? "BallRollE" : "BallRollW";
+    } else if (SDL_fabsf(s) - SDL_fabsf(c) > 0.5f) {
+        roll = s > 0 ? "BallRollS" : "BallRollN";
+    } else {
+        roll = s > 0 ? (c > 0 ? "BallRollSE" : "BallRollSW") : (c > 0 ? "BallRollNE" : "BallRollNW");
+    }
+    ssr_scene_spawn_anim(app->scene, id, "BallAnim", roll);
+    float speed = chance->kicking >= 2 ? SDL_max(0.2f, b->power / 5) : 0;
+    if (b->power <= 0.015f) speed = 0;
+    ssr_scene_spawn_set(app->scene, id, "BallAnim", SSR_GEL_ANIM_SPEED, speed);
+    // The aim arrow (c_MatchArrow): it points the way of the shot, and grows
+    // and goes from yellow to red with the power.
+    int aiming = chance->state == SSR_CHANCE_AIM && chance->kicking == 1 && chance->aimPower > 0;
+    ssr_scene_spawn_show(app->scene, app->arrowCopy, NULL, aiming);
+    if (aiming) {
+        float most = chance->setup.power * 0.4f + 60;
+        float length = SDL_clamp(chance->aimPower * 1.3f, 10, most);
+        ssr_scene_spawn_place(app->scene, app->arrowCopy, NULL, b->x, b->y);
+        ssr_scene_spawn_set(app->scene, app->arrowCopy, NULL, SSR_GEL_ANGLE, -chance->aimDirection);
+        ssr_scene_spawn_set(app->scene, app->arrowCopy, "Arrow#1", SSR_GEL_W, length + 20);
+        float t = length / most;
+        char colour[16];
+        SDL_snprintf(colour, sizeof(colour), "FF%02X0090", (int)(255 * (1 - t)));
+        ssr_scene_spawn_colour(app->scene, app->arrowCopy, "Arrow#1", colour);
+    }
+}
+
 static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     const SSRChance *chance = ssr_game_chance(app->game);
     if (!chance || SDL_strcmp(ssr_game_screen(app->game), "matchminigame") != 0 || !app->scene) {
@@ -271,6 +310,7 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         }
         app->ballCopy = ssr_scene_spawn(app->scene, "MatchPitch", "Ball", 0, NULL, 0);
         ssr_scene_spawn_show(app->scene, app->ballCopy, "BallTip", 0);
+        app->arrowCopy = ssr_scene_spawn(app->scene, "MatchPitch", "Arrow", 0, NULL, 0);
     }
     for (int i = 0; i < chance->players.count && i < SSR_PLAYERS_MAX; i++) {
         const SSRMatchPlayer *p = &chance->players.list[i];
@@ -280,8 +320,7 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         ssr_scene_spawn_place(app->scene, app->playerCopies[i], NULL, p->x, p->y + p->z);
         ssr_scene_spawn_anim(app->scene, app->playerCopies[i], "PlayerAnim", anim);
     }
-    ssr_scene_spawn_place(app->scene, app->ballCopy, NULL, chance->ball.x, chance->ball.y);
-    ssr_scene_spawn_place(app->scene, app->ballCopy, "BallHook", 0, -chance->ball.z);
+    update_ball_view(app, chance);
     ssr_scene_update(app->pitchScene, env, ms);
     // The banner of the result (c_TQuickMessage "scoreanim") starts again
     // for each chance.
