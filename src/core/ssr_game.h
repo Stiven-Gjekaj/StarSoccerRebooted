@@ -124,6 +124,11 @@ typedef struct {
     // The id of the data pack that the world reads (ssr_pack), or "" for
     // the world of the game.
     char pack[48];
+    // The seed of the world of the next new career, or 0 for a new seed
+    // each career. The challenge of the next new career: 0 none, 1 the
+    // pace at the maximum, 2 no Bux and no NRG.
+    int nextWorldSeed;
+    int challenge;
 } SSRSettings;
 
 // The tickers of a career, in the order of the game

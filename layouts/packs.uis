@@ -1,7 +1,7 @@
-// The data packs. A screen of the remake. The code fills the list
-// "PackList" from the template "PackEntry". Each row has the texts 1 and
-// 2: the name, and the author and the version. A tap on a row chooses
-// the pack.
+// The world: the data packs, and the seed and the challenge of the next
+// new career. A screen of the remake. The code fills the list "PackList"
+// from the template "PackEntry". Each row has the texts 1 and 2: the
+// name, and the author and the version. A tap on a row chooses the pack.
 
 UnsortedLayer:(AfterGloss,1)
 
@@ -75,27 +75,27 @@ EndM
 
 // The list.
 PushOrigin:(13,210)
-	Draw:(GreyRecess,0,0,614,516)
+	Draw:(GreyRecess,0,0,614,410)
 		SwipePanel(Packs,Scroll,Packs,ScrollVel)
 	{
 		PushOrigin:(7,8)
 			M_BGScrollWindow:(599,502)
 		PopOrigin()
 
-		Clip:(4,14,611,451)
+		Clip:(4,14,611,345)
 			Handle(0,-46)
 		{
 			M_PackRow:(PackEntry)
 
 			Rect:(0,0,0,0) ref:PackList
-				ScrollingList(Packs,Scroll,496,Packs,ScrollVel) ref:ScrollingList
+				ScrollingList(Packs,Scroll,390,Packs,ScrollVel) ref:ScrollingList
 			{
 			}
 		}
 		PushOrigin:(2,-1)
-			Draw:(GreyRecess,579,16,22,490)
+			Draw:(GreyRecess,579,16,22,384)
 			{
-				Draw:(SliderButton,581,16,20,490,,#656565FF)
+				Draw:(SliderButton,581,16,20,384,,#656565FF)
 					ScrollIndicator(PackList,ScrollingList)
 			}
 		PopOrigin
@@ -120,6 +120,55 @@ PushOrigin:(22,220)
 			FontScale(0.4,0.4)
 			StringReadout(Packs,Title)
 	}
+		ConvergeFrom(-640,0)
+PopOrigin
+
+// The seed of the world of the next new career, and its challenge. A tap
+// on the seed types a new one.
+PushOrigin:(13,630)
+	Rect:(0,0,300,96)
+	{
+		Draw:(GreyRecess,0,0,300,96)
+		Text:(SEED,10,2,280,40,C,,#BBDDBBFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.4,0.4)
+			StringReadout(Packs,SeedLabel)
+		Text:(00000,10,40,280,50,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.55,0.55)
+			GS_WorldSeed()
+	}
+		Click(packs.inp_Seed)
+		<
+			PlaySnd(UISelect)
+		>
+PopOrigin
+PushOrigin:(327,630)
+	Rect:(0,0,300,96)
+	{
+		Draw:(ButtonShadow,8,8,300,96,,#FFFFFF80)
+		Draw:(GreenButton,0,0,300,96)
+		Draw:(Glint,0,15.5,42,,,#606060FFFFFFFFFF)
+			Handle(42,16)
+			Shine(0,280)
+			Additive()
+		Text:(CHALLENGE,10,2,280,40,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.4,0.4)
+			StringReadout(Packs,ChallengeLabel)
+		Text:(NONE,10,40,280,50,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.5,0.5)
+			GS_Challenge()
+	}
+		Click(packs.btn_Challenge)
+		<
+			PlaySnd(UISelect)
+		>
 		ConvergeFrom(-640,0)
 PopOrigin
 

@@ -190,6 +190,8 @@ struct SSRGame {
     int hardMode;
     // 0 no name, 1 the first name, 2 the last name takes the keyboard.
     int typing;
+    // The seed that the player types on the world screen.
+    char seedText[16];
 
     // The nationality (c_TScreen_ChooseNation): 1 when the Ok shows full.
     int canPlay;
@@ -565,7 +567,9 @@ static void packs_fill(SSRGame *game) {
         }
         add_op(game, SSR_OP_LIST_PARAM, "PackList", NULL, NULL, i);
     }
-    ssr_tweaks_set(t, "Packs", "Title", loc(game, "SSR_Packs"));
+    ssr_tweaks_set(t, "Packs", "Title", loc(game, "SSR_World"));
+    ssr_tweaks_set(t, "Packs", "SeedLabel", loc(game, "SSR_SeedLabel"));
+    ssr_tweaks_set(t, "Packs", "ChallengeLabel", loc(game, "SSR_ChallengeLabel"));
     ssr_tweaks_set_number(t, "Packs", "CanInstall", game->canInstallPacks);
     ssr_tweaks_set_number(t, "Packs", "CanRemove", game->packRow > 0);
     ssr_tweaks_set_number(t, "Packs", "Scroll", 0);
@@ -594,8 +598,39 @@ static void packs_remove(SSRGame *game) {
     packs_fill(game);
 }
 
+static void seed_done(SSRGame *game);
+static void options(SSRGame *game);
+
+static void packs_back(SSRGame *game) {
+    if (game->typing == 3) seed_done(game);
+    options(game);
+}
+
 static void packs_install(SSRGame *game) {
     game->packInstallAsked = 1;
+}
+
+// packs.inp_Seed: the player types the seed of the next world. Enter or a
+// tap elsewhere keeps it. An empty seed gives a new world each career.
+static void seed_start(SSRGame *game) {
+    if (game->typing == 3) {
+        seed_done(game);
+        return;
+    }
+    game->typing = 3;
+    game->seedText[0] = 0;
+}
+
+static void seed_done(SSRGame *game) {
+    game->typing = 0;
+    game->settings.nextWorldSeed = atoi(game->seedText);
+    settings_changed(game);
+}
+
+static void challenge_next(SSRGame *game) {
+    if (game->typing == 3) seed_done(game);
+    game->settings.challenge = (game->settings.challenge + 1) % 3;
+    settings_changed(game);
 }
 
 static void volume(SSRGame *game) {
@@ -1373,7 +1408,15 @@ static void call_start_career(SSRGame *game) {
         if (skills[i][0] == 0) skills[i][0] = 1;
     }
     skip_to_first_match(game);
-    c->worldSeed = 0;
+    c->worldSeed = game->settings.nextWorldSeed;
+    // The challenge of the new career.
+    if (game->settings.challenge == 1) {
+        memset(c->pace, 0, sizeof(c->pace));
+        c->pace[0] = 100;
+    } else if (game->settings.challenge == 2) {
+        c->bank = 0;
+        memset(c->nrg, 0, sizeof(c->nrg));
+    }
     people_start(game);
     signed_moment(game);
     ssr_honours_clear(&game->honours);
@@ -3449,7 +3492,11 @@ static void honours_fill(SSRGame *game) {
     SSRTweaks *t = game->tweaks;
     int career = game->honoursMode == 1;
     ssr_tweaks_set(t, "Honours", "Title", loc(game, career ? "Career" : "SSR_Honours"));
-    ssr_tweaks_set(t, "Honours", "Column", loc(game, career ? "Year" : "Season"));
+    char column[128], seed[16];
+    snprintf(column, sizeof(column), "%s", loc(game, career ? "Year" : "SSR_WorldSeedOf"));
+    snprintf(seed, sizeof(seed), "%d", game->career.worldSeed);
+    replace_all(column, sizeof(column), "$seed", seed);
+    ssr_tweaks_set(t, "Honours", "Column", column);
     ssr_tweaks_set(t, "Honours", "ModeText", loc(game, career ? "World" : "Career"));
     ssr_tweaks_set_number(t, "Honours", "Scroll", 0);
     add_op(game, SSR_OP_LIST_CLEAR, "HonourList", NULL, NULL, 0);
@@ -9350,10 +9397,12 @@ static const Route ROUTES[] = {
     {"language.btn_Ok", language_ok},
     {"options.btn_Back", main_menu},
     {"options.btn_Packs", packs_screen},
-    {"packs.btn_Back", options},
+    {"packs.btn_Back", packs_back},
     {"packs.row_pack", packs_row},
     {"packs.btn_Remove", packs_remove},
     {"packs.btn_Install", packs_install},
+    {"packs.inp_Seed", seed_start},
+    {"packs.btn_Challenge", challenge_next},
     {"about.btn_Ok", options},
     {"message.btn_Ok", message_ok},
     {"message.btn_Cancel", message_cancel},
@@ -9553,6 +9602,8 @@ int ssr_game_load_settings(SSRGame *game, const char *path) {
         if (strcmp(key, "doneloseskills") == 0) game->settings.doneLoseSkills = value != 0;
         if (strcmp(key, "hardmodeunlocked") == 0) game->settings.hardModeUnlocked = value != 0;
         if (strcmp(key, "language") == 0 && value >= -1 && value <= 12) game->settings.language = value;
+        if (strcmp(key, "worldseed") == 0 && value >= 0) game->settings.nextWorldSeed = value;
+        if (strcmp(key, "challenge") == 0 && value >= 0 && value <= 2) game->settings.challenge = value;
     }
     fclose(file);
     set_option_tweaks(game);
@@ -9570,6 +9621,7 @@ int ssr_game_save_settings(const SSRGame *game, const char *path) {
                      game->settings.volume, game->settings.distance, game->settings.replays,
                      game->settings.doneLoseSkills, game->settings.hardModeUnlocked, game->settings.language) > 0;
     ok = fprintf(file, "pack=%s\n", game->settings.pack) > 0 && ok;
+    ok = fprintf(file, "worldseed=%d\nchallenge=%d\n", game->settings.nextWorldSeed, game->settings.challenge) > 0 && ok;
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
         remove(temp);
@@ -10096,6 +10148,16 @@ const char *ssr_game_text(SSRGame *game, const char *name) {
         const SSRClub *club = game->world ? ssr_world_club(game->world, game->career.clubId) : NULL;
         return club ? club->tla : loc(game, "Club");
     }
+    if (strcmp(name, "GS_WorldSeed") == 0) {
+        if (game->typing == 3) return game->seedText;
+        if (game->settings.nextWorldSeed == 0) return loc(game, "SSR_SeedRandom");
+        snprintf(game->shown, sizeof(game->shown), "%d", game->settings.nextWorldSeed);
+        return game->shown;
+    }
+    if (strcmp(name, "GS_Challenge") == 0) {
+        static const char *const NAMES[3] = {"SSR_ChallengeNone", "SSR_ChallengePace", "SSR_ChallengeBroke"};
+        return loc(game, NAMES[game->settings.challenge % 3]);
+    }
     if (strcmp(name, "GS_PlayerFullName") == 0) {
         snprintf(game->shown, sizeof(game->shown), "%s", game->career.fullName);
         return game->shown;
@@ -10109,6 +10171,17 @@ int ssr_game_wants_text(const SSRGame *game) {
 
 void ssr_game_type(SSRGame *game, const char *text) {
     if (!game || !game->typing || !text) return;
+    if (game->typing == 3) {
+        // The seed of a world: up to 9 digits.
+        for (const char *p = text; *p; p++) {
+            size_t length = strlen(game->seedText);
+            if (*p >= '0' && *p <= '9' && length < 9) {
+                game->seedText[length] = *p;
+                game->seedText[length + 1] = 0;
+            }
+        }
+        return;
+    }
     char *name = game->typing == 1 ? game->firstName : game->lastName;
     for (const char *p = text; *p; p++) {
         // A comma or a semicolon would break the save of the game.
@@ -10128,6 +10201,12 @@ void ssr_game_type(SSRGame *game, const char *text) {
 
 void ssr_game_key(SSRGame *game, SSRKey key) {
     if (!game || !game->typing) return;
+    if (game->typing == 3) {
+        size_t length = strlen(game->seedText);
+        if (key == SSR_KEY_BACKSPACE && length > 0) game->seedText[length - 1] = 0;
+        if (key == SSR_KEY_ENTER) seed_done(game);
+        return;
+    }
     char *name = game->typing == 1 ? game->firstName : game->lastName;
     if (key == SSR_KEY_BACKSPACE) {
         size_t length = strlen(name);
