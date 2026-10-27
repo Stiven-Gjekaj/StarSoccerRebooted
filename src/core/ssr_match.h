@@ -84,7 +84,7 @@ typedef struct {
     int score[3];
     int playerChance[120];
     // The stats of the player in this match.
-    int goals, assists, passes, chances, shotChances, dribbles;
+    int goals, assists, passes, chances, shotChances, dribbles, shotsOnTarget;
     int playerInBuildup;
     int lastGoalTime;
     float energy;

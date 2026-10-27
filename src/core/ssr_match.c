@@ -618,6 +618,7 @@ static int rating_of(const SSRChance *c) {
 void ssr_match_chance_done(SSRMatch *m, const SSRChance *c, int now, SSRRandom *random) {
     m->state = SSR_MATCH_CLOCK;
     m->stage = 0;
+    m->shotsOnTarget += c->shotsOnTarget;
     int pass = m->chanceType == 1 || m->chanceType == 9;
     switch (c->result) {
     case SSR_RESULT_GOAL:

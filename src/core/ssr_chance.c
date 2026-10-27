@@ -349,6 +349,7 @@ static void check_players(SSRChance *c, SSRRandom *random) {
                 wide = 35;
             }
             if (!(b->z < top && dx < wide && dy < 8)) continue;
+            if (c->lastTouchedBy == 0) c->shotsOnTarget++;
             c->lastTouchedBy = p->id;
             c->kickTime = c->now;
             if (frame < 15) {
@@ -560,7 +561,9 @@ void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRando
         b->windSpeed = toucher && toucher->type == SSR_PLAYER_KEEPER ? 0 : c->setup.windSpeed;
         b->holdStop = players_moving(c);
         int noGoal = is_pass_chance(c->info.chanceType) || c->info.chanceType == 12;
+        int postHit = b->postHit;
         ssr_ball_update(b, noGoal ? NULL : &c->goal, random);
+        if (!postHit && b->postHit && c->lastTouchedBy == 0) c->shotsOnTarget++;
         predict_bounce(c);
         if (b->outcome == SSR_BALL_GOAL) {
             const SSRMatchPlayer *last = c->lastTouchedBy > 0 ? find_player(c, c->lastTouchedBy) : NULL;

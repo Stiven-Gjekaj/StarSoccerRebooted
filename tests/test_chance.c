@@ -95,6 +95,7 @@ static void test_sets_up_the_players(void) {
 }
 
 static void test_shoots_a_penalty(void) {
+    int saves = 0;
     for (int seed = 0; seed < 20; seed++) {
         SSRRandom random = {seed * 7919};
         SSRChance c;
@@ -106,7 +107,12 @@ static void test_shoots_a_penalty(void) {
         CHECK(ticks > 0 && c.state == SSR_CHANCE_OVER && c.ball.kicks >= 1);
         CHECK(c.result == SSR_RESULT_GOAL || c.result == SSR_RESULT_ASSIST || c.result == SSR_RESULT_SAVED ||
               c.result == SSR_RESULT_MISSED);
+        // A save is on target. A goal is not.
+        if (c.result == SSR_RESULT_SAVED) saves++;
+        CHECK(c.result != SSR_RESULT_SAVED || c.shotsOnTarget == 1);
+        CHECK(c.result != SSR_RESULT_GOAL || c.ball.postHit || c.shotsOnTarget == 0);
     }
+    CHECK(saves > 0);
 }
 
 static void test_scores_in_the_far_corner(void) {

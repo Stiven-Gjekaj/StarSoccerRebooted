@@ -134,8 +134,9 @@ static void test_a_dribble_leads_to_an_attack(void) {
     memset(&chance, 0, sizeof(chance));
     chance.result = SSR_RESULT_DRIBBLED;
     chance.info.chanceType = 11;
+    chance.shotsOnTarget = 1;
     ssr_match_chance_done(&m, &chance, 1000, &random);
-    CHECK(m.state == SSR_MATCH_STAGES && m.stage == 11 && m.dribbles == 1);
+    CHECK(m.state == SSR_MATCH_STAGES && m.stage == 11 && m.dribbles == 1 && m.shotsOnTarget == 1);
     SSRMatchEvent event = SSR_MATCH_EVENT_NONE;
     for (int now = 1000; now < 60000 && event != SSR_MATCH_EVENT_CHANCE; now += 16) {
         event = ssr_match_update(&m, now, &random);
