@@ -3118,11 +3118,10 @@ static void retirement_play(SSRGame *game) {
     game_menu(game);
 }
 
-// The answer: No keeps the club [I: the transfer screens come with the
-// life of the player; until then Yes also keeps the club].
 static void desired_transfer_screen(SSRGame *game, int nation);
 
-// The call "SeasonEndTransfer": Yes looks for a new club.
+// The call "SeasonEndTransfer": No keeps the club, and Yes looks for a
+// new club.
 static void call_season_end_transfer(SSRGame *game) {
     if (game->returnState != 1) {
         new_season(game);
