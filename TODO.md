@@ -116,15 +116,21 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 
 ## 0.6 The season
 
-- [ ] Fixtures and tables (`c_TFixture`, `c_TTable`, `LeagueFixtures`,
+- [x] Fixtures and tables (`c_TFixture`, `c_TTable`, `LeagueFixtures`,
       `ClubFixtures`, `League`)
-- [ ] Cups and continental competitions (`c_TCompetition`)
-- [ ] Extra time and the penalty shoot-out of a cup match
-- [ ] The results of the other matches (`c_TFixData`)
-- [ ] Promotion and relegation
-- [ ] The end of the season (`SeasonReview`, `PlayerOfTheYear`,
-      `Achievements`)
-- [ ] International call-ups
+- [x] Cups and continental competitions (`c_TCompetition`)
+- [x] Extra time and the penalty shoot-out of a cup match
+- [x] The results of the other matches (`c_TFixData`)
+- [x] Promotion and relegation
+- [x] The end of the season (`SeasonReview`, `PlayerOfTheYear`)
+- [x] International call-ups: the nation picks the player by the relation
+      with its boss, as the original does
+- [x] The selection: the boss can make the player a substitute, or leave
+      the player out
+- [ ] The news of a cup winner and of the result (`headlineresult`)
+- [ ] The trophy log and the stat history (`Achievements`)
+- [ ] The transfer at the end of the season (`DesiredTransfer`). Yes
+      keeps the club for now.
 
 ## 0.7 The life of the player
 
