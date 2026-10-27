@@ -1,5 +1,7 @@
 # Star Soccer Rebooted
 
+![Star Soccer Rebooted](docs/banner.jpg)
+
 A remake of New Star Soccer for iOS, Android, macOS, Windows, and Linux.
 It uses C99 and SDL3.
 
