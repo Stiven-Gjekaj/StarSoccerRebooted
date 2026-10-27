@@ -1002,6 +1002,58 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && ssr_game_overlay(game)[0] == 0);
 }
 
+// Saves the career with no news done this week, and loads it again.
+static SSRCareer *news_week(SSRGame *game, const char *path, SSRCareer *c) {
+    c->newsDone = 0;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    for (int i = 0; i < 4 && strcmp(ssr_game_screen(game), "gamemenu") != 0; i++) ssr_game_message(game, "message.btn_Cancel");
+    return (SSRCareer *)ssr_game_career(game);
+}
+
+// The news before a match: the old boots of an ex pro, then a sponsor.
+static void get_old_boots_and_a_sponsor(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.bootId = 0;
+    c.oldProBoots = 0;
+    c.apps = 9;
+    const SSRCareer *now = news_week(game, path, &c);
+    ssr_game_message(game, "gamemenu.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "message") == 0 && now->oldProBoots == 21 && now->newsDone == 1);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(now->bootId == 21 && now->bootUses == 5 && strcmp(ssr_game_modal(game), "PurchaseAnim") == 0);
+    ssr_game_message(game, "PurchaseAnim.Close");
+    // A player of star level 3 with no sponsors gets the first offer.
+    c = *ssr_game_career(game);
+    c.starRating = 260;
+    c.seasonApps = 0;
+    c.relationSponsors = 0;
+    for (int i = 0; i < 10; i++) c.sponsors[i] = 0;
+    c.captain = 0;
+    c.relationFans = 50;
+    // News that comes before it in the chain, as the transfer window, can
+    // take the week. The test tries again.
+    for (int i = 0; i < 4; i++) {
+        SSRCareer week = c;
+        now = news_week(game, path, &week);
+        ssr_game_message(game, "gamemenu.btn_Play");
+        if (strcmp(ssr_game_screen(game), "messagesponsor") == 0) break;
+        for (int k = 0; k < 4 && strcmp(ssr_game_screen(game), "gamemenu") != 0; k++) {
+            if (strcmp(ssr_game_screen(game), "contract") == 0) ssr_game_message(game, "contract.btn_Reject");
+            else if (strncmp(ssr_game_screen(game), "webpage", 7) == 0) ssr_game_message(game, "webpage.btn_Ok");
+            else ssr_game_message(game, "message.btn_Ok");
+        }
+    }
+    CHECK(strcmp(ssr_game_screen(game), "messagesponsor") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(now->sponsors[0] == 1 && now->relationSponsors == 50 && strcmp(ssr_game_screen(game), "relationships") == 0);
+    ssr_game_message(game, "relationships.btn_Home");
+    (void)tweaks;
+}
+
 // The talk with the boss of the club: the contract, a turn of the
 // negotiate game, and the signature.
 static void renew_the_contract(SSRGame *game, SSRTweaks *tweaks, const char *path) {
@@ -1270,6 +1322,7 @@ static void test_starts_a_new_career(void) {
     choose_a_dilemma(game, path);
     go_shopping(game, tweaks, path);
     hire_and_kit_out(game, tweaks, path);
+    get_old_boots_and_a_sponsor(game, tweaks, path);
     renew_the_contract(game, tweaks, path);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 24 && seasons < 2; i++) play_a_match(game, tweaks);

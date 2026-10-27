@@ -1012,6 +1012,8 @@ static void call_vehicle_partner(SSRGame *game);
 static void call_tip(SSRGame *game);
 static void call_expired_item(SSRGame *game);
 static void call_buy_property(SSRGame *game);
+static void call_old_pro_boots(SSRGame *game);
+static void call_sponsorship_offer(SSRGame *game);
 static void call_change_staff(SSRGame *game);
 static void call_change_boots(SSRGame *game);
 static void call_reopen_staff(SSRGame *game);
@@ -1054,6 +1056,8 @@ static void run_call(SSRGame *game, const char *name) {
         {"DoTip", call_tip},
         {"ExpiredItem", call_expired_item},
         {"BuyProperty", call_buy_property},
+        {"OldProBoots", call_old_pro_boots},
+        {"SponsorshipOffer", call_sponsorship_offer},
         {"ChangeSoftAgentOrTrainer", call_change_staff},
         {"ChangeSoftBat", call_change_boots},
         {"ReopenAgentTrainerShop", call_reopen_staff},
@@ -1919,6 +1923,11 @@ static void stats_continue(SSRGame *game) {
     if (!(played && played->data->level == 1)) {
         game->payGoals = game->facts.goals * c->goalBonus;
         for (int i = 0; i < 10; i++) game->paySponsors += c->sponsors[i];
+        // GetCaptaincySponsorBoost: a captain earns more from the sponsors.
+        if (ssr_career_count_sponsors(c) > 0 && c->captain >= 1 && c->captain <= 3) {
+            float f = (float)game->paySponsors / 100.0f * (float)(c->captain * 10);
+            game->paySponsors += (int)(f >= 1 ? f : 1);
+        }
     } else {
         // A match of the nation pays the wage only.
         game->payGoals = game->payAssists = 0;
@@ -4100,6 +4109,193 @@ static int news_random_club(SSRGame *game) {
     return 1;
 }
 
+
+static void shop_price(char *out, size_t capacity, int price);
+
+// c_TPlayer.CheckOldProBoots: an ex pro gives the player old boots, once
+// after 8 matches and once after 24.
+static int news_old_pro_boots(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->bootId > 0) return 0;
+    if (c->tryBoots > 0) c->tryBoots = 0;
+    // OldProBoots.OldProBoots1Index and OldProBoots2Index.
+    int first = 21, second = 25, id = 0;
+    if (c->oldProBoots == first) id = c->apps > 24 ? second : 0;
+    else if (c->oldProBoots != second && c->apps > 8) id = first;
+    const SSRBoot *boot = ssr_shop_boot(id);
+    if (!boot) return 0;
+    c->oldProBoots = id;
+    char text[512], name[64];
+    snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_OLDPROBOOTS"));
+    snprintf(name, sizeof(name), "Title_%s", boot->name);
+    replace_all(text, sizeof(text), "$name", loc(game, name));
+    replace_all(text, sizeof(text), "$num", "5");
+    game->messageData = id;
+    message(game, "message", text, 1, 1, "OldProBoots");
+    return 1;
+}
+
+static void call_old_pro_boots(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (game->returnState == 1) {
+        c->bootId = game->messageData;
+        c->bootUses = 5;
+        c->tryBoots = 1;
+        ssr_tweaks_set(game->tweaks, "Products", "PurchaseOverlayMessage", loc(game, "Item_Received"));
+        snprintf(game->modal, sizeof(game->modal), "PurchaseAnim");
+    }
+    save_career(game);
+}
+
+static float club_strength(SSRGame *game) {
+    SSRSeasonClub *club = game->season ? ssr_season_club(game->season, game->career.clubId, 0) : NULL;
+    return club ? (float)club->strength : 0;
+}
+
+static void captain_message(SSRGame *game, const char *tag, const char *team) {
+    char text[512];
+    snprintf(text, sizeof(text), "%s", loc(game, tag));
+    replace_all(text, sizeof(text), "$teamname", team);
+    message(game, "messageboss", text, 0, 1, NULL);
+}
+
+// c_TPlayer.CheckCaptaincy: the club and the nation make the player
+// captain, or take the armband away.
+static int news_captaincy(SSRGame *game, const SSRFixture *next) {
+    SSRCareer *c = &game->career;
+    int level = ssr_career_star_level(c), year = ssr_career_year(c);
+    if (next->level == 0) {
+        const char *team = my_club_tla(game);
+        if (c->captain != 1 && c->captain != 3) {
+            if (c->seasonApps <= 4 || c->apps < 25) return 0;
+            float avg = c->seasonTotalRating / (float)c->seasonApps;
+            int tell = year > 1 && c->seasonApps % 20 == 0;
+            const char *no = level < (int)club_strength(game) / 6 ? "CMESSAGE_NOTCAPTAIN_STARRATING"
+                             : avg < 7.0f                          ? "CMESSAGE_NOTCAPTAIN_RATING"
+                             : (int)c->relationBoss < 80 || (int)c->relationTeam < 80 || (int)c->relationFans < 80
+                                 ? "CMESSAGE_NOTCAPTAIN_RELATIONSHIPS"
+                                 : NULL;
+            if (no) {
+                if (!tell) return 0;
+                captain_message(game, no, team);
+                return 1;
+            }
+            c->captain = c->captain == 2 ? 3 : 1;
+            captain_message(game, "CMESSAGE_CAPTAINCY", team);
+            return 1;
+        }
+        if (c->seasonApps <= 4) return 0;
+        const char *tag = NULL;
+        if (c->seasonTotalRating / (float)c->seasonApps < 6.0f) tag = "CMESSAGE_CAPTAINCYSTRIP_RATING";
+        else if ((int)c->relationBoss < 60 || (int)c->relationTeam < 60 || (int)c->relationFans < 60) {
+            tag = "CMESSAGE_CAPTAINCYSTRIP_RELATIONSHIPS";
+        }
+        if (!tag) return 0;
+        c->captain = c->captain == 3 ? 2 : 0;
+        captain_message(game, tag, team);
+        save_career(game);
+        return 1;
+    }
+    const SSRNation *nation = ssr_world_nation(game->world, c->nationId);
+    const char *team = nation ? nation->name : "";
+    if (c->captain != 2 && c->captain != 3) {
+        if (c->intApps <= 19) return 0;
+        float avg = c->intTotalRating / (float)c->intApps;
+        int tell = year > 1 && c->intApps % 12 == 0;
+        const char *no = nation && level < nation->strength / 5 ? "CMESSAGE_NOTCAPTAIN_STARRATING"
+                         : avg < 7.0f                            ? "CMESSAGE_NOTCAPTAIN_RATING"
+                         : (int)c->relationBossInt < 90 || (int)c->relationTeamInt < 90 || (int)c->relationFansInt < 90
+                             ? "CMESSAGE_NOTCAPTAIN_RELATIONSHIPS"
+                             : NULL;
+        if (no) {
+            if (!tell) return 0;
+            captain_message(game, no, team);
+            return 1;
+        }
+        c->captain = c->captain == 1 ? 3 : 2;
+        captain_message(game, "CMESSAGE_CAPTAINCY", team);
+        save_career(game);
+        return 1;
+    }
+    const char *tag = NULL;
+    if (c->intTotalRating / (float)(c->intApps ? c->intApps : 1) < 6.0f) tag = "CMESSAGE_CAPTAINCYSTRIP_RATING";
+    else if ((int)c->relationBossInt < 70 || (int)c->relationTeamInt < 70 || (int)c->relationFansInt < 70) {
+        tag = "CMESSAGE_CAPTAINCYSTRIP_RELATIONSHIPS";
+    }
+    if (!tag) return 0;
+    c->captain = c->captain == 3 ? 1 : 0;
+    captain_message(game, tag, team);
+    save_career(game);
+    return 1;
+}
+
+// GetStringSponsorName.
+static const char *sponsor_name(SSRGame *game, int i) {
+    static const char *NAMES[10] = {"sponsor_Boots", "sponsor_SportsDrink", "sponsor_SportsClothing",
+                                    "sponsor_CasualClothing", "sponsor_Food", "sponsor_Cosmetics", "sponsor_Watch",
+                                    "sponsor_Electronics", "sponsor_Jewelry", "sponsor_Car"};
+    return i >= 0 && i < 10 ? loc(game, NAMES[i]) : "";
+}
+
+// GSCheckSponsorship: a sponsor leaves, or a new one makes an offer.
+static int news_sponsorship(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int n = ssr_career_count_sponsors(c);
+    char text[512], name[64];
+    if (n > 0 && c->relationSponsors < 20) {
+        for (int i = 9; i >= 0; i--) {
+            if (c->sponsors[i] <= 0) continue;
+            snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_SPONSORCANCEL"));
+            snprintf(name, sizeof(name), "%s", sponsor_name(game, i));
+            upper(name);
+            replace_all(text, sizeof(text), "$sponsor", name);
+            c->sponsors[i] = 0;
+            if (ssr_career_count_sponsors(c) == 0) c->relationSponsors = 0;
+            else ssr_career_update_relation(c, SSR_RELATION_SPONSORS, 30);
+            game_menu(game);
+            message(game, "messagesponsor", text, 0, 1, NULL);
+            return 1;
+        }
+        return 0;
+    }
+    if (c->seasonApps % 10 > 0) return 0;
+    if (ssr_career_lifestyle(c) < (float)((n - 2) * 10)) {
+        message(game, "messagesponsor", loc(game, "CMESSAGE_SPONSORSNOTIMPRESSEDLIFESTYLE"), 0, 1, NULL);
+        return 1;
+    }
+    if (c->relationFans < (float)((n - 2) * 10)) {
+        message(game, "messagesponsor", loc(game, "CMESSAGE_SPONSORSNOTIMPRESSEDFANS"), 0, 1, NULL);
+        return 1;
+    }
+    // OfferSponsorship: the first free slot that the star level reaches.
+    int level = ssr_career_star_level(c), rating = c->starRating % 100;
+    for (int i = 0; i < 10; i++) {
+        if (!(c->sponsors[i] == 0 && level > i && rating > 50)) continue;
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_SPONSOROFFERMOBILE"));
+        snprintf(name, sizeof(name), "%s", sponsor_name(game, i));
+        upper(name);
+        replace_all(text, sizeof(text), "$sponsor", name);
+        char cash[32];
+        shop_price(cash, sizeof(cash), i / 2 + 1);
+        replace_all(text, sizeof(text), "$cash", cash);
+        relation_tweaks(game, 1);
+        game->messageData = i;
+        message(game, "messagesponsor", text, 1, 1, "SponsorshipOffer");
+        return 1;
+    }
+    return 0;
+}
+
+static void call_sponsorship_offer(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (game->returnState != 1) return;
+    if (c->relationSponsors == 0) c->relationSponsors = 50;
+    else ssr_career_update_relation(c, SSR_RELATION_SPONSORS, 25);
+    int i = game->messageData;
+    if (i >= 0 && i < 10) c->sponsors[i] = i / 2 + 1;
+    relationships_screen(game, 0, 0);
+}
+
 // The random news of the week, by the round of the next match.
 static int random_news(SSRGame *game, const SSRFixture *next) {
     SSRCareer *c = &game->career;
@@ -4126,9 +4322,12 @@ static int random_news(SSRGame *game, const SSRFixture *next) {
 // GSPlayerPlay: the news of the week comes before the match.
 static int play_news(SSRGame *game, const SSRFixture *next) {
     SSRCareer *c = &game->career;
-    // [I: the old pro boots (a), the captaincy (f), the sponsors (g), and
-    // the gambling (h) come with their parts.
-    // The Facebook box (b) is not in the remake.]
+    // [I: the gambling (h) comes with the casino. The Facebook box (b) is
+    // not in the remake.]
+    if (news_old_pro_boots(game)) {
+        c->newsDone = 1;
+        return 1;
+    }
     if (!game->settings.doneLoseSkills && c->apps > 3) {
         game->settings.doneLoseSkills = 1;
         game->settingsChanged = 1;
@@ -4136,7 +4335,8 @@ static int play_news(SSRGame *game, const SSRFixture *next) {
         message(game, "message", loc(game, "CMESSAGE_LOSESKILLS"), 0, 1, NULL);
         return 1;
     }
-    if (check_transfer_window(game) || news_get_dumped(game) || news_partner_unhappy(game) || news_item_expiry(game)) {
+    if (check_transfer_window(game) || news_captaincy(game, next) || news_sponsorship(game) || news_get_dumped(game) ||
+        news_partner_unhappy(game) || news_item_expiry(game)) {
         c->newsDone = 1;
         return 1;
     }
@@ -4260,9 +4460,11 @@ static void interview_screen(SSRGame *game) {
 // some matches with gains for the boss, the team, and the fans.
 static int start_interview(SSRGame *game) {
     SSRCareer *c = &game->career;
-    // [I: the captain gets an interview more often; the captaincy comes
-    // with its part.]
-    int n = 8, gap = 21;
+    // A captain of the team of the match has interviews more often.
+    SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, game->fixtureComp) : NULL;
+    int level = comp ? comp->data->level : 0;
+    int captain = (level == 0 && (c->captain == 1 || c->captain == 3)) || (level == 1 && (c->captain == 2 || c->captain == 3));
+    int n = captain ? 4 : 8, gap = captain ? 13 : 21;
     if (game->interviewDone || ssr_rand(&game->random, n) != 1 || c->sdate <= c->lastInterview + gap) return 0;
     if (game->after.boss <= 0 || game->after.team <= 0 || game->after.fans <= 0) return 0;
     game->interviewDone = 1;
