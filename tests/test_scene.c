@@ -1227,7 +1227,8 @@ static void test_player_shadows(void) {
     ssr_tweaks_set_number(tweaks, "CelColours", "ShadowFade", 0.5);
     ssr_tweaks_set_number(tweaks, "CelColours", "ShadowFirst", 0);
     layout = "SortedLayer:(Minigame,3)\n"
-             "Draw:(Man,300,400,200,200)\n"
+             "Draw:(Man,300,400,256,256)\n"
+             "\tSize(200,200)\n"
              "\tHandle(100,100)\n"
              "\tShadow(110,105,85,105,-90,148,-110,148)\n"
              "\tLayer(Minigame)\n";
@@ -1245,7 +1246,8 @@ static void test_player_shadows(void) {
     const SSRSceneItem *third = ssr_scene_item(scene, 2), *man = ssr_scene_item(scene, 8);
     // The third shadow: 155 degrees, flipped, with the handle (-90, 148).
     CHECK(near(third->angle, 155) && near(third->w, -200) && near(third->x, 390) && near(third->y, 252));
-    CHECK(man->fade == 0 && man->colour == 0xFFFFFFFF);
+    // Size() gives the box of 200, with the handle in its middle.
+    CHECK(man->fade == 0 && man->colour == 0xFFFFFFFF && near(man->w, 200) && near(man->x, 200));
     ssr_scene_free(scene);
     ssr_ui_free(tree);
     ssr_tweaks_free(tweaks);

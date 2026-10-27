@@ -1264,6 +1264,10 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
             free_doodads(d);
             return NULL;
         }
+    } else if (is(n, "Size")) {
+        // c_SizeHelper: the width and the height of the gel, at parse time.
+        g->w = (float)number(s, m, 0, g->w);
+        g->h = (float)number(s, m, 1, g->h);
     } else if (is(n, "Handle")) {
         float hx = (float)number(s, m, 0, 0), hy = (float)number(s, m, 1, 0);
         // A handle of 1 or less is a part of the size.
