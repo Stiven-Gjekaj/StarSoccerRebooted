@@ -1284,6 +1284,11 @@ static void test_starts_a_new_career(void) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Player", "Bux") == 15 && ssr_tweaks_number(tweaks, "Player", "Age") == 16);
     CHECK(strcmp(ssr_game_text(game, "GS_PlayerClubName"), world.clubs[career->clubId - 100].tla) == 0);
+    // The skills bar: the sum of the five skills / 3.
+    float skills = (ssr_career_skill(career->pace) + ssr_career_skill(career->power) +
+                    ssr_career_skill(career->technique) + ssr_career_skill(career->vision) +
+                    ssr_career_skill(career->setPieces)) / 3.0f;
+    CHECK(skills > 0 && fabs(ssr_tweaks_number(tweaks, "Player", "Skills") - skills) < 1e-4);
     ssr_game_message(game, "gamemenu.btn_Quit");
     CHECK(strcmp(ssr_game_screen(game), "mainmenu") == 0);
 

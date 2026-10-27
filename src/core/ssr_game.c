@@ -1114,6 +1114,13 @@ static void star_transition(SSRGame *game, const char *after) {
     set_screen(game, "startransition");
 }
 
+// c_TPlayer.GetSkills: the sum of the five skills / 3.
+static float career_skills(const SSRCareer *c) {
+    return (ssr_career_skill(c->pace) + ssr_career_skill(c->power) + ssr_career_skill(c->technique) +
+            ssr_career_skill(c->vision) + ssr_career_skill(c->setPieces)) /
+           3.0f;
+}
+
 // The tweaks of the game menu (c_TScreen_GameMenu.UpdatePanels and
 // bb_tweakinterface.UpdatePlayerBasicTweaks).
 static void player_tweaks(SSRGame *game) {
@@ -1128,6 +1135,7 @@ static void player_tweaks(SSRGame *game) {
     // UpdatePlayerBasicTweaks.
     ssr_tweaks_set_number(t, "Player", "Happiness", ssr_career_happiness(c));
     ssr_tweaks_set_number(t, "Player", "Lifestyle", ssr_career_lifestyle(c));
+    ssr_tweaks_set_number(t, "Player", "Skills", career_skills(c));
     ssr_tweaks_set_number(t, "Player", "EarningsWage", c->wage);
     ssr_tweaks_set_number(t, "Player", "EarningsBonusGoals", c->goalBonus);
     ssr_tweaks_set_number(t, "Player", "EarningsBonusAssists", c->assistBonus);
