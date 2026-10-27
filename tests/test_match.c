@@ -314,6 +314,21 @@ static void test_plays_in_the_rain(void) {
     CHECK(rain == 1 && ssr_match_chance_setup(&m, 50, 50, 1).weather == 1);
 }
 
+// A match in the snow says so at the kick-off, and its chances have the
+// ball of the snow.
+static void test_plays_in_the_snow(void) {
+    SSRMatch m;
+    SSRRandom random = {11};
+    SSRMatchSetup s = setup_for();
+    s.weather = 2;
+    ssr_match_start(&m, &s, localise, NULL, &random);
+    ssr_match_play(&m, 0);
+    SSRMatchLine line;
+    int snow = 0;
+    while (ssr_match_take_line(&m, &line)) snow += strcmp(line.text, "SSR_MatchSnow") == 0;
+    CHECK(snow == 1 && ssr_match_chance_setup(&m, 50, 50, 1).weather == 2);
+}
+
 // A cup final is in the biggest stadium, says so at the kick-off, and the
 // other team raises its game. A match that the club must win says so too.
 static void test_plays_a_big_match(void) {
@@ -363,6 +378,7 @@ int main(void) {
     test_counts_the_posts_and_the_late_goals();
     test_a_team_behind_pushes();
     test_plays_in_the_rain();
+    test_plays_in_the_snow();
     test_plays_a_big_match();
     test_plays_a_match();
     test_a_cup_tie_goes_to_extra_time_and_penalties();

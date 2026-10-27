@@ -64,8 +64,9 @@ typedef struct {
     // the away team now.
     int matchType;
     int firstLegHome, firstLegAway;
-    // The weather of the remake: 0 dry, 1 rain. A wet pitch lets the ball
-    // roll further (SSRChanceSetup.weather).
+    // The weather of the remake: 0 dry, 1 rain, 2 snow. A wet pitch lets
+    // the ball roll further, and snow stops it sooner
+    // (SSRChanceSetup.weather).
     int weather;
     // A big match of the remake (SSR_BIG_*): the stadium is full, and the
     // other team raises its game.

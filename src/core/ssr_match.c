@@ -152,6 +152,7 @@ int ssr_match_play(SSRMatch *m, int now) {
         if (m->minute == 0) {
             say(m, 0, "Kick Off", 0, 0);
             if (m->setup.weather == 1) say(m, 0, text_of(m, "SSR_MatchRain"), 0, 0);
+            if (m->setup.weather == 2) say(m, 0, text_of(m, "SSR_MatchSnow"), 0, 0);
             if (m->setup.bigMatch == SSR_BIG_FINAL) say(m, 0, text_of(m, "SSR_MatchFinal"), 0, 0);
             if (m->setup.bigMatch == SSR_BIG_MUST_WIN) say(m, 0, text_of(m, "SSR_MatchMustWin"), 0, 0);
         }

@@ -2071,6 +2071,17 @@ static void match_ball_tweak(SSRGame *game) {
     ssr_tweaks_set_number(game->tweaks, "Match", "MatchBall", ball - 1);
 }
 
+// The weeks of the winter of the year of the game, which starts in the
+// summer: December to February in the north, June to August in the south.
+#define WINTER_NORTH_FIRST 18
+#define WINTER_NORTH_LAST 30
+#define WINTER_SOUTH_FIRST 44
+#define WINTER_SOUTH_LAST 4
+// The latitude from which the rain of the winter is snow.
+#define SNOW_LATITUDE 45
+// A club under this strength has a worn pitch in the winter.
+#define WORN_PITCH_STRENGTH 40
+
 // The rounds at the end of a league season that make a big match.
 #define MUST_WIN_ROUNDS 3
 
@@ -2147,13 +2158,22 @@ static void start_match(SSRGame *game) {
     // The weather of the remake: rain is more likely far from the equator,
     // as in the training of 4.32. The numbers come from the seed of the
     // world, the day, and the ground, so no stream of numbers changes.
+    // In the winter, the rain is snow far from the equator. The pitch of a
+    // small club is worn in the winter.
     const SSRClub *ground = game->world ? ssr_world_club(game->world, ssr_fixture_home_team(game->season, f)) : NULL;
+    int worn = 0;
     if (ground && f->level == 0) {
         SSRRandom r = {(int32_t)(c->worldSeed * 7919 + f->sdate * 104729 + ground->id * 31)};
         int far = (int)(ground->latitude < 0 ? -ground->latitude : ground->latitude);
         s.weather = ssr_rand(&r, 80) < far && ssr_rand(&r, 4) == 1;
+        int week = ssr_date_week(f->sdate);
+        int winter = ground->latitude >= 0 ? week >= WINTER_NORTH_FIRST && week <= WINTER_NORTH_LAST
+                                           : week >= WINTER_SOUTH_FIRST || week <= WINTER_SOUTH_LAST;
+        if (s.weather == 1 && winter && far >= SNOW_LATITUDE) s.weather = 2;
+        worn = winter && ground->strength < WORN_PITCH_STRENGTH;
     }
-    ssr_tweaks_set_number(game->tweaks, "Pitch", "WeatherType", s.weather ? 3 : 0);
+    // The pitch of the game: 0 dry, 1 snow, 2 worn, 3 rain.
+    ssr_tweaks_set_number(game->tweaks, "Pitch", "WeatherType", s.weather == 1 ? 3 : s.weather == 2 ? 1 : worn ? 2 : 0);
     s.bigMatch = big_match(game, comp, f, pool, homeIsMine ? f->home : f->away);
     ssr_match_start(game->match, &s, game->localise, game->context, &game->random);
     game->commentaryCount = 0;
