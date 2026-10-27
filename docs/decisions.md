@@ -172,6 +172,9 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   man screen, and the star shower.** Reason: these screens and effects come
   in later parts. The rating, the relation changes, and the star rating are
   as in the game.
+- **The type of the player is the type that its ratings give now.** The
+  game shows the last type that a rating news named, and a news comes
+  only once in 60 days for each type. Reason: the news come later.
 - **`AnimateProgress` moves the value of a bar but draws no highlight, no
   overlay, and no burst.** Reason: these are gadgets of the game that the
   remake does not make yet. The bar has the same length at each frame.

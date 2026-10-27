@@ -108,7 +108,9 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] After the match: the match stats (`MatchStats`) with the rating, the
       relation changes, and the star rating, and the weekly update
       (`MatchReview`) with the energy and the pay
-- [ ] The ratings screen (`Ratings`) and the interview after a match
+- [x] The skill ratings: the change after each chance, the type of the
+      player, and the ratings screen (`Ratings`)
+- [ ] The interview after a match (`Interview`)
 - [x] Energy drinks and boosts (`ChooseBoost`): the five kinds of can, the
       skill and the relation boosts, and the bolts
 - [ ] The five trials of a new career (they need the chance view)
