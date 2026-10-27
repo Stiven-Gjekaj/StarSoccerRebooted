@@ -172,6 +172,11 @@ int ssr_scene_dragged(const SSRScene *scene);
 // The next sound that a click asked for, or NULL when there is none.
 const char *ssr_scene_take_sound(SSRScene *scene);
 
+// The next message of a Message() line that ran in an update, not in a
+// click, for example when an animation is nearly over. NULL when there is
+// none.
+const char *ssr_scene_take_message(SSRScene *scene);
+
 // Gives the first text of each element with the ref this text, as the code
 // of the game does with the gadgets of a screen. Returns the number of
 // elements.

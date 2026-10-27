@@ -581,6 +581,41 @@ static void test_copies_a_template_into_a_hook(void) {
 
 // A card of the pairs game: the code chooses the face, and plays the flip
 // forward to the back or back to the face.
+static void test_sends_the_messages_of_an_update(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Casino", "CasinoOutcome", 0);
+    layout = "Rect:(0,0,10,10)\n"
+             "\tif(twk(Casino,CasinoOutcome)=1)\n"
+             "\t<\n"
+             "\t\t.:Message(blackjack.playerCardSlid)\n"
+             "\t>\n"
+             "Rect:(20,0,10,10)\n"
+             "\tClick()\n"
+             "\t<\n"
+             "\t\tMessage(blackjack.btn_Play)\n"
+             "\t>\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(ssr_scene_take_message(scene) == NULL);
+    ssr_tweaks_set_number(tweaks, "Casino", "CasinoOutcome", 1);
+    ssr_scene_update(scene, &env, 16);
+    const char *message = ssr_scene_take_message(scene);
+    CHECK(message && strcmp(message, "blackjack.playerCardSlid") == 0);
+    // ".:" sends it once while the test stays true.
+    ssr_scene_update(scene, &env, 16);
+    CHECK(ssr_scene_take_message(scene) == NULL);
+    // The Message() of a click goes to the click, not to the queue.
+    const SSRSceneItem *item = ssr_scene_hit_item(scene, 25, 5);
+    const char *click = item ? ssr_scene_click(scene, &env, item) : NULL;
+    CHECK(click && strcmp(click, "blackjack.btn_Play") == 0 && ssr_scene_take_message(scene) == NULL);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_holds_one_instance_at_a_frame(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     layout = "Animation:(40,Loop) ref:RoseAnim\n"
@@ -1603,6 +1638,7 @@ int main(void) {
     test_plays_an_animation();
     test_plays_an_animation_from_a_frame();
     test_holds_one_instance_at_a_frame();
+    test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
     test_builds_a_shop_button();

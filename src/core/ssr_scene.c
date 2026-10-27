@@ -268,6 +268,10 @@ struct SSRScene {
     // The sounds that PlaySnd() of a click asked for.
     const char *sounds[8];
     int soundCount;
+    // The Message() lines that run in an update, not in a click, wait here
+    // for the game. inClick is 1 while a click runs.
+    const char *messages[8];
+    int messageCount, inClick;
     // The message of a Message() in the block of the last click, or NULL.
     const char *clickMessage;
 
@@ -2662,7 +2666,8 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         if (s->soundCount < 8) s->sounds[s->soundCount++] = d->text[0];
         break;
     case D_MESSAGE:
-        s->clickMessage = d->text[0];
+        if (s->inClick) s->clickMessage = d->text[0];
+        else if (s->messageCount < 8) s->messages[s->messageCount++] = d->text[0];
         break;
     case D_PLAY_ANIM: {
         Gel *target = d->text[0] ? find_ref(s, d->text[0]) : s->instance;
@@ -3504,7 +3509,9 @@ const char *ssr_scene_click(SSRScene *scene, const SSRSceneEnv *env, const SSRSc
     scene->clickMessage = NULL;
     if (g) {
         scene->env = env;
+        scene->inClick = 1;
         pump(scene, g, g->clickChain);
+        scene->inClick = 0;
         scene->env = NULL;
     }
     return scene->clickMessage && !item->click[0] ? scene->clickMessage : item->click;
@@ -3516,6 +3523,14 @@ const char *ssr_scene_take_sound(SSRScene *scene) {
     memmove(scene->sounds, scene->sounds + 1, (size_t)(scene->soundCount - 1) * sizeof(const char *));
     scene->soundCount--;
     return sound;
+}
+
+const char *ssr_scene_take_message(SSRScene *scene) {
+    if (!scene || scene->messageCount == 0) return NULL;
+    const char *message = scene->messages[0];
+    memmove(scene->messages, scene->messages + 1, (size_t)(scene->messageCount - 1) * sizeof(const char *));
+    scene->messageCount--;
+    return message;
 }
 
 const char *ssr_scene_hit(const SSRScene *scene, float x, float y) {
