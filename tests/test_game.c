@@ -572,7 +572,7 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
             results_play(game, tweaks);
             if (strcmp(ssr_game_screen(game), "league") == 0) ssr_game_message(game, "league.btn_Continue");
             if (strcmp(ssr_game_screen(game), "seasonreview") == 0) finish_season(game, tweaks);
-            CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+            CHECK(at_game_menu(game, tweaks));
             return;
         }
         // A substitute comes on in the second half.
@@ -1121,6 +1121,55 @@ static void lose_a_skill_with_no_training(SSRGame *game, SSRTweaks *tweaks, cons
     CHECK(now->deplete[1] == now->sdate && now->deplete[3] == now->sdate);
     ssr_game_message(game, "message.btn_Ok");
     // The career goes on from where it was.
+    load_career(game, &before, path);
+    CHECK(at_game_menu(game, tweaks));
+}
+
+// The tickers of the career: each kind has its rule, and most count the
+// requests since they showed. Before a career and after a quit, none
+// shows.
+static void read_the_tickers(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    while (strncmp(ssr_game_screen(game), "message", 7) == 0) ssr_game_message(game, "message.btn_Ok");
+    static SSRCareer c, before;
+    before = *ssr_game_career(game);
+    c = before;
+    for (int i = 0; i < 10; i++) c.nrg[i] = 0;
+    c.nrg[0] = 2;
+    c.relationBoss = 80;
+    c.relationSponsors = 25;
+    for (int i = 0; i < 10; i++) c.sponsors[i] = 0;
+    c.sponsors[3] = 5;
+    load_career(game, &c, path);
+    at_game_menu(game, tweaks);
+    int count = 0;
+    char text[256] = "";
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_LOW_NRG, &count) == 1);
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_LOW_NRG, &count) == 2);
+    ssr_game_ticker_text(game, SSR_TICKER_LOW_NRG, &count, text, sizeof(text));
+    CHECK(count == 0 && strcmp(text, "TICKER_LOW_NRG") == 0);
+    // The next match: 0 the first time after it showed, then 1000.
+    count = 0;
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_NEXT_MATCH, &count) == 0);
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_NEXT_MATCH, &count) == 1000);
+    count = 0;
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_HIGH_BOSS, &count) == 1);
+    // The sponsors from 20 to 30 keep the last text.
+    count = 0;
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_LOW_SPONSORS, &count) == 1);
+    snprintf(text, sizeof(text), "Old text");
+    ssr_game_ticker_text(game, SSR_TICKER_LOW_SPONSORS, &count, text, sizeof(text));
+    CHECK(strcmp(text, "Old text") == 0);
+    ((SSRCareer *)ssr_game_career(game))->relationSponsors = 15;
+    ssr_game_ticker_text(game, SSR_TICKER_LOW_SPONSORS, &count, text, sizeof(text));
+    CHECK(strcmp(text, "TICKER_LOW_SPONSORS") == 0);
+    // Three cans, and a boss under 80 as an int: no ticker.
+    ((SSRCareer *)ssr_game_career(game))->nrg[1] = 1;
+    ((SSRCareer *)ssr_game_career(game))->relationBoss = 79.9f;
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_LOW_NRG, &count) == -1);
+    CHECK(ssr_game_ticker_priority(game, SSR_TICKER_HIGH_BOSS, &count) == -1);
+    // After a quit the player is blank.
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    for (int kind = 1; kind < SSR_TICKER_KINDS; kind++) CHECK(ssr_game_ticker_priority(game, kind, &count) == -1);
     load_career(game, &before, path);
     CHECK(at_game_menu(game, tweaks));
 }
@@ -2172,6 +2221,7 @@ static void test_starts_a_new_career(void) {
     an_accident_costs_a_skill(game, path);
     look_at_achievements(game, tweaks);
     lose_a_skill_with_no_training(game, tweaks, path);
+    read_the_tickers(game, tweaks, path);
     go_to_the_casino(game, tweaks, path);
     play_roulette(game, tweaks, path);
     play_blackjack(game, tweaks, path);

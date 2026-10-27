@@ -258,6 +258,8 @@ struct SSRGame {
     int dilemmaRelation[2], dilemmaImage[2], dilemmaInt[2];
     int dilemmaChoice, dilemmaChosen, dilemmaEnd;
     int lastAccident;
+    // 1 while a career plays (the player of the game is not blank).
+    int hasPlayer;
     // 1 after the check of the trainer in this match week
     // (c_TPlayer.donetrainerwarning, not in the save).
     int doneTrainerWarning;
@@ -600,6 +602,7 @@ static void open_slot(SSRGame *game, int slot) {
     char path[2200];
     slot_path(game, slot, path, sizeof(path));
     if (game->slotExists[slot] && ssr_career_load(&game->career, path)) {
+        game->hasPlayer = 1;
         casino_new_player(game);
         horses_for_career(game);
         new_season_state(game);
@@ -950,6 +953,7 @@ static void nation_ok(SSRGame *game) {
     int assistBonus = (int)ssr_tweaks_number(game->tweaks, "Player", "StartingAssistBonus");
     ssr_career_create(&game->career, game->firstName, game->lastName, game->gender, game->hardMode, league, wage,
                       goalBonus, assistBonus);
+    game->hasPlayer = 1;
     casino_new_player(game);
     horses_for_career(game);
     game->career.nationId = chosen(game, "ChosenDesiredNation");
@@ -8212,6 +8216,8 @@ static void call_teammates_shopping(SSRGame *game) {
 // hard mode. The message shows over the main menu.
 static void quit_career(SSRGame *game) {
     save_career(game);
+    // GameMenu.ButtonQuit: the player of the game is blank.
+    game->hasPlayer = 0;
     ssr_tweaks_set_number(game->tweaks, "Menu", "CanSavePlayer", 0);
     main_menu(game);
     if (game->career.retired && !game->settings.hardModeUnlocked) {
@@ -8498,6 +8504,222 @@ int ssr_game_save_settings(const SSRGame *game, const char *path) {
 
 const SSRSettings *ssr_game_settings(const SSRGame *game) {
     return game ? &game->settings : NULL;
+}
+
+/* ------------------------------------------------------------ the ticker */
+
+// The rule of most tickers: the requests since it last showed.
+static int ticker_counter(int *count) {
+    return ++*count;
+}
+
+static int total_nrg(const SSRCareer *c) {
+    int n = 0;
+    for (int i = 0; i < 10; i++) n += c->nrg[i];
+    return n;
+}
+
+// The first skill that the trainer would warn of, in the order of
+// Ticker_Skill_Degrade (pace, power, set pieces, technique, vision), or -1.
+static int degrading_skill(const SSRCareer *c) {
+    static const int ROWS[5] = {0, 1, 4, 2, 3};
+    int limit = last_trained_limit(c);
+    for (int i = 0; i < 5; i++) {
+        int r = ROWS[i], start = c->deplete[r] < 0 ? -c->deplete[r] : c->deplete[r];
+        if (c->sdate > start + limit && skill_levels((SSRCareer *)c, r)[1] > 0) return i;
+    }
+    return -1;
+}
+
+// The first product, in the order of the shop, that wears too much.
+static const SSRShopItem *worn_item(const SSRCareer *c) {
+    for (int i = 0; i < SSR_SHOP_COUNT; i++) {
+        const SSRShopItem *item = ssr_shop_item(i);
+        if (!item) continue;
+        const int *wear = item->type == SSR_SHOP_ITEM ? c->items : item->type == SSR_SHOP_VEHICLE ? c->vehicles : c->properties;
+        if (wear[item->id - 1] > 1000) return item;
+    }
+    return NULL;
+}
+
+int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
+    if (!game || !count || !game->hasPlayer) return -1;
+    const SSRCareer *c = &game->career;
+    int club = c->clubId != 0;
+    switch (kind) {
+    case SSR_TICKER_NEXT_MATCH:
+        season_in(game);
+        if (!club || !game->season || !ssr_season_next_fixture(game->season)) return -1;
+        return ++*count < 2 ? 0 : 1000;
+    case SSR_TICKER_LOW_NRG:
+        return club && total_nrg(c) <= 2 ? ticker_counter(count) : -1;
+    case SSR_TICKER_LOW_AGENT:
+    case SSR_TICKER_LOW_TRAINER: {
+        int level = kind == SSR_TICKER_LOW_AGENT ? ssr_career_agent(c) : ssr_career_trainer(c);
+        const int *left = kind == SSR_TICKER_LOW_AGENT ? c->agent : c->trainer;
+        int weeks = (level ? left[level - 1] : 0) - 1;
+        return club && weeks > 0 && weeks <= 5 ? ticker_counter(count) : -1;
+    }
+    case SSR_TICKER_LOW_BOOT:
+        return club && c->bootId != 0 && c->bootUses <= 5 ? ticker_counter(count) : -1;
+    case SSR_TICKER_LOW_BOSS:
+        return club && (int)c->relationBoss <= 30 ? ticker_counter(count) : -1;
+    case SSR_TICKER_LOW_FANS:
+        return club && (int)c->relationFans <= 30 ? ticker_counter(count) : -1;
+    case SSR_TICKER_LOW_TEAM:
+        return club && (int)c->relationTeam <= 30 ? ticker_counter(count) : -1;
+    case SSR_TICKER_LOW_SPONSORS:
+        return club && ssr_career_count_sponsors(c) > 0 && (int)c->relationSponsors <= 30 ? ticker_counter(count)
+                                                                                           : -1;
+    case SSR_TICKER_SKILL_DEGRADE:
+        return club && ssr_career_trainer(c) > 0 && degrading_skill(c) >= 0 ? ticker_counter(count) : -1;
+    case SSR_TICKER_LIFESTYLE_DEGRADE:
+        return worn_item(c) ? ticker_counter(count) : -1;
+    case SSR_TICKER_CAREER_STAT:
+        return c->apps >= 5 ? ticker_counter(count) : -1;
+    case SSR_TICKER_HIGH_BOSS:
+        return (int)c->relationBoss >= 80 ? ticker_counter(count) : -1;
+    case SSR_TICKER_HIGH_FANS:
+        return (int)c->relationFans >= 80 ? ticker_counter(count) : -1;
+    case SSR_TICKER_HIGH_TEAM:
+        return (int)c->relationTeam >= 80 ? ticker_counter(count) : -1;
+    case SSR_TICKER_HIGH_PARTNER:
+        return (int)c->relationPartner >= 80 ? ticker_counter(count) : -1;
+    case SSR_TICKER_HIGH_SPONSORS:
+        return club && ssr_career_count_sponsors(c) > 0 && (int)c->relationSponsors >= 80 ? ticker_counter(count)
+                                                                                           : -1;
+    case SSR_TICKER_AGENT_HINT: {
+        if (!club || ssr_career_agent(c) == 0 || c->sdate < c->lastNegotiations + 56) return -1;
+        // GetOffer of the own club: the count of the offers goes to 0.
+        SSRContractOffer offer;
+        ssr_contract_offer(&game->contract, c, c->clubId, 0, &offer);
+        if (offer.wage <= c->wage || (int)c->relationBoss < 25 || (int)c->relationTeam < 25 ||
+            (int)c->relationFans < 25) {
+            return -1;
+        }
+        return ticker_counter(count);
+    }
+    default:
+        return -1;
+    }
+}
+
+void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_t capacity) {
+    if (!game || !count || !text || capacity == 0) return;
+    const SSRCareer *c = &game->career;
+    char number[16];
+    *count = 0;
+    switch (kind) {
+    case SSR_TICKER_NEXT_MATCH: {
+        season_in(game);
+        SSRFixture *f = game->season ? ssr_season_next_fixture(game->season) : NULL;
+        SSRSeasonComp *comp = f ? ssr_season_comp(game->season, f->compId) : NULL;
+        if (!f || !comp) return;
+        char names[5][64];
+        fixture_strings(game, comp, f, names);
+        snprintf(text, capacity, "%s", loc(game, "TICKER_NEXTMATCH"));
+        snprintf(number, sizeof(number), "%d", ssr_date_week(f->sdate));
+        replace_all(text, capacity, "$week", number);
+        replace_all(text, capacity, "$hometeam", names[1]);
+        replace_all(text, capacity, "$awayteam", names[3]);
+        replace_all(text, capacity, "$competition", comp->data->tla);
+        break;
+    }
+    case SSR_TICKER_LOW_NRG: {
+        int n = total_nrg(c);
+        snprintf(text, capacity, "%s", loc(game, n > 0 ? "TICKER_LOW_NRG" : "TICKER_EMPTY_NRG"));
+        snprintf(number, sizeof(number), "%d", n);
+        replace_all(text, capacity, "$num", number);
+        break;
+    }
+    case SSR_TICKER_LOW_AGENT:
+    case SSR_TICKER_LOW_TRAINER: {
+        int agent = kind == SSR_TICKER_LOW_AGENT;
+        int level = agent ? ssr_career_agent(c) : ssr_career_trainer(c);
+        const int *left = agent ? c->agent : c->trainer;
+        snprintf(text, capacity, "%s", loc(game, "TICKER_LOW_STAFF"));
+        snprintf(number, sizeof(number), "%d", (level ? left[level - 1] : 0) - 1);
+        replace_all(text, capacity, "$num", number);
+        // The game puts the English word, not a text of the language.
+        replace_all(text, capacity, "$staff", agent ? "Agent" : "Trainer");
+        break;
+    }
+    case SSR_TICKER_LOW_BOOT:
+        snprintf(text, capacity, "%s", loc(game, "TICKER_LOW_BOOTS"));
+        snprintf(number, sizeof(number), "%d", c->bootUses);
+        replace_all(text, capacity, "$num", number);
+        // [I: the game shows no name of the boots: its m_title is empty.]
+        replace_all(text, capacity, "$boot", "");
+        break;
+    case SSR_TICKER_LOW_BOSS:
+        snprintf(text, capacity, "%s", loc(game, "TICKER_LOW_BOSS"));
+        break;
+    case SSR_TICKER_LOW_FANS:
+        snprintf(text, capacity, "%s", loc(game, "TICKER_LOW_FANS"));
+        break;
+    case SSR_TICKER_LOW_TEAM:
+        snprintf(text, capacity, "%s", loc(game, "TICKER_LOW_TEAM"));
+        break;
+    case SSR_TICKER_LOW_SPONSORS:
+        // From 20 to 30 the ticker keeps its last text, as the game does.
+        if (ssr_career_count_sponsors(c) > 0 && c->relationSponsors < 20.0f) {
+            for (int i = 9; i >= 0; i--) {
+                if (c->sponsors[i] <= 0) continue;
+                char name[128];
+                snprintf(name, sizeof(name), "%s", sponsor_name(game, i));
+                upper(game, name);
+                snprintf(text, capacity, "%s", loc(game, "TICKER_LOW_SPONSORS"));
+                replace_all(text, capacity, "$sponsor", name);
+                break;
+            }
+        }
+        break;
+    case SSR_TICKER_SKILL_DEGRADE: {
+        static const char *const TAGS[5] = {"SKILL_PACE", "SKILL_POWER", "SKILL_SETPIECES", "SKILL_TECHNIQUE",
+                                            "SKILL_VISION"};
+        int skill = degrading_skill(c);
+        snprintf(text, capacity, "%s", loc(game, "TICKER_SKILL_DEGRADE_1"));
+        replace_all(text, capacity, "$skill", skill >= 0 ? loc(game, TAGS[skill]) : "DEBUG SKILL");
+        break;
+    }
+    case SSR_TICKER_LIFESTYLE_DEGRADE: {
+        const SSRShopItem *item = worn_item(c);
+        char tag[48], name[128];
+        snprintf(tag, sizeof(tag), "TICKER_LIFESTYLE_DEGRADE_%d", ssr_rand2(&game->random, 1, 3));
+        snprintf(name, sizeof(name), "%s", item ? loc(game, item->uid) : "DebugItem");
+        upper(game, name);
+        snprintf(text, capacity, "%s", loc(game, tag));
+        replace_all(text, capacity, "$item", name);
+        break;
+    }
+    case SSR_TICKER_CAREER_STAT: {
+        int assists = ssr_rand2(&game->random, 1, 2) == 1;
+        snprintf(text, capacity, "%s", loc(game, assists ? "TICKER_CAREERSTAT_ASSISTS" : "TICKER_CAREERSTAT_CHANCES"));
+        snprintf(number, sizeof(number), "%d", assists ? c->assists : c->chances);
+        replace_all(text, capacity, "$num", number);
+        break;
+    }
+    case SSR_TICKER_HIGH_BOSS:
+        snprintf(text, capacity, "%s", loc(game, "TICKER_HIGH_BOSS"));
+        break;
+    case SSR_TICKER_HIGH_FANS:
+        snprintf(text, capacity, "%s", loc(game, "TICKER_HIGH_FANS"));
+        break;
+    case SSR_TICKER_HIGH_TEAM:
+        snprintf(text, capacity, "%s", loc(game, "TICKER_HIGH_TEAM"));
+        break;
+    case SSR_TICKER_HIGH_PARTNER:
+        snprintf(text, capacity, "%s", loc(game, "TICKER_HIGH_GIRLFRIEND"));
+        break;
+    case SSR_TICKER_HIGH_SPONSORS:
+        snprintf(text, capacity, "%s", loc(game, "TICKER_HIGH_SPONSORS"));
+        break;
+    case SSR_TICKER_AGENT_HINT:
+        snprintf(text, capacity, "%s", loc(game, "TICKER_CONTRACT"));
+        break;
+    default:
+        break;
+    }
 }
 
 void ssr_game_set_language(SSRGame *game, int language, int metres) {

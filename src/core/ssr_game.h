@@ -6,6 +6,8 @@
 #ifndef SSR_GAME_H
 #define SSR_GAME_H
 
+#include <stddef.h>
+
 #include "ssr_career.h"
 #include "ssr_match.h"
 #include "ssr_training.h"
@@ -119,6 +121,32 @@ typedef struct {
     int language;
 } SSRSettings;
 
+// The tickers of a career, in the order of the game
+// (bb_soccer_tickers.InitialiseTickers). The promotions, the star player,
+// and the news of the competitions never show in 4.32, so they are not
+// here.
+typedef enum {
+    SSR_TICKER_NEXT_MATCH = 1,
+    SSR_TICKER_LOW_NRG,
+    SSR_TICKER_LOW_AGENT,
+    SSR_TICKER_LOW_TRAINER,
+    SSR_TICKER_LOW_BOOT,
+    SSR_TICKER_LOW_BOSS,
+    SSR_TICKER_LOW_FANS,
+    SSR_TICKER_LOW_TEAM,
+    SSR_TICKER_LOW_SPONSORS,
+    SSR_TICKER_SKILL_DEGRADE,
+    SSR_TICKER_LIFESTYLE_DEGRADE,
+    SSR_TICKER_CAREER_STAT,
+    SSR_TICKER_HIGH_BOSS,
+    SSR_TICKER_HIGH_FANS,
+    SSR_TICKER_HIGH_TEAM,
+    SSR_TICKER_HIGH_PARTNER,
+    SSR_TICKER_HIGH_SPONSORS,
+    SSR_TICKER_AGENT_HINT,
+    SSR_TICKER_KINDS,
+} SSRTickerKind;
+
 // Starts at the main menu. The game keeps the tweaks, and sets the tweaks
 // of each screen in them.
 SSRGame *ssr_game_create(SSRTweaks *tweaks);
@@ -143,6 +171,14 @@ const SSRCareer *ssr_game_career(const SSRGame *game);
 int ssr_game_load_settings(SSRGame *game, const char *path);
 int ssr_game_save_settings(const SSRGame *game, const char *path);
 const SSRSettings *ssr_game_settings(const SSRGame *game);
+
+// The priority of a ticker of a kind (c_Ticker_*.Priority), or -1 when it
+// does not show. Most kinds add 1 to *count each time. With no career, only
+// the welcome texts show.
+int ssr_game_ticker_priority(SSRGame *game, int kind, int *count);
+// The text of a ticker of a kind that shows (c_Ticker_*.Activate). A kind
+// can keep the last text.
+void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_t capacity);
 
 // Sets the language, for example from the language of the device. The
 // distance goes to metres or yards with it, as the device table says.
