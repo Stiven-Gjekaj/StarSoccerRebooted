@@ -147,7 +147,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       vehicles, the other clubs, the dilemma, and the tips
 - [x] The news checks of the old pro boots, the transfer window, the
       captaincy, and the sponsors
-- [ ] The gambling news, with the casino of 0.8
+- [x] The gambling news, with the casino of 0.8
 - [ ] The skill bar in the message of a dilemma accident
 - [ ] Check the colour of the interview buttons against the original
 - [x] Money, the lifestyle shop, and boots (`ShopLifestyle`, `BootShop`,
@@ -161,12 +161,25 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [ ] The history of the seasons and the trophy log. The score of the
       retirement counts no medals and no seasons until they come.
 
-## 0.8 Side games
+## 0.8 Side games (done)
 
-- [ ] Casino: blackjack, roulette, slots, pairs (`Casino`, `BlackJack`,
-      `Roulette`, `Slots`, `Pairs`)
-- [ ] Horses: the stable, the market, and races (`MyStable`,
-      `HorsesForSale`, `Racing`, `RacingResult`)
+- [x] Casino: the stakes, the bets, blackjack, roulette, and slots
+      (`Casino`, `BlackJack`, `Roulette`, `Slots`). The pairs game of the
+      original is only in the relationships screen.
+- [x] The gambling news, the trip with the team mates, and the catch of a
+      player under 18
+- [x] Horses: the stable, the market, training, sales, and races
+      (`MyStable`, `Racing`, `RacingResult`)
+- [ ] The sounds of the casino and of the races
+- [ ] The alerts at the bottom of the screen: the energy of the bets
+- [ ] The coin shower and the ticker tape of a win (`Spawn`)
+- [ ] The camera of the race moves all horses; check it against the
+      original
+- [ ] The size of the roulette wheel: the remake takes 545 for the width
+      of the "Wheel" gadget. Check it against the original.
+- The casino games take their numbers from the clock, as the original
+  does. The remake keeps the numbers of the career apart, so a visit to
+  the casino does not change them.
 
 ## 1.0 The full game
 
@@ -216,6 +229,10 @@ place of the atlas image with the same name (`art/NewStarLogo.png`).
       original.
 - [ ] The microphones of the interview (`InterviewMics`). It is a
       stripped image, and a patch works only on a plain image.
+- [ ] The marks of the casino: the title of the slots ("New Star"), the
+      table and the card backs of blackjack (`BlackJackLogo`, `CardBack`),
+      the icon of blackjack, and the boards of the race track ("NEW STAR
+      GAMES")
 - [ ] The sponsor images of `Images/`
 - `BannerFrontLogo` stays: it is a ball with a star, with no name.
 
