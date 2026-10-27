@@ -6,8 +6,8 @@
 // the APK of the installed New Star Soccer.
 // Set SSR_SHOT to a path to save the first frame as a PNG and quit. Set
 // SSR_SHOT_MS to save a later frame, that many milliseconds after the first.
-// Set SSR_PRESS to "x,y" to press that point of the screen after the first
-// frame. Set SSR_WINDOW to "WxH" for the size of the window in points.
+// Set SSR_PRESS to "x,y" to press that point of the screen 1.5 seconds
+// after the first frame. Set SSR_WINDOW to "WxH" for the size of the window in points.
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -17,6 +17,7 @@
 
 #include "ssr_audio.h"
 #include "ssr_fs.h"
+#include "ssr_game.h"
 #include "ssr_gfx.h"
 #include "ssr_import.h"
 #include "ssr_scene.h"
@@ -39,6 +40,10 @@ typedef struct {
     SSRWorld *world;
     SSRText *text;
     SSRTweaks *tweaks;
+    // The logic of the screens, and the screen that it showed last.
+    SSRGame *game;
+    int gameScreen;
+    char settingsPath[2048];
     // The screen that shows now, from NewGUI/Screens, and its last frame.
     SSRUiTree *screen;
     SSRScene *scene;
@@ -118,6 +123,28 @@ static void open_screen(SSRApp *app, const char *name) {
     for (int i = 0; i < ssr_ui_problem_count(app->screen); i++) SDL_Log("%s", ssr_ui_problem(app->screen, i));
 }
 
+// The volume of the options: off, high, or low (c_TScreen_Options).
+static void apply_settings(SSRApp *app) {
+    const SSRSettings *settings = ssr_game_settings(app->game);
+    if (!settings) return;
+    ssr_audio_set_volume(app->audio, settings->volume == 0 ? 0.0f : settings->volume == 2 ? 0.5f : 1.0f);
+}
+
+// Opens the screen that the logic chose, and saves the changed settings.
+static void follow_game(SSRApp *app) {
+    if (!app->game) return;
+    if (ssr_game_take_settings_change(app->game)) {
+        if (!ssr_game_save_settings(app->game, app->settingsPath)) SDL_Log("The settings were not saved.");
+        apply_settings(app);
+    }
+    int version = ssr_game_screen_version(app->game);
+    if (version == app->gameScreen) return;
+    app->gameScreen = version;
+    char name[80];
+    SDL_snprintf(name, sizeof(name), "%s.uis", ssr_game_screen(app->game));
+    open_screen(app, name);
+}
+
 static void load_game(SSRApp *app) {
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
@@ -136,6 +163,11 @@ static void load_game(SSRApp *app) {
     app->text = NULL;
     SDL_snprintf(path, sizeof(path), "%s/MyData/Languages/en.txt", app->gameDirectory);
     app->text = ssr_text_load(path);
+    ssr_game_free(app->game);
+    app->game = ssr_game_create(app->tweaks);
+    ssr_game_load_settings(app->game, app->settingsPath);
+    apply_settings(app);
+    app->gameScreen = ssr_game_screen_version(app->game);
     const char *screen = SDL_getenv("SSR_SCREEN");
     open_screen(app, screen && *screen ? screen : "MainMenu.uis");
 }
@@ -253,6 +285,7 @@ SDL_AppResult SDL_AppInit(void **state, int argc, char *argv[]) {
     char *pref = SDL_GetPrefPath("StivenGjekaj", "StarSoccerRebooted");
     if (!pref) return SDL_APP_FAILURE;
     SDL_snprintf(app->gameDirectory, sizeof(app->gameDirectory), "%sgame", pref);
+    SDL_snprintf(app->settingsPath, sizeof(app->settingsPath), "%ssettings.txt", pref);
     SDL_free(pref);
     app->tweaks = ssr_tweaks_create();
 
@@ -310,6 +343,8 @@ SDL_AppResult SDL_AppEvent(void *state, SDL_Event *event) {
         if (item) {
             SDL_Log("Pressed %s (%s)", item->ref ? item->ref : "-", item->click ? item->click : "-");
             ssr_audio_play(app->audio, item->clickSound ? item->clickSound : "UISelect");
+            if (item->click && !ssr_game_message(app->game, item->click)) SDL_Log("No logic for %s yet.", item->click);
+            follow_game(app);
         }
     }
     return SDL_APP_CONTINUE;
@@ -359,22 +394,25 @@ SDL_AppResult SDL_AppIterate(void *state) {
     }
     if (app->message[0]) draw_centered_text(app, app->height - 40, app->message);
 
+    // The press comes 1.5 s after the first frame, when the buttons are in.
     const char *press = SDL_getenv("SSR_PRESS");
     static int pressed = 0;
-    if (press && *press && !pressed && app->scene) {
+    static Uint64 firstFrame = 0;
+    if (!firstFrame) firstFrame = SDL_GetTicks();
+    if (press && *press && !pressed && app->scene && SDL_GetTicks() - firstFrame >= 1500) {
         pressed = 1;
         float x = 0, y = 0;
         if (SDL_sscanf(press, "%f,%f", &x, &y) == 2) {
             const SSRSceneItem *item = ssr_scene_hit_item(app->scene, x + app->left, y + app->top);
             SDL_Log("Pressed %s (%s)", item && item->ref ? item->ref : "-", item && item->click ? item->click : "-");
             if (item) ssr_audio_play(app->audio, item->clickSound ? item->clickSound : "UISelect");
+            if (item && item->click) ssr_game_message(app->game, item->click);
+            follow_game(app);
         }
     }
 
     const char *shot = SDL_getenv("SSR_SHOT");
     const char *shotMs = SDL_getenv("SSR_SHOT_MS");
-    static Uint64 firstFrame = 0;
-    if (!firstFrame) firstFrame = SDL_GetTicks();
     int wait = shotMs ? SDL_atoi(shotMs) : 0;
     if (shot && *shot && SDL_GetTicks() - firstFrame >= (Uint64)wait) {
         SDL_Surface *frame = SDL_RenderReadPixels(app->renderer, NULL);
@@ -395,6 +433,7 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     for (int i = 0; i < app->spineCount; i++) ssr_spine_free(app->spines[i].spine);
     ssr_ui_free(app->screen);
     ssr_text_free(app->text);
+    ssr_game_free(app->game);
     ssr_tweaks_free(app->tweaks);
     ssr_audio_free(app->audio);
     ssr_gfx_free(app->gfx);

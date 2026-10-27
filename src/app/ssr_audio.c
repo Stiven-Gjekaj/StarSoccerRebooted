@@ -20,11 +20,13 @@ struct SSRAudio {
     char gameDirectory[2048];
     Cached cache[MAX_CACHED];
     int cacheCount;
+    float volume;
 };
 
 SSRAudio *ssr_audio_create(const char *gameDirectory) {
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) return NULL;
     SSRAudio *audio = SDL_calloc(1, sizeof(SSRAudio));
+    if (audio) audio->volume = 1;
     if (!audio) return NULL;
     audio->device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
     if (!audio->device) {
@@ -60,8 +62,12 @@ static const SSRPcm *pcm_for(SSRAudio *audio, const char *file) {
     return &slot->pcm;
 }
 
+void ssr_audio_set_volume(SSRAudio *audio, float volume) {
+    if (audio) audio->volume = volume;
+}
+
 void ssr_audio_play(SSRAudio *audio, const char *name) {
-    if (!audio || !name) return;
+    if (!audio || !name || audio->volume <= 0) return;
     int count = ssr_sounds_count(audio->sounds, name);
     if (count == 0) return;
     const char *file = ssr_sounds_file(audio->sounds, name, (int)SDL_rand(count));
@@ -79,5 +85,6 @@ void ssr_audio_play(SSRAudio *audio, const char *name) {
         audio->voices[index] = SDL_CreateAudioStream(&spec, NULL);
         if (!audio->voices[index] || !SDL_BindAudioStream(audio->device, audio->voices[index])) return;
     }
+    SDL_SetAudioStreamGain(audio->voices[index], audio->volume);
     SDL_PutAudioStreamData(audio->voices[index], pcm->samples, pcm->frames * pcm->channels * (int)sizeof(int16_t));
 }

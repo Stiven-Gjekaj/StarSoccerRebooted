@@ -14,4 +14,7 @@ void ssr_audio_free(SSRAudio *audio);
 // "UISelect". A name with more than one file plays one of them.
 void ssr_audio_play(SSRAudio *audio, const char *name);
 
+// The volume of all the sounds: 0 is off, 1 is full.
+void ssr_audio_set_volume(SSRAudio *audio, float volume);
+
 #endif
