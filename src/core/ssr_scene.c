@@ -94,6 +94,7 @@ typedef enum {
     D_SORT_BY_REF,
     D_RANDOM_TWEAK,
     D_SPAWN,
+    D_SLOT,
     D_SHOW_SHELL,
     D_SWIPE_PANEL,
     D_EMIT_PLACER,
@@ -1865,6 +1866,12 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         if (!d) return NULL;
         d->text[0] = keep(s, arg(m, 0));
         d->text[1] = keep(s, arg(m, 1));
+    } else if (is(n, "Slot")) {
+        // Slot(name): the gel follows the bone of the slot of the Spine gel
+        // above it, and takes the colour of the slot (c_Slot).
+        d = new_doodad(D_SLOT, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
     } else if (is(n, "SetMessage")) {
         // SetMessage(screen) names the layout of the next message
         // (c_SetMessageScreen). The save slots are its only user, and the
@@ -2494,6 +2501,7 @@ static void set_tweak_pair(const SSRScene *s, const char *pair, double value) {
 
 // The bottom of the children of g and of their children, in g.
 static Gel *find_ref_first(const SSRScene *s, const char *ref);
+static const SSRSpine *spine_now(const SSRScene *s, const Gel *g, int *animation, int *loop, float *time);
 
 static float content_bottom(const Gel *g) {
     float bottom = 0;
@@ -2795,6 +2803,22 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         copy->baked = mat_concat(destination->baked, local_matrix(copy));
         break;
     }
+    case D_SLOT: {
+        Gel *spine = g->parent;
+        while (spine && spine->kind != GEL_SPINE) spine = spine->parent;
+        int animation, loop;
+        float time, m[6], rgba[4];
+        const SSRSpine *file = spine ? spine_now(s, spine, &animation, &loop, &time) : NULL;
+        if (!file || !ssr_spine_slot(file, animation, time, loop, d->text[0], m, rgba)) break;
+        Mat bone = {m[0], m[1], m[2], m[3], m[4], m[5]};
+        set_local(g, bone);
+        ensure_colour(g);
+        g->colour.r = rgba[0] * 255;
+        g->colour.g = rgba[1] * 255;
+        g->colour.b = rgba[2] * 255;
+        g->colour.a = rgba[3];
+        break;
+    }
     case D_RANDOM_TWEAK:
         ssr_tweaks_set_number(s->env->tweaks, d->text[0], d->text[1], (int)ssr_rand_float(&s->random, d->v[0], d->v[1]));
         break;
@@ -2985,21 +3009,31 @@ static void draw_crowd(SSRScene *s, const Gel *g, const Frame *f) {
 
 // Draws a pose of a Spine animation at the time of the screen. Each image
 // is drawn at its own size with its centre on its place.
-static void draw_spine(SSRScene *s, const Gel *g, const Frame *f) {
-    if (!s->env->spine) return;
+// The file, the animation, and the time of a Spine gel now. Returns NULL
+// when the file or the animation is not there.
+static const SSRSpine *spine_now(const SSRScene *s, const Gel *g, int *animation, int *loop, float *time) {
+    if (!s->env->spine) return NULL;
     const SSRSpine *file = s->env->spine(s->env->context, g->name);
-    if (!file) return;
-    int animation = ssr_spine_animation(file, g->animationName);
-    if (animation < 0) return;
+    if (!file) return NULL;
+    *animation = ssr_spine_animation(file, g->animationName);
+    if (*animation < 0) return NULL;
     // A limit of loops plays the animation that many times, then it stops.
     int limit = (int)g->p[1];
-    int loop = g->p[0] != 0 && limit <= 0;
-    float time = s->gameMS / 1000.0f;
+    *loop = g->p[0] != 0 && limit <= 0;
+    *time = s->gameMS / 1000.0f;
     if (limit > 0) {
-        float duration = ssr_spine_duration(file, animation);
-        if (time > duration * limit) time = duration;
-        else if (duration > 0) time = fmodf(time, duration);
+        float duration = ssr_spine_duration(file, *animation);
+        if (*time > duration * limit) *time = duration;
+        else if (duration > 0) *time = fmodf(*time, duration);
     }
+    return file;
+}
+
+static void draw_spine(SSRScene *s, const Gel *g, const Frame *f) {
+    int animation, loop;
+    float time;
+    const SSRSpine *file = spine_now(s, g, &animation, &loop, &time);
+    if (!file) return;
     SSRSpineDraw draws[128];
     int count = ssr_spine_pose(file, animation, time, loop, draws, 128);
     if (count > 128) count = 128;

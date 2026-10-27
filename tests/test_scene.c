@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "ssr_scene.h"
+#include "ssr_spinewriter.h"
 #include "ssr_test.h"
 #include "ssr_zipwriter.h"
 
@@ -1682,6 +1683,46 @@ static void test_sets_the_place_on_the_screen(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static SSRSpine *testSpine;
+
+static const SSRSpine *spine_file(void *context, const char *name) {
+    (void)context;
+    return strcmp(name, "Test") == 0 ? testSpine : NULL;
+}
+
+// Slot() puts a gel on the bone of a slot of the Spine gel above it, with
+// the colour of the slot (c_Slot). The slot "Leaf" of the test file is on
+// the child bone at (110, 0), and it is red from 0.5 seconds.
+static void test_follows_a_spine_slot(void) {
+    unsigned char data[4096];
+    size_t size = ssr_spine_writer_build(data);
+    testSpine = ssr_spine_parse(data, size);
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    layout = "Spine:(Test,300,400,,Sway,Loop)\n"
+             "{\n"
+             "\tDraw:(Badge,0,0,20,20)\n"
+             "\t\tSlot(Leaf)\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    env.spine = spine_file;
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    const SSRSceneItem *badge = find_image(scene, "Badge");
+    CHECK(badge && near(badge->x, 410) && near(badge->y, 400));
+    CHECK(badge && (badge->colour & 0xFF00) == 0xFF00);
+    for (int i = 0; i < 45; i++) ssr_scene_update(scene, &env, 17);
+    badge = find_image(scene, "Badge");
+    // Red: the green of the colour is 0.
+    CHECK(badge && (badge->colour & 0xFF0000) == 0);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+    ssr_spine_free(testSpine);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -2068,6 +2109,7 @@ int main(void) {
     test_puts_a_random_number_in_a_tweak();
     test_spawns_an_emitter_at_a_point();
     test_sets_the_place_on_the_screen();
+    test_follows_a_spine_slot();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
