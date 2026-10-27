@@ -332,7 +332,7 @@ static void follow_game(SSRApp *app) {
     if (ssr_game_take_settings_change(app->game)) {
         if (!ssr_game_save_settings(app->game, app->settingsPath)) SDL_Log("The settings were not saved.");
         apply_settings(app);
-        if (SDL_strcmp(ssr_game_settings(app->game)->pack, app->packId) != 0) {
+        if (ssr_game_take_pack_change(app->game)) {
             // The world reads the chosen pack: the app loads the game again,
             // and the packs screen shows the choice.
             load_game(app);

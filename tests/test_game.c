@@ -2664,6 +2664,7 @@ static void test_chooses_a_pack(void) {
     CHECK(ssr_tweaks_number(tweaks, "Packs", "CanRemove") == 0);
     ssr_game_message(game, "packs.row_pack 1");
     CHECK(strcmp(ssr_game_settings(game)->pack, "harbour") == 0 && ssr_game_take_settings_change(game));
+    CHECK(ssr_game_take_pack_change(game) && !ssr_game_take_pack_change(game));
     CHECK(ssr_tweaks_number(tweaks, "Packs", "CanRemove") == 1);
     ssr_game_message(game, "packs.btn_Install");
     CHECK(ssr_game_take_pack_install(game) && !ssr_game_take_pack_install(game));

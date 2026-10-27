@@ -217,6 +217,9 @@ const SSRSettings *ssr_game_settings(const SSRGame *game);
 // The directory of the installed data packs, and 1 when the app can open a
 // file to install a pack.
 void ssr_game_set_packs_directory(SSRGame *game, const char *directory, int canInstall);
+// 1 once after the player chose another pack on the world screen. The app
+// then loads the world again.
+int ssr_game_take_pack_change(SSRGame *game);
 // 1 once after the player asks to install a pack from a file.
 int ssr_game_take_pack_install(SSRGame *game);
 // Opens the packs screen with the list of the installed packs.

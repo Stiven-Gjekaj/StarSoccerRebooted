@@ -69,6 +69,8 @@ struct SSRGame {
     char packsDirectory[2048];
     char packIds[33][48];
     int packCount, packRow, packInstallAsked, canInstallPacks;
+    // 1 after the player chose another pack: the app loads the world again.
+    int packChanged;
     SSRRandom random;
 
     SSRUiOp ops[MAX_OPS];
@@ -589,6 +591,7 @@ static void packs_row(SSRGame *game) {
     if (row < 0 || row >= game->packCount || row == game->packRow) return;
     ssr_game_set_pack(game, game->packIds[row]);
     settings_changed(game);
+    game->packChanged = 1;
     packs_fill(game);
 }
 
@@ -597,6 +600,7 @@ static void packs_remove(SSRGame *game) {
     ssr_pack_remove(game->packsDirectory, game->packIds[game->packRow]);
     ssr_game_set_pack(game, "");
     settings_changed(game);
+    game->packChanged = 1;
     packs_fill(game);
 }
 
@@ -10580,6 +10584,12 @@ void ssr_game_set_packs_directory(SSRGame *game, const char *directory, int canI
     if (!game) return;
     snprintf(game->packsDirectory, sizeof(game->packsDirectory), "%s", directory ? directory : "");
     game->canInstallPacks = canInstall != 0;
+}
+
+int ssr_game_take_pack_change(SSRGame *game) {
+    if (!game || !game->packChanged) return 0;
+    game->packChanged = 0;
+    return 1;
 }
 
 int ssr_game_take_pack_install(SSRGame *game) {
