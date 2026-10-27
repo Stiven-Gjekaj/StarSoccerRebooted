@@ -90,6 +90,8 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     ssr_game_message(game, "gamemenu.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "match") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 1);
+    CHECK(ssr_tweaks_kind(tweaks, "MatchColours", "MyTeamShirt1") == SSR_TWEAK_COLOUR);
+    CHECK(strlen(ssr_tweaks_get(tweaks, "MatchColours", "OppTeamPants")) == 8);
     const char *home = ssr_tweaks_get(tweaks, "Match", "HomeName");
     CHECK(strlen(home) == 3 && strcmp(home, ssr_tweaks_get(tweaks, "Match", "AwayName")) != 0);
     ssr_game_message(game, "match.btn_Time");

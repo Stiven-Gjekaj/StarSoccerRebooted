@@ -776,6 +776,19 @@ static void maximise_commentary(SSRGame *game) {
     }
 }
 
+// The colours of a kit in the MatchColours tweaks: MyTeam or OppTeam, with
+// Shirt1, Shirt2, and Pants.
+static void kit_tweaks(SSRGame *game, const char *team, const SSRKit *kit) {
+    char name[32], value[16];
+    const SSRColor colours[3] = {kit->shirt1, kit->shirt2, kit->shorts};
+    const char *parts[3] = {"Shirt1", "Shirt2", "Pants"};
+    for (int i = 0; i < 3; i++) {
+        snprintf(name, sizeof(name), "%s%s", team, parts[i]);
+        snprintf(value, sizeof(value), "%06XFF", (unsigned)(colours[i] & 0xFFFFFF));
+        ssr_tweaks_set_kind(game->tweaks, "MatchColours", name, value, SSR_TWEAK_COLOUR);
+    }
+}
+
 static void start_match(SSRGame *game) {
     const SSRClub *mine = player_club(game);
     if (!mine) return;
@@ -805,6 +818,9 @@ static void start_match(SSRGame *game) {
     ssr_match_start(game->match, &s, game->localise, game->context, &game->random);
     game->commentaryCount = 0;
     SSRTweaks *t = game->tweaks;
+    // Each team plays in its kit for the ground [I: the clash of kits].
+    kit_tweaks(game, "MyTeam", home ? &mine->home : &mine->away);
+    kit_tweaks(game, "OppTeam", home ? &other->away : &other->home);
     ssr_tweaks_set(t, "Match", "HomeName", s.homeName);
     ssr_tweaks_set(t, "Match", "AwayName", s.awayName);
     ssr_tweaks_set_number(t, "Match", "AggHomeScore", -1);
