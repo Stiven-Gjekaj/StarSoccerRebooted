@@ -1489,6 +1489,41 @@ static void test_shows_the_place_in_a_list(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// SortByRef puts the children that a tweak names one below the other, with
+// a padding of 2. The other children do not show, and the list does not
+// count them (c_SortByRef, c_ScrollingList).
+static void test_sorts_children_by_ref(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set(tweaks, "Combo", "Order", "C|A");
+    ssr_tweaks_set_number(tweaks, "Combo", "Scroll", -2000);
+    layout = "Rect:(0,0,0,0)\n"
+             "\tScrollingList(Combo,Scroll,100,Combo,ScrollVel)\n"
+             "\t.SortByRef(Combo,Order)\n"
+             "{\n"
+             "\tDraw:(RowA,0,0,400,100) ref:A\n"
+             "\tDraw:(RowB,0,0,400,50) ref:B\n"
+             "\tDraw:(RowC,0,0,400,80) ref:C\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    ssr_tweaks_set_number(tweaks, "Combo", "Scroll", 0);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(!find_image(scene, "RowB"));
+    CHECK(find_image(scene, "RowC") && near(find_image(scene, "RowC")->y, 2));
+    CHECK(find_image(scene, "RowA") && near(find_image(scene, "RowA")->y, 84));
+    // The contents end at 184, so the list goes up to 84, and 64 past it.
+    ssr_tweaks_set_number(tweaks, "Combo", "Scroll", -2000);
+    ssr_scene_update(scene, &env, 0);
+    float scroll = (float)ssr_tweaks_number(tweaks, "Combo", "Scroll");
+    CHECK(scroll < -84 && scroll > -148);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -1868,6 +1903,7 @@ int main(void) {
     test_keeps_the_text_of_a_template();
     test_gives_the_box_of_a_ref();
     test_shows_the_place_in_a_list();
+    test_sorts_children_by_ref();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();

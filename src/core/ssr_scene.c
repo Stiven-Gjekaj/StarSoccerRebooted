@@ -91,6 +91,7 @@ typedef enum {
     D_PLAY_SOUND,
     D_SCROLLING_LIST,
     D_SCROLL_INDICATOR,
+    D_SORT_BY_REF,
     D_SHOW_SHELL,
     D_SWIPE_PANEL,
     D_EMIT_PLACER,
@@ -1549,6 +1550,14 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         char velocity[160];
         snprintf(velocity, sizeof(velocity), "%s\x1f%s", arg(m, 3), arg(m, 4));
         d->text[2] = keep(s, velocity);
+    } else if (is(n, "SortByRef")) {
+        // SortByRef(Cat,Name,padding): the tweak names the refs of the
+        // children that show, in order and split by "|" (c_SortByRef).
+        d = new_doodad(D_SORT_BY_REF, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+        d->v[0] = (float)number(s, m, 2, 2);
     } else if (is(n, "ScrollIndicator")) {
         // ScrollIndicator(ref,doodad): the bar of the ScrollingList of the
         // element ref (c_ScrollIndicator).
@@ -2725,6 +2734,27 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         // the contents.
         d->v[1] = contents;
         d->v[2] = -y;
+        break;
+    }
+    case D_SORT_BY_REF: {
+        // The children that the tweak names show, one below the other, with
+        // the padding between them. The other children do not show.
+        const char *order = ssr_tweaks_get(s->env->tweaks, d->text[0], d->text[1]);
+        float y = d->v[0];
+        for (int i = 0; i < g->childCount; i++) g->children[i]->hidden = 1;
+        while (order && *order) {
+            size_t length = strcspn(order, "|");
+            for (int i = 0; i < g->childCount; i++) {
+                Gel *child = g->children[i];
+                if (!child->ref || strlen(child->ref) != length || strncmp(child->ref, order, length) != 0) continue;
+                child->y = y;
+                child->hidden = 0;
+                y += child->h + d->v[0];
+                break;
+            }
+            order += length;
+            if (*order == '|') order++;
+        }
         break;
     }
     case D_SCROLL_INDICATOR: {
