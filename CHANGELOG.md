@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.28.0 (2026-10-28)
+
+- Data packs can give the stadiums of the clubs (`world/Stadiums.txt`):
+  the name greets the match, and the seats choose the size of the
+  stadium.
+- The editor of the squad screen: the Kit button changes the kit of the
+  club, a tap on the name of the league renames it, and a tap on a player
+  renames the player.
+
 ## 0.27.0 (2026-10-28)
 
 - Big matches: a cup final is in a full stadium, and the other team raises
