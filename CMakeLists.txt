@@ -55,6 +55,7 @@ add_library(ssr_core STATIC
     src/core/ssr_blackjack.c
     src/core/ssr_casino.c
     src/core/ssr_contract.c
+    src/core/ssr_horses.c
     src/core/ssr_ticker.c
     src/core/ssr_ball.c
     src/core/ssr_ex.c
@@ -165,6 +166,7 @@ ssr_add_test(test_career)
 ssr_add_test(test_blackjack)
 ssr_add_test(test_casino)
 ssr_add_test(test_contract)
+ssr_add_test(test_horses)
 ssr_add_test(test_ticker)
 ssr_add_test(test_ball)
 ssr_add_test(test_ex)
