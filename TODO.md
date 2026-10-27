@@ -144,7 +144,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] The news checks of the old pro boots, the transfer window, the
       captaincy, and the sponsors
 - [x] The gambling news, with the casino of 0.8
-- [ ] The skill bar in the message of a dilemma accident
+- [x] The skill bar in the message of a dilemma accident
 - [ ] Check the colour of the interview buttons against the original
 - [x] Money, the lifestyle shop, and boots (`ShopLifestyle`, `BootShop`,
       `BuyItem`)
