@@ -340,6 +340,8 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     write_ints(file, "vision", c->vision, SSR_CAREER_SKILL_LEVELS);
     write_ints(file, "setpieces", c->setPieces, SSR_CAREER_SKILL_LEVELS);
     write_ints(file, "power", c->power, SSR_CAREER_SKILL_LEVELS);
+    write_ints(file, "lasttrained", c->lastTrained, 5);
+    write_ints(file, "deplete", c->deplete, 5);
     write_ints(file, "nrg", c->nrg, 10);
     write_floats(file, "ratings", c->ratings, 10);
     fprintf(file, "apps=%d\ngoals=%d\nassists=%d\npasses=%d\nstarman=%d\n", c->apps, c->goals, c->assists, c->passes,
@@ -488,6 +490,8 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "vision") == 0) read_ints(value, c->vision, SSR_CAREER_SKILL_LEVELS);
         else if (strcmp(key, "setpieces") == 0) read_ints(value, c->setPieces, SSR_CAREER_SKILL_LEVELS);
         else if (strcmp(key, "power") == 0) read_ints(value, c->power, SSR_CAREER_SKILL_LEVELS);
+        else if (strcmp(key, "lasttrained") == 0) read_ints(value, c->lastTrained, 5);
+        else if (strcmp(key, "deplete") == 0) read_ints(value, c->deplete, 5);
         else if (strcmp(key, "nrg") == 0) read_ints(value, c->nrg, 10);
         else if (strcmp(key, "ratings") == 0) read_floats(value, c->ratings, 10);
         else if (strcmp(key, "apps") == 0) c->apps = number;

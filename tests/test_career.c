@@ -275,6 +275,27 @@ static void test_keeps_the_trophies_and_the_history(void) {
     CHECK(back.historyCount == 2);
 }
 
+// The days of the training of each skill, and the days of the loss with
+// the sign of the warning, go into the save. An old save has none.
+static void test_keeps_the_days_of_training(void) {
+    static SSRCareer c, back;
+    ssr_career_create(&c, "The", "Kid", 0, 0, 62, 1, 1, 0);
+    c.clubId = 10;
+    int days[5] = {10, 20, 30, 40, 50};
+    for (int i = 0; i < 5; i++) {
+        c.lastTrained[i] = days[i];
+        c.deplete[i] = i == 2 ? -days[i] : days[i];
+    }
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/training.txt", ssr_test_directory("career_training"));
+    CHECK(ssr_career_save(&c, path) && ssr_career_load(&back, path));
+    CHECK(back.lastTrained[4] == 50 && back.deplete[2] == -30 && back.deplete[0] == 10);
+    FILE *file = fopen(path, "wb");
+    fputs("clubid=10\nsdate=5\n", file);
+    fclose(file);
+    CHECK(ssr_career_load(&back, path) && back.lastTrained[0] == 0 && back.deplete[4] == 0);
+}
+
 // StoreOldStats: a career of the second year with no history gets a row
 // of year 0 with the counts before the season.
 static void test_stores_the_old_stats(void) {
@@ -298,6 +319,7 @@ static void test_stores_the_old_stats(void) {
 int main(void) {
     test_keeps_the_trophies_and_the_history();
     test_stores_the_old_stats();
+    test_keeps_the_days_of_training();
     test_changes_the_relations();
     test_names_the_player_type();
     test_updates_a_rating();

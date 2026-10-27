@@ -123,6 +123,12 @@ typedef struct {
     int vision[SSR_CAREER_SKILL_LEVELS];
     int setPieces[SSR_CAREER_SKILL_LEVELS];
     int power[SSR_CAREER_SKILL_LEVELS];
+    // The day of the last training of each skill (lasttrained), and the
+    // day that the clock of its loss started (deplete). A negative deplete
+    // means that the trainer warned. The order is pace, power, technique,
+    // vision, and set pieces.
+    int lastTrained[5];
+    int deplete[5];
     // The energy drinks of each kind.
     int nrg[10];
     float ratings[10];
