@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.13.0 (2026-10-27)
+
+- The world has players. Each club that plays gets a squad of made-up
+  players. They play, score, get better and older, move to other clubs,
+  and retire, and young players come each season.
+- Three rivals start their careers with the player.
+- The league screen has a Squad button. It shows the squad of the chosen
+  club, or the top scorers of the league, with the goals and the assists.
+- The ticker tells of the rivals, the top scorer of the league, and the
+  transfers of the new season.
+- Data packs: drop a zip file with a pack.txt on the window to install a
+  pack. A pack can change the clubs, the nations, the leagues, the names
+  of the players, the images, and the screens. See docs/packs.md.
+- Each new career gets a seed of the world. The career keeps it.
+
 ## 0.12.0 (2026-10-27)
 
 - The career unlocks the 108 awards of 4.32. Each award opens an alert at
