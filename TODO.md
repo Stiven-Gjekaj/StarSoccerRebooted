@@ -174,6 +174,22 @@ that use the modifier.
 - [ ] `func` (2), `call` (2): functions of the expression language
 - [ ] `Touch` (1), `RandomTweak` (1), `ModifyTweak` (1), `MechDigit` (1)
 
+## The look of the remake
+
+The remake keeps the look of the original. Only the marks of New Star
+Games change. The art of the remake is in `art/`. A file there takes the
+place of the atlas image with the same name (`art/NewStarLogo.png`).
+
+- [x] Replace an atlas image with a file of `art/`
+- [ ] The logo of Star Soccer Rebooted on the title (`NewStarLogo`, the
+      translated "Soccer" logos `CL_Logo_*`)
+- [ ] The TV of the match (`MapNSGTVLogo`) and the sponsor of the match
+      (`NSGamesLogo`)
+- [ ] The newspaper (`NSNewsLogo`, `CLHeaderNewsLogo`)
+- [ ] The boards and the roof of the stadiums ("NEW STAR GAMES", "NSS")
+- [ ] The other marks: `BannerFrontLogo`, `LogoStrip`, `CLNewStar`, the
+      sponsor images of `Images/`
+
 ## Not in the remake
 
 - Advertisements (`FakeInterstitial`, `NSS5Ad`, `RewardedAdStaffSelector`,
