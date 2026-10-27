@@ -97,6 +97,9 @@ typedef struct {
     // 1 after the message that skills go down with no training. It shows
     // once for each install (global data 11 of the game).
     int doneLoseSkills;
+    // 1 after the first career that retires. A new career can then play
+    // the hard mode (global data 12 of the game).
+    int hardModeUnlocked;
 } SSRSettings;
 
 // Starts at the main menu. The game keeps the tweaks, and sets the tweaks

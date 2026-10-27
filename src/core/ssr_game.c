@@ -107,6 +107,10 @@ struct SSRGame {
     // The player of the year screen: the stage, the time of the last stage,
     // and the awards.
     int potyStage, potyTime, potyCount;
+    // The retirement screen: the stage, the time of the last stage, the
+    // values that show, and the score.
+    int retireStage, retireTime, retireScore;
+    float retireStats[9];
     int slot;
     int slotExists[SSR_CAREER_SLOTS];
 
@@ -559,7 +563,7 @@ static void career(SSRGame *game) {
 static void set_profile_tweaks(SSRGame *game) {
     ssr_tweaks_set_number(game->tweaks, "Player", "Gender", game->gender);
     ssr_tweaks_set_number(game->tweaks, "Player", "Hardmode", game->hardMode);
-    ssr_tweaks_set_number(game->tweaks, "Menu", "HardmodeUnlocked", 0);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "HardmodeUnlocked", game->settings.hardModeUnlocked);
     ssr_tweaks_set_number(game->tweaks, "Menu", "FocusedItem", game->typing);
 }
 
@@ -1028,6 +1032,7 @@ static void call_new_season_same_club(SSRGame *game);
 static void call_trainer_get(SSRGame *game);
 static void call_boots_expired(SSRGame *game);
 static void call_dump_partner(SSRGame *game);
+static void call_retirement(SSRGame *game);
 
 static void run_call(SSRGame *game, const char *name) {
     static const struct {
@@ -1044,6 +1049,7 @@ static void run_call(SSRGame *game, const char *name) {
         {"StartCareer", call_start_career},
         {"DrinkNRG", call_drink},
         {"SeasonEndTransfer", call_season_end_transfer},
+        {"Retirement", call_retirement},
         {"PlayToDate", call_play_to_date},
         {"SetUpFixture", call_set_up_fixture},
         {"DebutTired", call_debut_tired},
@@ -2653,7 +2659,14 @@ static void league_home(SSRGame *game) {
 static int play_news(SSRGame *game, const SSRFixture *next);
 static int check_transfer_window(SSRGame *game);
 
+static void retirement_screen(SSRGame *game);
+
 static void game_play(SSRGame *game) {
+    // A retired player sees the retirement screen again.
+    if (game->career.retired) {
+        retirement_screen(game);
+        return;
+    }
     season_in(game);
     SSRFixture *f = ssr_season_next_fixture(game->season);
     if (!f || ssr_date_year(f->sdate) > ssr_career_year(&game->career)) {
@@ -2836,6 +2849,138 @@ static void new_season(SSRGame *game) {
 // playeroftheyear.btn_Play: GSSeasonEndTransfer asks about a transfer.
 static void poty_play(SSRGame *game) {
     message(game, "message", loc(game, "CMESSAGE_SEASONENDTRANSFER"), 1, 1, "SeasonEndTransfer");
+}
+
+static void do_news(SSRGame *game, const char *tag, const char *team, const char *team2);
+static const char *my_club_tla(SSRGame *game);
+
+// playeroftheyear.btn_Retire: c_TScreen_PlayerOfTheYear.ButtonRetire.
+static void poty_retire(SSRGame *game) {
+    char text[1024];
+    snprintf(text, sizeof(text), "%s %s", loc(game, "CMESSAGE_RETIREMENTCHECK"), loc(game, "CMESSAGE_LOSESTARBUX"));
+    message(game, "message", text, 1, 1, "Retirement");
+}
+
+static void replace_number(char *text, size_t capacity, const char *name, int value) {
+    char number[16];
+    snprintf(number, sizeof(number), "%d", value);
+    replace_all(text, capacity, name, number);
+}
+
+// The call "Retirement": Yes is c_TPlayer.Retire, the news and then the
+// retirement screen. No comes back to the awards as they were.
+static void call_retirement(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (game->returnState != 1) {
+        for (int award = 0; award < 4; award++) {
+            if (award != 1 || ssr_career_age(c) <= 23) show_award_row(game, award);
+        }
+        add_op(game, SSR_OP_SHOW, "PlayButton", NULL, NULL, 0);
+        add_op(game, SSR_OP_SHOW, "RetireButton", NULL, NULL, 0);
+        return;
+    }
+    do_news(game, "CNEWS_RETIREMENT", my_club_tla(game), NULL);
+    replace_number(c->headline, sizeof(c->headline), "$years", ssr_career_year(c) - 1);
+    replace_number(c->headline, sizeof(c->headline), "$num", c->goals + c->intGoals);
+    replace_number(c->headline, sizeof(c->headline), "$age", ssr_career_age(c) - 1);
+    webpage_to(game, "retirement", 0);
+}
+
+static const char *const RETIRE_STATS[9] = {"CareerMatches", "CareerAverageGoals", "CareerAverageAssists",
+                                            "CareerStarMan", "CareerAverageRating", "CareerMedals",
+                                            "CareerPlayerOfYear", "CareerAwards", "StarRating"};
+
+// The ref of the row of a stat. The row of the awards has its own spelling.
+static const char *retire_ref(const char *name) {
+    return strcmp(name, "CareerPlayerOfYear") == 0 ? "CareerPlayerofYear" : name;
+}
+
+// c_AScreen_Retirement.SetScore: the score with commas.
+static void retirement_score(SSRGame *game, int score) {
+    char digits[16], text[24];
+    snprintf(digits, sizeof(digits), "%d", score < 0 ? -score : score);
+    size_t n = strlen(digits), o = 0;
+    if (score < 0) text[o++] = '-';
+    for (size_t i = 0; i < n; i++) {
+        if (i > 0 && (n - i) % 3 == 0) text[o++] = ',';
+        text[o++] = digits[i];
+    }
+    text[o] = 0;
+    ssr_tweaks_set(game->tweaks, "PlayerStats", "CareerScore", text);
+}
+
+// c_TScreen_Retirement.SetUpScreen: the stats of the career and the New
+// Star Soccer score. [I: the remake keeps no trophy log and no history of
+// the seasons, so the medals are 0 and the history sums are empty. The
+// achievements are not in the remake.]
+static void retirement_screen(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    set_screen(game, "retirement");
+    game->retireStage = 0;
+    game->retireTime = game->now;
+    int apps = c->apps + c->intApps;
+    float goals = (float)(c->goals + c->intGoals), assists = (float)(c->assists + c->intAssists);
+    if (goals > 0) goals /= apps;
+    if (assists > 0) assists /= apps;
+    float average = c->apps > 0 ? c->totalRating / c->apps : 0;
+    int star = ssr_career_star_level(c), medals = 0, achievements = 0;
+    float bonus = 0, history = 1, historyGoals = 0, historyAssists = 0, historyStarMan = 0;
+    float stats[9] = {(float)apps, goals, assists, (float)(c->starMan + c->intStarMan), average, (float)medals,
+                      (float)c->potyAwards, (float)achievements, (float)star};
+    memcpy(game->retireStats, stats, sizeof(stats));
+    int score = (int)(historyGoals / history * 100.0f + 1.0f);
+    score = (int)(score + historyAssists / history * 50.0f + 1.0f);
+    score = (int)(score + historyStarMan / history * 200.0f + 1.0f);
+    score = (int)(score * (average + 1.0f) * 200.0f);
+    score = (int)(score + bonus * 250.0f);
+    score += c->potyAwards * 250;
+    score += achievements * 200;
+    score += (star < 1 ? 1 : star > 100 ? 100 : star) * 200;
+    score = (int)(score * (career_skills(c) / 100.0f + 1.0f + ssr_career_happiness(c) / 100.0f +
+                           ssr_career_lifestyle(c) / 100.0f));
+    game->retireScore = score * 10;
+    // The bars of the screen read the live tweaks of the player.
+    ssr_tweaks_set_number(game->tweaks, "Player", "Happiness", ssr_career_happiness(c));
+    ssr_tweaks_set_number(game->tweaks, "Player", "Lifestyle", ssr_career_lifestyle(c));
+    ssr_tweaks_set_number(game->tweaks, "Player", "Skills", career_skills(c));
+    // c_AScreen_Retirement.HideStats.
+    retirement_score(game, 0);
+    for (int i = 0; i < 9; i++) {
+        add_op(game, SSR_OP_HIDE, retire_ref(RETIRE_STATS[i]), NULL, NULL, 0);
+    }
+}
+
+// c_TScreen_Retirement.Update: one stat each stage, then the score.
+// [I: the sounds come with the sounds of the game.]
+static void retirement_tick(SSRGame *game) {
+    int step = game->touchWasDown ? 100 : 1000;
+    if (game->retireStage >= 20 || game->now <= game->retireTime + step) return;
+    game->retireTime = game->now;
+    int stage = ++game->retireStage;
+    if (stage >= 1 && stage <= 9) {
+        const char *name = RETIRE_STATS[stage - 1];
+        ssr_tweaks_set_number(game->tweaks, "PlayerStats", name, game->retireStats[stage - 1]);
+        add_op(game, SSR_OP_SHOW, retire_ref(name), NULL, NULL, 0);
+        // The modern look has no bars 10 to 12.
+        if (stage == 9) game->retireStage = 12;
+    } else if (stage == 13) {
+        retirement_score(game, game->retireScore);
+    }
+}
+
+// retirement.btn_Play: c_TScreen_Retirement.ButtonPlay. The first visit
+// keeps the score and saves the career one day back.
+static void retirement_play(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (!c->retired) {
+        ssr_tweaks_set_number(game->tweaks, "Menu", "CanSavePlayer", 1);
+        c->retired = game->retireScore;
+        c->sdate--;
+        save_career(game);
+    }
+    ssr_tweaks_set_number(game->tweaks, "Menu", "DisableQuitButton", 0);
+    game->seasonEndMode = 0;
+    game_menu(game);
 }
 
 // The answer: No keeps the club [I: the transfer screens come with the
@@ -3440,6 +3585,8 @@ static void relationships_screen(SSRGame *game, int instant, int international) 
     update_relationships(game, instant, international);
 }
 
+static void retirement_screen(SSRGame *game);
+
 // c_TScreen_WebPage.ButtonOk: the screen after the news.
 static void webpage_ok(SSRGame *game) {
     char next[32];
@@ -3448,6 +3595,7 @@ static void webpage_ok(SSRGame *game) {
     if (!next[0] || strcmp(next, "gamemenu") == 0) game_menu(game);
     else if (strcmp(next, "relationships") == 0) relationships_screen(game, 0, 0);
     else if (strcmp(next, "leaguefixtures") == 0) leaguefixtures_play(game);
+    else if (strcmp(next, "retirement") == 0) retirement_screen(game);
     else set_screen(game, next);
 }
 
@@ -6400,10 +6548,17 @@ CARD(14)
 CARD(15)
 #undef CARD
 
+// c_TScreen_GameMenu.ButtonQuit: the first retired career unlocks the
+// hard mode. The message shows over the main menu.
 static void quit_career(SSRGame *game) {
     save_career(game);
     ssr_tweaks_set_number(game->tweaks, "Menu", "CanSavePlayer", 0);
     main_menu(game);
+    if (game->career.retired && !game->settings.hardModeUnlocked) {
+        game->settings.hardModeUnlocked = 1;
+        game->settingsChanged = 1;
+        message(game, "message", loc(game, "CMESSAGE_HARDMODEUNLOCKED"), 0, 1, NULL);
+    }
 }
 
 static const Route ROUTES[] = {
@@ -6525,6 +6680,8 @@ static const Route ROUTES[] = {
     {"seasonreview.btn_League", season_review_league},
     {"seasonreview.btn_Play", player_of_the_year},
     {"playeroftheyear.btn_Play", poty_play},
+    {"playeroftheyear.btn_Retire", poty_retire},
+    {"retirement.btn_Play", retirement_play},
     {"match.btn_Play", match_play},
     {"leaguefixtures.btn_Kits", kits_button},
     {"match.btn_Time", match_speed},
@@ -6600,6 +6757,7 @@ int ssr_game_load_settings(SSRGame *game, const char *path) {
         if (strcmp(key, "distance") == 0) game->settings.distance = value != 0;
         if (strcmp(key, "replays") == 0) game->settings.replays = value != 0;
         if (strcmp(key, "doneloseskills") == 0) game->settings.doneLoseSkills = value != 0;
+        if (strcmp(key, "hardmodeunlocked") == 0) game->settings.hardModeUnlocked = value != 0;
     }
     fclose(file);
     set_option_tweaks(game);
@@ -6613,8 +6771,9 @@ int ssr_game_save_settings(const SSRGame *game, const char *path) {
     snprintf(temp, sizeof(temp), "%s.new", path);
     FILE *file = fopen(temp, "wb");
     if (!file) return 0;
-    int ok = fprintf(file, "volume=%d\ndistance=%d\nreplays=%d\ndoneloseskills=%d\n", game->settings.volume,
-                     game->settings.distance, game->settings.replays, game->settings.doneLoseSkills) > 0;
+    int ok = fprintf(file, "volume=%d\ndistance=%d\nreplays=%d\ndoneloseskills=%d\nhardmodeunlocked=%d\n",
+                     game->settings.volume, game->settings.distance, game->settings.replays,
+                     game->settings.doneLoseSkills, game->settings.hardModeUnlocked) > 0;
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
         remove(temp);
@@ -6741,6 +6900,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->ticks -= 1;
             game->now += 16;
             if (strcmp(game->screen, "playeroftheyear") == 0) poty_tick(game);
+        }
+    } else if (strcmp(game->screen, "retirement") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1) {
+            game->ticks -= 1;
+            game->now += 16;
+            retirement_tick(game);
         }
     } else if (strcmp(game->screen, "interview") == 0) {
         game->ticks += frames;

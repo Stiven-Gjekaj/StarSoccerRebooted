@@ -71,6 +71,7 @@ static const char *localise(void *context, const char *tag) {
     if (strcmp(tag, "help_newplayer") == 0) return "Welcome.";
     if (strcmp(tag, "CMESSAGE_DELETESLOT") == 0) return "Delete?";
     if (strcmp(tag, "sla_versus_RESKIN") == 0) return "vs.";
+    if (strcmp(tag, "CNEWS_RETIREMENT") == 0) return "$years $num $age";
     return NULL;
 }
 
@@ -229,7 +230,83 @@ static void transfer_at_season_end(SSRGame *game, SSRTweaks *tweaks) {
     transfers++;
 }
 
-static int starManSum = 0;
+static int retireNow = 0, starManSum = 0;
+static const char *careerPath = NULL;
+
+// The retirement: No comes back to the awards. Yes shows the news, then
+// the stats one at a time and the score.
+static void retire(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    const SSRCareer *c = ssr_game_career(game);
+    SSRUiOp ops[64];
+    ssr_game_message(game, "playeroftheyear.btn_Retire");
+    CHECK(strcmp(ssr_game_screen(game), "message") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_RETIREMENTCHECK CMESSAGE_LOSESTARBUX") == 0);
+    ssr_game_message(game, "message.btn_Cancel");
+    CHECK(strcmp(ssr_game_screen(game), "playeroftheyear") == 0 && !c->retired);
+    int count = take_ops(game, ops, 64);
+    CHECK(has_op(ops, count, SSR_OP_SHOW, "PlayButton", NULL) && has_op(ops, count, SSR_OP_SHOW, "RetireButton", NULL));
+    CHECK(has_op(ops, count, SSR_OP_SHOW, ssr_career_age(c) <= 23 ? "TeamPlayerOfYear" : "TeamPlayerOfYearOld", NULL));
+    int sdate = c->sdate;
+    ssr_game_message(game, "playeroftheyear.btn_Retire");
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "webpagenews") == 0);
+    count = take_ops(game, ops, 64);
+    char news[64];
+    snprintf(news, sizeof(news), "%d %d %d", ssr_career_year(c) - 1, c->goals + c->intGoals, ssr_career_age(c) - 1);
+    CHECK(count == 1 && strcmp(ops[0].text, news) == 0);
+    ssr_game_message(game, "webpage.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "retirement") == 0);
+    count = take_ops(game, ops, 64);
+    CHECK(has_op(ops, count, SSR_OP_HIDE, "CareerPlayerofYear", NULL));
+    CHECK(has_op(ops, count, SSR_OP_HIDE, "StarRating", NULL));
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "PlayerStats", "CareerScore"), "0") == 0);
+    // Ten steps of one second: nine stats, a wait, and the score.
+    int shown = 0, frames = 0;
+    for (; frames < 12 * 60 && strcmp(ssr_tweaks_get(tweaks, "PlayerStats", "CareerScore"), "0") == 0; frames++) {
+        ssr_game_update(game, 1);
+        count = take_ops(game, ops, 64);
+        for (int i = 0; i < count; i++) shown += ops[i].kind == SSR_OP_SHOW;
+    }
+    CHECK(shown == 9 && frames >= 10 * 60 && frames <= 11 * 60);
+    CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "CareerMatches") == c->apps + c->intApps);
+    CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "CareerStarMan") == c->starMan + c->intStarMan);
+    CHECK(fabs(ssr_tweaks_number(tweaks, "PlayerStats", "CareerAverageRating") - c->totalRating / c->apps) < 1e-4);
+    CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "StarRating") == c->starRating / 100 + 1);
+    // The score: 3 * (average + 1) * 200, the star level, and the bars.
+    float skills = (ssr_career_skill(c->pace) + ssr_career_skill(c->power) + ssr_career_skill(c->technique) +
+                    ssr_career_skill(c->vision) + ssr_career_skill(c->setPieces)) / 3.0f;
+    int score = (int)(3 * (c->totalRating / c->apps + 1.0f) * 200.0f);
+    score += c->potyAwards * 250 + (c->starRating / 100 + 1) * 200;
+    float bars = skills / 100.0f + 1.0f + ssr_career_happiness(c) / 100.0f + ssr_career_lifestyle(c) / 100.0f;
+    score = (int)(score * bars) * 10;
+    char text[32];
+    snprintf(text, sizeof(text), "%d,%03d", score / 1000, score % 1000);
+    CHECK(score >= 1000 && score < 1000000 && strcmp(ssr_tweaks_get(tweaks, "PlayerStats", "CareerScore"), text) == 0);
+    // Play keeps the score, and the career goes one day back.
+    ssr_game_message(game, "retirement.btn_Play");
+    CHECK(c->retired == score && c->sdate == sdate - 1);
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "DisableQuitButton") == 0);
+    SSRCareer saved;
+    CHECK(ssr_career_load(&saved, path) && saved.retired == score);
+    // Play opens the retirement screen again; it saves nothing.
+    ssr_game_message(game, "gamemenu.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "retirement") == 0);
+    ssr_game_message(game, "retirement.btn_Play");
+    CHECK(c->retired == score && c->sdate == sdate - 1);
+    // The first retired career unlocks the hard mode, once.
+    CHECK(!ssr_game_settings(game)->hardModeUnlocked);
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(strcmp(ssr_game_screen(game), "message") == 0 && ssr_game_settings(game)->hardModeUnlocked);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_HARDMODEUNLOCKED") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "mainmenu") == 0);
+    ssr_game_message(game, "mainmenu.btn_Career");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "SaveSlot", "Slot0ButtonText"), "Retired") == 0);
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && c->retired == score);
+}
 
 static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     const SSRCareer *c = ssr_game_career(game);
@@ -262,6 +339,11 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(shown);
     // A player with few matches wins no award.
     CHECK(ssr_tweaks_number(tweaks, "SeasonAwards", "TeamPlayerOfYear") == 0);
+    if (retireNow) {
+        retire(game, tweaks, careerPath);
+        retireNow = 2;
+        return;
+    }
     ssr_game_message(game, "playeroftheyear.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "message") == 0);
     if (seasons < 2) {
@@ -1207,6 +1289,7 @@ static void test_starts_a_new_career(void) {
     char path[1200];
     snprintf(path, sizeof(path), "%s/career1.txt", directory);
     remove(path);
+    careerPath = path;
     SSRGame *game = ssr_game_create(tweaks);
     ssr_game_set_data(game, &world, localise, NULL, directory);
     SSRUiOp ops[64];
@@ -1341,7 +1424,13 @@ static void test_starts_a_new_career(void) {
     // The weeks had news: tips, and a dilemma or other news.
     CHECK(newsSeen > 0 && ssr_game_career(game)->tipCount > 0);
     CHECK(interviews >= 2 && interviewsWon >= 1);
+    // The player retires at the end of the next season.
+    retireNow = 1;
+    for (int i = 0; i < 24 && retireNow == 1; i++) play_a_match(game, tweaks);
+    CHECK(retireNow == 2);
+    // A second quit shows no message.
     ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(strcmp(ssr_game_screen(game), "mainmenu") == 0);
 
     // Delete: Cancel keeps it, Ok deletes it.
     ssr_game_message(game, "mainmenu.btn_Career");
