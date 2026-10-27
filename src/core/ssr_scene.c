@@ -196,6 +196,9 @@ struct Gel {
     // The %variables of float(), strvar(), and colvar().
     SSRExVar **vars;
     int varCount;
+    // YDepth(n): the depth is the y on the screen plus n.
+    int yDepth;
+    float yDepthOffset;
 };
 
 typedef struct {
@@ -1245,6 +1248,9 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         g->layer = find_layer(s, arg(m, 0));
     } else if (is(n, "Depth")) {
         g->depth = (int)number(s, m, 0, 0);
+    } else if (is(n, "YDepth")) {
+        g->yDepth = 1;
+        g->yDepthOffset = (float)number(s, m, 0, 0);
     } else if (is(n, "FontSize")) {
         g->font = (int)number(s, m, 0, 1);
         if (g->font < 0 || g->font > 3) g->font = 1;
@@ -2747,6 +2753,8 @@ static void draw_gel(SSRScene *s, Gel *g, const Frame *parent) {
     if (g->hidden || g->dead) return;
     f.m = mat_concat(parent->m, local_matrix(g));
     g->baked = f.m;
+    // A gel lower on the screen draws over a gel higher up (c_Gel.YDepth).
+    if (g->yDepth) f.depth = (int)(f.m.ty + g->yDepthOffset);
     if (g->hasColour) f.colour = colour_mix(g->colour, parent->colour);
 
     int pressable = 0;
@@ -3161,4 +3169,40 @@ void ssr_scene_spawn_remove(SSRScene *scene, int id) {
         }
     }
     free_gel(g);
+}
+
+// The gel with the ref in g and its children, or NULL.
+static Gel *find_below(Gel *g, const char *ref) {
+    if (g->ref && strcmp(g->ref, ref) == 0) return g;
+    for (int i = 0; i < g->childCount; i++) {
+        Gel *found = find_below(g->children[i], ref);
+        if (found) return found;
+    }
+    return NULL;
+}
+
+static Gel *spawned(const SSRScene *scene, int id) {
+    return scene && id > 0 && id <= 64 ? scene->spawned[id - 1] : NULL;
+}
+
+void ssr_scene_spawn_place(SSRScene *scene, int id, const char *ref, float x, float y) {
+    Gel *g = spawned(scene, id);
+    if (g && ref) g = find_below(g, ref);
+    if (!g) return;
+    g->x = x;
+    g->y = y;
+}
+
+void ssr_scene_spawn_anim(SSRScene *scene, int id, const char *ref, const char *anim) {
+    Gel *g = spawned(scene, id);
+    if (g && ref) g = find_below(g, ref);
+    if (!g || g->kind != GEL_ANIM || !anim) return;
+    if (g->animName && strcmp(g->animName, anim) == 0) return;
+    set_animation(g, keep(scene, anim));
+}
+
+void ssr_scene_spawn_show(SSRScene *scene, int id, const char *ref, int visible) {
+    Gel *g = spawned(scene, id);
+    if (g && ref) g = find_below(g, ref);
+    if (g) g->hidden = !visible;
 }

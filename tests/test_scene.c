@@ -784,6 +784,62 @@ static void test_runs_expressions(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The code moves copies of a template, plays their animations, and a gel
+// lower on the screen draws over a gel higher up (YDepth).
+static void test_moves_copies_and_sorts_by_y(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    layout = "SortedLayer:(Minigame,3)\n"
+             "Animation:(90,Loop) ref:RunA\n"
+             "{\n"
+             "\tDuring:(0,90)\n"
+             "\t{\n"
+             "\t\tDraw:(ImageA,0,0,10,10)\n"
+             "\t}\n"
+             "}\n"
+             "Animation:(90,Loop) ref:RunB\n"
+             "{\n"
+             "\tDuring:(0,90)\n"
+             "\t{\n"
+             "\t\tDraw:(ImageB,0,0,10,10)\n"
+             "\t}\n"
+             "}\n"
+             "Rect:(0,0,0,0) ref:Pitch\n"
+             "Rect:(0,0) $HIDE ref:Player\n"
+             "{\n"
+             "\tAnimInstance:(0,-30,RunA) ref:PlayerAnim\n"
+             "\t\tLayer(Minigame)\n"
+             "\t\tYDepth(25)\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    int low = ssr_scene_spawn(scene, "Pitch", "Player", 0, NULL, 0);
+    int high = ssr_scene_spawn(scene, "Pitch", "Player", 0, NULL, 0);
+    CHECK(low && high && low != high);
+    ssr_scene_spawn_place(scene, low, NULL, 100, 500);
+    ssr_scene_spawn_place(scene, high, NULL, 200, 300);
+    ssr_scene_spawn_anim(scene, high, "PlayerAnim", "RunB");
+    ssr_scene_update(scene, &env, 0);
+    const SSRSceneItem *a = find_image(scene, "ImageA"), *b = find_image(scene, "ImageB");
+    CHECK(a && b && b < a);
+    CHECK(b && near(b->x, 200) && near(b->y, 270) && a && near(a->x, 100) && near(a->y, 470));
+    // The copy moves past the other one, and draws over it now.
+    ssr_scene_spawn_place(scene, high, NULL, 200, 700);
+    ssr_scene_spawn_show(scene, low, "PlayerAnim", 0);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(!find_image(scene, "ImageA") && find_image(scene, "ImageB"));
+    ssr_scene_spawn_show(scene, low, "PlayerAnim", 1);
+    ssr_scene_update(scene, &env, 16);
+    a = find_image(scene, "ImageA");
+    b = find_image(scene, "ImageB");
+    CHECK(a && b && a < b);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // A drag on a swipe panel scrolls the list under it, and the list keeps
 // the speed of the drag, then slows down and stops at its ends.
 static void test_scrolls_a_list_by_a_swipe(void) {
@@ -867,6 +923,7 @@ int main(void) {
     test_fills_lists_and_changes_elements();
     test_readouts_conditions_and_click_actions();
     test_converges_after_a_delay_and_on_press();
+    test_moves_copies_and_sorts_by_y();
     test_runs_expressions();
     test_plays_an_animation();
     test_mixes_colours_and_orders_layers();

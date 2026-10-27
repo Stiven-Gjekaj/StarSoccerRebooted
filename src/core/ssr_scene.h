@@ -170,4 +170,12 @@ float ssr_scene_spawn_x(const SSRScene *scene, int id);
 void ssr_scene_spawn_remove(SSRScene *scene, int id);
 int ssr_scene_list_add(SSRScene *scene, const char *list, const char *template_, const char *text, int id);
 
+// Moves the copy with the id, or the element with the ref inside it, to
+// (x, y) in its parent. ref can be NULL.
+void ssr_scene_spawn_place(SSRScene *scene, int id, const char *ref, float x, float y);
+// Plays the animation on the AnimInstance with the ref inside the copy.
+void ssr_scene_spawn_anim(SSRScene *scene, int id, const char *ref, const char *anim);
+// Shows or hides the copy, or the element with the ref inside it.
+void ssr_scene_spawn_show(SSRScene *scene, int id, const char *ref, int visible);
+
 #endif
