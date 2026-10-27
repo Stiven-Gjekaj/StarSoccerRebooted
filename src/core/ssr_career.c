@@ -280,6 +280,10 @@ float ssr_career_lifestyle(const SSRCareer *c) {
     return 100.0f / SSR_CAREER_SHOP_PRODUCTS * (float)n;
 }
 
+int ssr_career_hat_tricks(int goals) {
+    return goals >= 9 ? 3 : goals / 3;
+}
+
 void ssr_career_add_form(int *form, int rating) {
     if (!form) return;
     for (int i = 0; i < 4; i++) form[i] = form[i + 1];

@@ -220,6 +220,9 @@ int ssr_career_age(const SSRCareer *career);
 int ssr_career_year(const SSRCareer *career);
 int ssr_career_week(const SSRCareer *career);
 
+// AddStat: a match gives a hat trick at the 3rd, the 6th, and the 9th goal.
+int ssr_career_hat_tricks(int goals);
+
 // c_TPlayer.AddForm and AddInternationalForm: the newest rating goes in at
 // the end.
 void ssr_career_add_form(int *form, int rating);

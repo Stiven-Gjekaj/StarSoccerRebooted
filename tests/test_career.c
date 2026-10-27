@@ -334,6 +334,9 @@ static void test_keeps_the_records(void) {
     CHECK(ssr_career_save(&c, path) && ssr_career_load(&back, path));
     CHECK(back.hatTricks == 4 && memcmp(back.careerForm, form, sizeof(form)) == 0);
     CHECK(back.seasonFurthest[0] == 300.5f && back.furthest[1] == 640 && back.intFurthest[3] == 250);
+    // A hat trick comes at the 3rd, the 6th, and the 9th goal only.
+    CHECK(ssr_career_hat_tricks(2) == 0 && ssr_career_hat_tricks(3) == 1 && ssr_career_hat_tricks(6) == 2);
+    CHECK(ssr_career_hat_tricks(9) == 3 && ssr_career_hat_tricks(12) == 3);
     ssr_career_reset_season(&back);
     CHECK(back.seasonFurthest[0] == 0 && back.furthest[1] == 640 && back.intFurthest[3] == 250);
 }

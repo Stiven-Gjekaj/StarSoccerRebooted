@@ -1869,7 +1869,7 @@ static void end_match(SSRGame *game) {
     // The counts of the club, or of the nation (c_TScreen_MatchStats).
     SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, game->fixtureComp) : NULL;
     float rating = game->after.rating;
-    int hatTrick = m->goals >= 3;
+    int hatTrick = ssr_career_hat_tricks(m->goals);
     if (comp && comp->data->level == 1) {
         c->intApps++;
         c->intGoals += m->goals;
@@ -1890,6 +1890,7 @@ static void end_match(SSRGame *game) {
         c->passes += m->passes;
         c->seasonPasses += m->passes;
         c->seasonHatTricks += hatTrick;
+        c->hatTricks += hatTrick;
         c->seasonChances += m->chances;
         c->chances += m->chances;
         c->seasonStarMan += game->after.starMan;
@@ -2181,7 +2182,7 @@ static void match_awards(SSRGame *game, SSRFixture *f) {
     SSRCareer *c = &game->career;
     const SSRAfterMatchFacts *m = &game->facts;
     // A hat trick counts at the third, the sixth, and the ninth goal.
-    int hatTricks = m->goals / 3;
+    int hatTricks = ssr_career_hat_tricks(m->goals);
     if (m->passes >= 5) award(game, 4);
     if (m->passes >= 10) award(game, 5);
     if (m->assists > 0) award(game, 6);
@@ -4128,14 +4129,13 @@ static void player_string_stat(SSRGame *game, const char *name, const char *seas
     ssr_tweaks_set(game->tweaks, "PlayerStats", key, international);
 }
 
-// TweakInterface.UpdatePlayerStats. [I: the remake keeps no hat tricks of
-// the career, no form of the career, and no furthest goals and passes, so
-// these show 0 or nothing.]
+// TweakInterface.UpdatePlayerStats. [I: the remake keeps no form of the
+// career, and no furthest goals and passes, so these show nothing.]
 static void update_player_stats(SSRGame *game) {
     const SSRCareer *c = &game->career;
     player_stat(game, "Matches", c->seasonApps, c->apps, c->intApps);
     player_stat(game, "Goals", c->seasonGoals, c->goals, c->intGoals);
-    player_stat(game, "HatTricks", c->seasonHatTricks, 0, c->intHatTricks);
+    player_stat(game, "HatTricks", c->seasonHatTricks, c->hatTricks, c->intHatTricks);
     player_stat(game, "Passes", c->seasonPasses, c->passes, c->intPasses);
     player_stat(game, "Assists", c->seasonAssists, c->assists, c->intAssists);
     player_stat(game, "StarMan", c->seasonStarMan, c->starMan, c->intStarMan);
