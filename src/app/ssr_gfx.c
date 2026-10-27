@@ -217,6 +217,9 @@ typedef struct {
     SDL_FColor colour;
     float cosA, sinA;
     float offsetX, offsetY;
+    // The fade of the alpha (SSRSceneItem.fade) from the y0 to the y1 of
+    // the drawn rect, in parts of the box.
+    float fade, fadeY0, fadeY1;
 } Placement;
 
 // A point of the box (as parts of the box) on the screen, after the
@@ -259,6 +262,11 @@ static SDL_Vertex vertex(const Placement *p, float x, float y, float u, float v)
     SDL_Vertex out;
     out.position = place(p, x, y);
     out.color = p->colour;
+    if (p->fade > 0 && p->fadeY1 != p->fadeY0) {
+        float t = (y - p->fadeY0) / (p->fadeY1 - p->fadeY0);
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        out.color.a *= 1 + (p->fade - 1) * t;
+    }
     out.tex_coord.x = u;
     out.tex_coord.y = v;
     return out;
@@ -318,7 +326,10 @@ static void draw_atlas_image(SSRGfx *gfx, const SSRAtlasImage *image, const Plac
             u1 = 1 - u0;
             v1 = 1 - v0;
         }
-        draw_quad(gfx, texture, p, r[0], r[1], r[4], r[5], u0, v0, u1, v1);
+        Placement faded = *p;
+        faded.fadeY0 = r[1];
+        faded.fadeY1 = r[5];
+        draw_quad(gfx, texture, &faded, r[0], r[1], r[4], r[5], u0, v0, u1, v1);
     } else if (image->kind == SSR_ATLAS_SLICED) {
         // A corner is at o + s * (drawn - fixed), in pixels of the box.
         float stretchX = fabsf(item->w) - (float)image->fixedWidth;
@@ -371,6 +382,9 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     p.sinA = sinf(radians);
     p.offsetX = gfx->offsetX;
     p.offsetY = gfx->offsetY;
+    p.fade = item->fade;
+    p.fadeY0 = 0;
+    p.fadeY1 = 1;
 
     const SSRAtlasImage *image = ssr_atlas_find(gfx->atlases, item->image);
     const char *file = image || !gfx->scene ? NULL : ssr_scene_image_file(gfx->scene, item->image);
@@ -391,6 +405,8 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     SDL_Texture *page = atlas_texture_for(gfx, image);
     if (page) SDL_SetTextureBlendMode(page, mode);
     draw_atlas_image(gfx, image, &p);
+    // A shadow draws the image alone (c_GImage.Render2).
+    if (item->fade > 0) return;
     // The cels of the image draw over it, each in the colour of its tweak
     // CelColours:cel on the colour of the item (c_GImage).
     const char *cels[16];
