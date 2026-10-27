@@ -51,6 +51,9 @@ int ssr_gfx_image_size(SSRGfx *gfx, const char *name, const char *file, float *w
 // layouts to the units of the window.
 void ssr_gfx_set_offset(SSRGfx *gfx, float x, float y);
 
+// The tweaks that give the colours of the cels (CelColours), or NULL.
+void ssr_gfx_set_tweaks(SSRGfx *gfx, const SSRTweaks *tweaks);
+
 // Draws each item of the scene.
 void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene);
 

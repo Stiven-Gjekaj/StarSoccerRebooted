@@ -116,6 +116,11 @@ const SSRSceneItem *ssr_scene_item(const SSRScene *scene, int index);
 // The file of an image that the layout names with Img:(Name,Path), or NULL.
 const char *ssr_scene_image_file(const SSRScene *scene, const char *name);
 
+// The colour text (#RRGGBBAA, or 16 digits with the mix factors) on the
+// parent colour 0xRRGGBBAA, as the colour stack of the game mixes them.
+// Returns the parent when the text is not a colour.
+uint32_t ssr_scene_mix_colour(const char *colour, uint32_t parent);
+
 // The ref of the last item with a ref at the point, or NULL.
 const char *ssr_scene_hit(const SSRScene *scene, float x, float y);
 

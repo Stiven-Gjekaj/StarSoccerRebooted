@@ -35,6 +35,7 @@ struct SSRGfx {
     SDL_Texture **frameTextures;
     // The Img: files of the scene that draws now.
     const SSRScene *scene;
+    const SSRTweaks *tweaks;
     float offsetX, offsetY;
 };
 
@@ -329,6 +330,31 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     SDL_Texture *page = atlas_texture_for(gfx, image);
     if (page) SDL_SetTextureBlendMode(page, mode);
     draw_atlas_image(gfx, image, &p);
+    // The cels of the image draw over it, each in the colour of its tweak
+    // CelColours:cel on the colour of the item (c_GImage).
+    const char *cels[16];
+    int celCount = ssr_atlas_cels(gfx->atlases, item->image, cels, 16);
+    for (int i = 0; i < celCount && i < 16; i++) {
+        char name[256];
+        SDL_snprintf(name, sizeof(name), "%s_%s", cels[i], item->image);
+        const SSRAtlasImage *cel = ssr_atlas_find(gfx->atlases, name);
+        if (!cel) continue;
+        const char *tweak = gfx->tweaks ? ssr_tweaks_get(gfx->tweaks, "CelColours", cels[i]) : "";
+        char text[24];
+        SDL_snprintf(text, sizeof(text), "#%s", tweak[0] == '#' ? tweak + 1 : tweak);
+        uint32_t colour = ssr_scene_mix_colour(text, item->colour);
+        p.colour.r = ((colour >> 24) & 0xFF) / 255.0f;
+        p.colour.g = ((colour >> 16) & 0xFF) / 255.0f;
+        p.colour.b = ((colour >> 8) & 0xFF) / 255.0f;
+        p.colour.a = (colour & 0xFF) / 255.0f;
+        SDL_Texture *celPage = atlas_texture_for(gfx, cel);
+        if (celPage) SDL_SetTextureBlendMode(celPage, mode);
+        draw_atlas_image(gfx, cel, &p);
+    }
+}
+
+void ssr_gfx_set_tweaks(SSRGfx *gfx, const SSRTweaks *tweaks) {
+    if (gfx) gfx->tweaks = tweaks;
 }
 
 // Draws one line of text with its top left at (x, y), scaled. The glyphs

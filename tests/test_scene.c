@@ -527,6 +527,10 @@ static void test_mixes_colours_and_orders_layers(void) {
     CHECK(strcmp(ssr_scene_item(scene, 3)->image, "Shallow") == 0);
     CHECK(strcmp(ssr_scene_item(scene, 4)->image, "Deep") == 0);
     CHECK(strcmp(ssr_scene_item(scene, 5)->image, "Replace") == 0);
+    // A cel tweak of 8 digits replaces the colour. One of 16 digits mixes.
+    CHECK(ssr_scene_mix_colour("#FF00FFFF", 0x80808080) == 0xFF00FFFF);
+    CHECK(ssr_scene_mix_colour("#FFFFFFFF000000FF", 0x80808080) == 0xFFFFFF80);
+    CHECK(ssr_scene_mix_colour("bad", 0x12345678) == 0x12345678);
     ssr_scene_free(scene);
     ssr_ui_free(tree);
     ssr_tweaks_free(tweaks);

@@ -2241,6 +2241,17 @@ const char *ssr_scene_image_file(const SSRScene *scene, const char *name) {
     return NULL;
 }
 
+uint32_t ssr_scene_mix_colour(const char *colour, uint32_t parent) {
+    Colour own, under;
+    if (!parse_colour(colour, &own)) return parent;
+    under.r = (float)(parent >> 24);
+    under.g = (float)((parent >> 16) & 0xFF);
+    under.b = (float)((parent >> 8) & 0xFF);
+    under.a = (parent & 0xFF) / 255.0f;
+    under.mr = under.mg = under.mb = under.ma = 0;
+    return colour_rgba(colour_mix(own, under));
+}
+
 static const SSRSceneItem *hit(const SSRScene *scene, float x, float y, int clicksOnly) {
     if (!scene) return NULL;
     for (int i = scene->count - 1; i >= 0; i--) {

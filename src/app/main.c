@@ -347,6 +347,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         }
         app->lastFrame = now;
         ssr_scene_update(app->scene, &env, ms);
+        ssr_gfx_set_tweaks(app->gfx, app->tweaks);
         ssr_gfx_draw_scene(app->gfx, app->scene);
     }
     if (!app->gfx) {
