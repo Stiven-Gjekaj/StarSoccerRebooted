@@ -9759,6 +9759,10 @@ void ssr_game_set_names(SSRGame *game, const char *text) {
     game->names = ssr_names_parse(text);
 }
 
+int ssr_game_add_players(SSRGame *game, const char *text) {
+    return game ? ssr_names_add_players(game->names, text) : 0;
+}
+
 void ssr_game_set_world_seed(SSRGame *game, int seed) {
     if (game) game->nextWorldSeed = seed;
 }

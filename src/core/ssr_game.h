@@ -196,6 +196,9 @@ void ssr_game_set_horse_names(SSRGame *game, const char *text);
 // The name lists of the players of the world (data/names.txt). The game
 // keeps a copy.
 void ssr_game_set_names(SSRGame *game, const char *text);
+// Adds the real players of a pack (world/Players.txt) to the names. Set
+// the names first. Returns the number of players.
+int ssr_game_add_players(SSRGame *game, const char *text);
 // The seed of the world of the next new career. 0 takes 1.
 void ssr_game_set_world_seed(SSRGame *game, int seed);
 // The players of the world of the career, or NULL.

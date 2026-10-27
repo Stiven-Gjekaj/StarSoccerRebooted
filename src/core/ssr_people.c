@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ssr_tsv.h"
+
 /* ------------------------------------------------------------ the names */
 
 typedef struct {
@@ -19,8 +21,21 @@ typedef struct {
     int group;
 } GroupLink;
 
+// A real player of a club, from world/Players.txt of a pack.
+typedef struct {
+    int club;
+    char first[24];
+    char last[32];
+    int nation, age, position, skill, potential;
+} RosterEntry;
+
+// The position of the manager in world/Players.txt.
+#define ROSTER_MANAGER SSR_POS_COUNT
+
 struct SSRNames {
     char *text;
+    RosterEntry *roster;
+    int rosterCount;
     NameGroup *groups;
     int groupCount;
     GroupLink *nations;
@@ -120,10 +135,49 @@ void ssr_names_free(SSRNames *names) {
         free(names->groups[i].last);
     }
     free(names->groups);
+    free(names->roster);
     free(names->nations);
     free(names->continents);
     free(names->text);
     free(names);
+}
+
+static int roster_position(const char *text) {
+    static const char *const NAMES[] = {"GK", "DEF", "MID", "ATT", "MGR"};
+    for (int i = 0; i <= ROSTER_MANAGER; i++) {
+        if (strcmp(text, NAMES[i]) == 0) return i;
+    }
+    return -1;
+}
+
+int ssr_names_add_players(SSRNames *names, const char *text) {
+    if (!names || !text) return 0;
+    SSRTsv *table = ssr_tsv_parse(text, strlen(text));
+    if (!table) return 0;
+    int club = ssr_tsv_column(table, "club"), first = ssr_tsv_column(table, "first");
+    int last = ssr_tsv_column(table, "last"), position = ssr_tsv_column(table, "position");
+    int rows = ssr_tsv_rows(table), added = 0;
+    RosterEntry *grown = club < 0 || last < 0 || position < 0 ? NULL
+                         : realloc(names->roster, sizeof(RosterEntry) * (size_t)(names->rosterCount + rows + 1));
+    if (grown) names->roster = grown;
+    for (int row = 0; grown && row < rows; row++) {
+        RosterEntry e = {0};
+        e.club = ssr_tsv_int(table, row, club, 0);
+        e.position = roster_position(ssr_tsv_cell(table, row, position));
+        const char *surname = ssr_tsv_cell(table, row, last);
+        // A row with no club, no surname, or no good position is not a player.
+        if (e.club <= 0 || !*surname || e.position < 0) continue;
+        snprintf(e.first, sizeof(e.first), "%s", ssr_tsv_cell(table, row, first));
+        snprintf(e.last, sizeof(e.last), "%s", surname);
+        e.nation = ssr_tsv_int(table, row, ssr_tsv_column(table, "nation"), 0);
+        e.age = ssr_tsv_int(table, row, ssr_tsv_column(table, "age"), 0);
+        e.skill = ssr_tsv_int(table, row, ssr_tsv_column(table, "skill"), 0);
+        e.potential = ssr_tsv_int(table, row, ssr_tsv_column(table, "potential"), 0);
+        names->roster[names->rosterCount++] = e;
+        added++;
+    }
+    ssr_tsv_free(table);
+    return added;
 }
 
 static int linked_group(const GroupLink *links, int count, int id) {
@@ -309,9 +363,37 @@ int ssr_people_make_squad(SSRPeople *people, const SSRWorld *world, const SSRNam
         if (!ssr_people_manager(people, club)) new_manager(people, world, names, c, year);
         return 0;
     }
-    int made = 0;
+    int made = 0, have[SSR_POS_COUNT] = {0};
+    // The real players of the club come first, then made-up players fill
+    // each position up to the shape of a squad.
+    for (int i = 0; i < names->rosterCount && made < SSR_SQUAD_MAX; i++) {
+        const RosterEntry *e = &names->roster[i];
+        if (e->club != club) continue;
+        if (e->position == ROSTER_MANAGER) {
+            SSRManager *m = new_manager(people, world, names, c, year);
+            if (!m) continue;
+            snprintf(m->first, sizeof(m->first), "%s", e->first);
+            snprintf(m->last, sizeof(m->last), "%s", e->last);
+            if (ssr_world_nation(world, e->nation)) m->nation = e->nation;
+            if (e->age > 0) m->born = year - e->age;
+            continue;
+        }
+        int age = e->age > 0 ? e->age : ssr_rand2(&people->random, 17, 34);
+        SSRPerson *p = new_player(people, world, names, c, e->position, age, year);
+        if (!p) continue;
+        snprintf(p->first, sizeof(p->first), "%s", e->first);
+        snprintf(p->last, sizeof(p->last), "%s", e->last);
+        if (ssr_world_nation(world, e->nation)) p->nation = e->nation;
+        if (e->skill > 0) {
+            int growth = p->potential - p->skill;
+            p->skill = clamp(e->skill, 1, 99);
+            p->potential = clamp(e->potential > 0 ? e->potential : p->skill + growth, p->skill, 100);
+        }
+        have[e->position]++;
+        made++;
+    }
     for (int pos = 0; pos < SSR_POS_COUNT; pos++) {
-        for (int k = 0; k < SHAPE[pos]; k++) made += new_player(people, world, names, c, pos, ssr_rand2(&people->random, 17, 34), year) != NULL;
+        for (int k = have[pos]; k < SHAPE[pos]; k++) made += new_player(people, world, names, c, pos, ssr_rand2(&people->random, 17, 34), year) != NULL;
     }
     if (!ssr_people_manager(people, club)) new_manager(people, world, names, c, year);
     return made;

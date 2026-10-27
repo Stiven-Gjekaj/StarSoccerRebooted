@@ -51,6 +51,42 @@ static void test_picks_names_by_nation(void) {
     CHECK(ssr_names_parse("# nothing\nnation 1 x\n") == NULL);
 }
 
+// The real players of a pack make the squad of their club. Made-up
+// players fill each position. A bad row is not a player.
+static void test_makes_a_squad_of_real_players(void) {
+    SSRWorld *world = small_world();
+    SSRNames *names = ssr_names_parse(NAMES);
+    CHECK(world && names);
+    const char *players = "club\tfirst\tlast\tposition\tnation\tage\tskill\tpotential\n"
+                          "10\tJon\tKeeper\tGK\t2\t30\t80\t\n"
+                          "10\tAl\tStriker\tATT\t\t19\t70\t88\n"
+                          "10\tMo\tBoss\tMGR\t2\t50\t\t\n"
+                          "10\tNo\tPlace\tWING\t1\t20\t50\t\n"
+                          "0\tNo\tClub\tGK\t1\t20\t50\t\n";
+    CHECK(ssr_names_add_players(names, players) == 3);
+    CHECK(ssr_names_add_players(names, "first\tlast\nA\tB\n") == 0);
+    SSRPeople *people = ssr_people_create(5);
+    CHECK(ssr_people_make_squad(people, world, names, 10, 1) == SSR_SQUAD_SIZE);
+    SSRPerson *squad[64];
+    int n = ssr_people_squad(people, 10, squad, 64), keeper = 0, striker = 0, keepers = 0;
+    for (int i = 0; i < n; i++) {
+        SSRPerson *p = squad[i];
+        keepers += p->position == SSR_POS_KEEPER;
+        if (strcmp(p->last, "Keeper") == 0)
+            keeper = p->position == SSR_POS_KEEPER && p->nation == 2 && p->born == 1 - 30 && p->skill == 80;
+        if (strcmp(p->last, "Striker") == 0)
+            striker = p->position == SSR_POS_ATTACKER && p->skill == 70 && p->potential == 88 && p->nation > 0;
+    }
+    CHECK(n == SSR_SQUAD_SIZE && keeper && striker && keepers == 3);
+    SSRManager *m = ssr_people_manager(people, 10);
+    CHECK(m && strcmp(m->first, "Mo") == 0 && strcmp(m->last, "Boss") == 0 && m->nation == 2 && m->born == 1 - 50);
+    // The other club has no real players.
+    CHECK(ssr_people_make_squad(people, world, names, 11, 1) == SSR_SQUAD_SIZE);
+    ssr_people_free(people);
+    ssr_names_free(names);
+    ssr_world_free(world);
+}
+
 // A squad has 22 players in four positions. The skills follow the
 // strength of the club. The same seed makes the same squad.
 static void test_makes_a_squad(void) {
@@ -251,6 +287,7 @@ static void test_keeps_the_people(void) {
 int main(void) {
     test_picks_names_by_nation();
     test_makes_a_squad();
+    test_makes_a_squad_of_real_players();
     test_plays_a_match();
     test_runs_the_seasons();
     test_runs_the_managers();

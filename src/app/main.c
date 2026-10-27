@@ -1140,6 +1140,15 @@ static void load_game(SSRApp *app) {
     } else {
         SDL_Log("The app has no data/names.txt.");
     }
+    // The real players of the pack.
+    if (app->packDirectory[0]) {
+        SDL_snprintf(path, sizeof(path), "%s/world/Players.txt", app->packDirectory);
+        char *players = SDL_LoadFile(path, NULL);
+        if (players) {
+            SDL_Log("The pack has %d players.", ssr_game_add_players(app->game, players));
+            SDL_free(players);
+        }
+    }
     ssr_game_load_settings(app->game, app->settingsPath);
     int chosen = ssr_game_settings(app->game)->language >= 0 || language_from_device(app);
     if (ssr_game_take_settings_change(app->game) && !ssr_game_save_settings(app->game, app->settingsPath)) {

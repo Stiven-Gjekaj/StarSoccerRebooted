@@ -27,6 +27,8 @@ enum {
 
 // The players in a squad that a club keeps.
 #define SSR_SQUAD_SIZE 22
+// The most real players of a pack that a squad takes.
+#define SSR_SQUAD_MAX 40
 
 typedef struct {
     int id;
@@ -81,6 +83,16 @@ typedef struct SSRNames SSRNames;
 // world/Names.txt of a pack). Returns NULL when the text has no names.
 SSRNames *ssr_names_parse(const char *text);
 void ssr_names_free(SSRNames *names);
+
+// Adds the real players of the clubs (world/Players.txt of a pack). The
+// text has a header row and the columns club, first, last, position,
+// nation, age, skill, and potential. position is GK, DEF, MID, ATT, or MGR
+// for the manager. club is the id of the club. A cell that is empty or not
+// there is made up: the nation, the age, and the skill. Returns the number
+// of rows that it added. ssr_people_make_squad then makes the squad of a
+// club from its real players, and fills each position with made-up
+// players.
+int ssr_names_add_players(SSRNames *names, const char *text);
 
 // Picks a first and a last name for a player of the nation. A nation with
 // no group of its own takes the group of its continent, then the first
