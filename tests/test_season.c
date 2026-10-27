@@ -216,6 +216,11 @@ static void test_counts_the_match_of_the_player(void) {
     ssr_season_my_result(s, tie, 1, 1);
     CHECK(tie->resultType == SSR_RESULT_EXTRA_TIME || tie->resultType == SSR_RESULT_PENALTIES);
     CHECK(ssr_fixture_winner(s, tie) != 0);
+    // A tie that the match played to penalties keeps the shoot-out.
+    SSRFixture *other = &cup->fixtures[1];
+    ssr_season_my_result_after_extra_time(s, other, 2, 2, 3, 4);
+    CHECK(other->resultType == SSR_RESULT_PENALTIES && other->result == -1);
+    CHECK(ssr_fixture_winner(s, other) == other->away);
     ssr_season_free(s);
 }
 

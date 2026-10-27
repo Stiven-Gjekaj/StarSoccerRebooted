@@ -1748,6 +1748,21 @@ void ssr_season_my_result(SSRSeason *s, SSRFixture *f, int score1, int score2) {
     if (h && a) update_points(h, a, f);
 }
 
+void ssr_season_my_result_after_extra_time(SSRSeason *s, SSRFixture *f, int score1, int score2, int pen1,
+                                           int pen2) {
+    if (!s || !f) return;
+    SSRPool *pool = fixture_pool(s, f);
+    if (!pool) return;
+    f->score1 = score1;
+    f->score2 = score2;
+    f->pen1 = pen1;
+    f->pen2 = pen2;
+    f->resultType = pen1 != pen2 ? SSR_RESULT_PENALTIES : SSR_RESULT_EXTRA_TIME;
+    f->result = -1;
+    SSRTableRow *h = ssr_season_row(s, pool, f->home), *a = ssr_season_row(s, pool, f->away);
+    if (h && a) update_points(h, a, f);
+}
+
 SSRFixture *ssr_season_find(SSRSeason *s, int compId, int sdate, int home, int away) {
     SSRSeasonComp *c = ssr_season_comp(s, compId);
     if (!c) return NULL;

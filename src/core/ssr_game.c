@@ -72,6 +72,8 @@ struct SSRGame {
     SSRSeason *season;
     // The minute when the player comes on, or 0 (c_TPlayer.m_subtime).
     int subTime;
+    // 1 when the last match went to extra time, and its penalties.
+    int extraTime, pens[3];
     // The fixture of the match that plays now: its competition, date, and
     // sides. A fixture has no fixed place in its list.
     int fixtureComp, fixtureDate, fixtureHome, fixtureAway;
@@ -1004,7 +1006,7 @@ static void match_tweaks(SSRGame *game) {
 static void match_state(SSRGame *game) {
     int state = 0;
     if (game->match->state == SSR_MATCH_PREMATCH) state = 1;
-    if (game->match->state == SSR_MATCH_HALF_TIME) state = 2;
+    if (game->match->state == SSR_MATCH_HALF_TIME || game->match->state == SSR_MATCH_PENALTIES) state = 2;
     if (game->match->state == SSR_MATCH_FULL_TIME) state = 3;
     ssr_tweaks_set_number(game->tweaks, "Match", "MatchState", state);
     ssr_tweaks_set_number(game->tweaks, "Menu", "MatchScreenFooter", state == 0 ? -1 : 0);
@@ -1196,6 +1198,8 @@ static void kits_button(SSRGame *game) {
 }
 
 // c_TMatch.SetUpFixture: the match of the next fixture of the player.
+static const SSRFixture *first_leg_of(const SSRSeasonComp *comp, const SSRFixture *f);
+
 static void start_match(SSRGame *game) {
     season_in(game);
     SSRFixture *f = ssr_season_next_fixture(game->season);
@@ -1241,6 +1245,10 @@ static void start_match(SSRGame *game) {
     // c_TPlayer sets m_dodribbling to 1 for each career, new or loaded.
     s.dribbling = 1;
     s.subTime = game->subTime;
+    s.matchType = f->matchType;
+    const SSRFixture *one = f->leg == 2 ? first_leg_of(comp, f) : NULL;
+    s.firstLegHome = one ? one->score1 : 0;
+    s.firstLegAway = one ? one->score2 : 0;
     ssr_match_start(game->match, &s, game->localise, game->context, &game->random);
     game->commentaryCount = 0;
     SSRTweaks *t = game->tweaks;
@@ -1404,6 +1412,9 @@ static void end_match(SSRGame *game) {
     }
     c->energy = m->energy;
     c->debut = 0;
+    game->extraTime = m->half >= 3;
+    game->pens[1] = m->pens[1];
+    game->pens[2] = m->pens[2];
     // UpdateRating: one change of a skill rating for each chance.
     for (int i = 0; i < m->ratingCount; i++) ssr_career_update_rating(c, m->ratingIndex[i], m->ratingSuccess[i]);
     free(game->match);
@@ -1615,7 +1626,12 @@ static void stats_continue(SSRGame *game) {
     season_in(game);
     SSRFixture *f = ssr_season_find(game->season, game->fixtureComp, game->fixtureDate, game->fixtureHome,
                                     game->fixtureAway);
-    if (f) ssr_season_my_result(game->season, f, game->facts.score1, game->facts.score2);
+    if (f && game->extraTime) {
+        ssr_season_my_result_after_extra_time(game->season, f, game->facts.score1, game->facts.score2,
+                                              game->pens[1], game->pens[2]);
+    } else if (f) {
+        ssr_season_my_result(game->season, f, game->facts.score1, game->facts.score2);
+    }
     // MatchRecovery comes first in PlayToDate, with the rest days to the
     // next match.
     game->recovery = ssr_energy_recovery(game->season ? ssr_season_rest_days(game->season) : 14, ssr_career_age(c));

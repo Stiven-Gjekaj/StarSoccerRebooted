@@ -203,6 +203,12 @@ int ssr_season_play_to(SSRSeason *season, int sdate);
 // remake has no extra time yet].
 void ssr_season_my_result(SSRSeason *season, SSRFixture *fixture, int score1, int score2);
 
+// The result of a tie of the player that went to extra time in the match:
+// the score after 120 minutes, and the penalties of a shoot-out (0 and 0
+// when there was none).
+void ssr_season_my_result_after_extra_time(SSRSeason *season, SSRFixture *fixture, int score1, int score2,
+                                           int pen1, int pen2);
+
 // The fixture with the competition, the date, and the sides, or NULL. A
 // fixture keeps no fixed place in its list, so the game finds it again.
 SSRFixture *ssr_season_find(SSRSeason *season, int compId, int sdate, int home, int away);
