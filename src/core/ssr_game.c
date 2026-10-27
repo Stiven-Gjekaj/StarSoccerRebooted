@@ -50,6 +50,8 @@ typedef struct {
     // plays in its away kit (m_awaykit).
     int kitStyle;
     int awayKit;
+    // 1 for a nation, else a club.
+    int level;
 } Team;
 
 struct SSRGame {
@@ -1826,11 +1828,36 @@ static void set_colour_tweak(SSRGame *game, const char *name, Rgb c, float alpha
     ssr_tweaks_set_kind(game->tweaks, "MatchColours", name, value, SSR_TWEAK_COLOUR);
 }
 
+// The crest of a club in the chosen pack (crests/<id>.png) takes the place
+// of the shield of the team in the badge slot (1 or 2). The frame of the
+// shield gets the image of the crest, and the parts of the shield go. A
+// shield of slot 1 is a flipped image, so it gets the flipped crest.
+static void team_crest(SSRGame *game, int slot, int level, int id) {
+    char path[4096], name[48], image[48];
+    int has = 0;
+    if (level != 1 && game->packsDirectory[0] && game->settings.pack[0]) {
+        snprintf(path, sizeof(path), "%s/%s/crests/%d.png", game->packsDirectory, game->settings.pack, id);
+        FILE *file = fopen(path, "rb");
+        has = file != NULL;
+        if (file) fclose(file);
+    }
+    snprintf(name, sizeof(name), "HasCrest%d", slot);
+    ssr_tweaks_set_number(game->tweaks, "MatchColours", name, has);
+    snprintf(name, sizeof(name), "ShieldFrame%d", slot);
+    if (has) {
+        snprintf(image, sizeof(image), "%s%d", slot == 1 ? "CrestM_" : "Crest_", id);
+    } else {
+        snprintf(image, sizeof(image), "MapShieldFrameAll");
+    }
+    ssr_tweaks_set(game->tweaks, "MatchColours", name, image);
+}
+
 static int team_of(SSRGame *game, int level, int id, int strength, Team *team) {
     memset(team, 0, sizeof(*team));
     team->id = id;
     team->strength = strength;
     team->badgeStyle = id % 15;
+    team->level = level;
     if (level == 1) {
         const SSRNation *n = ssr_world_nation(game->world, id);
         if (!n) return 0;
@@ -1867,6 +1894,7 @@ static void team_plates(SSRGame *game, const Team *home, const Team *away, const
         set_colour_tweak(game, name, teams[i]->badge2, 1);
         snprintf(name, sizeof(name), "BadgeStyle%d", i + 1);
         ssr_tweaks_set_number(game->tweaks, "MatchColours", name, teams[i]->badgeStyle);
+        team_crest(game, i + 1, teams[i]->level, teams[i]->id);
     }
     set_colour_tweak(game, "MyTeamBadge1Col1", mine->badge1, 1);
     set_colour_tweak(game, "MyTeamBadge1Col2", mine->badge2, 1);
@@ -3384,6 +3412,7 @@ static void club_fixtures(SSRGame *game, int teamId, int level) {
         set_colour_tweak(game, "Badge1Col1", team.badge1, 1);
         set_colour_tweak(game, "Badge1Col2", team.badge2, 1);
         ssr_tweaks_set_number(game->tweaks, "MatchColours", "BadgeStyle1", team.badgeStyle);
+        team_crest(game, 1, level, teamId);
         add_op(game, SSR_OP_TEXT, "FixtureTeamName", NULL, team.tla, 0);
     }
     add_op(game, SSR_OP_LIST_CLEAR, "FixtureList", NULL, NULL, 0);

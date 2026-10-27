@@ -247,6 +247,61 @@ static SDL_Texture *own_art(SSRGfx *gfx, const char *name) {
     return cached_texture(gfx, key, path, 1);
 }
 
+// The size of the image of a crest: the shape of a shield, so that the
+// crest fills the box of the shield that it replaces.
+#define CREST_W 256
+#define CREST_H 348
+
+// The crest of a club in the pack: "Crest_<id>", or "CrestM_<id>" for the
+// flipped crest of a flipped shield. The image of crests/<id>.png goes in
+// a circle with a white ring, in the middle of an image of the shape of a
+// shield. Returns NULL when the image is not a crest or is not there.
+static SDL_Texture *crest_texture(SSRGfx *gfx, const char *name) {
+    int flip = SDL_strncmp(name, "CrestM_", 7) == 0;
+    if (!flip && SDL_strncmp(name, "Crest_", 6) != 0) return NULL;
+    if (!gfx->packDirectory[0]) return NULL;
+    for (int i = 0; i < gfx->textureCount; i++) {
+        if (SDL_strcmp(gfx->textures[i].name, name) == 0) return gfx->textures[i].texture;
+    }
+    char path[2400];
+    SDL_snprintf(path, sizeof(path), "%s/crests/%d.png", gfx->packDirectory, SDL_atoi(name + (flip ? 7 : 6)));
+    SSRImage source;
+    SDL_Texture *texture = NULL;
+    unsigned char *pixels = load_own_image(path, &source) ? SDL_calloc(CREST_W * CREST_H, 4) : NULL;
+    if (pixels) {
+        const float cx = CREST_W / 2.0f, cy = CREST_H / 2.0f, outer = CREST_W / 2.0f - 4, inner = outer - 9;
+        // The source covers the inner circle.
+        float scale = (float)(source.width < source.height ? source.width : source.height) / (2 * inner);
+        for (int y = 0; y < CREST_H; y++) {
+            for (int x = 0; x < CREST_W; x++) {
+                float dx = x + 0.5f - cx, dy = y + 0.5f - cy, d = SDL_sqrtf(dx * dx + dy * dy);
+                float ring = SDL_clamp(outer - d + 0.5f, 0.0f, 1.0f);
+                if (ring <= 0) continue;
+                float in = SDL_clamp(inner - d + 0.5f, 0.0f, 1.0f);
+                int sx = (int)(source.width / 2.0f + (flip ? -dx : dx) * scale);
+                int sy = (int)(source.height / 2.0f + dy * scale);
+                sx = SDL_clamp(sx, 0, source.width - 1);
+                sy = SDL_clamp(sy, 0, source.height - 1);
+                const unsigned char *from = source.pixels + ((size_t)sy * source.width + sx) * 4;
+                // The crest lies on white, inside the white ring.
+                float a = from[3] / 255.0f * in;
+                unsigned char *to = pixels + ((size_t)y * CREST_W + x) * 4;
+                for (int c = 0; c < 3; c++) to[c] = (unsigned char)(from[c] * a + 255 * (1 - a) + 0.5f);
+                to[3] = (unsigned char)(ring * 255 + 0.5f);
+            }
+        }
+        texture = texture_from_pixels(gfx->renderer, CREST_W, CREST_H, pixels);
+        SDL_free(pixels);
+        ssr_image_free(&source);
+    }
+    if (gfx->textureCount < MAX_TEXTURES) {
+        NamedTexture *slot = &gfx->textures[gfx->textureCount++];
+        SDL_strlcpy(slot->name, name, sizeof(slot->name));
+        slot->texture = texture;
+    }
+    return texture;
+}
+
 // Uploads the atlas of the font when it has new glyphs. The atlas becomes
 // white pixels with the coverage as alpha, so that a colour mod tints it.
 static SDL_Texture *atlas_texture(SSRGfx *gfx, FontSlot *slot) {
@@ -575,8 +630,9 @@ static void draw_image_item(SSRGfx *gfx, const SSRSceneItem *item) {
     p.fadeY0 = 0;
     p.fadeY1 = 1;
 
-    const SSRAtlasImage *image = ssr_atlas_find(gfx->atlases, item->image);
-    SDL_Texture *texture = own_art(gfx, item->image);
+    SDL_Texture *texture = crest_texture(gfx, item->image);
+    const SSRAtlasImage *image = texture ? NULL : ssr_atlas_find(gfx->atlases, item->image);
+    if (!texture) texture = own_art(gfx, item->image);
     if (texture) image = NULL;
     const char *file = image || texture || !gfx->scene ? NULL : ssr_scene_image_file(gfx->scene, item->image);
     if (file) texture = ssr_gfx_texture(gfx, file);
