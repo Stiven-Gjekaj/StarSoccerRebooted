@@ -3714,6 +3714,7 @@ static void call_relation_screen(SSRGame *game) {
 }
 
 static void spent_too_much_time(SSRGame *game) {
+    play_sound(game, "CError");
     char text[256], number[16];
     snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_SPENTTOOMUCHTIME"));
     snprintf(number, sizeof(number), "%d", MAX_RELATION_ACTIVITIES);
@@ -3725,6 +3726,7 @@ static void spent_too_much_time(SSRGame *game) {
 // GSPlayerNotEnoughEnergy: the remake has no adverts, so the NRG overlay
 // offers only the cans.
 static void not_enough_energy(SSRGame *game, const char *activity, float need) {
+    play_sound(game, "CError");
     float v = need - game->career.energy;
     ssr_tweaks_set_number(game->tweaks, "WatchAdNRG", "RefillAmount", v < 1 ? 1 : v);
     ssr_tweaks_set_number(game->tweaks, "WatchAdNRG", "ShowNRGAdReward", 0);
@@ -3758,15 +3760,21 @@ static void activity(SSRGame *game, int bar) {
         if (ssr_career_lifestyle(c) < 20.0f) text = "CMESSAGE_NOGIRLFRIENDLIFESTYLE";
         else if (c->relationPartner == 0) text = "CMESSAGE_NOGIRLFRIEND";
         if (text) {
+            play_sound(game, "CError");
             message(game, partner_screen(game), loc(game, text), 0, 1, "DoRelationScreen");
             return;
         }
     }
     if (bar == 4 && c->relationSponsors == 0) {
+        play_sound(game, "CError");
         message(game, "messagesponsor", loc(game, "CMESSAGE_NOSPONSORS"), 0, 1, "DoRelationScreen");
         return;
     }
-    if (!activity_allowed(game)) return;
+    if (!activity_allowed(game)) {
+        // The partner and the sponsors play the error two times.
+        if (bar >= 3) play_sound(game, "CError");
+        return;
+    }
     // The time with the partner counts before the game, win or lose.
     if (bar == 3) c->lastSpendTimePartner = (float)c->sdate;
     start_pairs(game, bar);
@@ -6506,6 +6514,8 @@ static void start_pairs(SSRGame *game, int relation) {
 }
 
 static void flip_cards_down(SSRGame *game) {
+    // [I: the game names "Card_Dealt_1"; the remake plays its set DealCard.]
+    play_sound(game, "DealCard");
     for (int k = 0; k < 16; k++) flip_card(game, k, 0, "1");
 }
 
@@ -6522,6 +6532,7 @@ static int compare_places(void *context, int a, int b) {
 
 // NewButtonPositions and AScreen_Pairs.Shuffle.
 static void shuffle_cards(SSRGame *game) {
+    play_sound(game, "KeyboardWhoosh");
     int randNo[16], places[16];
     for (int i = 0; i < 16; i++) {
         randNo[i] = ssr_rand(&game->random, 99);
@@ -6543,6 +6554,7 @@ static void pairs_success(SSRGame *game, int imgId) {
     static const char *TAGS[5] = {"CDILEMMA_BOSS", "CDILEMMA_TEAM", "CDILEMMA_FANS", "CDILEMMA_GIRL",
                                   "CDILEMMA_SPONSORS"};
     int r = game->pairsRelation;
+    play_sound(game, "CSuccess");
     char text[64];
     snprintf(text, sizeof(text), "%s", loc(game, "Success!"));
     upper(text);
@@ -6559,6 +6571,7 @@ static void pairs_success(SSRGame *game, int imgId) {
 }
 
 static void pairs_fail(SSRGame *game) {
+    play_sound(game, "CError");
     char text[64];
     snprintf(text, sizeof(text), "%s", loc(game, "Fail!"));
     upper(text);
@@ -6616,6 +6629,7 @@ static void click_card(SSRGame *game, int k) {
     int icon = game->iconOrder[k];
     if (game->icons[icon].picked) return;
     game->icons[icon].picked = 1;
+    play_sound(game, "DealCard");
     flip_card(game, k, 40, "-1");
     game->clicked++;
     if (game->clicked == 2) game->timeClicked = game->now;

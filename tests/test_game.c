@@ -815,9 +815,14 @@ static void spend_time(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Player", "BossRelationship_Title"), "BOSS_CAPS_SPACEAFTER 50") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Player", "BossRelationship_Displayed") == 50);
     CHECK(ssr_tweaks_number(tweaks, "Menu", "InternationalBoss") == 0);
-    // No partner and no sponsors: a message, and no activity.
+    // No partner and no sponsors: a message with the error sound, and no
+    // activity.
+    while (ssr_game_take_sound(game)) {
+    }
     ssr_game_message(game, "relationships.btn_Girlfriend");
     CHECK(strcmp(ssr_game_screen(game), "messageboyfriend") == 0);
+    const char *sound = ssr_game_take_sound(game);
+    CHECK(sound && strcmp(sound, "CError") == 0);
     ssr_game_message(game, "message.btn_Ok");
     CHECK(strcmp(ssr_game_screen(game), "relationships") == 0 && c->spentTime == 0);
     ssr_game_message(game, "relationships.btn_Sponsors");
@@ -841,9 +846,18 @@ static void spend_time(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     // The cards turn and move before the player can click.
     ssr_game_message(game, "pairs.btn_0");
     ssr_game_update(game, 60 * 4);
+    while (ssr_game_take_sound(game)) {
+    }
     click_two(game, faces, 1);
     ssr_game_update(game, 90);
     CHECK(strcmp(ssr_game_screen(game), "messageboss") == 0 && c->relationBoss == 55);
+    // Each card plays the deal sound, then the pair plays the success.
+    int deals = 0, success = 0;
+    while ((sound = ssr_game_take_sound(game)) != NULL) {
+        deals += strcmp(sound, "DealCard") == 0;
+        success += strcmp(sound, "CSuccess") == 0;
+    }
+    CHECK(deals == 2 && success == 1);
     CHECK(strncmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CDILEMMA_BOSS", 13) == 0);
     ssr_game_message(game, "message.btn_Ok");
     CHECK(strcmp(ssr_game_screen(game), "relationships") == 0);
