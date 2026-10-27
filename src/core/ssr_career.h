@@ -99,6 +99,11 @@ typedef struct {
     int retired;
     // The news that the next screen shows, or "".
     char headline[512];
+    // The news of a cup winner that the results show next, or "".
+    char headlineResult[256];
+    // 1 when the news of this match week is done: the next Play goes to
+    // the match (c_TPlayer.newsdone).
+    int newsDone;
     char gameVersion[16];
 } SSRCareer;
 

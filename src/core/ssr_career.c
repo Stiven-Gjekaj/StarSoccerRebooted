@@ -41,6 +41,7 @@ void ssr_career_create(SSRCareer *c, const char *first, const char *last, int ge
     c->relationBoss = c->relationTeam = c->relationFans = 75;
     c->debut = 1;
     c->lastSpendTimeFriends = c->lastSpendTimePartner = 28;
+    c->newsDone = 1;
     c->energy = 100;
     c->nrg[0] = c->nrg[1] = c->nrg[2] = 1;
     for (int i = 0; i < 10; i++) c->ratings[i] = 5;
@@ -175,6 +176,37 @@ static void write_ints(FILE *file, const char *name, const int *values, int coun
     fputc('\n', file);
 }
 
+// A line ends a text, so the save keeps its new lines as "\n".
+static void write_text(FILE *file, const char *name, const char *text) {
+    fprintf(file, "%s=", name);
+    for (const char *p = text; *p; p++) {
+        if (*p == '\n') {
+            fputs("\\n", file);
+        } else if (*p == '\\') {
+            fputs("\\\\", file);
+        } else {
+            fputc(*p, file);
+        }
+    }
+    fputc('\n', file);
+}
+
+static void read_text(const char *value, char *out, size_t capacity) {
+    size_t used = 0;
+    for (const char *p = value; *p && used + 1 < capacity; p++) {
+        if (p[0] == '\\' && p[1] == 'n') {
+            out[used++] = '\n';
+            p++;
+        } else if (p[0] == '\\' && p[1] == '\\') {
+            out[used++] = '\\';
+            p++;
+        } else {
+            out[used++] = *p;
+        }
+    }
+    out[used] = 0;
+}
+
 static void write_floats(FILE *file, const char *name, const float *values, int count) {
     fprintf(file, "%s=", name);
     for (int i = 0; i < count; i++) fprintf(file, i ? ",%g" : "%g", values[i]);
@@ -244,6 +276,7 @@ void ssr_career_reset_season(SSRCareer *c) {
     c->seasonHatTricks = c->seasonStarMan = c->seasonChances = 0;
     c->seasonTotalRating = 0;
     c->wonMajorAward = 0;
+    c->headlineResult[0] = 0;
     c->energy = 100;
     // The boss and the team forget a tenth of the relation.
     c->relationBoss -= c->relationBoss * 0.1f;
@@ -300,18 +333,9 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     fprintf(file, "potyawards=%d\nwonmajoraward=%d\n", c->potyAwards, c->wonMajorAward);
     fprintf(file, "starrating=%d\n", c->starRating);
     fprintf(file, "retired=%d\n", c->retired);
-    // A line ends the headline, so the save keeps its new lines as "\n".
-    fputs("headline=", file);
-    for (const char *p = c->headline; *p; p++) {
-        if (*p == '\n') {
-            fputs("\\n", file);
-        } else if (*p == '\\') {
-            fputs("\\\\", file);
-        } else {
-            fputc(*p, file);
-        }
-    }
-    fputc('\n', file);
+    fprintf(file, "newsdone=%d\n", c->newsDone);
+    write_text(file, "headline", c->headline);
+    write_text(file, "headlineresult", c->headlineResult);
     int ok = !ferror(file);
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
@@ -425,21 +449,9 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "wonmajoraward") == 0) c->wonMajorAward = number;
         else if (strcmp(key, "starrating") == 0) c->starRating = number;
         else if (strcmp(key, "retired") == 0) c->retired = number;
-        else if (strcmp(key, "headline") == 0) {
-            size_t used = 0;
-            for (const char *p = value; *p && used + 1 < sizeof(c->headline); p++) {
-                if (p[0] == '\\' && p[1] == 'n') {
-                    c->headline[used++] = '\n';
-                    p++;
-                } else if (p[0] == '\\' && p[1] == '\\') {
-                    c->headline[used++] = '\\';
-                    p++;
-                } else {
-                    c->headline[used++] = *p;
-                }
-            }
-            c->headline[used] = 0;
-        }
+        else if (strcmp(key, "newsdone") == 0) c->newsDone = number;
+        else if (strcmp(key, "headline") == 0) read_text(value, c->headline, sizeof(c->headline));
+        else if (strcmp(key, "headlineresult") == 0) read_text(value, c->headlineResult, sizeof(c->headlineResult));
     }
     fclose(file);
     return c->clubId != 0;

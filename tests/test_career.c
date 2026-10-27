@@ -62,6 +62,10 @@ static void test_saves_and_loads_a_career(void) {
     c.vehicles[19] = 10500;
     c.properties[4] = 1;
     snprintf(c.headline, sizeof(c.headline), "Line one\nA \\ two");
+    // A new career has no news in its first week.
+    CHECK(c.newsDone == 1);
+    c.newsDone = 0;
+    snprintf(c.headlineResult, sizeof(c.headlineResult), "ARS have won the CUP!");
     char path[1200];
     snprintf(path, sizeof(path), "%s/slot0.txt", ssr_test_directory("career_save"));
     CHECK(ssr_career_save(&c, path));
@@ -79,6 +83,7 @@ static void test_saves_and_loads_a_career(void) {
     CHECK(back.potyAwards == 2 && back.wonMajorAward == 1);
     CHECK(back.relationBossInt == 60 && back.relationFansInt == 12.5f && back.debut == 0);
     CHECK(back.intNotPickedMessage == 400);
+    CHECK(back.newsDone == 0 && strcmp(back.headlineResult, "ARS have won the CUP!") == 0);
     CHECK(back.relationPartner == 40.5f && back.relationSponsors == 22 && back.spentTime == 2);
     CHECK(back.lastSpendTimePartner == 28 && back.lastSpendTimeFriends == 28);
     CHECK(back.sponsors[3] == 9 && back.sponsors[0] == 0);
@@ -89,6 +94,7 @@ static void test_saves_and_loads_a_career(void) {
     ssr_career_reset_season(&back);
     CHECK(back.relationBoss == 45 && back.relationBossInt == 54);
     CHECK(back.seasonApps == 0 && back.seasonTotalRating == 0 && back.wonMajorAward == 0 && back.energy == 100);
+    CHECK(back.headlineResult[0] == 0);
     CHECK(back.apps == 12 && back.potyAwards == 2 && back.form[4] == 8);
     back.sdate = 1;
     CHECK(ssr_career_age(&back) == 16);
