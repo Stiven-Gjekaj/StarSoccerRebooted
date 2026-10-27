@@ -281,8 +281,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       them.
 - [x] Compare the stats of the rivals with the stats of the player (the
       third list of the squad screen)
-- [ ] Teammates who matter: a strike partner, a captain, a young player
-      that the player mentors
+- [x] Teammates who matter: the strike partner, and a young player that
+      the player mentors. A good team spirit helps the young player grow.
 - [x] Managers with styles (balanced, youth, attacking). The managers of
       the bottom clubs can go at the end of a season. A new manager of the
       club of the player starts the boss relation again at 50.
@@ -309,7 +309,7 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] Rivalries that grow from title races and transfers, in the ticker
 - [ ] Rivalries that grow from cup finals
 - [x] Form: a club in a run of wins or defeats, in the ticker
-- [ ] Comebacks: a player who returns from an injury
+- [x] Comebacks: the player returns from an injury, with an alert
 
 ### History
 
@@ -335,17 +335,17 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 - [x] Rest and fitness: a match can injure the player, who misses the
       matches until the injury heals
-- [ ] The player can choose to play with pain, at a risk
+- [x] The player can choose to play with pain, at a risk
 - [ ] Contract drama: release clauses, loans, a club that refuses to sell
 - [ ] Business and charity, with effects on fame and on the world
 
 ### Replay value
 
-- [ ] World seeds, so that friends can share a world. The career keeps
-      its seed (`SSR_WORLD_SEED` fixes it). A screen to type it is still
-      to do.
-- [ ] Challenge starts: the lowest league at age 30, or one stat at its
-      maximum
+- [x] World seeds, so that friends can share a world. Options, World
+      types the seed of the next career. The Honours screen shows the seed
+      of the career.
+- [x] Challenge starts: the pace at its maximum, or no Bux and no NRG
+- [ ] A challenge start at age 30 in the lowest league
 - [ ] Many careers in one world. The next player can play against the
       last one.
 
