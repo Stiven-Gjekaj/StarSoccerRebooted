@@ -96,6 +96,7 @@ typedef enum {
     D_SPAWN,
     D_SLOT,
     D_READOUT_CONCAT,
+    D_MECH_DIGIT,
     D_SHOW_SHELL,
     D_SWIPE_PANEL,
     D_EMIT_PLACER,
@@ -1548,6 +1549,17 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         d->v[1] = (float)number(s, m, 8, 0);
         d->v[2] = (float)(int)number(s, m, 10, lo);
         d->v[3] = (float)(int)number(s, m, 11, hi);
+    } else if (is(n, "MechDigit") && g->kind == GEL_ANIM) {
+        // MechDigit(Cat,Name,scale): the animation rolls to the digit of the
+        // tweak, 200 frames a digit (c_MechDigit). It starts at frame 2200
+        // and moves only by the doodad.
+        d = new_doodad(D_MECH_DIGIT, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+        d->v[1] = (float)(int)number(s, m, 2, 0);
+        g->speed = 0;
+        g->frame = 2200;
     } else if (is(n, "ReadoutConcat")) {
         // ReadoutConcat(Cat,Name,separator,...): the values of the tweaks,
         // each with the separator after it. A separator "@Tag" is the text
@@ -2700,6 +2712,26 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         snprintf(text, sizeof(text), "%.*s%s%.*s", prefixLength, d->text[2], sign ? number : number + 1, suffixLength,
                  suffix);
         set_shown(g, text);
+        break;
+    }
+    case D_MECH_DIGIT: {
+        // The roll speeds up by 0.35 a frame, up to 30, and stops on the
+        // frame of the digit. It goes on past 2400 to the next turn.
+        g->speed = 0;
+        int value = (int)ssr_tweaks_number(s->env->tweaks, d->text[0], d->text[1]);
+        int scale = (int)d->v[1] != 0 ? (int)d->v[1] : 1;
+        float target = (float)((value < 0 ? 0 : (int)fmodf((float)(value / scale), 12.0f)) * 200);
+        for (int i = 0; i <= (int)(s->frameDelta - 1); i++) {
+            float at = fmodf(g->frame, 2400.0f);
+            while (target + 1 < at) target += 2400.0f;
+            d->v[0] = d->v[0] + 0.35f < 30 ? d->v[0] + 0.35f : 30;
+            if (at + d->v[0] >= target) {
+                g->frame = target;
+                d->v[0] = 0;
+            } else {
+                g->frame = at + d->v[0];
+            }
+        }
         break;
     }
     case D_READOUT_CONCAT: {

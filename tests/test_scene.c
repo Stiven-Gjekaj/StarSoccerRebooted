@@ -1756,6 +1756,48 @@ static void test_joins_tweaks_in_a_text(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// MechDigit() rolls a card from 11 to the digit of a tweak, 200 frames a
+// digit, always forward (c_MechDigit).
+static void test_rolls_a_digit(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Negotiation", "Card1", 1);
+    SSRUiTree *tree;
+    layout = "Animation:(2400,Loop) ref:DigitAnim\n"
+             "{\n"
+             "\tDuring:(0,199>)\n"
+             "\t{\n"
+             "\t\tDraw:(D0,0,0,10,10)\n"
+             "\t}\n"
+             "\tDuring:(200,399>)\n"
+             "\t{\n"
+             "\t\tDraw:(D1,0,0,10,10)\n"
+             "\t}\n"
+             "\tDuring:(2200,2399>)\n"
+             "\t{\n"
+             "\t\tDraw:(D11,0,0,10,10)\n"
+             "\t}\n"
+             "}\n"
+             "AnimInstance:(0,0,DigitAnim,2000,0)\n"
+             "\tMechDigit(Negotiation,Card1,1,1,0)\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(find_image(scene, "D11") && !find_image(scene, "D1"));
+    for (int i = 0; i < 100; i++) ssr_scene_update(scene, &env, 17);
+    CHECK(find_image(scene, "D1") && !find_image(scene, "D11"));
+    // The card goes on forward to 0, past the end of the turn.
+    ssr_tweaks_set_number(tweaks, "Negotiation", "Card1", 0);
+    for (int i = 0; i < 10; i++) ssr_scene_update(scene, &env, 17);
+    CHECK(!find_image(scene, "D0"));
+    for (int i = 0; i < 200; i++) ssr_scene_update(scene, &env, 17);
+    CHECK(find_image(scene, "D0") && !find_image(scene, "D1"));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -2145,6 +2187,7 @@ int main(void) {
     test_follows_a_spine_slot();
     test_styles_the_shadow_of_a_text();
     test_joins_tweaks_in_a_text();
+    test_rolls_a_digit();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
