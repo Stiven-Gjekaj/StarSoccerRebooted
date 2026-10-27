@@ -228,11 +228,26 @@ static int seasons = 0, notPicked = 0, substitutes = 0;
 
 static int transfers = 0;
 
+// 1 when the game menu shows, after the test closes the messages that can
+// come over it: the trainer, the agent, and the offers of the shop. A
+// question gets No.
+static int at_game_menu(SSRGame *game, SSRTweaks *tweaks) {
+    for (int i = 0; i < 6 && strncmp(ssr_game_screen(game), "message", 7) == 0; i++) {
+        int question = ssr_tweaks_number(tweaks, "Message", "ShowDec") == 1;
+        ssr_game_message(game, question ? "message.btn_Cancel" : "message.btn_Ok");
+        ssr_game_update(game, 130);
+    }
+    return strcmp(ssr_game_screen(game), "gamemenu") == 0;
+}
+
 // Yes to a transfer at the end of the season: a nation, a division, a
 // club, and the contract. A season with no club that wants the player
 // goes on with the club.
 static void transfer_at_season_end(SSRGame *game, SSRTweaks *tweaks) {
     const SSRCareer *c = ssr_game_career(game);
+    // At the second end the star rating is 400: the limit is about 65, so
+    // the club of strength 50 wants the player.
+    if (seasons == 1) ((SSRCareer *)c)->starRating = 400;
     ssr_game_message(game, "message.btn_Ok");
     // A player of a low star rating: no club wants the player.
     if (strcmp(ssr_game_screen(game), "message") == 0) {
@@ -348,7 +363,7 @@ static void retire(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     // Play keeps the score, and the career goes one day back.
     ssr_game_message(game, "retirement.btn_Play");
     CHECK(c->retired == score && c->sdate == sdate - 1);
-    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+    CHECK(at_game_menu(game, tweaks));
     CHECK(ssr_tweaks_number(tweaks, "Menu", "DisableQuitButton") == 0);
     SSRCareer saved;
     CHECK(ssr_career_load(&saved, path) && saved.retired == score);
@@ -434,7 +449,7 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     seasons++;
 }
 
-static int winnerPages = 0, newsSeen = 0, dilemmasSeen = 0, interviews = 0, interviewsWon = 0;
+static int winnerPages = 0, newsSeen = 0, dilemmasSeen = 0, interviews = 0, interviewsWon = 0, trainerMessages = 0;
 
 // The interview after a match: the green buttons light one at a time, then
 // the player repeats them. Every second interview the test makes a fault.
@@ -477,6 +492,11 @@ static void give_an_interview(SSRGame *game, SSRTweaks *tweaks) {
 // Play on the game menu: the news of the week comes first. The test
 // answers it until the fixtures show.
 static void press_play(SSRGame *game) {
+    // The message of the trainer can show on the game menu after a match.
+    for (int i = 0; i < 4 && strcmp(ssr_game_screen(game), "messagetrainer") == 0; i++) {
+        trainerMessages++;
+        ssr_game_message(game, "message.btn_Ok");
+    }
     ssr_game_message(game, "gamemenu.btn_Play");
     for (int i = 0; i < 20 && strcmp(ssr_game_screen(game), "leaguefixtures") != 0; i++) {
         const char *screen = ssr_game_screen(game);
@@ -486,6 +506,10 @@ static void press_play(SSRGame *game) {
             // A decision runs its function 2000 ms after the choice.
             ssr_game_update(game, 130);
         } else if (strncmp(screen, "webpage", 7) == 0) {
+            // The news of a cup winner comes first on the next page.
+            SSRUiOp ops[16];
+            int count = take_ops(game, ops, 16);
+            winnerPages += has_op(ops, count, SSR_OP_TEXT, "MessageText", "PRM have won the CUP!");
             ssr_game_message(game, "webpage.btn_Ok");
         } else if (strcmp(screen, "dilemma") == 0) {
             dilemmasSeen++;
@@ -494,6 +518,9 @@ static void press_play(SSRGame *game) {
             ssr_game_update(game, 160);
         } else if (strcmp(screen, "relationships") == 0) {
             ssr_game_message(game, "relationships.btn_Home");
+        } else if (strcmp(screen, "casino") == 0) {
+            // The team mates ask the player to the casino: no bet.
+            ssr_game_message(game, "casino.btn_Home");
         } else if (strcmp(screen, "contract") == 0) {
             // An offer in the transfer window: the player stays.
             ssr_game_message(game, "contract.btn_Reject");
@@ -804,6 +831,8 @@ static void not_picked_by_the_boss(SSRGame *game, SSRTweaks *tweaks, const char 
     int apps = ssr_game_career(game)->apps;
     press_play(game);
     if (strcmp(ssr_game_screen(game), "league") == 0) return;
+    // The news of the week can change the relation: it is 5 at the match.
+    ((SSRCareer *)ssr_game_career(game))->relationBoss = 5;
     ssr_game_message(game, "leaguefixtures.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "messageboss") == 0);
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_NOTPICKEDRELATION_NEW") == 0);
@@ -812,7 +841,7 @@ static void not_picked_by_the_boss(SSRGame *game, SSRTweaks *tweaks, const char 
     ssr_game_message(game, "leaguefixtures.btn_Play");
     if (strcmp(ssr_game_screen(game), "league") == 0) ssr_game_message(game, "league.btn_Continue");
     if (strcmp(ssr_game_screen(game), "seasonreview") == 0) finish_season(game, tweaks);
-    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+    CHECK(at_game_menu(game, tweaks));
 }
 
 // Saves the career after three activities, with two sponsors and the news
@@ -1024,6 +1053,78 @@ static void choose_a_dilemma(SSRGame *game, const char *path) {
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
+// Loads the career c from the save file, with no news done.
+static void load_career(SSRGame *game, SSRCareer *c, const char *path) {
+    c->newsDone = 0;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+}
+
+// A skill with no training: with no trainer it loses its top level after
+// the days of the year. With a trainer, the trainer warns first, and the
+// next check takes the level.
+static void lose_a_skill_with_no_training(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    while (strncmp(ssr_game_screen(game), "message", 7) == 0) ssr_game_message(game, "message.btn_Ok");
+    static SSRCareer c, before;
+    before = *ssr_game_career(game);
+    c = before;
+    c.sdate = 364 * 2 + 50;
+    for (int i = 0; i < 3; i++) c.trainer[i] = c.agent[i] = 0;
+    for (int r = 0; r < 5; r++) c.lastTrained[r] = c.deplete[r] = c.sdate;
+    for (int k = 0; k < SSR_CAREER_SKILL_LEVELS; k++) c.pace[k] = k < 6 ? 3 : 0;
+    // Year 3 keeps a skill 105 days.
+    c.deplete[0] = c.sdate - 106;
+    c.lastAgentHint = c.sdate;
+    load_career(game, &c, path);
+    const SSRCareer *now = ssr_game_career(game);
+    CHECK(strcmp(ssr_game_screen(game), "messagetrainer") == 0);
+    CHECK(strstr(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_LASTTRAINED|(CMESSAGE_LASTTRAINED2)") != NULL);
+    CHECK(now->pace[5] == 0 && now->pace[4] == 3 && now->deplete[0] == now->sdate && now->power[1] == c.power[1]);
+    SSRUiOp ops[64];
+    int count = take_ops(game, ops, 64);
+    CHECK(has_op(ops, count, SSR_OP_SHOW, "OneBar", NULL) && has_op(ops, count, SSR_OP_BAR_SOURCE, "BarPBDoodad", "Player,Pace"));
+    ssr_game_message(game, "message.btn_Ok");
+
+    // A trainer warns of two skills: no level goes yet.
+    c = *ssr_game_career(game);
+    c.trainer[0] = 20;
+    c.deplete[1] = c.sdate - 106;
+    c.deplete[3] = c.sdate - 106;
+    for (int k = 0; k < 4; k++) c.power[k] = c.vision[k] = 3;
+    load_career(game, &c, path);
+    CHECK(strcmp(ssr_game_screen(game), "messagetrainer") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_TRAINERWARNING") == 0);
+    CHECK(now->deplete[1] == -(c.sdate - 106) && now->deplete[3] < 0 && now->power[3] == 3);
+    count = take_ops(game, ops, 64);
+    int rows = 0;
+    for (int i = 0; i < count; i++) rows += ops[i].kind == SSR_OP_LIST_ADD_AT && strcmp(ops[i].ref, "SkillsScroll") == 0;
+    CHECK(has_op(ops, count, SSR_OP_SHOW, "SkillsDepletion", NULL) && rows == 2);
+    ssr_game_message(game, "message.btn_Ok");
+    // The next check takes the top level of each warned skill.
+    c = *ssr_game_career(game);
+    int power = 0, vision = 0, powerNow = 0, visionNow = 0;
+    for (int k = 0; k < SSR_CAREER_SKILL_LEVELS; k++) {
+        power += c.power[k];
+        vision += c.vision[k];
+    }
+    load_career(game, &c, path);
+    CHECK(strcmp(ssr_game_screen(game), "messagetrainer") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_LASTTRAINED") == 0);
+    for (int k = 0; k < SSR_CAREER_SKILL_LEVELS; k++) {
+        powerNow += now->power[k];
+        visionNow += now->vision[k];
+    }
+    CHECK(powerNow < power && visionNow < vision);
+    CHECK(now->deplete[1] == now->sdate && now->deplete[3] == now->sdate);
+    ssr_game_message(game, "message.btn_Ok");
+    // The career goes on from where it was.
+    load_career(game, &before, path);
+    CHECK(at_game_menu(game, tweaks));
+}
+
 // The achievements: the stats of the career, the trophy log with the
 // newest first, and the clubs with the part of the season first.
 static void look_at_achievements(SSRGame *game, SSRTweaks *tweaks) {
@@ -1183,8 +1284,11 @@ static void go_to_the_casino(SSRGame *game, SSRTweaks *tweaks, const char *path)
     ssr_game_message(game, "relationships.btn_Home");
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 
-    // A player under 18 who gambles can be caught: 1 bet in 20.
+    // A player under 18 who gambles can be caught: 1 bet in 20. The test
+    // makes the player 17 for it, and gives the day back after it.
     c = *ssr_game_career(game);
+    int day = c.sdate;
+    if (ssr_career_age(&c) >= 18) c.sdate = 364 + 10;
     CHECK(ssr_career_age(&c) < 18);
     c.bank = 1000;
     c.gambling = 30;
@@ -1218,6 +1322,18 @@ static void go_to_the_casino(SSRGame *game, SSRTweaks *tweaks, const char *path)
     CHECK(strcmp(ssr_game_screen(game), "relationships") == 0);
     ssr_game_message(game, "relationships.btn_Home");
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+    if (day != now->sdate) {
+        c = *ssr_game_career(game);
+        c.sdate = day;
+        ssr_game_message(game, "gamemenu.btn_Quit");
+        CHECK(ssr_career_save(&c, path));
+        ssr_game_message(game, "mainmenu.btn_Career");
+        ssr_game_message(game, "saveslot.btn_Slot0");
+        ssr_game_update(game, 60);
+        for (int i = 0; i < 4 && strncmp(ssr_game_screen(game), "message", 7) == 0; i++) {
+            ssr_game_message(game, "message.btn_Ok");
+        }
+    }
 }
 
 // Roulette: three bets on red. Back is off while the wheel turns.
@@ -2055,6 +2171,7 @@ static void test_starts_a_new_career(void) {
     choose_a_dilemma(game, path);
     an_accident_costs_a_skill(game, path);
     look_at_achievements(game, tweaks);
+    lose_a_skill_with_no_training(game, tweaks, path);
     go_to_the_casino(game, tweaks, path);
     play_roulette(game, tweaks, path);
     play_blackjack(game, tweaks, path);
@@ -2065,10 +2182,10 @@ static void test_starts_a_new_career(void) {
     renew_the_contract(game, tweaks, path);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 24 && seasons < 2; i++) play_a_match(game, tweaks);
-    // At the second end the star rating is near 400: the limit is about
-    // 65, so the club of strength 50 wants the player.
     CHECK(seasons >= 2 && transfers == 1);
-    // The weeks had news: tips, and a dilemma or other news.
+    // The weeks had news: a dilemma or other news, and a tip in a week
+    // with no other news.
+    for (int i = 0; i < 40 && ssr_game_career(game)->tipCount == 0; i++) play_a_match(game, tweaks);
     CHECK(newsSeen > 0 && ssr_game_career(game)->tipCount > 0);
     CHECK(interviews >= 2 && interviewsWon >= 1);
     gambling_news(game, tweaks, path);

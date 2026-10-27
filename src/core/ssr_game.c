@@ -258,6 +258,9 @@ struct SSRGame {
     int dilemmaRelation[2], dilemmaImage[2], dilemmaInt[2];
     int dilemmaChoice, dilemmaChosen, dilemmaEnd;
     int lastAccident;
+    // 1 after the check of the trainer in this match week
+    // (c_TPlayer.donetrainerwarning, not in the save).
+    int doneTrainerWarning;
 
     // The interview after a match (c_TScreen_Interview): 1 once a match
     // has had one, the words to repeat, the buttons, the decoys, the
@@ -592,6 +595,8 @@ static void horses_for_career(SSRGame *game);
 
 static void open_slot(SSRGame *game, int slot) {
     game->slot = slot;
+    // The game keeps no flag of the check of the trainer in the save.
+    game->doneTrainerWarning = 0;
     char path[2200];
     slot_path(game, slot, path, sizeof(path));
     if (game->slotExists[slot] && ssr_career_load(&game->career, path)) {
@@ -1019,8 +1024,14 @@ static void end_trial(SSRGame *game) {
     if (won) {
         SSRCareer *c = &game->career;
         int *skills[5] = {c->technique, c->setPieces, c->power, c->pace, c->vision};
+        // The rows of the days of training: pace, power, technique,
+        // vision, and set pieces.
+        static const int ROWS[5] = {2, 4, 1, 0, 3};
         int skill = ssr_training_skill(t->training);
-        if (skill >= 0) skills[skill][0] = t->lives;
+        if (skill >= 0) {
+            skills[skill][0] = t->lives;
+            c->lastTrained[ROWS[skill]] = c->deplete[ROWS[skill]] = c->sdate;
+        }
     }
     free(game->training);
     game->training = NULL;
@@ -1287,6 +1298,8 @@ static int agent_hint(SSRGame *game);
 
 // c_TPlayer.CheckAgentAndTrainer: a message when a contract runs out.
 // Returns 1 when a message shows.
+static int check_trainer_warning(SSRGame *game);
+
 static int check_staff(SSRGame *game) {
     SSRCareer *c = &game->career;
     if (c->retired) return 0;
@@ -1314,8 +1327,10 @@ static int check_staff(SSRGame *game) {
         message(game, "messagetrainer", loc(game, "CMESSAGE_TRAINEREXPIRED"), 1, 1, "TrainerGet");
         return 1;
     }
-    // [I: the warning of the trainer comes with the loss of skills.]
-    return agent_hint(game);
+    if (agent_hint(game)) return 1;
+    if (game->doneTrainerWarning) return 0;
+    game->doneTrainerWarning = 1;
+    return check_trainer_warning(game);
 }
 
 // GSBootsRenewMessage: the boots that ran out ask for a new pair.
@@ -2378,6 +2393,7 @@ static void not_picked(SSRGame *game, const char *text) {
 // start again, and each sponsor takes a little of the relation.
 static void match_recovery(SSRGame *game) {
     SSRCareer *c = &game->career;
+    game->doneTrainerWarning = 0;
     c->gambling = c->gambling - 5 < 0 ? 0 : c->gambling - 5;
     if (game->caughtGambling > 0) game->caughtGambling--;
     c->spentTime = 0;
@@ -3017,6 +3033,9 @@ static void new_season(SSRGame *game) {
     }
     ssr_tweaks_set_number(t, "Menu", "DisableQuitButton", 0);
     skip_to_first_match(game);
+    // ResetSeasonStats: the clock of the loss of each skill starts again,
+    // a week more or less from today.
+    for (int r = 0; r < 5; r++) game->career.deplete[r] = game->career.sdate + ssr_rand2(&game->random, -7, 7);
     ssr_tweaks_set_number(t, "Menu", "CanSavePlayer", 1);
     ssr_career_reset_season(&game->career);
     save_career(game);
@@ -3627,6 +3646,8 @@ static void choose_boost(SSRGame *game, int row) {
             while (stars > 0 && levels[e] < 3) {
                 levels[e]++;
                 stars--;
+                // A star that the skill takes is a training of the skill.
+                c->lastTrained[row] = c->deplete[row] = c->sdate;
             }
         }
         if (game->bolt1 > 0) {
@@ -4192,6 +4213,105 @@ static void skill_bar(SSRGame *game, const char *skill, int change) {
         snprintf(text, sizeof(text), "%s", loc(game, skill));
     }
     add_op(game, SSR_OP_TEXT, "BarText", NULL, text, 0);
+}
+
+static int deplete_skill(int *levels, int count);
+
+// GetLastTrainedLimit: the days that a skill keeps with no training. The
+// first year has no loss.
+static int last_trained_limit(const SSRCareer *c) {
+    int year = ssr_career_year(c);
+    if (year == 1) return 999;
+    int weeks = 16 - year / 2;
+    return (weeks < 2 ? 2 : weeks > 16 ? 16 : weeks) * 7;
+}
+
+// The message of the trainer with the bars of the skills: one bar for one
+// skill, else the list SkillsDepletion (AScreen_Message.SetUpBar).
+static void trainer_message(SSRGame *game, const char *text, const int flags[5]) {
+    message(game, "messagetrainer", text, 0, 1, NULL);
+    int count = 0, last = 0;
+    for (int r = 0; r < 5; r++) {
+        if (flags[r]) {
+            count++;
+            last = r;
+        }
+    }
+    if (count == 1) {
+        skill_bar(game, SKILL_NAMES[last], 0);
+        return;
+    }
+    add_op(game, SSR_OP_SHOW, "SkillsDepletion", NULL, NULL, 0);
+    int height = (int)ssr_tweaks_number(game->tweaks, "Message", "SkillBarHeight");
+    if (height <= 0) height = 65;
+    for (int r = 0, k = 0; r < 5; r++) {
+        if (!flags[r]) continue;
+        char source[64];
+        snprintf(source, sizeof(source), "Player,%s", SKILL_NAMES[r]);
+        add_op(game, SSR_OP_LIST_START, "SkillsScroll", NULL, NULL, k++ * height);
+        add_op(game, SSR_OP_LIST_ADD_AT, "SkillsScroll", "SkillItem", "", 0);
+        add_op(game, SSR_OP_ENTRY_BAR, "SkillsScroll", "SkillItemBar", source, 60);
+        add_op(game, SSR_OP_LIST_SUB, "SkillsScroll", "SkillItemText", loc(game, SKILL_NAMES[r]), 1);
+    }
+}
+
+// CheckSkillDeplete: with no trainer, a skill that waited too long loses
+// its top level. With a trainer, a skill loses only after a warning.
+static int check_skill_deplete(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int trainer = ssr_career_trainer(c) > 0, limit = last_trained_limit(c), flags[5] = {0}, any = 0;
+    for (int r = 0; r < 5; r++) {
+        int start = c->deplete[r] < 0 ? -c->deplete[r] : c->deplete[r];
+        if (!((trainer && c->deplete[r] < 0) || (!trainer && c->sdate > start + limit))) continue;
+        if (deplete_skill(skill_levels(c, r), 1) > 0) {
+            c->deplete[r] = c->sdate;
+            flags[r] = 1;
+            any = 1;
+        }
+    }
+    if (!any) return 0;
+    c->expiredBoots = -1;
+    skill_tweaks(game);
+    char text[1024];
+    snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_LASTTRAINED"));
+    if (!trainer) {
+        size_t n = strlen(text);
+        snprintf(text + n, sizeof(text) - n, "|(%s)", loc(game, "CMESSAGE_LASTTRAINED2"));
+    }
+    trainer_message(game, text, flags);
+    save_career(game);
+    return 1;
+}
+
+// ShowTrainerWarning: the trainer warns of each skill that waited too
+// long. The sign of its day marks the warning.
+static int show_trainer_warning(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int limit = last_trained_limit(c), flags[5] = {0}, any = 0;
+    for (int r = 0; r < 5; r++) {
+        if (c->sdate > c->deplete[r] + limit && skill_levels(c, r)[1] > 0) {
+            c->deplete[r] = -c->deplete[r];
+            flags[r] = 1;
+            any = 1;
+        }
+    }
+    if (any) trainer_message(game, loc(game, "CMESSAGE_TRAINERWARNING"), flags);
+    return any;
+}
+
+// CheckTrainerWarning: once each match week, on the game menu after the
+// match. A skill with no day of training starts its clock now, a week
+// more or less.
+static int check_trainer_warning(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->newsDone) return 0;
+    for (int r = 0; r < 5; r++) {
+        if (c->lastTrained[r] != 0) continue;
+        int day = c->sdate + ssr_rand2(&game->random, -7, 7);
+        c->lastTrained[r] = c->deplete[r] = day;
+    }
+    if (check_skill_deplete(game)) return 1;
+    return ssr_career_trainer(c) > 0 && show_trainer_warning(game);
 }
 
 // c_TPlayer.DepleteSkillByLevels: the top levels of the skill go.
