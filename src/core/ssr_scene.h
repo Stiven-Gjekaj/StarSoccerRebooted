@@ -242,8 +242,11 @@ int ssr_scene_entry_child(SSRScene *scene, const char *list, const char *ref, co
 // The strvar %name of the part ref of the last entry takes the value.
 int ssr_scene_entry_var(SSRScene *scene, const char *list, const char *ref, const char *name, const char *value);
 // The ProgressBar of the part ref of the last entry follows the tweak
-// group,name (c_ProgressBar.SetSourceTweakValue).
-int ssr_scene_entry_bar(SSRScene *scene, const char *list, const char *ref, const char *group, const char *name);
+// group,name (c_ProgressBar.SetSourceTweakValue). A max above 0 is the new
+// top of the bar, and an AnimateProgress of the part follows the tweak too.
+// Returns the number of modifiers that changed.
+int ssr_scene_entry_bar(SSRScene *scene, const char *list, const char *ref, const char *group, const char *name,
+                        float max);
 
 // The ProgressBar and AnimateProgress modifiers with the ref follow the
 // tweak group,name (c_ProgressBar.SetSourceTweakValue,

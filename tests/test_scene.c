@@ -507,7 +507,7 @@ static void test_builds_a_shop_button(void) {
     CHECK(ssr_scene_entry_child(scene, "LifestyleList", "ItemButton", "ShopTitle") == 1);
     ssr_scene_list_sub(scene, "LifestyleList", "Title", "Phone", 1);
     CHECK(ssr_scene_entry_child(scene, "LifestyleList", "ItemButton", "ShopOwnedBar") == 1);
-    CHECK(ssr_scene_entry_bar(scene, "LifestyleList", "ProgressBar", "Products", "item_Phone_Owned") == 1);
+    CHECK(ssr_scene_entry_bar(scene, "LifestyleList", "ProgressBar", "Products", "item_Phone_Owned", 0) == 1);
     ssr_tweaks_set_number(tweaks, "Products", "item_Phone_Owned", 50);
     // A second entry goes under the first.
     CHECK(ssr_scene_list_add_at(scene, "LifestyleList", "ShopButtonSmall", 20) == 1);
@@ -1601,6 +1601,22 @@ static void test_points_a_bar_at_another_tweak(void) {
     ssr_scene_update(scene, &env, 16);
     // 20 + (200 - 20) * 30 / 60 = 110.
     CHECK(fabsf(find_image(scene, "Bar")->w - 110) < 0.01f);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    // The bar of an entry of a list: with a max, both modifiers change.
+    layout = "Rect:(4,0,200,46) ref:SkillItem\n"
+             "{\n"
+             "\tDraw:(Row,0,0,200,20) ref:SkillItemBar\n"
+             "\t\tAnimateProgress(P,Boss,H,O,B,20,200,0,0,0,0,100)\n"
+             "\t\tProgressBar(P,Boss_Displayed,0,100,20)\n"
+             "} Template\n"
+             "Rect:(0,0,0,0) ref:SkillsScroll\n";
+    tree = ssr_ui_parse("Screen.uis", &files);
+    scene = ssr_scene_open(tree, &env);
+    CHECK(ssr_scene_list_add(scene, "SkillsScroll", "SkillItem", "", 0) == 1);
+    CHECK(ssr_scene_entry_bar(scene, "SkillsScroll", "SkillItemBar", "P", "Pace", 60) == 2);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(fabsf(find_image(scene, "Row")->w - 110) < 0.01f);
     ssr_scene_free(scene);
     ssr_ui_free(tree);
     ssr_tweaks_free(tweaks);

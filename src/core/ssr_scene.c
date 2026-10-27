@@ -3962,16 +3962,27 @@ int ssr_scene_entry_var(SSRScene *scene, const char *list, const char *ref, cons
     return 0;
 }
 
-int ssr_scene_entry_bar(SSRScene *scene, const char *list, const char *ref, const char *group, const char *name) {
+int ssr_scene_entry_bar(SSRScene *scene, const char *list, const char *ref, const char *group, const char *name,
+                        float max) {
     Gel *part = entry_part(scene, list, ref);
     if (!part || !group || !name) return 0;
+    int count = 0;
     for (Doodad *d = part->doodads; d; d = d->next) {
+        // With a max, the AnimateProgress follows the tweak too
+        // (AScreen_Message.SetUpSkillBars).
+        if (d->kind == D_ANIMATE_PROGRESS && max > 0) {
+            d->text[0] = keep(scene, group);
+            d->text[1] = keep(scene, name);
+            d->v[3] = max;
+            count++;
+        }
         if (d->kind != D_PROGRESS_BAR) continue;
         d->text[0] = keep(scene, group);
         d->text[1] = keep(scene, name);
-        return 1;
+        if (max > 0) d->v[1] = max;
+        return count + 1;
     }
-    return 0;
+    return count;
 }
 
 // The ProgressBar and AnimateProgress doodads with the ref in the chain d

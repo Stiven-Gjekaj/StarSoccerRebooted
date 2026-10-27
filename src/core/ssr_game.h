@@ -67,7 +67,8 @@ typedef enum {
     // value. text is "name=value".
     SSR_OP_ENTRY_VAR,
     // The ProgressBar of the part ref2 of the last entry of the list ref
-    // follows a tweak. text is "Group,Name".
+    // follows a tweak. text is "Group,Name". id above 0 is the top of the
+    // bar, and the AnimateProgress of the part follows the tweak too.
     SSR_OP_ENTRY_BAR,
     // The first element ref goes to the x in id, in its parent.
     SSR_OP_SET_X,

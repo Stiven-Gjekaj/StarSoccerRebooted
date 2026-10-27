@@ -789,7 +789,7 @@ static void apply_op(SSRApp *app, SSRScene *s, const SSRUiOp *o) {
         if (!sep) break;
         *sep = 0;
         if (op.kind == SSR_OP_ENTRY_VAR) ssr_scene_entry_var(s, op.ref, op.ref2, op.text, sep + 1);
-        else ssr_scene_entry_bar(s, op.ref, op.ref2, op.text, sep + 1);
+        else ssr_scene_entry_bar(s, op.ref, op.ref2, op.text, sep + 1, (float)op.id);
         break;
     }
     case SSR_OP_SET_X:
