@@ -29,19 +29,29 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 
 - [x] Read the layouts of the remake from `layouts/` first, then from the
       import
-- [ ] Port the rest of the layout commands of the game: animations,
-      tweens, particle emitters, image sequences, templates, the crowd,
-      and the effects
+- [x] Run a screen as a tree of elements, as the game does (`c_Gel`):
+      animations, tweens, converges, delays, press feedback, movers,
+      spinners, faders, lifetimes, image sequences, templates, instances,
+      particle emitters, the crowd, layers, and the colour stack
+- [x] The time base of the game: frames of 60 a second
+- [x] Slanted text, the cels of an image, additive and gloss blends
+- [ ] The rest of the layout commands: font shadows (`FontShadow`), the
+      fade of a screen (`Dissolve:`), global emitters, cached and embedded
+      draws (`DrawCached:`, `Embed:`), and the 3D models of the match
+- [ ] The rule of the game that makes text smaller to fit its box
 
-## 0.3 Platforms
+## 0.3 Platforms (done)
 
-- [ ] Build for iOS
-- [ ] Build for Android
-- [ ] Touch input, and the mouse as touch on the desktop
-- [ ] Save files in the data directory of each platform
+- [x] Build for iOS
+- [x] Build for Android. The app imports the game that is installed on
+      the device.
+- [x] Touch input, and the mouse as touch on the desktop
+- [ ] Save files in the data directory of each platform. This moves to
+      0.4, with the first save.
 
 ## 0.4 A new career
 
+- [ ] Save files in the data directory of each platform
 - [ ] Main menu and save slots (`MainMenu`, `SaveSlot`)
 - [ ] Make a player: name, nation, look (`ChooseNation`)
 - [ ] Choose a league and a club (`ChooseLeague`, `ChooseClub`)

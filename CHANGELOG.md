@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0 (2026-10-27)
+
+- The app runs on iOS and Android. On Android it imports the game that is
+  installed on the device. On iOS it imports the file that you put in its
+  Documents folder.
+- The screens move as in the game. The app runs each screen as a tree of
+  elements with the time base of the game: the buttons slide in after
+  their delays, the ball rolls in and spins, the clouds move, and the
+  floodlights glow.
+- A button goes down when you press it. A click is when the touch goes
+  up, as in the game. The mouse works as a touch on the desktop.
+- Animations, tweens, image sequences, templates, and particle emitters
+  work, with the random numbers of the game.
+- The layers and the colours mix as in the game. Colours can come from
+  the tweaks, so the seats and the banners take the colours of the club.
+- Text slants as in the game. The parts of a player image (shirt, pants,
+  skin) take the colours of their tweaks.
+
 ## 0.2.0 (2026-10-27)
 
 - The app draws the main menu of the game from the layout files and the
