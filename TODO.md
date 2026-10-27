@@ -279,7 +279,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [x] Rival players: players of the same age who start with the player
       and follow their own careers. The squad screen and the ticker show
       them.
-- [ ] Compare the stats of the rivals with the stats of the player
+- [x] Compare the stats of the rivals with the stats of the player (the
+      third list of the squad screen)
 - [ ] Teammates who matter: a strike partner, a captain, a young player
       that the player mentors
 - [ ] Managers with styles: a new manager can drop the player, change the
@@ -304,8 +305,9 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 ### History
 
-- [ ] The champions of each season, the records, and a hall of fame for
-      each club, league, and nation
+- [x] The champions and the top scorers of each league in each season
+      (the Honours screen)
+- [ ] The records and a hall of fame for each club, league, and nation
 - [ ] A career timeline: the seasons, clubs, trophies, and big moments
 - [ ] A legacy after retirement: how the world remembers the player. The
       world continues in a manager career or with a new player.
@@ -346,8 +348,9 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 - [ ] An editor in the app for the leagues, the clubs, and the players
 - [x] Data packs: the player installs a pack from a file (a drop on the
       window, or the path at the start)
-- [ ] A screen to choose or remove a pack, and an install on iOS and
-      Android
+- [x] A screen to choose or remove a pack (Options, Packs), and an
+      install with a file dialog. On iOS the app installs each zip file of
+      its Documents folder.
 - [x] Art packs: a pack can replace any image of the game, and any
       screen
 - [ ] The index repository of the packs, with a CI check for each pull

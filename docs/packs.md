@@ -6,13 +6,17 @@ screens. A pack holds only data. It holds no code.
 
 ## Install a pack
 
-- On the desktop, drop the zip file of the pack on the window, or start
-  the app with the path of the zip file.
+- Open Options, then Packs, and press Install. Choose the zip file of
+  the pack.
+- On the desktop, you can also drop the zip file of the pack on the
+  window, or start the app with the path of the zip file.
+- On iOS, put the zip file in the Documents folder of the app with
+  Finder or the Files app. The app installs it at the next start.
 - The app installs the pack into the folder `packs/<id>` of its data
   folder and chooses it. The world then reads the pack.
 - A pack with the same id takes the place of the installed pack.
-- The setting `pack=<id>` in `settings.txt` gives the chosen pack. Remove
-  the line to play with the world of the game.
+- The Packs screen chooses a pack, or the world of the game. Remove
+  deletes the chosen pack.
 
 ## The files of a pack
 
