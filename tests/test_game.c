@@ -7,6 +7,7 @@
 
 #include "ssr_ball.h"
 #include "ssr_game.h"
+#include "ssr_pack.h"
 #include "ssr_shop.h"
 #include "ssr_test.h"
 #include "ssr_zipwriter.h"
@@ -2559,10 +2560,45 @@ static void test_starts_a_new_career(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// The packs screen lists the world of the game and the installed packs. A
+// tap chooses a pack, and Remove removes it.
+static void test_chooses_a_pack(void) {
+    char root[1024], archive[1200], packs[1200];
+    snprintf(root, sizeof(root), "%s", ssr_test_directory("game_packs"));
+    snprintf(archive, sizeof(archive), "%s/harbour.zip", root);
+    snprintf(packs, sizeof(packs), "%s/packs", root);
+    static const char INFO[] = "id=harbour\nname=Harbour\nauthor=Ann\nversion=2\nformat=1\n";
+    SSRZipFile files[] = {{"pack.txt", INFO, sizeof(INFO) - 1, 0}};
+    CHECK(ssr_zipwriter_write(archive, files, 1) && ssr_pack_install(archive, packs, NULL));
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRGame *game = ssr_game_create(tweaks);
+    ssr_game_set_packs_directory(game, packs, 1);
+    ssr_game_message(game, "options.btn_Packs");
+    CHECK(strcmp(ssr_game_screen(game), "packs") == 0 && ssr_tweaks_number(tweaks, "Packs", "CanInstall") == 1);
+    SSRUiOp ops[64];
+    int count = take_ops(game, ops, 64), rows = 0;
+    for (int i = 0; i < count; i++) rows += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "PackList") == 0;
+    CHECK(rows == 2 && has_op(ops, count, SSR_OP_LIST_TEXT, "PackList", "Harbour"));
+    CHECK(ssr_tweaks_number(tweaks, "Packs", "CanRemove") == 0);
+    ssr_game_message(game, "packs.row_pack 1");
+    CHECK(strcmp(ssr_game_settings(game)->pack, "harbour") == 0 && ssr_game_take_settings_change(game));
+    CHECK(ssr_tweaks_number(tweaks, "Packs", "CanRemove") == 1);
+    ssr_game_message(game, "packs.btn_Install");
+    CHECK(ssr_game_take_pack_install(game) && !ssr_game_take_pack_install(game));
+    ssr_game_message(game, "packs.btn_Remove");
+    char ids[4][48];
+    CHECK(ssr_game_settings(game)->pack[0] == 0 && ssr_pack_list(packs, ids, 4) == 0);
+    ssr_game_message(game, "packs.btn_Back");
+    CHECK(strcmp(ssr_game_screen(game), "options") == 0);
+    ssr_game_free(game);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
     test_starts_a_new_career();
     test_goes_between_screens();
     test_changes_and_saves_the_options();
     test_chooses_a_language();
+    test_chooses_a_pack();
     return TEST_RESULT();
 }

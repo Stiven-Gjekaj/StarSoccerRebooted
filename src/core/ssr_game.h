@@ -187,6 +187,13 @@ const SSRCareer *ssr_game_career(const SSRGame *game);
 int ssr_game_load_settings(SSRGame *game, const char *path);
 int ssr_game_save_settings(const SSRGame *game, const char *path);
 const SSRSettings *ssr_game_settings(const SSRGame *game);
+// The directory of the installed data packs, and 1 when the app can open a
+// file to install a pack.
+void ssr_game_set_packs_directory(SSRGame *game, const char *directory, int canInstall);
+// 1 once after the player asks to install a pack from a file.
+int ssr_game_take_pack_install(SSRGame *game);
+// Opens the packs screen with the list of the installed packs.
+void ssr_game_show_packs(SSRGame *game);
 // Chooses the data pack of the world. "" or NULL chooses the world of the
 // game. The app loads the world again.
 void ssr_game_set_pack(SSRGame *game, const char *id);

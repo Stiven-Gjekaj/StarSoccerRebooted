@@ -1,0 +1,168 @@
+// The data packs. A screen of the remake. The code fills the list
+// "PackList" from the template "PackEntry". Each row has the texts 1 and
+// 2: the name, and the author and the version. A tap on a row chooses
+// the pack.
+
+UnsortedLayer:(AfterGloss,1)
+
+Import:(ButtonDefs.uis)
+Import:(ButtonMacros.uis)
+Import:(JDButtonDefs.uis)
+Import:(JDButtonMacros.uis)
+
+Rect:(0,0,0,0)
+	ShowShell(Ticker,1)
+	SetTweak(Menu,StarBuxButtonEnabled,1)
+
+M_Background:()
+M_Footer:(OFF,,,)
+
+// The ribbon at the top: the quit button, the Bux, and the help.
+Rect:()
+	ShowIf(Menu,DisableQuitButton,0)
+{
+	M_Header:(-40,@T,IWorld,32,36,88,198,14)
+	Import:(quitmenu.uih)
+}
+Rect:()
+	ShowIf(Menu,DisableQuitButton,1)
+{
+	M_Header:(-40,@T,IWorld,32,36,88,198,14,YES)
+}
+
+// The top of the buttons at the bottom.
+Set:(@n=[@B-960]*0.7+744)
+
+// The title.
+PushOrigin:(60,128)
+	Rect:(0,0,500,76)
+	{
+		Draw:(ButtonShadow,18,8,500,76,,#FFFFFF80)
+		Draw:(GreenButton,10,0,500,76)
+		Draw:(Glint,0,15.5,42,,,#606060FFFFFFFFFF)
+			Handle(42,16)
+			Shine(0,480)
+			Additive()
+		Text:(Packs,20,0,480,72)
+			FontSize(1)
+			Layer(AfterGloss)
+			StringReadout(Packs,Title)
+	}
+		ConvergeFrom(-640,0)
+PopOrigin
+
+// A row of the list.
+Macro:(M_PackRow,?REF?)
+	Draw:(GreyRecess,0,0,562,82) ref:?REF?
+	{
+		Draw:(GreyRecess,3,3,555,76,,#00EF00FF) $HIDE ref:Highlight
+			Additive()
+		Text:(NAME,20,4,520,44,L,,#BBDDBBFF) ref:?REF?
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.5,0.5)
+		Text:(DETAILS,20,40,520,36,L,,#80BB80FF) ref:?REF?
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.35,0.35)
+		Draw:(ScrollFade,-1,-2,561,30,,#FFFFFF70)
+	} Template
+		Click(packs.row_pack,0)
+		<
+			PlaySnd(UISelect)
+		>
+EndM
+
+// The list.
+PushOrigin:(13,210)
+	Draw:(GreyRecess,0,0,614,516)
+		SwipePanel(Packs,Scroll,Packs,ScrollVel)
+	{
+		PushOrigin:(7,8)
+			M_BGScrollWindow:(599,502)
+		PopOrigin()
+
+		Clip:(4,14,611,451)
+			Handle(0,-46)
+		{
+			M_PackRow:(PackEntry)
+
+			Rect:(0,0,0,0) ref:PackList
+				ScrollingList(Packs,Scroll,496,Packs,ScrollVel) ref:ScrollingList
+			{
+			}
+		}
+		PushOrigin:(2,-1)
+			Draw:(GreyRecess,579,16,22,490)
+			{
+				Draw:(SliderButton,581,16,20,490,,#656565FF)
+					ScrollIndicator(PackList,ScrollingList)
+			}
+		PopOrigin
+
+		Draw:(ScrollFade,2,1,611,60,0,#000000FF)
+			Layer(AfterGloss)
+	}
+		ConvergeFrom(-640,0)
+PopOrigin
+
+// The name of the column.
+PushOrigin:(22,220)
+	Rect:(0,0)
+	{
+		Draw:(ScrollFade,-3,40,574,60,0,#000000FF)
+			Layer(AfterGloss)
+		Draw:(GreyReadout,-2,0,568,52,,#EEFFEEFF)
+			Layer(AfterGloss)
+		Text:(Pack,20,5,520,44,L,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.4,0.4)
+			StringReadout(Packs,Title)
+	}
+		ConvergeFrom(-640,0)
+PopOrigin
+
+// Back to the options.
+PushOrigin:(12,@n)
+	M_NavButton:(0,0,navigate_Back,,)
+	{
+		Draw:(IBack,28,30,90,90)
+	}
+		Delay(0.2)
+		ConvergeFrom(-640,0)
+		Click(packs.btn_Back)
+		<
+			PlaySnd(UISelect)
+		>
+PopOrigin
+
+// Install a pack from a file.
+PushOrigin:(168,@n)
+	M_NavButton:(0,0,SSR_Install,,)
+	{
+		Draw:(IAccept,30,25,90,90)
+	}
+		Delay(0.1)
+		ConvergeFrom(-640,0)
+		Click(packs.btn_Install)
+		<
+			PlaySnd(UISelect)
+		>
+		ShowIf(Packs,CanInstall,1)
+PopOrigin
+
+// Remove the chosen pack.
+PushOrigin:(324,@n)
+	M_NavButton:(0,0,SSR_Remove,,)
+	{
+		Draw:(IDecline,30,25,90,90)
+	}
+		Delay(0.15)
+		ConvergeFrom(-640,0)
+		Click(packs.btn_Remove)
+		<
+			PlaySnd(UISelect)
+		>
+		ShowIf(Packs,CanRemove,1)
+PopOrigin

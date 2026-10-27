@@ -17,6 +17,7 @@
 #include "ssr_fs.h"
 #include "ssr_horses.h"
 #include "ssr_match.h"
+#include "ssr_pack.h"
 #include "ssr_people.h"
 #include "ssr_random.h"
 #include "ssr_season.h"
@@ -61,6 +62,12 @@ struct SSRGame {
     SSRLocalise localise;
     void *context;
     char saveDirectory[2048];
+    // The installed data packs, the ids on the packs screen (the first is
+    // the world of the game), the row that is chosen there, 1 when the
+    // player asks to install a pack, and 1 when the app can open a file.
+    char packsDirectory[2048];
+    char packIds[33][48];
+    int packCount, packRow, packInstallAsked, canInstallPacks;
     SSRRandom random;
 
     SSRUiOp ops[MAX_OPS];
@@ -512,6 +519,76 @@ static void main_menu(SSRGame *game) {
 static void options(SSRGame *game) {
     set_option_tweaks(game);
     set_screen(game, "options");
+}
+
+/* --------------------------------------------------------- the packs */
+
+// The packs screen: the world of the game first, then each installed
+// pack. The row of the chosen pack shows its highlight.
+static void packs_fill(SSRGame *game) {
+    SSRTweaks *t = game->tweaks;
+    char ids[32][48];
+    int n = game->packsDirectory[0] ? ssr_pack_list(game->packsDirectory, ids, 32) : 0;
+    game->packCount = n + 1;
+    game->packIds[0][0] = 0;
+    for (int i = 0; i < n; i++) snprintf(game->packIds[i + 1], 48, "%s", ids[i]);
+    game->packRow = 0;
+    add_op(game, SSR_OP_LIST_CLEAR, "PackList", NULL, NULL, 0);
+    add_op(game, SSR_OP_LIST_START, "PackList", NULL, NULL, 82);
+    for (int i = 0; i < game->packCount; i++) {
+        char name[128], details[256];
+        SSRPackInfo info;
+        char directory[2200];
+        snprintf(directory, sizeof(directory), "%s/%s", game->packsDirectory, game->packIds[i]);
+        if (i == 0 || !ssr_pack_info(directory, &info)) {
+            snprintf(name, sizeof(name), "%s", loc(game, "SSR_GameWorld"));
+            snprintf(details, sizeof(details), "New Star Soccer %s", SSR_WORLD_DEFAULT_SET);
+        } else {
+            snprintf(name, sizeof(name), "%s", info.name);
+            snprintf(details, sizeof(details), "%s", loc(game, "SSR_PackBy"));
+            replace_all(details, sizeof(details), "$author", info.author);
+            replace_all(details, sizeof(details), "$version", info.version);
+        }
+        add_op(game, SSR_OP_LIST_ADD, "PackList", "PackEntry", "", 0);
+        add_op(game, SSR_OP_LIST_TEXT, "PackList", NULL, name, 1);
+        add_op(game, SSR_OP_LIST_TEXT, "PackList", NULL, details, 2);
+        if (strcmp(game->packIds[i], game->settings.pack) == 0) {
+            add_op(game, SSR_OP_LIST_SUB, "PackList", "Highlight", NULL, 1);
+            game->packRow = i;
+        }
+        add_op(game, SSR_OP_LIST_PARAM, "PackList", NULL, NULL, i);
+    }
+    ssr_tweaks_set(t, "Packs", "Title", loc(game, "SSR_Packs"));
+    ssr_tweaks_set_number(t, "Packs", "CanInstall", game->canInstallPacks);
+    ssr_tweaks_set_number(t, "Packs", "CanRemove", game->packRow > 0);
+    ssr_tweaks_set_number(t, "Packs", "Scroll", 0);
+}
+
+static void packs_screen(SSRGame *game) {
+    set_screen(game, "packs");
+    packs_fill(game);
+}
+
+// packs.row_pack: the world reads the pack of the row. The app loads the
+// world again.
+static void packs_row(SSRGame *game) {
+    int row = game->messageParam;
+    if (row < 0 || row >= game->packCount || row == game->packRow) return;
+    ssr_game_set_pack(game, game->packIds[row]);
+    settings_changed(game);
+    packs_fill(game);
+}
+
+static void packs_remove(SSRGame *game) {
+    if (game->packRow <= 0) return;
+    ssr_pack_remove(game->packsDirectory, game->packIds[game->packRow]);
+    ssr_game_set_pack(game, "");
+    settings_changed(game);
+    packs_fill(game);
+}
+
+static void packs_install(SSRGame *game) {
+    game->packInstallAsked = 1;
 }
 
 static void volume(SSRGame *game) {
@@ -8938,6 +9015,11 @@ static const Route ROUTES[] = {
     {"options.btn_Language", language_screen},
     {"language.btn_Ok", language_ok},
     {"options.btn_Back", main_menu},
+    {"options.btn_Packs", packs_screen},
+    {"packs.btn_Back", options},
+    {"packs.row_pack", packs_row},
+    {"packs.btn_Remove", packs_remove},
+    {"packs.btn_Install", packs_install},
     {"about.btn_Ok", options},
     {"message.btn_Ok", message_ok},
     {"message.btn_Cancel", message_cancel},
@@ -9686,6 +9768,22 @@ const char *ssr_game_screen(const SSRGame *game) {
 
 int ssr_game_screen_version(const SSRGame *game) {
     return game ? game->version : 0;
+}
+
+void ssr_game_set_packs_directory(SSRGame *game, const char *directory, int canInstall) {
+    if (!game) return;
+    snprintf(game->packsDirectory, sizeof(game->packsDirectory), "%s", directory ? directory : "");
+    game->canInstallPacks = canInstall != 0;
+}
+
+int ssr_game_take_pack_install(SSRGame *game) {
+    if (!game || !game->packInstallAsked) return 0;
+    game->packInstallAsked = 0;
+    return 1;
+}
+
+void ssr_game_show_packs(SSRGame *game) {
+    if (game) packs_screen(game);
 }
 
 int ssr_game_take_settings_change(SSRGame *game) {

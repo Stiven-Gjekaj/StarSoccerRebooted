@@ -1,0 +1,17 @@
+# The options have a button to the data packs (packs.uis). It goes in the
+# place of the comment before the support button of Windows Phone, with
+# the comment after it.
+- //---------------------------------------------WP Support Button
++ PushOrigin:(324,@n)
++ M_NavButton:(0,0,SSR_Packs,,) ref:PacksButton
++ {
++ Draw:(IWorld,30,25,90,90,,#FFFFFFFF)
++ }
++ Delay(0.1)
++ ConvergeFrom(-640,0)
++ Click(options.btn_Packs)
++ <
++ PlaySnd(UISelect)
++ >
++ PopOrigin
++ // The support button of Windows Phone.
