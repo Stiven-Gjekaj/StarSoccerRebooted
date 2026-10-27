@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.15.0 (2026-10-27)
+
+- Career moments: the debut, the first goal, and the milestones of the
+  matches and the goals show an alert.
+- The Honours screen has a second list: the timeline of the career, with
+  the clubs, the titles, the awards, and the moments.
+- Derbies: two clubs with stadiums under 30 km apart play a derby. The
+  ticker tells of the next derby.
+- The ticker tells of the title race and the fight against relegation.
+
 ## 0.14.0 (2026-10-27)
 
 - Options has a Packs screen: choose a data pack or the world of the
