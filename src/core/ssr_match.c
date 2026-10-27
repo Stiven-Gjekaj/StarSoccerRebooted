@@ -360,6 +360,16 @@ static void create_chance(SSRMatch *m, int forPlayer, SSRRandom *random) {
     } else {
         s2 += boost;
     }
+    // Momentum, a rule of the remake: from the hour, the team that is
+    // behind pushes forward, with 4 more strength for each goal behind, 10
+    // at most. A comeback from 2-0 is then possible.
+    int behind = m->score[1] - m->score[2];
+    if (m->minute >= 60 && behind != 0) {
+        float push = 4.0f * (float)(behind > 0 ? behind : -behind);
+        if (push > 10) push = 10;
+        if (behind > 0) s2 += push;
+        else s1 += push;
+    }
     m->attacking = ssr_rand_float(random, 0, s1 > 0 ? s1 : 0) >= ssr_rand_float(random, 0, s2 > 0 ? s2 : 0) ? 1 : 2;
     if (ssr_rand(random, 70) == 1) {
         chance_penalty(m, random);
