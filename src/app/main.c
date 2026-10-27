@@ -904,6 +904,15 @@ static void load_language(SSRApp *app) {
     ssr_text_rebrand(app->text);
     app->textLanguage = language;
     ssr_gfx_set_language(app->gfx, ssr_text_language_code(language));
+    // TNation.LoadNames and TContinent.LoadNames.
+    char resolved[2300];
+    SDL_snprintf(path, sizeof(path), "%s/MyData/Languages/Nation_Trans.txt", app->gameDirectory);
+    char *nations = ssr_fs_resolve(path, resolved, sizeof(resolved)) ? SDL_LoadFile(resolved, NULL) : NULL;
+    SDL_snprintf(path, sizeof(path), "%s/MyData/Languages/Continent_Trans.txt", app->gameDirectory);
+    char *continents = ssr_fs_resolve(path, resolved, sizeof(resolved)) ? SDL_LoadFile(resolved, NULL) : NULL;
+    ssr_world_set_language(app->world, nations, continents, ssr_text_language_code(language));
+    SDL_free(nations);
+    SDL_free(continents);
 }
 
 // GSSetLanguageFromDevice: the first language of the device that the table
