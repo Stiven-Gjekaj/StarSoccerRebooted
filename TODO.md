@@ -95,12 +95,15 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       substitutions
 - [x] The match screen (`match.uis`): the names, the scores, the time, the
       speed, the work rate, the focus, and the commentary
-- [ ] The view of a chance: the pitch is a 3D `Sheet:` that the game draws
-      into a texture (`Surf:`). The players, their kits, and the ball show
-      now, but the pitch has no lines.
+- [x] The view of a chance: the 3D pitch (`Sheet:`), the players in their
+      kits, the ball, the aim arrow, the tap ball in front of the stadium,
+      and the banner of the result
+- [ ] The render of a `Sheet:` into a surface (`Surf:`). The remake draws
+      its children each frame in its place, which gives the same picture.
 - [ ] The intercept game (type 6) and the dribble game (type 11). Until then
       the player wins the ball or gets past at once.
-- [ ] The result banner of a chance (`scoreanim.uis`) and the replays
+- [ ] The replays of a goal (`WatchReplay`), the ball trail, and the
+      make-run arrows of the team-mates
 - [ ] Extra time and the penalty shoot-out of a cup match
 - [ ] Before and after the match (`Prematch`, `MatchReview`, `MatchStats`,
       `Ratings`)
