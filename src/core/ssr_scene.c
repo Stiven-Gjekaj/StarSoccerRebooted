@@ -1256,6 +1256,16 @@ static int names_tweak(const SSRUiNode *m, int i) {
     return isalpha((unsigned char)a[0]) && isalpha((unsigned char)b[0]) && !is(a, "Soft") && !is(a, "Instant");
 }
 
+// 1 for a sum of numbers as "-640*2", which a macro times a number gives.
+static int is_sum(const char *text) {
+    int sum = text[0] != 0, op = 0;
+    for (const char *p = text; *p && sum; p++) {
+        sum = isdigit((unsigned char)*p) || strchr(".+-*/() ", *p) != NULL;
+        op |= p != text && strchr("+-*/", *p) != NULL;
+    }
+    return sum && op;
+}
+
 static void converge_rates(SSRScene *s, const SSRUiNode *m, int i, Doodad *d) {
     float rate = 0.2f, maxRate = 0.2f, accel = 0;
     const char *a = arg(m, i);
@@ -1591,13 +1601,7 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
             d->text[2] = keep(s, arg(m, 2));
             // A sum as "-640*2" (a macro times a number) is a number for a
             // float tweak (Phrase.PopFloat).
-            const char *value = arg(m, 2);
-            int sum = value[0] != 0, op = 0;
-            for (const char *p = value; *p && sum; p++) {
-                sum = isdigit((unsigned char)*p) || strchr(".+-*/() ", *p) != NULL;
-                op |= p != value && strchr("+-*/", *p) != NULL;
-            }
-            if (sum && op) {
+            if (is_sum(arg(m, 2))) {
                 char number_text[32];
                 snprintf(number_text, sizeof(number_text), "%g", number(s, m, 2, 0));
                 d->text[2] = keep(s, number_text);
@@ -2271,7 +2275,9 @@ static int shown(SSRScene *s, const SSRUiNode *node) {
             double v = ssr_tweaks_number(s->env->tweaks, arg(m, 0), arg(m, 1));
             value = v >= number(s, m, 2, 0) && v <= number(s, m, 3, 0);
         } else if (m->argCount >= 3) {
-            value = ssr_tweaks_equals(s->env->tweaks, arg(m, 0), arg(m, 1), arg(m, 2));
+            value = is_sum(arg(m, 2))
+                        ? ssr_tweaks_number(s->env->tweaks, arg(m, 0), arg(m, 1)) == number(s, m, 2, 0)
+                        : ssr_tweaks_equals(s->env->tweaks, arg(m, 0), arg(m, 1), arg(m, 2));
         } else {
             value = ssr_tweaks_number(s->env->tweaks, arg(m, 0), arg(m, 1)) != 0;
         }
