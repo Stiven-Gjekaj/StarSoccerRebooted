@@ -746,9 +746,13 @@ static int league_duration(const SSRWorld *world, int league) {
 // TContractOffer.GetProspectiveClubs(0, nation, 1, 3) for a new career: the
 // clubs of the nation get strengths in steps from the best down to 15, then
 // the game takes a random league and a weak club in it.
-static const SSRClub *first_club(SSRGame *game, int nation) {
+// The clubs with a league for GetProspectiveClubs, the weakest first. The
+// clubs of the nation get the strengths of AverageOutStrengthAll. The
+// caller frees the list.
+static Prospect *prospect_list(SSRGame *game, int nation, int *outCount) {
     const SSRWorld *world = game->world;
     Prospect *list = malloc((size_t)world->clubCount * sizeof(Prospect));
+    *outCount = 0;
     if (!list) return NULL;
     int count = 0, own = 0;
     for (int i = 0; i < world->clubCount; i++) {
@@ -788,6 +792,15 @@ static const SSRClub *first_club(SSRGame *game, int nation) {
     }
     free(mine);
     qsort(list, (size_t)count, sizeof(Prospect), compare_strength);
+    *outCount = count;
+    return list;
+}
+
+static const SSRClub *first_club(SSRGame *game, int nation) {
+    const SSRWorld *world = game->world;
+    int count = 0;
+    Prospect *list = prospect_list(game, nation, &count);
+    if (!list) return NULL;
 
     int league = 0;
     for (int i = 0; i < count; i++) {
@@ -1132,6 +1145,8 @@ static void player_tweaks(SSRGame *game) {
 
 static void webpage_to(SSRGame *game, const char *next, int style);
 
+static int agent_hint(SSRGame *game);
+
 // c_TPlayer.CheckAgentAndTrainer: a message when a contract runs out.
 // Returns 1 when a message shows.
 static int check_staff(SSRGame *game) {
@@ -1161,9 +1176,8 @@ static int check_staff(SSRGame *game) {
         message(game, "messagetrainer", loc(game, "CMESSAGE_TRAINEREXPIRED"), 1, 1, "TrainerGet");
         return 1;
     }
-    // [I: the hint of the agent comes with the contracts, and the warning
-    // of the trainer with the loss of skills.]
-    return 0;
+    // [I: the warning of the trainer comes with the loss of skills.]
+    return agent_hint(game);
 }
 
 // GSBootsRenewMessage: the boots that ran out ask for a new pair.
@@ -2619,6 +2633,7 @@ static void league_home(SSRGame *game) {
 // GSPlayerPlay: with no match left this year the table shows, else the
 // fixtures of the next round.
 static int play_news(SSRGame *game, const SSRFixture *next);
+static int check_transfer_window(SSRGame *game);
 
 static void game_play(SSRGame *game) {
     season_in(game);
@@ -4111,8 +4126,8 @@ static int random_news(SSRGame *game, const SSRFixture *next) {
 // GSPlayerPlay: the news of the week comes before the match.
 static int play_news(SSRGame *game, const SSRFixture *next) {
     SSRCareer *c = &game->career;
-    // [I: the old pro boots (a), the transfer window (e), the captaincy
-    // (f), the sponsors (g), and the gambling (h) come with their parts.
+    // [I: the old pro boots (a), the captaincy (f), the sponsors (g), and
+    // the gambling (h) come with their parts.
     // The Facebook box (b) is not in the remake.]
     if (!game->settings.doneLoseSkills && c->apps > 3) {
         game->settings.doneLoseSkills = 1;
@@ -4121,7 +4136,7 @@ static int play_news(SSRGame *game, const SSRFixture *next) {
         message(game, "message", loc(game, "CMESSAGE_LOSESKILLS"), 0, 1, NULL);
         return 1;
     }
-    if (news_get_dumped(game) || news_partner_unhappy(game) || news_item_expiry(game)) {
+    if (check_transfer_window(game) || news_get_dumped(game) || news_partner_unhappy(game) || news_item_expiry(game)) {
         c->newsDone = 1;
         return 1;
     }
@@ -5626,6 +5641,134 @@ static void negotiate_tick(SSRGame *game) {
     }
 }
 
+
+
+/* ------------------------------------------------------ transfer window */
+
+// GetProspectiveClubs during a season: up to max stronger clubs of the
+// nation that want the player. The game seeds its random numbers from the
+// clock here.
+static int window_clubs(SSRGame *game, int nation, int max, const SSRClub **out) {
+    const SSRWorld *world = game->world;
+    const SSRCareer *c = &game->career;
+    int thr = (c->starRating + 200) / 10;
+    thr = thr < 10 ? 10 : thr > 90 ? 90 : thr;
+    int count = 0, n = 0;
+    Prospect *list = prospect_list(game, nation, &count);
+    if (!list) return 0;
+    game->random.seed = game->now;
+    int mine = 0;
+    for (int i = 0; i < count; i++) {
+        if (list[i].club->id == c->clubId) mine = list[i].strength;
+    }
+    for (int i = 0; i < count; i++) {
+        const SSRClub *club = list[i].club;
+        if (ssr_rand(&game->random, 2) != 1 && club->nation == nation && league_duration(world, club->league) > 0) break;
+    }
+    for (int i = 0; i < count && n < max; i++) {
+        const SSRClub *club = list[i].club;
+        if (list[i].strength <= thr || club->nation != nation || club->id == c->clubId) continue;
+        int r = ssr_rand(&game->random, 2);
+        if (r == 1 && (list[i].strength > mine + 10 || list[i].strength > 89) && league_duration(world, club->league) > 0) {
+            out[n++] = club;
+        }
+    }
+    free(list);
+    return n;
+}
+
+// TransferWindowOpenDate: the day of the match after the half of the
+// season of the club.
+static int window_open_date(SSRGame *game) {
+    const SSRFixture *fixtures[128];
+    int n = game->season ? team_fixtures(game, game->career.clubId, 0, fixtures, 128) : 0;
+    int half = n / 2;
+    return half < n ? fixtures[half]->sdate : 0;
+}
+
+// GSCheckTransferWindow: the window opens, closes, and brings offers.
+static int check_transfer_window(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    SSRContractState *w = &game->contract;
+    int open = window_open_date(game);
+    if (open == 0 || c->sdate < open) {
+        w->windowOpen = 0;
+        return 0;
+    }
+    if (!w->windowOpen) {
+        if (c->sdate > open + 28) return 0;
+        w->windowOpen = 1;
+        if (c->sdate > open + 7) return 0;
+        message(game, "message", loc(game, "CMESSAGE_TRANSFERWINDOWOPEN"), 0, 1, NULL);
+        w->offerClubId = 0;
+        return 1;
+    }
+    if (c->sdate > open + 28) {
+        w->windowOpen = 0;
+        char text[512];
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_TRANSFERWINDOWCLOSED"));
+        if (ssr_rand(&game->random, 3) > 1) {
+            relationships_screen(game, 1, 0);
+            size_t n = strlen(text);
+            if (c->relationTeam < 60) {
+                snprintf(text + n, sizeof(text) - n, " %s", loc(game, "CMESSAGE_TRANSFERSBOOST"));
+                ssr_career_update_relation(c, SSR_RELATION_TEAM, (100 - c->relationTeam) * 0.2f);
+            } else {
+                snprintf(text + n, sizeof(text) - n, " %s", loc(game, "CMESSAGE_TRANSFERSDRAIN"));
+                ssr_career_update_relation(c, SSR_RELATION_TEAM, -c->relationTeam * 0.1f);
+            }
+            relation_tweaks(game, 0);
+            message_bar(game, "messageteam", text, "DoRelationScreen");
+        } else {
+            message(game, "message", text, 0, 1, NULL);
+        }
+        return 1;
+    }
+    if (c->sdate < c->lastTransferDate + 84) return 0;
+    const SSRClub *clubs[3];
+    int n = window_clubs(game, c->clubNationId, 3, clubs);
+    if (n == 0) return 0;
+    if (c->sdate <= open + 14 && !w->doneRumour) {
+        w->doneRumour = 1;
+        char list[256];
+        snprintf(list, sizeof(list), "%s", clubs[0]->tla);
+        for (int k = 1; k < n; k++) {
+            size_t used = strlen(list);
+            snprintf(list + used, sizeof(list) - used, "%s%s", k < n - 1 ? ", " : " & ", clubs[k]->tla);
+        }
+        do_news(game, "CMESSAGE_TRANSFERRUMOUR", NULL, NULL);
+        replace_all(c->headline, sizeof(c->headline), "$clubs", list);
+        webpage_to(game, "gamemenu", 0);
+        return 1;
+    }
+    for (int k = 0; k < n; k++) {
+        if (ssr_rand(&game->random, 2) != 1) continue;
+        get_offer(game, clubs[k]->id, 0);
+        contract_screen(game, 1);
+        char text[512];
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_TRANSFEROFFERMOBILE"));
+        replace_all(text, sizeof(text), "$clubname", my_club_tla(game));
+        replace_all(text, sizeof(text), "$offerclubname", clubs[k]->tla);
+        message(game, "message", text, 0, 1, NULL);
+        return 1;
+    }
+    return 0;
+}
+
+// The hint of the agent at the game menu: the club would pay more.
+static int agent_hint(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (ssr_career_agent(c) == 0 || c->sdate <= c->lastAgentHint + 27 || c->sdate < c->lastNegotiations + 56) return 0;
+    get_offer(game, c->clubId, 0);
+    if (game->offer.wage <= c->wage) return 0;
+    const char *tag = (int)c->relationBoss < 25   ? "CMESSAGE_AGENTHINTLOWBOSS"
+                      : (int)c->relationTeam < 25 ? "CMESSAGE_AGENTHINTLOWTEAM"
+                      : (int)c->relationFans < 25 ? "CMESSAGE_AGENTHINTLOWFANS"
+                                                  : "CMESSAGE_AGENTHINT";
+    message(game, "messageagent", loc(game, tag), 0, 1, NULL);
+    c->lastAgentHint = c->sdate;
+    return 1;
+}
 
 /* ----------------------------------------------------- desired transfer */
 

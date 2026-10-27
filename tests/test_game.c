@@ -335,6 +335,9 @@ static void press_play(SSRGame *game) {
             ssr_game_update(game, 160);
         } else if (strcmp(screen, "relationships") == 0) {
             ssr_game_message(game, "relationships.btn_Home");
+        } else if (strcmp(screen, "contract") == 0) {
+            // An offer in the transfer window: the player stays.
+            ssr_game_message(game, "contract.btn_Reject");
         } else if (strcmp(screen, "gamemenu") == 0) {
             ssr_game_message(game, "gamemenu.btn_Play");
         } else {
@@ -593,6 +596,11 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsSponsors") == sponsors);
     ssr_game_message(game, "matchreview.btn_Play");
     if (strcmp(ssr_game_screen(game), "seasonreview") == 0) finish_season(game, tweaks);
+    // The game menu can open with a message: the hint of the agent, or a
+    // contract that ran out.
+    for (int i = 0; i < 4 && strncmp(ssr_game_screen(game), "message", 7) == 0; i++) {
+        ssr_game_message(game, "message.btn_Cancel");
+    }
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
