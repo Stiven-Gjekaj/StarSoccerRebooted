@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "ssr_fixdata.h"
+#include "ssr_sort.h"
 
 /* ---------------------------------------------------------------- dates */
 
@@ -42,39 +43,21 @@ static float rnd2(SSRSeason *s, float a, float b) {
 
 typedef int (*Compare)(SSRSeason *s, const void *context, int a, int b);
 
-// The quicksort of Monkey X (bb_collections). It is not stable, and a
-// compare can take random numbers, so the remake uses the same steps.
-static int partition(SSRSeason *s, int *items, int low, int high, int middle, Compare compare, const void *context,
-                     int descending) {
-    int pivot = items[middle];
-    items[middle] = items[high];
-    items[high] = pivot;
-    int store = low;
-    for (int i = low; i < high; i++) {
-        int c = compare(s, context, items[i], pivot);
-        if (descending ? c >= 0 : c <= 0) {
-            int t = items[i];
-            items[i] = items[store];
-            items[store] = t;
-            store++;
-        }
-    }
-    int t = items[store];
-    items[store] = items[high];
-    items[high] = t;
-    return store;
-}
+// The compare of the season, with the season and a context.
+typedef struct {
+    SSRSeason *season;
+    Compare compare;
+    const void *context;
+} SortContext;
 
-static void quicksort(SSRSeason *s, int *items, int low, int high, Compare compare, const void *context,
-                      int descending) {
-    if (high <= low) return;
-    int p = partition(s, items, low, high, low + (high - low) / 2, compare, context, descending);
-    quicksort(s, items, low, p - 1, compare, context, descending);
-    quicksort(s, items, p + 1, high, compare, context, descending);
+static int sort_compare(void *context, int a, int b) {
+    const SortContext *c = context;
+    return c->compare(c->season, c->context, a, b);
 }
 
 static void sort(SSRSeason *s, int *items, int count, Compare compare, const void *context, int descending) {
-    if (count > 1) quicksort(s, items, 0, count - 1, compare, context, descending);
+    SortContext c = {s, compare, context};
+    ssr_sort(items, count, sort_compare, &c, descending);
 }
 
 /* ------------------------------------------------------------ lookups */
