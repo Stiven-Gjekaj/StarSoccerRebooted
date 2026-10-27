@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include "ssr_aftermatch.h"
+#include "ssr_ball.h"
 #include "ssr_blackjack.h"
 #include "ssr_career.h"
 #include "ssr_casino.h"
@@ -91,6 +92,9 @@ struct SSRGame {
     // The fixture of the match that plays now: its competition, date, and
     // sides. A fixture has no fixed place in its list.
     int fixtureComp, fixtureDate, fixtureHome, fixtureAway;
+    // The match type of the ball of the match (c_TFixture.GetBallType): 1
+    // the league, 2 the cup, 3 the continent, 4 the nation.
+    int matchBallType;
     // The two teams of the match, for the kits (c_TMatch.m_team1, m_team2),
     // and the kit choice of the kit button.
     Team homeTeam, awayTeam;
@@ -1589,6 +1593,22 @@ static void kits_button(SSRGame *game) {
 // c_TMatch.SetUpFixture: the match of the next fixture of the player.
 static const SSRFixture *first_leg_of(const SSRSeasonComp *comp, const SSRFixture *f);
 
+// c_TFixture.GetBallType: the cup of a nation is 2, a competition of a
+// continent 3, and a match of the nation 4. Another is the league, 1.
+static int ball_type_of(const SSRCompetition *comp) {
+    if (!comp) return 1;
+    if (comp->level == 0 && comp->locale == 0) return comp->type == 1 ? 2 : 1;
+    if (comp->level == 0 && comp->locale == 1) return 3;
+    if (comp->level == 1) return 4;
+    return 1;
+}
+
+// ABall.SetType: the layouts show the ball of the match.
+static void match_ball_tweak(SSRGame *game) {
+    int ball = ssr_career_selected_ball(&game->career, game->matchBallType);
+    ssr_tweaks_set_number(game->tweaks, "Match", "MatchBall", ball - 1);
+}
+
 static void start_match(SSRGame *game) {
     season_in(game);
     SSRFixture *f = ssr_season_next_fixture(game->season);
@@ -1607,6 +1627,8 @@ static void start_match(SSRGame *game) {
     int mine = level == 1 ? game->career.nationId : game->career.clubId;
     int homeIsMine = home.id == mine;
     game->fixtureComp = f->compId;
+    game->matchBallType = ball_type_of(comp->data);
+    match_ball_tweak(game);
     game->fixtureDate = f->sdate;
     game->fixtureHome = f->home;
     game->fixtureAway = f->away;
@@ -3451,6 +3473,10 @@ static void start_chance(SSRGame *game) {
     s.pace = boot_skill(c, 0);
     s.careerGoals = (float)c->goals;
     s.careerPasses = (float)c->passes;
+    // c_TBall_Type.UpdateMatchBallImages: the factors of the ball of the
+    // match.
+    int ball = ssr_career_selected_ball(&game->career, game->matchBallType);
+    ssr_ball_type_factors(ball, &s.ballSpeed, &s.ballBounce, &s.ballWeight, &s.ballCurl);
     ssr_chance_start(game->chance, &s, &game->random);
     game->chanceEnd = 0;
     // InitChance: a new recording, and no replay.

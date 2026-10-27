@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ssr_ball.h"
 #include "ssr_game.h"
 #include "ssr_test.h"
 #include "ssr_zipwriter.h"
@@ -449,6 +450,8 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     seasons++;
 }
 
+// 1 after the test checked the ball of a chance.
+static int ballChecked = 0;
 static int winnerPages = 0, newsSeen = 0, dilemmasSeen = 0, interviews = 0, interviewsWon = 0, trainerMessages = 0;
 
 // The interview after a match: the green buttons light one at a time, then
@@ -616,6 +619,16 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         take_ops(game, ops, 64);
         if (ssr_game_replaying(game) == 1) watch_a_replay(game, tweaks);
         const SSRChance *chance = ssr_game_chance(game);
+        if (chance && !ballChecked) {
+            // The ball of the league gives its factors to the chance.
+            int ball = ((SSRCareer *)ssr_game_career(game))->ballLeague;
+            float speed, bounce, weight, curl;
+            ssr_ball_type_factors(ball, &speed, &bounce, &weight, &curl);
+            CHECK(chance->ball.speedFactor == speed && chance->ball.weightFactor == weight);
+            CHECK(chance->ball.curlFactor == curl && chance->tap.bounce == bounce);
+            CHECK(ssr_tweaks_number(tweaks, "Match", "MatchBall") == ball - 1);
+            ballChecked = 1;
+        }
         if (chance && chance->state == SSR_CHANCE_DRIBBLE) {
             // A dribble: swipe up the screen until the chance ends.
             chances++;
@@ -848,6 +861,9 @@ static void not_picked_by_the_boss(SSRGame *game, SSRTweaks *tweaks, const char 
 // of a cup winner, and loads it again.
 static void busy(SSRGame *game, const char *path) {
     SSRCareer c = *ssr_game_career(game);
+    // The next match plays with NS-Rocket.
+    c.ballLeague = 2;
+    ballChecked = 0;
     c.spentTime = 3;
     c.sponsors[0] = c.sponsors[1] = 4;
     c.relationSponsors = 50;
