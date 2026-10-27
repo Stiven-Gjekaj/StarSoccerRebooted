@@ -127,7 +127,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       with its boss, as the original does
 - [x] The selection: the boss can make the player a substitute, or leave
       the player out
-- [ ] The news of a cup winner and of the result (`headlineresult`)
+- [x] The news of a cup winner and of the result (`headlineresult`)
 - [ ] The trophy log and the stat history (`Achievements`)
 - [ ] The transfer at the end of the season (`DesiredTransfer`). Yes
       keeps the club for now.
@@ -140,8 +140,15 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       yet.
 - [ ] The NRG overlay when the energy is too low for an activity
       (`upsellnrg`, `NRGOverlay`). A message shows now.
-- [ ] Dilemmas and interviews (`Dilemma`, `Interview`), with the
+- [x] Dilemmas and interviews (`Dilemma`, `Interview`), with the
       interview after a match
+- [x] The news of the week before a match (`GSPlayerPlay`): the partner,
+      the requests of the relations, the happiness, the style, the
+      vehicles, the other clubs, the dilemma, and the tips
+- [ ] The news checks that wait for their parts: the old pro boots, the
+      transfer window, the captaincy, the sponsors, and the gambling
+- [ ] The skill bar in the message of a dilemma accident
+- [ ] Check the colour of the interview buttons against the original
 - [ ] Money, the lifestyle shop, boots, and match balls (`ShopLifestyle`,
       `BootShop`, `MatchBalls`, `BuyItem`)
 - [ ] The agent, transfers, and contract talks (`AgentDetails`,
@@ -195,7 +202,8 @@ place of the atlas image with the same name (`art/NewStarLogo.png`).
       `BannerFrontAbv`)
 - [ ] The other marks: `BannerFrontLogo`, `LogoStrip`, `CLNewStar`, the
       sponsor images of `Images/`, the shirt card of the pairs game
-      (`PShirt`), and the back of the cards (`PCardBackPattern1`)
+      (`PShirt`), the back of the cards (`PCardBackPattern1`), and the
+      microphones of the interview (`InterviewMics`)
 
 ## Not in the remake
 
