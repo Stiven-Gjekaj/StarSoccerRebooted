@@ -197,8 +197,8 @@ const char *ssr_scene_take_message(SSRScene *scene);
 // elements.
 int ssr_scene_set_text(SSRScene *scene, const char *ref, const char *text);
 
-// Shows or hides each element with the ref. Returns the number of
-// elements.
+// Shows or hides each element with the ref. An element that was hidden
+// starts its emitters again when it shows. Returns the number of elements.
 int ssr_scene_set_visible(SSRScene *scene, const char *ref, int visible);
 
 // Gives the colour "RRGGBBAA" to each element with the ref

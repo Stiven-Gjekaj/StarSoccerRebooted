@@ -1889,6 +1889,59 @@ static void test_calls_a_function_of_a_gel(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// An element that shows again starts its emitters again, as the new copy
+// of the ticker tape at each win of the casino (c_GGadget.CloneDisposable).
+static void test_restarts_emitters_when_shown(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/TweakValues.txt", ssr_test_directory("scene_restart"));
+    FILE *file = fopen(path, "wb");
+    fputs("Category:(Tape)\n"
+          "\tRange:(Rate,Rate,0.05,0.05,1)\n"
+          "\tRange:(Lifetime,Life,10,10,1)\n"
+          "\tRange:(Count,Count,2,2,1)\n"
+          "EndCategory\n",
+          file);
+    fclose(file);
+    CHECK(ssr_tweaks_load(tweaks, path) == 3);
+    SSRUiTree *tree;
+    layout = "Draw:(Strip,0,0,10,10) ref:StripTemplate\n"
+             "\tEmitPlacer()\n"
+             "\tEmitLifetime()\n"
+             "{\n"
+             "} Template\n"
+             "Emitter:(Tape,StripTemplate) ref:TapeEmitter\n"
+             "Rect:(0,0) ref:TickerTapeShower\n"
+             "{\n"
+             "\tInstance:(TapeEmitter,100,20)\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    int counts[3];
+    for (int round = 0; round < 3; round++) {
+        if (round > 0) {
+            ssr_scene_set_visible(scene, "TickerTapeShower", 0);
+            ssr_scene_update(scene, &env, 17);
+        }
+        // A show of a shown element does not start it again.
+        ssr_scene_set_visible(scene, "TickerTapeShower", 1);
+        if (round == 2) ssr_scene_set_visible(scene, "TickerTapeShower", 1);
+        for (int i = 0; i < 30; i++) ssr_scene_update(scene, &env, 17);
+        counts[round] = 0;
+        for (int i = 0; i < ssr_scene_count(scene); i++) {
+            const char *image = ssr_scene_item(scene, i)->image;
+            if (image && strcmp(image, "Strip") == 0) counts[round]++;
+        }
+    }
+    // Each show makes two strips more. The old strips live on.
+    CHECK(counts[0] == 2 && counts[1] == 4 && counts[2] == 6);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -2282,6 +2335,7 @@ int main(void) {
     test_colours_a_spine_slot();
     test_colours_the_shadow_of_a_text();
     test_calls_a_function_of_a_gel();
+    test_restarts_emitters_when_shown();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();

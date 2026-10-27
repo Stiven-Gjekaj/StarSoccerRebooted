@@ -3989,12 +3989,26 @@ int ssr_scene_set_text(SSRScene *scene, const char *ref, const char *text) {
     return count;
 }
 
+// The emitters under the gel start again, as in a new copy of the gel.
+static void restart_emitters(Gel *g) {
+    if (g->kind == GEL_EMITTER) {
+        g->started = 0;
+        g->emitted = 0;
+        g->next = 0;
+    }
+    for (int i = 0; i < g->childCount; i++) restart_emitters(g->children[i]);
+}
+
 int ssr_scene_set_visible(SSRScene *scene, const char *ref, int visible) {
     if (!scene || !ref) return 0;
     int count = 0;
     for (int i = 0; i < scene->refCount; i++) {
-        if (strcmp(scene->refs[i]->ref, ref) != 0) continue;
-        scene->refs[i]->hidden = !visible;
+        Gel *g = scene->refs[i];
+        if (strcmp(g->ref, ref) != 0) continue;
+        // A gel that shows again takes new emitters. The game shows a new
+        // copy of the ticker tape at each win (c_GGadget.CloneDisposable).
+        if (visible && g->hidden) restart_emitters(g);
+        g->hidden = !visible;
         count++;
     }
     return count;
