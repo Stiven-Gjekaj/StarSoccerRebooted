@@ -87,6 +87,7 @@ static void test_refuses_a_set_with_a_missing_file(void) {
 }
 
 // A data pack changes the clubs. The other files come from the data set.
+// A row of the pack changes the club with its id. The other clubs stay.
 static void test_reads_a_pack_over_the_data_set(void) {
     char set[1024];
     snprintf(set, sizeof(set), "%s", write_set("packbase"));
@@ -99,8 +100,38 @@ static void test_reads_a_pack_over_the_data_set(void) {
     SSRWorld *world = ssr_world_load_pack(set, pack);
     CHECK(world != NULL);
     if (!world) return;
-    CHECK(world->clubCount == 1 && strcmp(ssr_world_club(world, 810)->name, "Harbour Town") == 0);
+    CHECK(world->clubCount == 3 && strcmp(ssr_world_club(world, 810)->name, "Harbour Town") == 0);
+    CHECK(strcmp(ssr_world_club(world, 915)->name, "West Club") == 0);
     CHECK(world->nationCount == 1 && world->competitionCount == 1);
+    ssr_world_free(world);
+}
+
+// A pack gives only the columns that it changes. A new id adds a record.
+// The promotion places of a league in the pack take the place of the
+// places of that league.
+static void test_merges_the_rows_of_a_pack(void) {
+    char set[1024];
+    snprintf(set, sizeof(set), "%s", write_set("mergebase"));
+    const char *pack = ssr_test_directory("mergepack");
+    write_text(pack, "Clubs.txt",
+               "id\tshortname\thomekitshirtcol1\tstrength\r\n"
+               "915\tHarbour Town\t#00F\t\r\n"
+               "999\tNew Club\t\t40\r\n");
+    write_text(pack, "Competitions.txt", "id\ttla\r\n2270\tHarbour League\r\n");
+    write_text(pack, "PromotionPlaces.txt",
+               "parentid\tplace\tpromotiontoid\r\n2280\t1\t2270\r\n2280\t2\t2270\r\n");
+    SSRWorld *world = ssr_world_load_pack(set, pack);
+    CHECK(world != NULL);
+    if (!world) return;
+    const SSRClub *west = ssr_world_club(world, 915);
+    CHECK(world->clubCount == 4 && west && strcmp(west->name, "Harbour Town") == 0);
+    CHECK(west && west->home.shirt1 == 0x0000FF && west->home.shorts == 0xFF0000);
+    CHECK(west && west->strength == 98 && strcmp(west->tla, "WEST") == 0 && west->league == 2270);
+    const SSRClub *added = ssr_world_club(world, 999);
+    CHECK(added && added->strength == 40 && added->home.shirt1 == 0xFFFFFF && strcmp(added->tla, "") == 0);
+    const SSRCompetition *league = ssr_world_competition(world, 2270);
+    CHECK(league && strcmp(league->tla, "Harbour League") == 0 && league->duration == 38);
+    CHECK(world->promotionCount == 2 && world->promotions[1].place == 2);
     ssr_world_free(world);
 }
 
@@ -171,6 +202,7 @@ int main(void) {
     test_refuses_a_set_with_a_missing_file();
     test_parses_colours();
     test_reads_a_pack_over_the_data_set();
+    test_merges_the_rows_of_a_pack();
     test_edits_and_saves_the_clubs();
     return TEST_RESULT();
 }
