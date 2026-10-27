@@ -2042,6 +2042,16 @@ static void start_match(SSRGame *game) {
     const SSRFixture *one = f->leg == 2 ? first_leg_of(comp, f) : NULL;
     s.firstLegHome = one ? one->score1 : 0;
     s.firstLegAway = one ? one->score2 : 0;
+    // The weather of the remake: rain is more likely far from the equator,
+    // as in the training of 4.32. The numbers come from the seed of the
+    // world, the day, and the ground, so no stream of numbers changes.
+    const SSRClub *ground = game->world ? ssr_world_club(game->world, ssr_fixture_home_team(game->season, f)) : NULL;
+    if (ground && f->level == 0) {
+        SSRRandom r = {(int32_t)(c->worldSeed * 7919 + f->sdate * 104729 + ground->id * 31)};
+        int far = (int)(ground->latitude < 0 ? -ground->latitude : ground->latitude);
+        s.weather = ssr_rand(&r, 80) < far && ssr_rand(&r, 4) == 1;
+    }
+    ssr_tweaks_set_number(game->tweaks, "Pitch", "WeatherType", s.weather ? 3 : 0);
     ssr_match_start(game->match, &s, game->localise, game->context, &game->random);
     game->commentaryCount = 0;
     SSRTweaks *t = game->tweaks;

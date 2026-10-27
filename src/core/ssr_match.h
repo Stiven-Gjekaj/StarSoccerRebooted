@@ -64,6 +64,9 @@ typedef struct {
     // the away team now.
     int matchType;
     int firstLegHome, firstLegAway;
+    // The weather of the remake: 0 dry, 1 rain. A wet pitch lets the ball
+    // roll further (SSRChanceSetup.weather).
+    int weather;
 } SSRMatchSetup;
 
 // One row of the commentary.

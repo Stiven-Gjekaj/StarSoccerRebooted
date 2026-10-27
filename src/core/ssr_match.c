@@ -147,7 +147,10 @@ int ssr_match_play(SSRMatch *m, int now) {
     case SSR_MATCH_HALF_TIME:
         m->state = SSR_MATCH_CLOCK;
         m->matchTick = now;
-        if (m->minute == 0) say(m, 0, "Kick Off", 0, 0);
+        if (m->minute == 0) {
+            say(m, 0, "Kick Off", 0, 0);
+            if (m->setup.weather == 1) say(m, 0, text_of(m, "SSR_MatchRain"), 0, 0);
+        }
         return 0;
     case SSR_MATCH_PENALTIES:
         // DoShootOut: the first kick steps up.
@@ -697,6 +700,7 @@ SSRChanceSetup ssr_match_chance_setup(const SSRMatch *m, int technique, int powe
     c.chances = m->chances;
     c.windSpeed = m->windSpeed;
     c.windDirection = m->windDirection;
+    c.weather = m->setup.weather;
     // The captain of a club match is captain 1 or 3, of a nation match 2 or
     // 3. Only a player that started the match draws runs.
     int cap = s->captain;

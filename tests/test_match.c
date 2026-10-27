@@ -299,6 +299,21 @@ static void test_a_team_behind_pushes(void) {
     CHECK(behind > level * 11 / 10);
 }
 
+// A match in the rain says so at the kick-off, and its chances have a wet
+// ball.
+static void test_plays_in_the_rain(void) {
+    SSRMatch m;
+    SSRRandom random = {11};
+    SSRMatchSetup s = setup_for();
+    s.weather = 1;
+    ssr_match_start(&m, &s, localise, NULL, &random);
+    ssr_match_play(&m, 0);
+    SSRMatchLine line;
+    int rain = 0;
+    while (ssr_match_take_line(&m, &line)) rain += strcmp(line.text, "SSR_MatchRain") == 0;
+    CHECK(rain == 1 && ssr_match_chance_setup(&m, 50, 50, 1).weather == 1);
+}
+
 static void test_the_captain_draws_runs(void) {
     SSRMatch m;
     SSRRandom random = {11};
@@ -322,6 +337,7 @@ int main(void) {
     test_keeps_the_furthest_goal_and_pass();
     test_counts_the_posts_and_the_late_goals();
     test_a_team_behind_pushes();
+    test_plays_in_the_rain();
     test_plays_a_match();
     test_a_cup_tie_goes_to_extra_time_and_penalties();
     test_counts_the_goals_of_the_player();
