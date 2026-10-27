@@ -9461,6 +9461,17 @@ static SSRPerson *world_scorer(SSRGame *game) {
     return ssr_people_top_scorers(game->people, clubs, n, &top, 1) ? top : NULL;
 }
 
+// 1 when the next match of the player is a club match between two clubs
+// near each other. home and away get the clubs.
+static int next_derby(SSRGame *game, int *home, int *away) {
+    SSRFixture *f = game->season ? ssr_season_next_fixture(game->season) : NULL;
+    SSRSeasonComp *comp = f ? ssr_season_comp(game->season, f->compId) : NULL;
+    if (!f || !comp || comp->data->level != 0) return 0;
+    *home = ssr_fixture_home_team(game->season, f);
+    *away = ssr_fixture_away_team(game->season, f);
+    return ssr_world_is_derby(game->world, *home, *away);
+}
+
 static void person_name(const SSRPerson *p, char *out, size_t capacity) {
     snprintf(out, capacity, "%s %s", p->first, p->last);
 }
@@ -9533,6 +9544,11 @@ int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
         return club && world_scorer(game) ? ticker_counter(count) : -1;
     case SSR_TICKER_WORLD_MOVE:
         return club && game->people && game->people->moveCount > 0 ? ticker_counter(count) : -1;
+    case SSR_TICKER_WORLD_DERBY: {
+        season_in(game);
+        int home = 0, away = 0;
+        return club && next_derby(game, &home, &away) ? ticker_counter(count) : -1;
+    }
     default:
         return -1;
     }
@@ -9667,6 +9683,17 @@ void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_
         replace_all(text, capacity, "$apps", value);
         SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, ssr_season_actual_league(game->season, c->clubId)) : NULL;
         replace_all(text, capacity, "$league", comp ? comp->data->tla : "");
+        break;
+    }
+    case SSR_TICKER_WORLD_DERBY: {
+        season_in(game);
+        int home = 0, away = 0;
+        if (!next_derby(game, &home, &away)) return;
+        snprintf(text, capacity, "%s", loc(game, "SSR_TICKER_DERBY"));
+        replace_all(text, capacity, "$home", club_name(game, home));
+        replace_all(text, capacity, "$away", club_name(game, away));
+        snprintf(number, sizeof(number), "%d", (int)(ssr_world_club_distance(game->world, home, away) + 0.5));
+        replace_all(text, capacity, "$km", number);
         break;
     }
     case SSR_TICKER_WORLD_MOVE: {
