@@ -161,6 +161,8 @@ typedef enum {
     SSR_TICKER_WORLD_TABLE,
     // The new managers of the new season.
     SSR_TICKER_WORLD_MANAGER,
+    // A club of the league of the player in a run of wins or defeats.
+    SSR_TICKER_WORLD_FORM,
     SSR_TICKER_KINDS,
 } SSRTickerKind;
 

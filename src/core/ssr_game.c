@@ -9577,6 +9577,37 @@ static SSRPerson *world_scorer(SSRGame *game) {
 
 // 1 when the next match of the player is a club match between two clubs
 // near each other. home and away get the clubs.
+// The longest run of the league of the player now: a club with 5 wins or
+// 4 defeats in a row in its last league matches. run gets the length,
+// with a minus for defeats. Returns the club, or 0.
+static int form_run(SSRGame *game, int *run) {
+    SSRSeason *s = game->season;
+    SSRSeasonComp *comp = s ? ssr_season_comp(s, ssr_season_actual_league(s, game->career.clubId)) : NULL;
+    *run = 0;
+    if (!comp || comp->data->type != 0 || comp->poolCount == 0) return 0;
+    int best = 0, bestRun = 0;
+    SSRPool *pool = &comp->pools[0];
+    for (int r = 0; r < pool->count; r++) {
+        int team = s->rows[pool->rows[r]].id, streak = 0;
+        // The fixtures go by date; the run counts back from the last one.
+        for (int k = comp->fixtureCount - 1; k >= 0; k--) {
+            const SSRFixture *f = &comp->fixtures[k];
+            if (f->result != 1 || (f->home != team && f->away != team)) continue;
+            int mine = f->home == team ? f->score1 : f->score2, theirs = f->home == team ? f->score2 : f->score1;
+            int sign = mine > theirs ? 1 : mine < theirs ? -1 : 0;
+            if (sign == 0 || (streak != 0 && (streak > 0) != (sign > 0))) break;
+            streak += sign;
+        }
+        int strong = streak >= 5 || streak <= -4;
+        if (strong && abs(streak) > abs(bestRun)) {
+            best = s->rows[pool->rows[r]].teamId;
+            bestRun = streak;
+        }
+    }
+    *run = bestRun;
+    return best;
+}
+
 // 1 for a derby, 2 for a match of a big rivalry.
 static int next_derby(SSRGame *game, int *home, int *away) {
     SSRFixture *f = game->season ? ssr_season_next_fixture(game->season) : NULL;
@@ -9686,6 +9717,11 @@ int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
     }
     case SSR_TICKER_WORLD_MANAGER:
         return club && game->people && game->people->sackedCount > 0 ? ticker_counter(count) : -1;
+    case SSR_TICKER_WORLD_FORM: {
+        season_in(game);
+        int run = 0;
+        return club && form_run(game, &run) ? ticker_counter(count) : -1;
+    }
     default:
         return -1;
     }
@@ -9820,6 +9856,16 @@ void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_
         replace_all(text, capacity, "$apps", value);
         SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, ssr_season_actual_league(game->season, c->clubId)) : NULL;
         replace_all(text, capacity, "$league", comp ? comp->data->tla : "");
+        break;
+    }
+    case SSR_TICKER_WORLD_FORM: {
+        season_in(game);
+        int run = 0, team = form_run(game, &run);
+        if (!team) return;
+        snprintf(text, capacity, "%s", loc(game, run > 0 ? "SSR_TICKER_GOODRUN" : "SSR_TICKER_BADRUN"));
+        replace_all(text, capacity, "$club", club_name(game, team));
+        snprintf(number, sizeof(number), "%d", abs(run));
+        replace_all(text, capacity, "$num", number);
         break;
     }
     case SSR_TICKER_WORLD_MANAGER: {
