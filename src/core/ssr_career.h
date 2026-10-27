@@ -69,6 +69,9 @@ typedef struct {
     // A shopping trip with the team-mates: -1 none, else the purchases of
     // the trip so far (c_TPlayer.teammatesshoppingcount).
     int teamShopping;
+    // The gambling of the player, 0 to 100, and the number of bets of the
+    // career (c_TPlayer.gambling and casinocount).
+    int gambling, casinoCount;
     // The agent and the trainer of each level: the matches left plus 1,
     // or 0 (c_TPlayer.iapAgent1..3 and iapTrainer1..3).
     int agent[3], trainer[3];

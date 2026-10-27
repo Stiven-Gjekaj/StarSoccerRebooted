@@ -324,6 +324,7 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     write_ints(file, "vehicles", c->vehicles, SSR_CAREER_ITEMS);
     write_ints(file, "properties", c->properties, SSR_CAREER_ITEMS);
     fprintf(file, "teammatesshoppingcount=%d\n", c->teamShopping);
+    fprintf(file, "gambling=%d\ncasinocount=%d\n", c->gambling, c->casinoCount);
     write_ints(file, "agents", c->agent, 3);
     write_ints(file, "trainers", c->trainer, 3);
     int boots[9] = {c->bootId,       c->bootUses,   c->expiredBoots,   c->currentBootId, c->currentBootUses,
@@ -434,6 +435,8 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "vehicles") == 0) read_ints(value, c->vehicles, SSR_CAREER_ITEMS);
         else if (strcmp(key, "properties") == 0) read_ints(value, c->properties, SSR_CAREER_ITEMS);
         else if (strcmp(key, "teammatesshoppingcount") == 0) c->teamShopping = number;
+        else if (strcmp(key, "gambling") == 0) c->gambling = number;
+        else if (strcmp(key, "casinocount") == 0) c->casinoCount = number;
         else if (strcmp(key, "agents") == 0) read_ints(value, c->agent, 3);
         else if (strcmp(key, "trainers") == 0) read_ints(value, c->trainer, 3);
         else if (strcmp(key, "boots") == 0) {

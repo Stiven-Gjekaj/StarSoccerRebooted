@@ -65,6 +65,8 @@ static void test_saves_and_loads_a_career(void) {
     // No shopping trip runs in a new career.
     CHECK(c.teamShopping == -1);
     c.teamShopping = 2;
+    c.gambling = 36;
+    c.casinoCount = 12;
     CHECK(c.expiredBoots == -1 && ssr_career_agent(&c) == 0 && ssr_career_trainer(&c) == 0);
     c.agent[0] = 51;
     c.trainer[1] = 9;
@@ -108,6 +110,7 @@ static void test_saves_and_loads_a_career(void) {
     CHECK(back.lastSpendTimePartner == 28 && back.lastSpendTimeFriends == 28);
     CHECK(back.sponsors[3] == 9 && back.sponsors[0] == 0);
     CHECK(back.teamShopping == 2);
+    CHECK(back.gambling == 36 && back.casinoCount == 12);
     CHECK(ssr_career_agent(&back) == 1 && ssr_career_trainer(&back) == 2 && back.agent[0] == 51);
     CHECK(back.bootId == 21 && back.bootUses == 4 && back.expiredBoots == -1 && back.oldProBoots == 21);
     CHECK(back.ballCup == 3 && back.ballLeague == 0);
