@@ -8,6 +8,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "ssr_sha256.h"
+#include "ssr_tsv.h"
 #include "ssr_zip.h"
 
 #ifdef _WIN32
@@ -250,6 +252,41 @@ int ssr_pack_remove(const char *packs, const char *id) {
 
 static int compare_ids(const void *a, const void *b) {
     return strcmp((const char *)a, (const char *)b);
+}
+
+int ssr_pack_index_parse(const char *text, SSRPackEntry *entries, int max) {
+    SSRTsv *table = text ? ssr_tsv_parse(text, strlen(text)) : NULL;
+    if (!table) return 0;
+    int columns[8];
+    static const char *const NAMES[8] = {"id", "name", "author", "version", "format", "size", "sha256", "url"};
+    for (int k = 0; k < 8; k++) columns[k] = ssr_tsv_column(table, NAMES[k]);
+    int n = 0;
+    for (int row = 0; row < ssr_tsv_rows(table) && n < max; row++) {
+        SSRPackEntry e;
+        memset(&e, 0, sizeof(e));
+        snprintf(e.id, sizeof(e.id), "%s", ssr_tsv_cell(table, row, columns[0]));
+        snprintf(e.name, sizeof(e.name), "%s", ssr_tsv_cell(table, row, columns[1]));
+        snprintf(e.author, sizeof(e.author), "%s", ssr_tsv_cell(table, row, columns[2]));
+        snprintf(e.version, sizeof(e.version), "%s", ssr_tsv_cell(table, row, columns[3]));
+        e.format = ssr_tsv_int(table, row, columns[4], 0);
+        e.size = ssr_tsv_int(table, row, columns[5], 0);
+        snprintf(e.sha256, sizeof(e.sha256), "%s", ssr_tsv_cell(table, row, columns[6]));
+        snprintf(e.url, sizeof(e.url), "%s", ssr_tsv_cell(table, row, columns[7]));
+        if (!is_good_id(e.id) || e.format < 1 || e.format > SSR_PACK_FORMAT || strncmp(e.url, "https://", 8) != 0 ||
+            strlen(e.sha256) != 64 || e.size <= 0) {
+            continue;
+        }
+        entries[n++] = e;
+    }
+    ssr_tsv_free(table);
+    return n;
+}
+
+int ssr_pack_check_download(const SSRPackEntry *entry, const void *data, size_t size) {
+    if (!entry || !data || (long)size != entry->size) return 0;
+    char hex[65];
+    ssr_sha256_hex(data, size, hex);
+    return strcmp(hex, entry->sha256) == 0;
 }
 
 int ssr_pack_list(const char *packs, char ids[][48], int max) {

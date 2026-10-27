@@ -63,4 +63,28 @@ int ssr_pack_remove(const char *packs, const char *id);
 // the number of packs.
 int ssr_pack_list(const char *packs, char ids[][48], int max);
 
+// The address of the index of the packs (the repository
+// StarSoccerRebooted-Packs).
+#define SSR_PACK_INDEX_URL "https://raw.githubusercontent.com/Stiven-Gjekaj/StarSoccerRebooted-Packs/main/index.txt"
+
+// A row of the index of the packs.
+typedef struct {
+    char id[48];
+    char name[96];
+    char author[96];
+    char version[32];
+    int format;
+    long size;
+    char sha256[65];
+    char url[512];
+} SSRPackEntry;
+
+// Reads the text of index.txt into entries, up to max. A row with a bad
+// id, a format that the app does not read, or a url that is not https
+// is not an entry. Returns the number of entries.
+int ssr_pack_index_parse(const char *text, SSRPackEntry *entries, int max);
+
+// 1 when the downloaded data has the size and the SHA-256 of the entry.
+int ssr_pack_check_download(const SSRPackEntry *entry, const void *data, size_t size);
+
 #endif

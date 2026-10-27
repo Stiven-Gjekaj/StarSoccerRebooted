@@ -106,10 +106,28 @@ static void test_makes_a_pack(void) {
     CHECK(!ssr_pack_make(packs, "Bad Id", "X"));
 }
 
+// The index: good rows are entries, and a bad row is not. A download
+// passes the check only with the size and the SHA-256 of its entry.
+static void test_reads_the_index(void) {
+    const char *text = "id\tname\tauthor\tversion\tformat\tsize\tsha256\turl\n"
+                       "harbour\tHarbour\tA. Person\t1.0\t1\t3\t"
+                       "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\thttps://example.com/h.zip\n"
+                       "Bad Id\tX\tY\t1\t1\t3\tba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\thttps://x\n"
+                       "plain\tX\tY\t1\t1\t3\tba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\thttp://x\n"
+                       "future\tX\tY\t1\t9\t3\tba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\thttps://x\n";
+    SSRPackEntry entries[8];
+    CHECK(ssr_pack_index_parse(text, entries, 8) == 1);
+    CHECK(strcmp(entries[0].id, "harbour") == 0 && strcmp(entries[0].author, "A. Person") == 0 && entries[0].size == 3);
+    CHECK(ssr_pack_check_download(&entries[0], "abc", 3));
+    CHECK(!ssr_pack_check_download(&entries[0], "abd", 3) && !ssr_pack_check_download(&entries[0], "abcd", 4));
+    CHECK(ssr_pack_index_parse(NULL, entries, 8) == 0);
+}
+
 int main(void) {
     test_makes_a_pack();
     test_reads_the_info();
     test_installs_and_replaces_a_pack();
     test_refuses_a_bad_pack();
+    test_reads_the_index();
     return TEST_RESULT();
 }
