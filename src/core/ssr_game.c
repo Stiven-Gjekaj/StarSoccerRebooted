@@ -868,7 +868,7 @@ static void start_chance(SSRGame *game) {
     s.careerPasses = (float)c->passes;
     ssr_chance_start(game->chance, &s, &game->random);
     game->chanceEnd = 0;
-    set_screen(game, "matchchance");
+    set_screen(game, "matchminigame");
 }
 
 static void match_tick(SSRGame *game) {

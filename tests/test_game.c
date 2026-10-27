@@ -107,7 +107,7 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         const SSRChance *chance = ssr_game_chance(game);
         if (chance && chance->state == SSR_CHANCE_AIM && chance->kicking == 0) {
             chances++;
-            CHECK(strcmp(ssr_game_screen(game), "matchchance") == 0);
+            CHECK(strcmp(ssr_game_screen(game), "matchminigame") == 0);
             // Aim straight up, then tap the big ball at its centre.
             ssr_game_touch(game, 1, chance->ball.x, chance->ball.y);
             ssr_game_update(game, 1);

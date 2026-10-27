@@ -110,7 +110,7 @@ int ssr_game_screen_version(const SSRGame *game);
 int ssr_game_take_settings_change(SSRGame *game);
 
 // The match that plays now, or NULL, and the chance of the player in it,
-// or NULL. The screen "matchchance" shows the chance.
+// or NULL. The screen "matchminigame" shows the chance.
 const SSRMatch *ssr_game_match(const SSRGame *game);
 const SSRChance *ssr_game_chance(const SSRGame *game);
 
