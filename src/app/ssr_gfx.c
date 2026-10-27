@@ -733,11 +733,11 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
         } else if (item->alignY == 'B') {
             baseline = item->h + scaleY * (below - (float)count * fontHeight - config->padBottom);
         } else if (item->wrap) {
-            // The game puts the baseline of one line of a TextBox at the
-            // middle padding below the middle of the box. The screens of
-            // the game show this, not the -lines * height / 2 that the
-            // decompiled c_GelTextBoxFR reads as.
-            baseline = item->h * 0.5f + scaleY * (below - (float)(count - 1) * fontHeight * 0.5f + config->padMiddle);
+            // c_GelTextBoxFR: the lines start half of their height above
+            // the middle of the box. The middle padding then gives the
+            // baseline. The game divides the padding by the scale before
+            // it scales the lines, so the padding keeps its full size.
+            baseline = item->h * 0.5f + scaleY * (below - (float)count * fontHeight * 0.5f) + config->padMiddle;
         } else {
             baseline = (item->h - lineHeight) * 0.5f + scaleY * config->padMiddle;
         }
