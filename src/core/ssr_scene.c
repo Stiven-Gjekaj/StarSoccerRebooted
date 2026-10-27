@@ -3738,8 +3738,9 @@ int ssr_scene_list_add(SSRScene *scene, const char *list, const char *template_,
     entry->hidden = 0;
     g->listY += entry->h;
     add_child(g, entry);
+    // An empty text keeps the text of the template, as "No Records".
     Gel *label = first_text(entry);
-    if (label && text) set_shown(label, text);
+    if (label && text && text[0]) set_shown(label, text);
     // The SetTweak with the ref ID gives the id to the tweak of the list.
     Doodad *d = find_doodad_ref(entry->clickChain, "ID");
     if (!d) d = find_doodad_ref(entry->doodads, "ID");

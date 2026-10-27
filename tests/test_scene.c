@@ -712,6 +712,32 @@ static void test_converges_to_a_tweak(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// An entry with an empty text keeps the text of its template, as the
+// "No Records" row of the trophies.
+static void test_keeps_the_text_of_a_template(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "Rect:(0,0,560,300) ref:NoRecords\n"
+             "{\n"
+             "\tText:(No Records,0,0,560,300)\n"
+             "} Template\n"
+             "Rect:(0,0,0,0) ref:TrophyHook\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    CHECK(ssr_scene_list_add(scene, "TrophyHook", "NoRecords", "", 0) == 1);
+    ssr_scene_update(scene, &env, 16);
+    int found = 0;
+    for (int i = 0; i < ssr_scene_count(scene); i++) {
+        const SSRSceneItem *item = ssr_scene_item(scene, i);
+        found += item->text && strcmp(item->text, "No Records") == 0;
+    }
+    CHECK(found == 1);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_holds_one_instance_at_a_frame(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     layout = "Animation:(40,Loop) ref:RoseAnim\n"
@@ -1798,6 +1824,7 @@ int main(void) {
     test_holds_one_instance_at_a_frame();
     test_moves_the_target_of_a_converge();
     test_converges_to_a_tweak();
+    test_keeps_the_text_of_a_template();
     test_shows_the_place_in_a_list();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();

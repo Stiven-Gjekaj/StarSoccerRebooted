@@ -211,6 +211,8 @@ int ssr_scene_spawn(SSRScene *scene, const char *parent, const char *template_, 
 // The place of the copy in its parent: it moves with its Mover.
 float ssr_scene_spawn_x(const SSRScene *scene, int id);
 void ssr_scene_spawn_remove(SSRScene *scene, int id);
+// Adds to the list a copy of the template below the last entry. Its first
+// text takes the text, and an empty text keeps the text of the template.
 int ssr_scene_list_add(SSRScene *scene, const char *list, const char *template_, const char *text, int id);
 
 // The last entry of the list: the element with the number takes the colour
