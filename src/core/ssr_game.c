@@ -983,6 +983,9 @@ static void call_vehicle_partner(SSRGame *game);
 static void call_tip(SSRGame *game);
 static void call_expired_item(SSRGame *game);
 static void call_buy_property(SSRGame *game);
+static void call_change_staff(SSRGame *game);
+static void call_change_boots(SSRGame *game);
+static void call_reopen_staff(SSRGame *game);
 static void call_dump_partner(SSRGame *game);
 
 static void run_call(SSRGame *game, const char *name) {
@@ -1012,6 +1015,9 @@ static void run_call(SSRGame *game, const char *name) {
         {"DoTip", call_tip},
         {"ExpiredItem", call_expired_item},
         {"BuyProperty", call_buy_property},
+        {"ChangeSoftAgentOrTrainer", call_change_staff},
+        {"ChangeSoftBat", call_change_boots},
+        {"ReopenAgentTrainerShop", call_reopen_staff},
         {"DumpGirl", call_dump_partner},
     };
     for (size_t i = 0; i < sizeof(CALLS) / sizeof(CALLS[0]); i++) {
@@ -4518,10 +4524,6 @@ static void call_buy_property(SSRGame *game) {
     if (game->returnState == 1 && item) buy_product(game, item);
 }
 
-static void shop_on_item_selected(SSRGame *game) {
-    shop_selected(game);
-}
-
 // UpsellMsg.CloseLifestyle: the overlay goes, and a shopping trip ends.
 static void shop_close_lifestyle(SSRGame *game) {
     SSRCareer *c = &game->career;
@@ -4617,6 +4619,437 @@ static void repair_all(SSRGame *game) {
     }
     game->modal[0] = 0;
     rebuild_shop(game, 0);
+}
+
+
+/* ------------------------------------------------------- the skills shop */
+
+// The contract of an agent or a trainer of each level: the matches plus 1.
+static const int STAFF_PERIOD[3] = {51, 101, 151};
+
+// The kinds of products of the skills overlay, from the uid.
+enum { PRODUCT_NONE, PRODUCT_AGENT, PRODUCT_TRAINER, PRODUCT_BOOT, PRODUCT_NRG };
+
+static int product_kind(const char *uid, int *id) {
+    static const struct {
+        const char *prefix;
+        int kind;
+    } KINDS[4] = {{"Agent_", PRODUCT_AGENT}, {"Trainer_", PRODUCT_TRAINER}, {"Boot_", PRODUCT_BOOT}, {"NRG_", PRODUCT_NRG}};
+    for (int i = 0; uid && i < 4; i++) {
+        size_t n = strlen(KINDS[i].prefix);
+        if (strncmp(uid, KINDS[i].prefix, n) == 0) {
+            *id = atoi(uid + n);
+            return KINDS[i].kind;
+        }
+    }
+    return PRODUCT_NONE;
+}
+
+// GetNRGPrice for the cans that the remake sells, 1 to 4.
+static int nrg_price(const SSRCareer *c, int id) {
+    int level = ssr_career_star_level(c);
+    level = level < 1 ? 1 : level > 80 ? 80 : level;
+    static const int PER[4] = {3, 5, 5, 7};
+    return id >= 1 && id <= 4 ? PER[id - 1] * level - 1 : 1337;
+}
+
+// The price of a product in bux, or -1 when it has none (a purchase with
+// real money in the game).
+static int skill_price(const SSRCareer *c, int kind, int id) {
+    switch (kind) {
+    case PRODUCT_AGENT:
+    case PRODUCT_TRAINER: return id == 1 ? ssr_career_star_level(c) * 5 + 25 : -1;
+    case PRODUCT_BOOT: {
+        const SSRBoot *boot = ssr_shop_boot(id);
+        return boot && !boot->hard ? boot->price : -1;
+    }
+    case PRODUCT_NRG: return id >= 1 && id <= 4 ? nrg_price(c, id) : -1;
+    default: return -1;
+    }
+}
+
+// Owned() of a product of the skills overlay: the bar of the contract or of
+// the boots from 1 to 100, the count of the cans, or 0.
+static int skill_owned(const SSRCareer *c, int kind, int id) {
+    if (kind == PRODUCT_AGENT || kind == PRODUCT_TRAINER) {
+        int level = kind == PRODUCT_AGENT ? ssr_career_agent(c) : ssr_career_trainer(c);
+        if (level != id) return 0;
+        int left = kind == PRODUCT_AGENT ? c->agent[id - 1] : c->trainer[id - 1];
+        float v = 100.0f / (float)STAFF_PERIOD[id - 1] * (float)left;
+        return (int)(v < 1 ? 1 : v);
+    }
+    if (kind == PRODUCT_BOOT) {
+        const SSRBoot *boot = ssr_shop_boot(id);
+        if (!boot || c->bootId != id) return 0;
+        float v = 100.0f / (float)boot->uses * (float)c->bootUses;
+        return (int)(v < 1 ? 1 : v);
+    }
+    if (kind == PRODUCT_NRG) return id >= 1 && id <= 4 ? c->nrg[id - 1] : id <= 6 ? c->nrg[4] : 0;
+    return 0;
+}
+
+// MatchesRemaining of a product.
+static int skill_matches_left(const SSRCareer *c, int kind, int id) {
+    if (kind == PRODUCT_AGENT) return c->agent[id - 1] - 1;
+    if (kind == PRODUCT_TRAINER) return c->trainer[id - 1] - 1;
+    if (kind == PRODUCT_BOOT) return c->bootUses;
+    return 0;
+}
+
+// BuildButton for a product of the skills overlay.
+static void skills_button(SSRGame *game, const char *uid, int large) {
+    const SSRCareer *c = &game->career;
+    const char *list = "SkillsList";
+    const char *L = large ? "Large" : "";
+    int id = 0, kind = product_kind(uid, &id);
+    char name[96], text[160];
+    snprintf(name, sizeof(name), "ShopButton%s", large ? "Large" : "Small");
+    add_op(game, SSR_OP_LIST_ADD_AT, list, name, NULL, 20);
+    snprintf(text, sizeof(text), "hashed_uid=%s", uid);
+    add_op(game, SSR_OP_ENTRY_VAR, list, "ItemButton", text, 0);
+    snprintf(text, sizeof(text), "info_hashed_uid=%s", uid);
+    add_op(game, SSR_OP_ENTRY_VAR, list, "InfoButton", text, 0);
+    snprintf(name, sizeof(name), "ShopSelected%s", L);
+    add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    snprintf(text, sizeof(text), "sel_uid=%s", uid);
+    add_op(game, SSR_OP_ENTRY_VAR, list, name, text, 0);
+    snprintf(name, sizeof(name), "%s%s_Image", uid, large ? "_L" : "");
+    add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    // The title and the text of the product.
+    char title[96] = "", desc[160] = "";
+    const SSRBoot *boot = kind == PRODUCT_BOOT ? ssr_shop_boot(id) : NULL;
+    if (kind == PRODUCT_AGENT || kind == PRODUCT_TRAINER) {
+        snprintf(name, sizeof(name), "iap_%s%d", kind == PRODUCT_AGENT ? "Agent" : "Trainer", id);
+        snprintf(title, sizeof(title), "%s", loc(game, name));
+        snprintf(name, sizeof(name), "iap_%s%d_desc", kind == PRODUCT_AGENT ? "Agent" : "Trainer", id);
+        snprintf(desc, sizeof(desc), "%s", loc(game, name));
+    } else if (boot) {
+        snprintf(name, sizeof(name), "Title_%s", boot->name);
+        snprintf(title, sizeof(title), "%s", loc(game, name));
+    } else if (kind == PRODUCT_NRG) {
+        snprintf(name, sizeof(name), "NRG_%d_Title", id);
+        snprintf(title, sizeof(title), "%s", loc(game, name));
+        snprintf(name, sizeof(name), "NRG_%d_Description", id);
+        snprintf(desc, sizeof(desc), "%s", loc(game, name));
+        snprintf(text, sizeof(text), "%d", skill_owned(c, kind, id));
+        replace_all(desc, sizeof(desc), "$num", text);
+    }
+    snprintf(name, sizeof(name), "ShopTitle%s", L);
+    add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    add_op(game, SSR_OP_LIST_SUB, list, "Title", title, 1);
+    add_op(game, SSR_OP_LIST_SUB, list, "TitleShadow", title, 1);
+    if (boot) {
+        snprintf(name, sizeof(name), "ShopSkills%s", L);
+        add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+        snprintf(text, sizeof(text), "%d", boot->pace);
+        add_op(game, SSR_OP_LIST_SUB, list, "Pace", text, 1);
+        snprintf(text, sizeof(text), "%d", boot->power);
+        add_op(game, SSR_OP_LIST_SUB, list, "Power", text, 1);
+        snprintf(text, sizeof(text), "%d", boot->technique);
+        add_op(game, SSR_OP_LIST_SUB, list, "Technique", text, 1);
+        snprintf(text, sizeof(text), "%d", boot->uses);
+        add_op(game, SSR_OP_LIST_SUB, list, "Uses", text, 1);
+    } else {
+        snprintf(name, sizeof(name), "ShopDescription%s", L);
+        add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+        add_op(game, SSR_OP_LIST_SUB, list, "Description", desc, 1);
+    }
+    int owned = skill_owned(c, kind, id), consumable = kind == PRODUCT_NRG;
+    int price = skill_price(c, kind, id);
+    if (owned == 0 || consumable) {
+        snprintf(name, sizeof(name), "ShopPrice%s", L);
+        add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+        if (price == 0) snprintf(text, sizeof(text), "%s", loc(game, "shop_Free"));
+        else if (price > 0) shop_price(text, sizeof(text), price);
+        else text[0] = 0;
+        add_op(game, SSR_OP_LIST_SUB, list, "Price", text, 1);
+        add_op(game, SSR_OP_LIST_SUB, list, "PriceShadow", text, 1);
+    }
+    if (owned != 0 && !consumable) {
+        snprintf(name, sizeof(name), "ShopOwnedBar%s", L);
+        add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+        snprintf(text, sizeof(text), "Products,%s_Owned", uid);
+        add_op(game, SSR_OP_ENTRY_BAR, list, "ProgressBar", text, 0);
+        snprintf(text, sizeof(text), "%d %s", skill_matches_left(c, kind, id), loc(game, "Item_Uses"));
+        add_op(game, SSR_OP_LIST_SUB, list, "UsesRemaining", text, 1);
+    }
+    if (boot && (boot->control == 1 || boot->control == 3)) {
+        snprintf(name, sizeof(name), "ShopControlIcon%s", L);
+        add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    }
+    if (boot && boot->control >= 2) {
+        snprintf(name, sizeof(name), "ShopSwerveIcon%s", L);
+        add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    }
+    snprintf(name, sizeof(name), "ShopUnselected%s", L);
+    add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    snprintf(text, sizeof(text), "unsel_uid=%s", uid);
+    add_op(game, SSR_OP_ENTRY_VAR, list, name, text, 0);
+    if (owned > 0 && kind != PRODUCT_NRG && skill_matches_left(c, kind, id) <= 3) {
+        snprintf(name, sizeof(name), "ShopExpiringWarning%s", L);
+        add_op(game, SSR_OP_ENTRY_CHILD, list, name, "ItemButton", 0);
+    }
+    if (kind == PRODUCT_NRG) {
+        add_op(game, SSR_OP_ENTRY_CHILD, list, "ShopInventory", "ItemButton", 0);
+        snprintf(text, sizeof(text), "%d", owned);
+        add_op(game, SSR_OP_LIST_SUB, list, "Inventory", text, 1);
+        snprintf(text, sizeof(text), "inv_uid=%s", uid);
+        add_op(game, SSR_OP_ENTRY_VAR, list, "InventoryParent", text, 0);
+        add_op(game, SSR_OP_ENTRY_VAR, list, "InventoryAnim", text, 0);
+    }
+    snprintf(text, sizeof(text), "%s_Owned", uid);
+    ssr_tweaks_set_number(game->tweaks, "Products", text, owned);
+}
+
+// Available() of a product of the skills overlay in the remake.
+static int skill_available(SSRGame *game, int kind, int id, const int *boots) {
+    const SSRCareer *c = &game->career;
+    if (kind == PRODUCT_BOOT) return id >= 1 && id <= SSR_BOOT_COUNT && boots[id];
+    // The products for real money and adverts show only when owned.
+    if (skill_price(c, kind, id) < 0) return skill_owned(c, kind, id) > 0;
+    return kind != PRODUCT_NONE;
+}
+
+static void skills_selected(SSRGame *game);
+
+// RebuildShop for the tabs of the skills overlay.
+static void rebuild_skills(SSRGame *game, int select) {
+    SSRTweaks *t = game->tweaks;
+    const SSRCareer *c = &game->career;
+    const char *tab = ssr_tweaks_get(t, "Menu", "ShopTab");
+    const char *order = "StaffOrder", *title = "Hire_Staff", *value = "Staff_Value", *popular = "Staff_Popular";
+    if (strcmp(tab, "Boots") == 0) {
+        order = "BootOrder";
+        title = "Get_Boots";
+        value = "Boot_Value";
+        popular = "Boot_Popular";
+    } else if (strcmp(tab, "NRG") == 0) {
+        order = "NRGOrder";
+        title = "Get_NRG";
+        value = "NRG_Value";
+        popular = "NRG_Popular";
+    }
+    ssr_tweaks_set(t, "Menu", "ShopTitle", loc(game, title));
+    player_tweaks(game);
+    int boots[SSR_BOOT_COUNT + 1], k = 0;
+    const char *pop = ssr_tweaks_get(t, "Products", "Boot_Popular"), *val = ssr_tweaks_get(t, "Products", "Boot_Value");
+    ssr_shop_boots_available(ssr_career_year(c), c->bootId, product_kind(pop, &k) ? k : 10,
+                             product_kind(val, &k) ? k : 26, boots);
+    char text[1024], valueUid[64], popularUid[64], name[64];
+    snprintf(valueUid, sizeof(valueUid), "%s", ssr_tweaks_get(t, "Products", value));
+    snprintf(popularUid, sizeof(popularUid), "%s", ssr_tweaks_get(t, "Products", popular));
+    snprintf(text, sizeof(text), "%s", ssr_tweaks_get(t, "Products", order));
+    add_op(game, SSR_OP_LIST_CLEAR, "SkillsList", NULL, NULL, 0);
+    // UpdateBootOrder: the worn boots come first, large.
+    char worn[16] = "";
+    if (strcmp(tab, "Boots") == 0 && c->bootId > 0) {
+        snprintf(worn, sizeof(worn), "Boot_%d", c->bootId);
+        skills_button(game, worn, 1);
+        if (select) ssr_tweaks_set(t, "Menu", "ItemString", worn);
+        select = 0;
+    }
+    for (char *entry = strtok(text, "|"); entry; entry = strtok(NULL, "|")) {
+        size_t n = strlen(entry);
+        int large = n > 2 && strcmp(entry + n - 2, "_L") == 0;
+        if (large) entry[n - 2] = 0;
+        int id = 0, kind = product_kind(entry, &id);
+        if (strcmp(entry, worn) == 0 || !skill_available(game, kind, id, boots)) continue;
+        // A boot that is large in the order is small when other boots are
+        // worn.
+        if (worn[0] && kind == PRODUCT_BOOT) large = 0;
+        skills_button(game, entry, large);
+        if (select) ssr_tweaks_set(t, "Menu", "ItemString", entry);
+        select = 0;
+        const char *sticker = strcmp(valueUid, entry) == 0 ? "ShopBestValue" : strcmp(popularUid, entry) == 0 ? "ShopMostPopular" : NULL;
+        if (sticker) {
+            snprintf(name, sizeof(name), "%s%sInst", sticker, large ? "_L" : "");
+            add_op(game, SSR_OP_ENTRY_CHILD, "SkillsList", name, "", 0);
+        }
+    }
+    skills_selected(game);
+}
+
+static void skills_selected(SSRGame *game) {
+    int id = 0, kind = product_kind(ssr_tweaks_get(game->tweaks, "Menu", "ItemString"), &id);
+    int price = skill_price(&game->career, kind, id);
+    ssr_tweaks_set(game->tweaks, "Menu", "BuyButtonString", price >= 0 ? loc(game, "BUY") : "HIDE");
+}
+
+// ShopOverlay.Create for the skills overlay on a tab.
+static void skills_shop(SSRGame *game, const char *tab) {
+    if (game->career.retired) return;
+    snprintf(game->overlay, sizeof(game->overlay), "SkillsShopOverlay");
+    ssr_tweaks_set(game->tweaks, "Menu", "ShopTab", tab);
+    rebuild_skills(game, 1);
+}
+
+static void staff_shop(SSRGame *game) {
+    skills_shop(game, "Staff");
+}
+
+static void boots_shop(SSRGame *game) {
+    skills_shop(game, "Boots");
+}
+
+static void nrg_shop(SSRGame *game) {
+    skills_shop(game, "NRG");
+}
+
+static void skills_tab(SSRGame *game, const char *tab) {
+    ssr_tweaks_set(game->tweaks, "Menu", "ShopTab", tab);
+    rebuild_skills(game, 1);
+}
+
+static void shop_tab_staff(SSRGame *game) {
+    skills_tab(game, "Staff");
+}
+
+static void shop_tab_boots(SSRGame *game) {
+    skills_tab(game, "Boots");
+}
+
+static void shop_tab_nrg(SSRGame *game) {
+    skills_tab(game, "NRG");
+}
+
+// The purchase pop-up over the skills overlay.
+static void skill_purchased(SSRGame *game) {
+    if (game->overlay[0]) rebuild_skills(game, 0);
+    ssr_tweaks_set(game->tweaks, "Products", "PurchaseOverlayMessage", loc(game, "Item purchased"));
+    snprintf(game->modal, sizeof(game->modal), "PurchaseAnim");
+}
+
+// c_Product_Agent.Buy and c_Product_Trainer.Buy, level 1.
+static void buy_staff(SSRGame *game, int kind) {
+    SSRCareer *c = &game->career;
+    update_bank(game, -skill_price(c, kind, 1));
+    int *staff = kind == PRODUCT_AGENT ? c->agent : c->trainer;
+    staff[0] = staff[1] = staff[2] = 0;
+    staff[0] = STAFF_PERIOD[0];
+    save_career(game);
+    game->overlay[0] = 0;
+    message(game, kind == PRODUCT_AGENT ? "messageagent" : "messagetrainer",
+            loc(game, kind == PRODUCT_AGENT ? "CMESSAGE_AGENTBOOST" : "CMESSAGE_TRAINERBOOST"), 0, 1,
+            "ReopenAgentTrainerShop");
+    skill_purchased(game);
+}
+
+// c_Product_Boot_Soft.Buy.
+static void buy_boots(SSRGame *game, int id) {
+    SSRCareer *c = &game->career;
+    const SSRBoot *boot = ssr_shop_boot(id);
+    if (!boot) return;
+    c->bootId = id;
+    c->bootUses = boot->uses;
+    update_bank(game, -boot->price);
+    save_career(game);
+    // [I: the information screen of the control and swerve boots comes
+    // with the tutorials.]
+    skills_shop(game, "Boots");
+    skill_purchased(game);
+}
+
+// c_Product_NRG_Soft.Buy: the overlay stays.
+static void buy_nrg(SSRGame *game, int id) {
+    SSRCareer *c = &game->career;
+    int price = nrg_price(c, id);
+    if (price > 0) update_bank(game, -price);
+    c->nrg[id - 1]++;
+    if (c->teamShopping > -1) c->teamShopping++;
+    save_career(game);
+    player_tweaks(game);
+    if (price > 0) skill_purchased(game);
+}
+
+// shopoverlay.buy on the skills overlay.
+static void skills_buy(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    const char *uid = ssr_tweaks_get(game->tweaks, "Menu", "ItemString");
+    int id = 0, kind = product_kind(uid, &id), price = skill_price(c, kind, id);
+    if (price < 0) return;
+    if (c->bank < price) {
+        not_enough_cash(game, price - c->bank);
+        return;
+    }
+    game->messageData = kind * 100 + id;
+    if (kind == PRODUCT_AGENT || kind == PRODUCT_TRAINER) {
+        int level = kind == PRODUCT_AGENT ? ssr_career_agent(c) : ssr_career_trainer(c);
+        if (level == 0) {
+            buy_staff(game, kind);
+            return;
+        }
+        game->overlay[0] = 0;
+        message(game, kind == PRODUCT_AGENT ? "messageagent" : "messagetrainer",
+                loc(game, kind == PRODUCT_AGENT ? "CMESSAGE_ALREADYGOTAGENT" : "CMESSAGE_ALREADYGOTTRAINER"), 1, 1,
+                "ChangeSoftAgentOrTrainer");
+    } else if (kind == PRODUCT_BOOT) {
+        if (c->bootId == 0) {
+            buy_boots(game, id);
+            return;
+        }
+        game->overlay[0] = 0;
+        char text[512], number[16];
+        snprintf(text, sizeof(text), "%s", loc(game, c->bootId == id ? "MESSAGE_ALREADY_OWN_BOOTS" : "CMESSAGE_BOOTSHAVEMATCHES"));
+        snprintf(number, sizeof(number), "%d", c->bootUses);
+        replace_all(text, sizeof(text), "$num", number);
+        message(game, "message", text, 1, 1, "ChangeSoftBat");
+    } else if (kind == PRODUCT_NRG) {
+        buy_nrg(game, id);
+    }
+}
+
+// shopoverlay.buy: the product of the overlay that shows.
+static void overlay_buy(SSRGame *game) {
+    if (strcmp(game->overlay, "SkillsShopOverlay") == 0) skills_buy(game);
+    else shop_buy(game);
+}
+
+static void overlay_item_selected(SSRGame *game) {
+    if (strcmp(game->overlay, "SkillsShopOverlay") == 0) skills_selected(game);
+    else shop_selected(game);
+}
+
+static void call_change_staff(SSRGame *game) {
+    int kind = game->messageData / 100;
+    if (game->returnState == 1) buy_staff(game, kind);
+    else staff_shop(game);
+}
+
+static void call_change_boots(SSRGame *game) {
+    if (game->returnState == 1) buy_boots(game, game->messageData % 100);
+    else boots_shop(game);
+}
+
+static void call_reopen_staff(SSRGame *game) {
+    staff_shop(game);
+}
+
+// UpsellMsg.Close.
+static void shop_close(SSRGame *game) {
+    game->overlay[0] = 0;
+    game->modal[0] = 0;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "ItemInfoHelpIncrement", 0);
+    player_tweaks(game);
+}
+
+// UpsellMsg.DrinkNRG: ShopOverlay.ButtonDrinkNRG.
+static void shop_drink(SSRGame *game) {
+    int id = 0, kind = product_kind(ssr_tweaks_get(game->tweaks, "Menu", "ItemString"), &id);
+    int can = kind == PRODUCT_NRG ? (id >= 1 && id <= 4 ? id - 1 : 4) : 0;
+    SSRCareer *c = &game->career;
+    if (c->nrg[can] < 1) return;
+    if (c->energy >= 100) {
+        ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", loc(game, "CMESSAGE_ENERGYFULL"));
+        game->splashEnd = game->now + 1500;
+        return;
+    }
+    shop_close(game);
+    if (c->energy <= 75 || game->match) {
+        drink(game, can);
+        return;
+    }
+    game->messageData = can;
+    message(game, "message", loc(game, "CMESSAGE_DRINKNRGCHECK"), 1, 1, "DrinkNRG");
 }
 
 /* ------------------------------------------------------------ the pairs */
@@ -4883,8 +5316,16 @@ static const Route ROUTES[] = {
     {"shop.tab.items", shop_tab_items},
     {"shop.tab.vehicles", shop_tab_vehicles},
     {"shop.tab.property", shop_tab_property},
-    {"shopoverlay.onItemSelected", shop_on_item_selected},
-    {"shopoverlay.buy", shop_buy},
+    {"shopoverlay.onItemSelected", overlay_item_selected},
+    {"shopoverlay.buy", overlay_buy},
+    {"gamemenu.btn_Shop", staff_shop},
+    {"gamemenu.btn_BuyBoots", boots_shop},
+    {"shopoverlay.open_nrg", nrg_shop},
+    {"shop.tab.staff", shop_tab_staff},
+    {"shop.tab.boots", shop_tab_boots},
+    {"shop.tab.nrg", shop_tab_nrg},
+    {"UpsellMsg.Close", shop_close},
+    {"UpsellMsg.DrinkNRG", shop_drink},
     {"UpsellMsg.CloseLifestyle", shop_close_lifestyle},
     {"PurchaseAnim.Close", purchase_close},
     {"Repair.Cancel", repair_cancel},

@@ -838,6 +838,73 @@ static void go_shopping(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     ssr_game_message(game, "relationships.btn_Home");
 }
 
+// The skills shop: an agent, a trainer, boots, and a can.
+static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path) {
+    SSRCareer c = *ssr_game_career(game);
+    c.bank = 200;
+    c.starRating = 50;
+    c.agent[0] = c.trainer[0] = 0;
+    c.bootId = 0;
+    c.nrg[0] = 0;
+    c.energy = 60;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(ssr_career_save(&c, path));
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    const SSRCareer *now = ssr_game_career(game);
+    ssr_tweaks_set(tweaks, "Products", "StaffOrder", "Agent_1_L|Agent_3|Trainer_1");
+    ssr_tweaks_set(tweaks, "Products", "BootOrder", "Boot_10_L|Boot_23|Boot_1|Boot_2");
+    ssr_tweaks_set(tweaks, "Products", "NRGOrder", "NRG_7_L|NRG_1|NRG_2");
+    ssr_game_message(game, "gamemenu.btn_Shop");
+    CHECK(strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "Agent_1") == 0);
+    SSRUiOp ops[512];
+    int count = take_ops(game, ops, 512), buttons = 0;
+    for (int i = 0; i < count; i++) buttons += ops[i].kind == SSR_OP_LIST_ADD_AT;
+    // The agent of level 3 is a purchase with real money: it does not show.
+    CHECK(buttons == 2);
+    // The agent costs 5 for each star level and 25.
+    ssr_game_message(game, "shopoverlay.buy");
+    CHECK(now->bank == 170 && now->agent[0] == 51 && ssr_career_agent(now) == 1);
+    CHECK(strcmp(ssr_game_screen(game), "messageagent") == 0 && ssr_game_overlay(game)[0] == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0);
+    ssr_game_message(game, "PurchaseAnim.Close");
+    // A second agent asks first. No keeps the first one.
+    ssr_game_message(game, "shopoverlay.buy");
+    CHECK(strcmp(ssr_game_screen(game), "messageagent") == 0 && now->bank == 170);
+    ssr_game_message(game, "message.btn_Cancel");
+    CHECK(strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0);
+    ssr_tweaks_set(tweaks, "Menu", "ItemString", "Trainer_1");
+    ssr_game_message(game, "shopoverlay.buy");
+    CHECK(now->bank == 140 && now->trainer[0] == 51 && strcmp(ssr_game_screen(game), "messagetrainer") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    ssr_game_message(game, "PurchaseAnim.Close");
+    // Boots: the first pair, then a question for a second pair.
+    ssr_game_message(game, "shop.tab.boots");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "Boot_10") == 0);
+    ssr_game_message(game, "shopoverlay.buy");
+    CHECK(now->bootId == 10 && now->bootUses == 15 && now->bank == 110);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "Boot_10") == 0);
+    ssr_game_message(game, "PurchaseAnim.Close");
+    ssr_tweaks_set(tweaks, "Menu", "ItemString", "Boot_1");
+    ssr_game_message(game, "shopoverlay.buy");
+    CHECK(strcmp(ssr_game_screen(game), "message") == 0 && now->bootId == 10);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(now->bootId == 1 && now->bootUses == 5 && now->bank == 107);
+    ssr_game_message(game, "PurchaseAnim.Close");
+    // A can of NRG Classic costs 2 at star level 1, and the overlay stays.
+    ssr_game_message(game, "shop.tab.nrg");
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "NRG_1") == 0);
+    ssr_game_message(game, "shopoverlay.buy");
+    CHECK(now->nrg[0] == 1 && now->bank == 105 && strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0);
+    ssr_game_message(game, "PurchaseAnim.Close");
+    // The energy is 60, so the can goes at once.
+    ssr_game_message(game, "UpsellMsg.DrinkNRG");
+    CHECK(now->nrg[0] == 0 && now->energy == 100 && ssr_game_overlay(game)[0] == 0);
+}
+
 // Drinks the next can after a match: a question when the energy is above
 // 75, then the boost screen of a skill can, and full energy at the end.
 static void drink_a_can(SSRGame *game, SSRTweaks *tweaks) {
@@ -1053,6 +1120,7 @@ static void test_starts_a_new_career(void) {
     spend_time(game, tweaks, path);
     choose_a_dilemma(game, path);
     go_shopping(game, tweaks, path);
+    hire_and_kit_out(game, tweaks, path);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 12 && seasons == 0; i++) play_a_match(game, tweaks);
     CHECK(seasons >= 1);
