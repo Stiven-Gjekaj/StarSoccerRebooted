@@ -1,0 +1,237 @@
+# The names of the made-up players of the world (ssr_people).
+# A line "first <group> <names>" or "last <group> <names>" gives the
+# names of a group. A line "nation <id> <group>" gives the group of a
+# nation of the data set. A line "continent <id> <group>" gives the group
+# of the nations of a continent with no line of their own.
+# The names are common names. They are not the names of real players.
+
+first english James Jack Harry Oliver Thomas George Charlie Daniel Joe Sam Ben Luke Ryan Adam Jake Lewis Callum Connor Josh Matt Liam Kieran Danny Nathan Aaron Scott Craig Lee Dean Mark Paul Tom Will Alfie Reece Owen Jamie Ross Kyle
+last english Smith Jones Taylor Brown Williams Wilson Johnson Davies Robinson Wright Thompson Evans Walker White Roberts Green Hall Wood Jackson Clarke Hughes Edwards Turner Hill Moore Cooper Ward Morris King Baker Harris Lewis Martin Allen Young Mitchell Parker Bennett Carter Shaw Foster Barnes Holmes Fletcher Pearson Marsh Booth Dixon Lowe Webb
+
+first spanish Javier Carlos Sergio David Pablo Alejandro Daniel Adrian Diego Mario Alvaro Raul Ivan Jorge Marcos Ruben Hugo Nacho Iker Unai Gonzalo Miguel Rafael Andres Victor Oscar Fernando Luis Manuel Antonio Jose Juan Ignacio Mateo Tomas
+last spanish Garcia Fernandez Gonzalez Rodriguez Lopez Martinez Sanchez Perez Gomez Martin Jimenez Ruiz Hernandez Diaz Moreno Alvarez Munoz Romero Alonso Gutierrez Navarro Torres Dominguez Vazquez Ramos Gil Ramirez Serrano Blanco Molina Morales Suarez Ortega Delgado Castro Ortiz Rubio Marin Sanz Iglesias
+
+first portuguese Joao Pedro Tiago Diogo Rafael Andre Bruno Ricardo Miguel Rui Nuno Goncalo Lucas Gabriel Mateus Gustavo Felipe Thiago Vitor Caio Leandro Rodrigo Marcelo Renato Paulo Fabio Hugo Danilo Everton Wellington Douglas Anderson Igor
+last portuguese Silva Santos Ferreira Pereira Oliveira Costa Rodrigues Martins Sousa Fernandes Goncalves Gomes Lopes Marques Alves Almeida Ribeiro Pinto Carvalho Teixeira Moreira Correia Mendes Nunes Soares Vieira Monteiro Cardoso Rocha Neves Coelho Cruz Cunha Barbosa Araujo Melo Batista Freitas Moura Dias
+
+first french Lucas Hugo Louis Theo Nathan Enzo Mathis Tom Clement Maxime Antoine Alexandre Julien Romain Kevin Florian Quentin Adrien Bastien Benoit Cedric Damien Etienne Fabien Guillaume Jeremy Loic Mathieu Nicolas Olivier Pierre Remi Sebastien Yann
+last french Martin Bernard Dubois Thomas Robert Richard Petit Durand Leroy Moreau Simon Laurent Lefebvre Michel Garcia David Bertrand Roux Vincent Fournier Morel Girard Andre Mercier Dupont Lambert Bonnet Francois Martinez Legrand Garnier Faure Rousseau Blanc Guerin Muller Henry Roussel Nicolas Perrin
+
+first german Lukas Leon Finn Jonas Paul Felix Maximilian Niklas Tim Jan Moritz Philipp Florian Tobias Sebastian Stefan Matthias Andreas Michael Daniel Kevin Dennis Marco Patrick Sven Timo Lars Marvin Julian Fabian Dominik Benedikt Kai Malte
+last german Muller Schmidt Schneider Fischer Weber Meyer Wagner Becker Schulz Hoffmann Koch Bauer Richter Klein Wolf Schroder Neumann Schwarz Zimmermann Braun Kruger Hofmann Hartmann Lange Schmitt Werner Krause Meier Lehmann Kohler Herrmann Walter Konig Mayer Huber Kaiser Fuchs Peters Lang Vogel
+
+first italian Lorenzo Alessandro Andrea Matteo Leonardo Francesco Gabriele Riccardo Davide Federico Marco Luca Simone Stefano Daniele Giuseppe Antonio Paolo Roberto Fabio Mattia Nicolo Tommaso Giovanni Alberto Emanuele Domenico Salvatore Vincenzo Pietro Michele Filippo Dario
+last italian Rossi Russo Ferrari Esposito Bianchi Romano Colombo Ricci Marino Greco Bruno Gallo Conti DeLuca Mancini Costa Giordano Rizzo Lombardi Moretti Barbieri Fontana Santoro Mariani Rinaldi Caruso Ferrara Galli Martini Leone Longo Gentile Martinelli Vitale Serra Coppola Fabbri Villa Cattaneo
+
+first dutch Daan Sem Lucas Levi Milan Jesse Thijs Bram Ruben Lars Stijn Tim Jasper Niels Wouter Joost Pieter Sander Bas Koen Roel Jeroen Maarten Arjen Dirk Hendrik Jelle Gijs Floris Mats Luuk Teun Sven Rik
+last dutch DeJong Jansen DeVries VandenBerg VanDijk Bakker Janssen Visser Smit Meijer DeBoer Mulder DeGroot Bos Vos Peters Hendriks VanLeeuwen Dekker Brouwer DeWit Dijkstra Smits DeGraaf VanderMeer VanderLinden Kok Jacobs DeHaan Vermeulen VandenHeuvel VanderVeen Willems Verbeek Schouten Postma Kuipers
+
+first nordic Lars Erik Anders Johan Magnus Henrik Mikkel Rasmus Oskar Emil Viktor Kristian Jonas Sander Mathias Tobias Sindre Eirik Jesper Simon Niklas Fredrik Olav Gustav Axel Elias Aksel Isak Ole Leo Teemu Jukka Mikko Ville Aron Gunnar
+last nordic Hansen Johansen Olsen Larsen Andersen Pedersen Nilsen Kristiansen Jensen Karlsen Johnson Eriksson Lindberg Nilsson Persson Svensson Gustafsson Pettersson Jonsson Lindqvist Berg Dahl Holm Lund Strand Haugen Bakken Moen Solberg Virtanen Korhonen Nieminen Makinen Hamalainen Jonsson Magnusson Gunnarsson
+
+first slavic Ivan Dmitri Alexei Sergei Andrei Mikhail Nikita Artem Maxim Pavel Igor Oleg Yuri Roman Denis Vladimir Kirill Anton Jakub Tomas Lukas Ondrej Marek Michal Piotr Krzysztof Pawel Kamil Mateusz Bartosz Adam Filip Martin Petr Vojtech Szymon
+last slavic Ivanov Petrov Smirnov Kuznetsov Popov Sokolov Lebedev Kozlov Novikov Morozov Volkov Pavlov Fedorov Orlov Zaitsev Novak Svoboda Dvorak Cerny Prochazka Kucera Vesely Horak Nowak Kowalski Wisniewski Wojcik Kowalczyk Kaminski Lewandowski Zielinski Szymanski Wozniak Kozlowski Mazur Krawczyk Bondarenko Kovalenko Shevchenko Tkachenko
+
+first balkan Luka Marko Nikola Stefan Filip Ivan Milos Dusan Aleksandar Nemanja Bojan Dejan Goran Zoran Darko Mirko Ante Josip Mateo Petar Andrej Vuk Lazar Matej Domagoj Edin Amir Haris Emir Kenan Ardit Arben Besnik Dimitar Georgi Hristo Kristian Andrei Ionut Florin
+last balkan Jovanovic Petrovic Nikolic Markovic Djordjevic Stojanovic Ilic Pavlovic Kovacevic Popovic Horvat Kovac Babic Maric Juric Novak Knezevic Vukovic Hodzic Begic Hasic Kadric Krasniqi Gashi Berisha Hoxha Shala Dimitrov Georgiev Petkov Popescu Ionescu Stan Dumitru Stoica Radu Papadopoulos Georgiou Nikolaidis Christodoulou
+
+first turkish Mehmet Mustafa Ahmet Ali Huseyin Hasan Ibrahim Ismail Yusuf Omer Murat Emre Burak Serkan Kerem Arda Cenk Hakan Volkan Onur Ozan Baris Caglar Selcuk Tolga Umut Yigit Eren Berk Can Deniz Emir Kaan Furkan Enes
+last turkish Yilmaz Kaya Demir Sahin Celik Yildiz Yildirim Ozturk Aydin Ozdemir Arslan Dogan Kilic Aslan Cetin Kara Koc Kurt Ozkan Simsek Polat Ozcan Korkmaz Cakir Erdogan Yavuz Can Acar Sen Aktas Guler Yalcin Gunes Bozkurt Bulut Keskin Unal Turan
+
+first arabic Mohamed Ahmed Ali Omar Youssef Karim Khaled Hassan Hussein Ibrahim Mahmoud Mustafa Tariq Walid Samir Nabil Yassine Hamza Amine Bilal Mehdi Faris Nasser Salem Fahad Saud Majed Rami Ziad Adel Hatem Anis Ayoub
+last arabic Hassan Ali Mohamed Ibrahim Mahmoud Abdullah Salem Nasser Haddad Khalil Saleh Mansour Aziz Farouk Hamdi Rahman Karim Saeed Zaki Yousef Bakr Najjar Darwish Masri Amrani Benali Boukhari Haddadi Mansouri Belkacem Bouazza Cherif Tahiri Alaoui Idrissi Bennani Chraibi Fassi Ghanem
+
+first westafrican Kwame Kofi Yaw Kwesi Kojo Emmanuel Samuel Daniel Isaac Ibrahim Moussa Mamadou Cheikh Ousmane Abdoulaye Idrissa Lamine Seydou Bakary Adama Souleymane Victor Chinedu Emeka Obinna Chukwuma Tunde Femi Segun Ademola Wilfried Serge Yannick
+last westafrican Mensah Owusu Boateng Asante Appiah Osei Addo Agyeman Ansah Danso Diallo Traore Coulibaly Diop Ndiaye Sow Ba Fall Cisse Keita Kone Toure Sangare Camara Sylla Okafor Okonkwo Eze Nwosu Adeyemi Balogun Okoro Obi Bamba Kouassi Yao Konan Kouame Zadi
+
+first eastafrican Joseph John Peter Paul David Moses Daniel Isaac Samuel Brian Dennis Victor Kevin Eric Patrick Michael Abel Elias Tesfaye Dawit Yonas Bereket Ali Hassan Juma Omari Baraka Jabari Kamau Mwangi Otieno Musa Godfrey Tendai
+last eastafrican Kamau Mwangi Otieno Ochieng Odhiambo Kiprop Mutua Njoroge Onyango Wafula Kibet Rotich Tesfaye Bekele Girma Haile Alemu Tadesse Mohamed Juma Mussa Mbwana Moyo Ncube Banda Phiri Mwale Zulu Dlamini Nkosi Khumalo Ndlovu Mokoena Sithole Molefe Mabaso Chirwa
+
+first latin Juan Carlos Luis Jose Miguel Diego Santiago Matias Nicolas Sebastian Facundo Franco Gonzalo Joaquin Agustin Emiliano Rodrigo Cristian Jorge Alexis Brayan Kevin Wilmer Edwin Andres Felipe Mauricio Rafael Hector Hernan Ezequiel Thiago Bruno
+last latin Gonzalez Rodriguez Gomez Fernandez Lopez Diaz Martinez Perez Romero Sosa Alvarez Torres Ruiz Ramirez Flores Acosta Benitez Medina Herrera Suarez Aguirre Gimenez Gutierrez Pereyra Rojas Molina Castro Ortiz Silva Nunez Cabrera Vargas Rios Mendoza Cardenas Valencia Mosquera Arias Zapata Quintero
+
+first japanese Haruto Yuto Sota Yuki Hayato Haruki Ryusei Koki Sora Riku Kaito Takumi Daiki Kenta Shota Ryota Takuya Kazuki Naoki Yusuke Daisuke Shinji Keisuke Hiroki Kenji Makoto Tatsuya Yoshiki Kaoru Wataru Genki Ritsu Shun Kota Hiroshi
+last japanese Sato Suzuki Takahashi Tanaka Watanabe Ito Yamamoto Nakamura Kobayashi Kato Yoshida Yamada Sasaki Yamaguchi Matsumoto Inoue Kimura Hayashi Shimizu Yamazaki Mori Abe Ikeda Hashimoto Ishikawa Ogawa Fujita Okada Goto Hasegawa Murakami Kondo Ishii Saito Sakamoto Endo Aoki Fujii Nishimura Fukuda
+
+first korean Minjun Seojun Doyun Jiho Junwoo Hyunwoo Jihoon Taeyang Seungmin Donghyun Sungmin Jaehyun Youngjin Kyungho Changmin Wooyoung Jaesung Minjae Hyunjun Sangho Dongwon Taehee Jinsu Seongjin
+last korean Kim Lee Park Choi Jung Kang Cho Yoon Jang Lim Han Oh Seo Shin Kwon Hwang Ahn Song Jeon Hong Yoo Ko Moon Yang Son Bae Baek Heo Nam Noh
+
+first chinese Wei Jun Hao Lei Jie Tao Peng Bin Gang Yang Chen Long Bo Kai Ming Xin Yu Hui Feng Qiang Liang Hong Jian Cheng Zhi Rui Yi Xiang Kun Fei Lin Dong Shuai Hang
+last chinese Wang Li Zhang Liu Chen Yang Huang Zhao Wu Zhou Xu Sun Ma Zhu Hu Guo He Gao Lin Luo Zheng Liang Xie Song Tang Han Feng Deng Cao Peng Zeng Xiao Tian Dong Pan Yuan Cai Jiang Yu
+
+first southasian Arjun Rohan Rahul Vikram Aditya Sunil Anil Rajesh Suresh Amit Ravi Imran Faisal Asif Bilal Hamza Usman Zubair Kamal Tanvir Nadeem Sandeep Manoj Ajay Vijay Pradeep Naveen Harish Kiran Deepak Gurpreet Sandesh Anirudh
+last southasian Sharma Singh Kumar Patel Gupta Khan Ali Ahmed Hussain Rahman Chowdhury Reddy Nair Iyer Menon Das Bose Mukherjee Banerjee Chatterjee Rao Joshi Verma Mehta Shah Malik Qureshi Siddiqui Hossain Islam Sandhu Gill Dhillon Fernandes Thapa
+
+first seasian Nguyen Minh Duc Tuan Hung Quang Thanh Long Hai Phuong Somchai Kritsada Rizky Evan Faisal Irfan Arif Ryan Iqbal Kenny
+last seasian Nguyen Tran Le Pham Hoang Phan Vu Dang Bui Do Ho Ngo Duong Ly Wongsa Srisuk Chaiyaphum Saengchan Pamungkas Simanjuntak Saputra Hidayat Ramadhan Pratama Setiawan Rahman Ahmad Abdullah Ismail Tan Lim Ong Teo Goh Santos Reyes Cruz Bautista
+
+first oceanian Jack Liam Noah Lachlan Cooper Riley Mitchell Jayden Tama Sione Tevita Viliami Semi Losana Manu Kalani Pita Aisake Tasi Mose Junior Jordan Hamish Angus Callum Ryan Blake Brody Kahu Ropata Nikora Rewi Tane Maika Ioane
+last oceanian Smith Wilson Taylor Brown Williams Kelly Murphy Ryan Walsh Campbell Stewart Mackay Tuilagi Fifita Taufa Vaipulu Leota Faleolo Matagi Naufahu Tupou Ngata Parata Tamihana Rewiti Waaka Tipene Kereama Moana Kumar Prasad Naidu Tuidraki Ravuama
+
+first northamerican Michael Christopher Matthew Joshua Tyler Brandon Ryan Jordan Justin Austin Cody Dylan Caleb Logan Mason Ethan Jackson Aiden Carter Hunter Jalen Darnell Deshawn Marcus Andre Tyrone Jonathan Romain
+last northamerican Johnson Williams Brown Jones Miller Davis Wilson Anderson Taylor Thomas Moore Martin Jackson Thompson White Harris Clark Lewis Robinson Walker Young Allen King Wright Scott Green Baker Adams Nelson Hill Campbell Mitchell Roberts Carter Phillips Evans Turner Torres Parker Collins
+
+first caribbean Andre Damion Ricardo Leon Junior Dwayne Javon Jamal Marvin Levi Shaun Jermaine Darren Kenroy Akeem Nicholas Jean Pierre Johnny Derrick Kyle Alvin Tevin
+last caribbean Brown Campbell Williams Thomas Grant Gordon Bailey Lewis Francis Morgan Henry James Joseph Charles Pierre Jean Louis Baptiste Augustin Duverger Nazon Etienne Belfort Jerome Gayle Lawrence Nicholson Bernard Phillip Clarke Hamilton Jack Peltier Molino
+
+nation 62 english
+nation 140 english
+nation 154 english
+nation 164 english
+nation 206 english
+nation 12 english
+nation 136 english
+nation 175 spanish
+nation 5 spanish
+nation 151 portuguese
+nation 28 portuguese
+nation 6 portuguese
+nation 37 portuguese
+nation 129 portuguese
+nation 183 portuguese
+nation 83 portuguese
+nation 71 french
+nation 20 french
+nation 113 french
+nation 181 german
+nation 75 german
+nation 13 german
+nation 111 german
+nation 95 italian
+nation 162 italian
+nation 120 italian
+nation 133 dutch
+nation 134 dutch
+nation 178 dutch
+nation 11 dutch
+nation 55 nordic
+nation 141 nordic
+nation 180 nordic
+nation 70 nordic
+nation 89 nordic
+nation 68 nordic
+nation 156 slavic
+nation 198 slavic
+nation 19 slavic
+nation 150 slavic
+nation 53 slavic
+nation 170 slavic
+nation 99 slavic
+nation 65 slavic
+nation 106 slavic
+nation 112 slavic
+nation 124 slavic
+nation 10 slavic
+nation 74 slavic
+nation 14 slavic
+nation 50 balkan
+nation 166 balkan
+nation 26 balkan
+nation 126 balkan
+nation 171 balkan
+nation 67 balkan
+nation 2 balkan
+nation 211 balkan
+nation 31 balkan
+nation 155 balkan
+nation 77 balkan
+nation 52 balkan
+nation 88 balkan
+nation 193 turkish
+nation 3 arabic
+nation 128 arabic
+nation 192 arabic
+nation 110 arabic
+nation 60 arabic
+nation 177 arabic
+nation 121 arabic
+nation 163 arabic
+nation 153 arabic
+nation 199 arabic
+nation 103 arabic
+nation 16 arabic
+nation 142 arabic
+nation 98 arabic
+nation 182 arabic
+nation 93 arabic
+nation 107 arabic
+nation 144 arabic
+nation 207 arabic
+nation 92 arabic
+nation 173 arabic
+nation 56 arabic
+nation 100 eastafrican
+nation 186 eastafrican
+nation 197 eastafrican
+nation 66 eastafrican
+nation 64 eastafrican
+nation 157 eastafrican
+nation 33 eastafrican
+nation 174 eastafrican
+nation 209 eastafrican
+nation 208 eastafrican
+nation 116 eastafrican
+nation 27 eastafrican
+nation 108 eastafrican
+nation 179 eastafrican
+nation 131 eastafrican
+nation 115 eastafrican
+nation 122 eastafrican
+nation 167 eastafrican
+nation 45 eastafrican
+nation 9 latin
+nation 201 latin
+nation 147 latin
+nation 41 latin
+nation 25 latin
+nation 148 latin
+nation 59 latin
+nation 44 latin
+nation 204 latin
+nation 123 latin
+nation 49 latin
+nation 145 latin
+nation 86 latin
+nation 81 latin
+nation 61 latin
+nation 137 latin
+nation 51 latin
+nation 58 latin
+nation 152 latin
+nation 97 japanese
+nation 102 korean
+nation 101 korean
+nation 42 chinese
+nation 43 chinese
+nation 87 chinese
+nation 114 chinese
+nation 90 southasian
+nation 143 southasian
+nation 17 southasian
+nation 176 southasian
+nation 132 southasian
+nation 24 southasian
+nation 118 southasian
+nation 1 southasian
+nation 205 seasian
+nation 187 seasian
+nation 91 seasian
+nation 117 seasian
+nation 169 seasian
+nation 149 seasian
+nation 34 seasian
+nation 105 seasian
+nation 130 seasian
+nation 188 seasian
+nation 30 seasian
+nation 200 northamerican
+nation 36 northamerican
+nation 96 caribbean
+nation 191 caribbean
+nation 85 caribbean
+continent 1 seasian
+continent 2 westafrican
+continent 3 caribbean
+continent 4 latin
+continent 5 oceanian
+continent 6 english

@@ -114,6 +114,12 @@ if(SSR_FONTS)
     target_sources(ssr PRIVATE ${SSR_FONTS})
     set_source_files_properties(${SSR_FONTS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/fonts)
 endif()
+# The data of the remake: the names of the players of the world.
+file(GLOB SSR_DATA ${CMAKE_SOURCE_DIR}/data/*.txt)
+if(SSR_DATA)
+    target_sources(ssr PRIVATE ${SSR_DATA})
+    set_source_files_properties(${SSR_DATA} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/data)
+endif()
 set_target_properties(ssr PROPERTIES
     OUTPUT_NAME "Star Soccer Rebooted"
     MACOSX_BUNDLE_BUNDLE_NAME "Star Soccer Rebooted"
