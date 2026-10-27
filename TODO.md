@@ -240,13 +240,16 @@ place of the atlas image with the same name (`art/NewStarLogo.png`).
 - [x] The names in the text: "New Star Soccer", "NSS", and the "NS-" names
       of the boots and the balls. The credits keep the names of the
       original.
-- [ ] The microphones of the interview (`InterviewMics`). It is a
-      stripped image, and a patch works only on a plain image.
-- [ ] The marks of the casino: the title of the slots ("New Star"), the
-      table and the card backs of blackjack (`BlackJackLogo`, `CardBack`),
-      the icon of blackjack, and the boards of the race track ("NEW STAR
-      GAMES")
-- [ ] The sponsor images of `Images/`
+- [x] A patch on a stripped image, as on a plain image
+- [x] The marks of the casino: the title of the slots (`SlotsTitlePanel`),
+      the table and the card backs of blackjack (`BlackJackLogo`,
+      `CardBack`), the icon of blackjack (`IBlackJackColour`), and the
+      boards of the race tracks (`HorseBannerC`, `HorseBannerW`,
+      `AdBoardColour`, `AdBoardWhite`)
+- The microphones of the interview (`InterviewMics`) have no mark. They
+  are black shapes.
+- Of the images of `Images/`, only `Backgrounds/Sponsored_SPONSOR.png` has
+  a mark. No screen of the new look and no code of the remake shows it.
 - `BannerFrontLogo` stays: it is a ball with a star, with no name.
 
 ## Not in the remake
