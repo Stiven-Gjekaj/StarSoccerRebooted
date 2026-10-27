@@ -29,6 +29,27 @@ typedef enum {
     SSR_RELATION_FANS_INT,
 } SSRRelation;
 
+#define SSR_CAREER_TROPHIES 256
+#define SSR_CAREER_HISTORY 128
+
+// A trophy or an award of the trophy log. medal is 0 for a league place
+// that is not first, 1 for a league title, 2 for a title with promotion,
+// 3 for the cup, 4 for the continental cup, 5 for an international cup,
+// and 6 to 10 for the club, young, league, division, and world player of
+// the year. team is a tla. tournament is the text that shows.
+typedef struct {
+    int year, medal;
+    char tournament[64];
+    char team[16];
+} SSRTrophy;
+
+// The counts of the player for one club in one season. A row of year 0
+// holds the counts of a career from before the history.
+typedef struct {
+    int year, apps, goals, assists, starMan;
+    char club[16];
+} SSRStatRow;
+
 typedef struct {
     // The day of the career: (year - 1) * 364 + (week - 1) * 7 + day
     // (c_TMyDate.sdate). Day 1 is the first day of year 1.
@@ -138,6 +159,13 @@ typedef struct {
     // The skill of the player in interviews, and the day of the last one.
     int interviewSkill, lastInterview;
     char gameVersion[16];
+    // The trophy log (c_TrophyLog), in the order of the wins.
+    SSRTrophy trophies[SSR_CAREER_TROPHIES];
+    int trophyCount;
+    // The stat history (c_StatHistory): one row for each club of each
+    // season, in the order of the rows.
+    SSRStatRow history[SSR_CAREER_HISTORY];
+    int historyCount;
 } SSRCareer;
 
 // The start of a new career (c_TPlayer.m_Create). The values come from
@@ -208,6 +236,23 @@ void ssr_career_reset_season(SSRCareer *career);
 // Writes the career to the file. The new file takes the place of the old
 // one only when it is complete. Returns 1 when it worked.
 int ssr_career_save(const SSRCareer *career, const char *path);
+
+// TrophyLog.AddNewTrophy: a trophy with the same year and text as one in
+// the log is not added again.
+void ssr_career_add_trophy(SSRCareer *career, int year, const char *team, const char *tournament, int medal);
+// CountMedalsByType: the trophies with the medal, in the year or, for
+// year 0, in all years. CountNoofClubsWhereMedalsOfTypeWon: the number of
+// different teams with the medal.
+int ssr_career_count_medals(const SSRCareer *career, int medal, int year);
+int ssr_career_count_medal_teams(const SSRCareer *career, int medal);
+
+// StatHistory.AddNewStatHistory: a row of the club with the counts of the
+// career that no row holds yet.
+void ssr_career_add_history(SSRCareer *career, int year, const char *club);
+// The sums of the rows: GetTotalApps, GetTotalGoals, GetTotalAssists,
+// GetTotalStarMan. And GetTotalAppsForClub.
+void ssr_career_history_totals(const SSRCareer *career, int *apps, int *goals, int *assists, int *starMan);
+int ssr_career_history_apps(const SSRCareer *career, const char *club);
 
 // Reads the career from the file. Returns 0 when the file is not there or
 // has no club.

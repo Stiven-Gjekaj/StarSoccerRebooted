@@ -227,7 +227,77 @@ static void test_changes_the_relations(void) {
     CHECK(fabsf(ssr_career_lifestyle(&c) - 5.0f) < 1e-5f);
 }
 
+// The trophy log and the stat history: the rules of the game, and the
+// save file.
+static void test_keeps_the_trophies_and_the_history(void) {
+    static SSRCareer c, back;
+    ssr_career_create(&c, "The", "Kid", 0, 0, 62, 1, 1, 0);
+    c.clubId = 10;
+    c.sdate = 364 * 2 + 10;
+    ssr_career_add_trophy(&c, 2, "NORTH", "ENG1 1st", 2);
+    ssr_career_add_trophy(&c, 2, "NORTH", "ENG1 1st", 1);
+    ssr_career_add_trophy(&c, 3, "NORTH", "ENGCUP WINNER", 3);
+    ssr_career_add_trophy(&c, 3, "WEST", "ENG1 1st", 2);
+    CHECK(c.trophyCount == 3);
+    CHECK(ssr_career_count_medals(&c, 2, 0) == 2 && ssr_career_count_medals(&c, 2, 3) == 1);
+    CHECK(ssr_career_count_medal_teams(&c, 2) == 2 && ssr_career_count_medal_teams(&c, 3) == 1);
+    // Each row holds the counts that no row holds yet.
+    c.apps = 30;
+    c.goals = 12;
+    c.assists = 4;
+    c.starMan = 5;
+    ssr_career_add_history(&c, 2, "NORTH");
+    c.apps = 50;
+    c.goals = 20;
+    ssr_career_add_history(&c, 3, "WEST");
+    CHECK(c.historyCount == 2 && c.history[1].apps == 20 && c.history[1].goals == 8 && c.history[1].assists == 0);
+    CHECK(ssr_career_history_apps(&c, "NORTH") == 30 && ssr_career_history_apps(&c, "SOUTH") == 0);
+    int apps, goals;
+    ssr_career_history_totals(&c, &apps, &goals, NULL, NULL);
+    CHECK(apps == 50 && goals == 20);
+
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/history.txt", ssr_test_directory("career_history"));
+    CHECK(ssr_career_save(&c, path));
+    CHECK(ssr_career_load(&back, path));
+    CHECK(back.trophyCount == 3 && back.historyCount == 2);
+    CHECK(strcmp(back.trophies[1].tournament, "ENGCUP WINNER") == 0 && strcmp(back.trophies[1].team, "NORTH") == 0);
+    CHECK(back.trophies[1].year == 3 && back.trophies[1].medal == 3);
+    CHECK(strcmp(back.history[0].club, "NORTH") == 0 && back.history[0].starMan == 5 && back.history[1].apps == 20);
+
+    // A trophy of an old save has no team and no medal. A row of the
+    // history needs six parts.
+    FILE *file = fopen(path, "ab");
+    fputs("trophy=4:ENG2 3rd\nhistory=4:WEST:1:2:3\n", file);
+    fclose(file);
+    CHECK(ssr_career_load(&back, path));
+    CHECK(back.trophyCount == 4 && back.trophies[3].medal == 0 && back.trophies[3].team[0] == 0);
+    CHECK(back.historyCount == 2);
+}
+
+// StoreOldStats: a career of the second year with no history gets a row
+// of year 0 with the counts before the season.
+static void test_stores_the_old_stats(void) {
+    static SSRCareer c, back;
+    ssr_career_create(&c, "The", "Kid", 0, 0, 62, 1, 1, 0);
+    c.clubId = 10;
+    c.apps = 40;
+    c.seasonApps = 10;
+    c.goals = 9;
+    c.seasonGoals = 4;
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/old.txt", ssr_test_directory("career_old_stats"));
+    CHECK(ssr_career_save(&c, path) && ssr_career_load(&back, path));
+    CHECK(back.historyCount == 0);
+    c.sdate = 364 + 3;
+    CHECK(ssr_career_save(&c, path) && ssr_career_load(&back, path));
+    CHECK(back.historyCount == 1 && back.history[0].year == 0 && strcmp(back.history[0].club, "-") == 0);
+    CHECK(back.history[0].apps == 30 && back.history[0].goals == 5);
+}
+
 int main(void) {
+    test_keeps_the_trophies_and_the_history();
+    test_stores_the_old_stats();
     test_changes_the_relations();
     test_names_the_player_type();
     test_updates_a_rating();

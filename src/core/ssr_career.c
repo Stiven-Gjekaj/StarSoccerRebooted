@@ -361,6 +361,16 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     write_text(file, "headline", c->headline);
     write_text(file, "headlineresult", c->headlineResult);
     write_text(file, "horses", c->horses);
+    // One line for each entry, as a long career passes the length of a
+    // line (GetTrophyLog and GetStatHistory join them with "#").
+    for (int i = 0; i < c->trophyCount; i++) {
+        const SSRTrophy *t = &c->trophies[i];
+        fprintf(file, "trophy=%d:%s:%s:%d\n", t->year, t->tournament, t->team, t->medal);
+    }
+    for (int i = 0; i < c->historyCount; i++) {
+        const SSRStatRow *h = &c->history[i];
+        fprintf(file, "history=%d:%s:%d:%d:%d:%d\n", h->year, h->club, h->apps, h->goals, h->assists, h->starMan);
+    }
     int ok = !ferror(file);
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
@@ -385,6 +395,9 @@ static void read_floats(const char *text, float *values, int count) {
         text = *end == ',' ? end + 1 : end;
     }
 }
+
+static void read_trophy(SSRCareer *c, const char *value);
+static void read_history(SSRCareer *c, const char *value);
 
 int ssr_career_load(SSRCareer *c, const char *path) {
     if (!c || !path) return 0;
@@ -518,9 +531,139 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "headline") == 0) read_text(value, c->headline, sizeof(c->headline));
         else if (strcmp(key, "headlineresult") == 0) read_text(value, c->headlineResult, sizeof(c->headlineResult));
         else if (strcmp(key, "horses") == 0) read_text(value, c->horses, sizeof(c->horses));
+        else if (strcmp(key, "trophy") == 0) read_trophy(c, value);
+        else if (strcmp(key, "history") == 0) read_history(c, value);
     }
     fclose(file);
+    // StatHistory.StoreOldStats: a career from before the history gets
+    // one row of year 0 with the counts before this season.
+    if (ssr_career_year(c) > 1 && c->historyCount == 0) {
+        SSRStatRow *h = &c->history[c->historyCount++];
+        memset(h, 0, sizeof(*h));
+        snprintf(h->club, sizeof(h->club), "-");
+        h->apps = c->apps - c->seasonApps;
+        h->goals = c->goals - c->seasonGoals;
+        h->assists = c->assists - c->seasonAssists;
+        h->starMan = c->starMan - c->seasonStarMan;
+    }
     return c->clubId != 0;
+}
+
+// Splits text at ':' into parts, up to max. Returns the number of parts.
+static int split_parts(char *text, char **parts, int max) {
+    int n = 0;
+    for (char *p = text; p && n < max;) {
+        parts[n++] = p;
+        p = strchr(p, ':');
+        if (p) *p++ = 0;
+    }
+    return n;
+}
+
+// LoadTrophyLog: the year and the tournament, and the team and the medal
+// when they are there.
+static void read_trophy(SSRCareer *c, const char *value) {
+    if (c->trophyCount >= SSR_CAREER_TROPHIES) return;
+    char copy[256], *parts[4];
+    snprintf(copy, sizeof(copy), "%s", value);
+    int n = split_parts(copy, parts, 4);
+    if (n < 2) return;
+    SSRTrophy *t = &c->trophies[c->trophyCount++];
+    memset(t, 0, sizeof(*t));
+    t->year = atoi(parts[0]);
+    snprintf(t->tournament, sizeof(t->tournament), "%s", parts[1]);
+    if (n > 2) snprintf(t->team, sizeof(t->team), "%s", parts[2]);
+    if (n > 3) t->medal = atoi(parts[3]);
+}
+
+// LoadStatHistory: a row needs all six parts.
+static void read_history(SSRCareer *c, const char *value) {
+    if (c->historyCount >= SSR_CAREER_HISTORY) return;
+    char copy[256], *parts[6];
+    snprintf(copy, sizeof(copy), "%s", value);
+    if (split_parts(copy, parts, 6) < 6) return;
+    SSRStatRow *h = &c->history[c->historyCount++];
+    memset(h, 0, sizeof(*h));
+    h->year = atoi(parts[0]);
+    snprintf(h->club, sizeof(h->club), "%s", parts[1]);
+    h->apps = atoi(parts[2]);
+    h->goals = atoi(parts[3]);
+    h->assists = atoi(parts[4]);
+    h->starMan = atoi(parts[5]);
+}
+
+void ssr_career_add_trophy(SSRCareer *c, int year, const char *team, const char *tournament, int medal) {
+    if (!c || !tournament) return;
+    for (int i = 0; i < c->trophyCount; i++) {
+        if (c->trophies[i].year == year && strcmp(c->trophies[i].tournament, tournament) == 0) return;
+    }
+    if (c->trophyCount >= SSR_CAREER_TROPHIES) return;
+    SSRTrophy *t = &c->trophies[c->trophyCount++];
+    memset(t, 0, sizeof(*t));
+    t->year = year;
+    t->medal = medal;
+    snprintf(t->tournament, sizeof(t->tournament), "%s", tournament);
+    snprintf(t->team, sizeof(t->team), "%s", team ? team : "");
+}
+
+int ssr_career_count_medals(const SSRCareer *c, int medal, int year) {
+    int n = 0;
+    for (int i = 0; c && i < c->trophyCount; i++) {
+        n += c->trophies[i].medal == medal && (year == 0 || c->trophies[i].year == year);
+    }
+    return n;
+}
+
+int ssr_career_count_medal_teams(const SSRCareer *c, int medal) {
+    int n = 0;
+    for (int i = 0; c && i < c->trophyCount; i++) {
+        if (c->trophies[i].medal != medal) continue;
+        int seen = 0;
+        for (int k = 0; k < i && !seen; k++) {
+            seen = c->trophies[k].medal == medal && strcmp(c->trophies[k].team, c->trophies[i].team) == 0;
+        }
+        n += !seen;
+    }
+    return n;
+}
+
+void ssr_career_history_totals(const SSRCareer *c, int *apps, int *goals, int *assists, int *starMan) {
+    int a = 0, g = 0, s = 0, m = 0;
+    for (int i = 0; c && i < c->historyCount; i++) {
+        a += c->history[i].apps;
+        g += c->history[i].goals;
+        s += c->history[i].assists;
+        m += c->history[i].starMan;
+    }
+    if (apps) *apps = a;
+    if (goals) *goals = g;
+    if (assists) *assists = s;
+    if (starMan) *starMan = m;
+}
+
+int ssr_career_history_apps(const SSRCareer *c, const char *club) {
+    int n = 0;
+    for (int i = 0; c && club && i < c->historyCount; i++) {
+        if (strcmp(c->history[i].club, club) == 0) n += c->history[i].apps;
+    }
+    return n;
+}
+
+void ssr_career_add_history(SSRCareer *c, int year, const char *club) {
+    // [I: the game looks for a row with the name of the club, but it
+    // keeps the tla, so it adds a row each time. The remake does the
+    // same.]
+    if (!c || c->historyCount >= SSR_CAREER_HISTORY) return;
+    int apps, goals, assists, starMan;
+    ssr_career_history_totals(c, &apps, &goals, &assists, &starMan);
+    SSRStatRow *h = &c->history[c->historyCount++];
+    memset(h, 0, sizeof(*h));
+    h->year = year;
+    snprintf(h->club, sizeof(h->club), "%s", club ? club : "");
+    h->apps = c->apps - apps;
+    h->goals = c->goals - goals;
+    h->assists = c->assists - assists;
+    h->starMan = c->starMan - starMan;
 }
 
 int ssr_career_skill(const int *levels) {
