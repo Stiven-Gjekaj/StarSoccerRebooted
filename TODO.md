@@ -134,8 +134,8 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] Relationships (`Relationships`, `Pairs`)
 - [x] The sounds of the relationships screen and of the pairs game
       (`CError`, `Card_Dealt_1`, `CSuccess`)
-- [ ] The NRG overlay when the energy is too low for an activity
-      (`upsellnrg`, `NRGOverlay`). A message shows now.
+- [x] The NRG overlay when the energy is too low for an activity
+      (`upsellnrg`, `NRGOverlay`)
 - [x] Dilemmas and interviews (`Dilemma`, `Interview`), with the
       interview after a match
 - [x] The news of the week before a match (`GSPlayerPlay`): the partner,
