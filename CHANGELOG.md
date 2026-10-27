@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.0 (2026-10-27)
+
+- A new career can continue the world of the last career (Options,
+  World). The players, the managers, the honours, and the rivalries stay,
+  and the last player is a legend in the hall of fame.
+
 ## 0.19.0 (2026-10-27)
 
 - The honours mark a title won on the last day.
