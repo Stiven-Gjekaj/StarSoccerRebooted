@@ -186,8 +186,6 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   draws a copy as it draws the live chance.
 - **The help of the first replay (`Player.ReplayActive`) is not saved.** It
   shows again after the app starts again.
-- **The chance HUD (`minigamehud.uis`) shows the replay only.** The game
-  HUD of a career chance, with the wind and the chance bars, comes later.
 - **`AnimateProgress` moves the value of a bar but draws no highlight, no
   overlay, and no burst.** Reason: these are gadgets of the game that the
   remake does not make yet. The bar has the same length at each frame.
