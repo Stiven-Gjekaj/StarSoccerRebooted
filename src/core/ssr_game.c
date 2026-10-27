@@ -7786,6 +7786,13 @@ static void blackjack_banner(SSRGame *game, const char *tag) {
     show_splash(game, "splashmessagecards", 1500);
 }
 
+// TickerTapeShower.CloneDisposable().Show(): each win shows a new ticker
+// tape. The hide and the show start its emitters again.
+static void show_ticker_tape(SSRGame *game) {
+    add_op(game, SSR_OP_HIDE, "TickerTapeShower", NULL, NULL, 0);
+    add_op(game, SSR_OP_SHOW, "TickerTapeShower", NULL, NULL, 0);
+}
+
 // Win, Lose, and Tie of TScreen_BlackJack.
 static void blackjack_result(SSRGame *game, int result) {
     int back = result == 1 ? game->bet * 2 : result == 0 ? game->bet : 0;
@@ -7798,7 +7805,7 @@ static void blackjack_result(SSRGame *game, int result) {
     if (back > 0) update_bank(game, back);
     if (result == 1) save_career(game);
     check_stake(game);
-    if (result == 1) add_op(game, SSR_OP_SHOW, "TickerTapeShower", NULL, NULL, 0);
+    if (result == 1) show_ticker_tape(game);
     ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", result == 1 ? 1 : result == 0 ? 0 : -1);
     ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", back);
 }
@@ -8048,7 +8055,7 @@ static void roulette_result(SSRGame *game) {
         update_bank(game, win);
         save_career(game);
         casino_message(game, "bet_YouWon", win);
-        add_op(game, SSR_OP_SHOW, "TickerTapeShower", NULL, NULL, 0);
+        show_ticker_tape(game);
     } else {
         play_sound(game, "CError");
         casino_message(game, "bet_YouLost", game->bet);
@@ -8138,7 +8145,7 @@ static void slots_prize(SSRGame *game) {
         // ShowPrizeAnim: the title flashes, and the ticker tape falls.
         add_op(game, SSR_OP_SHOW, "TitleAnim", NULL, NULL, 0);
         add_op(game, SSR_OP_ANIM_PLAY, "TitleAnim", NULL, "1", 0);
-        add_op(game, SSR_OP_SHOW, "TickerTapeShower", NULL, NULL, 0);
+        show_ticker_tape(game);
     }
     ssr_tweaks_set_number(game->tweaks, "Casino", "CasinoOutcome", win > 0 ? 1 : -1);
     ssr_tweaks_set_number(game->tweaks, "Casino", "Winnings", win);

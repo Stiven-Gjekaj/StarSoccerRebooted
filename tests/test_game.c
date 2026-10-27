@@ -1516,7 +1516,7 @@ static void play_blackjack(SSRGame *game, SSRTweaks *tweaks, const char *path) {
         ssr_game_message(game, "blackjack.btn_Quit");
         CHECK(strcmp(ssr_game_screen(game), "blackjack") == 0);
         ssr_tweaks_set_number(tweaks, "Casino", "CasinoOutcome", 99);
-        int shown = 0, next = 0, dealt = 0, cashIn = 0;
+        int shown = 0, next = 0, dealt = 0, cashIn = 0, tape = 0;
         for (int f = 0; f < 20 * 60 && !next; f++) {
             ssr_game_update(game, 1);
             for (const char *sound; (sound = ssr_game_take_sound(game)) != NULL;) cashIn |= strcmp(sound, "CCashIn") == 0;
@@ -1530,6 +1530,11 @@ static void play_blackjack(SSRGame *game, SSRTweaks *tweaks, const char *path) {
                 }
                 if (ops[i].kind == SSR_OP_SHOW && strcmp(ops[i].ref, "HoldButton") == 0) shown = 1;
                 if (ops[i].kind == SSR_OP_SHOW && strcmp(ops[i].ref, "PlayButton") == 0) next = 1;
+                // A win hides the ticker tape, then shows it: a new tape.
+                if (strcmp(ops[i].ref, "TickerTapeShower") == 0) {
+                    if (ops[i].kind == SSR_OP_HIDE) tape = 1;
+                    else if (ops[i].kind == SSR_OP_SHOW && tape == 1) tape = 2;
+                }
             }
             if (shown) {
                 shown = 0;
@@ -1542,6 +1547,7 @@ static void play_blackjack(SSRGame *game, SSRTweaks *tweaks, const char *path) {
         CHECK(outcome == 1 ? winnings == 20 : outcome == 0 ? winnings == 10 : outcome == -1 && winnings == 0);
         // Only a win plays the cash sound. A tie gives the bet back quietly.
         CHECK(cashIn == (outcome == 1));
+        CHECK((tape == 2) == (outcome == 1));
         outcomes[(int)outcome + 1]++;
         bank = bank - 10 + winnings;
         CHECK(now->bank == bank);
