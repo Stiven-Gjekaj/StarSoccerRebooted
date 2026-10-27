@@ -84,6 +84,7 @@ typedef enum {
     D_IF,
     D_PLAY_SOUND,
     D_SCROLLING_LIST,
+    D_SHOW_SHELL,
     D_SWIPE_PANEL,
     D_EMIT_PLACER,
     D_EMIT_MOVER,
@@ -243,6 +244,8 @@ struct SSRScene {
         Gel *gel;
     } embeds[32];
     int embedCount;
+    // The copies of templates that the code made, by id - 1.
+    Gel *spawned[64];
     // The random numbers of the emitters. The crowds have their own.
     SSRRandom random;
 
@@ -989,6 +992,13 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         d->text[1] = keep(s, arg(m, 1));
         d->v[0] = (float)number(s, m, 2, 0);
         d->v[1] = (float)number(s, m, 3, 0);
+    } else if (is(n, "ShowShell")) {
+        // ShowShell(Name,1): the shell, for example the ticker, shows. The
+        // app reads the tweak Shell,Name.
+        d = new_doodad(D_SHOW_SHELL, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->v[0] = (float)number(s, m, 1, 0);
     } else if (is(n, "ScrollingList")) {
         // ScrollingList(Cat,Scroll,height,Cat,Velocity) (c_ScrollingList).
         d = new_doodad(D_SCROLLING_LIST, m);
@@ -1900,6 +1910,9 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
         }
         break;
     }
+    case D_SHOW_SHELL:
+        ssr_tweaks_set_number(s->env->tweaks, "Shell", d->text[0], d->v[0]);
+        break;
     case D_SCROLLING_LIST: {
         float at = (float)ssr_tweaks_number(s->env->tweaks, d->text[0], d->text[1]);
         float contents = 0;
@@ -2767,4 +2780,51 @@ int ssr_scene_list_add(SSRScene *scene, const char *list, const char *template_,
 
 int ssr_scene_dragged(const SSRScene *scene) {
     return scene ? scene->dragged : 0;
+}
+
+int ssr_scene_spawn(SSRScene *scene, const char *parent, const char *template_, float x, const char *text,
+                    float width) {
+    Gel *holder = scene && parent ? find_ref_first(scene, parent) : NULL;
+    Gel *model = scene && template_ ? find_ref_first(scene, template_) : NULL;
+    if (!holder || !model) return 0;
+    int id = 0;
+    for (int i = 0; i < 64 && !id; i++) {
+        if (!scene->spawned[i]) id = i + 1;
+    }
+    if (!id) return 0;
+    Gel *copy = clone_gel(model);
+    if (!copy) return 0;
+    copy->hidden = 0;
+    copy->x = x;
+    Gel *label = first_text(copy);
+    if (label && text) set_shown(label, text);
+    // c_GGadget.SetElementWidth(0) and (1): the gel and its text.
+    if (width > 0) {
+        copy->w = width;
+        if (label) label->w = width;
+    }
+    add_child(holder, copy);
+    scene->spawned[id - 1] = copy;
+    return id;
+}
+
+float ssr_scene_spawn_x(const SSRScene *scene, int id) {
+    return scene && id > 0 && id <= 64 && scene->spawned[id - 1] ? scene->spawned[id - 1]->x : 0;
+}
+
+void ssr_scene_spawn_remove(SSRScene *scene, int id) {
+    if (!scene || id < 1 || id > 64 || !scene->spawned[id - 1]) return;
+    Gel *g = scene->spawned[id - 1];
+    scene->spawned[id - 1] = NULL;
+    Gel *p = g->parent;
+    if (p) {
+        for (int i = 0; i < p->childCount; i++) {
+            if (p->children[i] == g) {
+                memmove(&p->children[i], &p->children[i + 1], (size_t)(p->childCount - i - 1) * sizeof(Gel *));
+                p->childCount--;
+                break;
+            }
+        }
+    }
+    free_gel(g);
 }

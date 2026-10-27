@@ -158,6 +158,16 @@ int ssr_scene_set_visible(SSRScene *scene, const char *ref, int visible);
 // template_: it goes below the entry before it, shows the text, and its
 // SetTweak with the ref ID gives the id. Returns 1 when it worked.
 void ssr_scene_list_clear(SSRScene *scene, const char *list);
+
+// Adds to the element with the ref parent a copy of the template, at x,
+// with the text in its first text. A width more than 0 is the width of the
+// copy and of its text (c_GGadget.SetElementWidth). Returns an id for the
+// copy, or 0.
+int ssr_scene_spawn(SSRScene *scene, const char *parent, const char *template_, float x, const char *text,
+                    float width);
+// The place of the copy in its parent: it moves with its Mover.
+float ssr_scene_spawn_x(const SSRScene *scene, int id);
+void ssr_scene_spawn_remove(SSRScene *scene, int id);
 int ssr_scene_list_add(SSRScene *scene, const char *list, const char *template_, const char *text, int id);
 
 #endif
