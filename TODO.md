@@ -16,8 +16,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] Load the atlases of the interface (`NewGUI/Atlases`)
 - [x] Draw text with the TTF fonts of the game (`Fonts`)
 - [x] Draw the star of `Fonts.txt` (`Inject:`): the bux icon in a text
-- [ ] The glyph tables of the other alphabets (`Fonts/Glyphs`). This
-      moves to 1.0, with the languages.
+- [x] The glyph tables of the other alphabets (`Fonts/Glyphs`)
 - [x] Play the sounds (OGG from an APK, MP3 from an IPA). The game has no
       music.
 - [x] Read the screen layouts (`.uis`, `.uih`) and draw a screen from them
@@ -184,7 +183,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 ## 1.0 The full game
 
 - [ ] All the content of 4.32
-- [ ] All the languages of 4.32, with the star glyph and the glyph tables
+- [x] All the languages of 4.32, with the star glyph and the glyph tables
 - [ ] All the features in this file
 - [ ] A test harness that compares the rules with the original code
 

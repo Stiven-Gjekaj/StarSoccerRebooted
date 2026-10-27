@@ -108,6 +108,15 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   injected libraries. Reason: the model above depends on a real copy of the
   player. The game is free on Google Play and on the App Store.
 
+- **The fallback fonts come with the app.** The fonts of the game have
+  no Cyrillic or CJK characters. 4.32 on Android draws them with Roboto
+  and Noto Sans CJK of the system. The app holds subsets of these fonts
+  (`fonts/`), under their own licences. Reason: the same look on iOS,
+  Android, and macOS, as on the Android reference.
+- **A language with no names of its own gets the names of the data set.**
+  4.32 keeps the names of the language before. [I: the remake gives the
+  English names back when the player goes back to English.]
+
 ## Toolchain
 
 - **C99 and SDL3.** Reason: one code base reaches all five platforms. The

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Play in all 13 languages of 4.32: English, Turkish, Brazilian
+  Portuguese, Italian, Spanish, Polish, German, French, Portuguese,
+  Russian, Japanese, Korean, and Chinese. Choose the language in the
+  options. At the first start, the app takes the language of the device.
+- The text has the glyph metrics of 4.32. Cyrillic, Japanese, Korean, and
+  Chinese text draws with Roboto and Noto Sans CJK, as on Android.
+- The nations and the continents have the names of the language. A new
+  career starts on the nation of the language.
+- Text is in capitals in English only, as in 4.32.
+
 ## 0.8.0 (2026-10-27)
 
 - The Life screen opens the casino. Choose a stake from 1 to 50 bux and
