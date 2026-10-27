@@ -58,7 +58,168 @@ static void test_changes_and_saves_the_options(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static const char *localise(void *context, const char *tag) {
+    (void)context;
+    if (strcmp(tag, "CMESSAGE_TRIALSUCCESSMOBILE") == 0) return "Signed by $clubname ($labelname) in $leaguename.";
+    if (strcmp(tag, "CNEWS_FIRSTCONTRACTMOBILE") == 0) return "$clubname have signed $playername.";
+    if (strcmp(tag, "help_newplayer") == 0) return "Welcome.";
+    if (strcmp(tag, "CMESSAGE_DELETESLOT") == 0) return "Delete?";
+    return NULL;
+}
+
+static int take_ops(SSRGame *game, SSRUiOp *ops, int max) {
+    int count = 0;
+    while (count < max && ssr_game_take_op(game, &ops[count])) count++;
+    return count;
+}
+
+static int has_op(const SSRUiOp *ops, int count, SSRUiOpKind kind, const char *ref, const char *text) {
+    for (int i = 0; i < count; i++) {
+        if (ops[i].kind == kind && strcmp(ops[i].ref, ref) == 0 && (!text || strcmp(ops[i].text, text) == 0)) return 1;
+    }
+    return 0;
+}
+
+// A new career from the main menu to the game menu, with a world that the
+// test makes: one continent, two nations, a league in England.
+static void test_starts_a_new_career(void) {
+    SSRContinent continents[1] = {{6, "Europe", "EUR", "UEFA", "UEFA", 1}};
+    SSRNation nations[2] = {0};
+    nations[0].id = 62;
+    nations[0].name = "England";
+    nations[0].tla = "ENG";
+    nations[0].continent = 6;
+    nations[1].id = 63;
+    nations[1].name = "Wales";
+    nations[1].tla = "WAL";
+    nations[1].continent = 6;
+    SSRCompetition competitions[1] = {0};
+    competitions[0].id = 2270;
+    competitions[0].tla = "PRM";
+    competitions[0].based = 62;
+    competitions[0].duration = 38;
+    competitions[0].level = 1;
+    SSRClub clubs[4] = {0};
+    const char *names[4] = {"Big FC", "Mid FC", "Small FC", "Tiny FC"};
+    const char *tlas[4] = {"BIG", "MID", "SML", "TNY"};
+    for (int i = 0; i < 4; i++) {
+        clubs[i].id = 100 + i;
+        clubs[i].name = names[i];
+        clubs[i].tla = tlas[i];
+        clubs[i].nation = 62;
+        clubs[i].league = 2270;
+        clubs[i].strength = 90 - i * 20;
+    }
+    SSRWorld world = {0};
+    world.continents = continents;
+    world.continentCount = 1;
+    world.nations = nations;
+    world.nationCount = 2;
+    world.competitions = competitions;
+    world.competitionCount = 1;
+    world.clubs = clubs;
+    world.clubCount = 4;
+
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Player", "StartingWage", 1);
+    ssr_tweaks_set_number(tweaks, "Player", "StartingGoalBonus", 1);
+    const char *directory = ssr_test_directory("game_career");
+    char path[1200];
+    snprintf(path, sizeof(path), "%s/career1.txt", directory);
+    remove(path);
+    SSRGame *game = ssr_game_create(tweaks);
+    ssr_game_set_data(game, &world, localise, NULL, directory);
+    SSRUiOp ops[64];
+
+    ssr_game_message(game, "mainmenu.btn_Career");
+    CHECK(strcmp(ssr_game_screen(game), "saveslot") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "SaveSlot", "Slot0Data"), "Save Slot 1") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "SaveSlot", "Slot0Exist") == 0);
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    CHECK(strcmp(ssr_game_screen(game), "messagedefault") == 0);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "Welcome.") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Message", "ShowAcc") == 1 && ssr_tweaks_number(tweaks, "Message", "ShowDec") == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "chooseclub") == 0);
+
+    // The name boxes.
+    CHECK(strcmp(ssr_game_text(game, "GS_ShowNameF"), "FIRSTNAME_ENTRY_INSTRUCTIONS") == 0);
+    CHECK(!ssr_game_wants_text(game));
+    ssr_game_message(game, "chooseclub.inp_NameF_HIT");
+    CHECK(ssr_game_wants_text(game) && ssr_tweaks_number(tweaks, "Menu", "FocusedItem") == 1);
+    ssr_game_type(game, "billy,;");
+    ssr_game_type(game, "x");
+    ssr_game_key(game, SSR_KEY_BACKSPACE);
+    CHECK(strcmp(ssr_game_text(game, "GS_ShowNameF"), "Billy") == 0);
+    ssr_game_key(game, SSR_KEY_ENTER);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "FocusedItem") == 2);
+    ssr_game_type(game, "Abcdefghijklmnop");
+    CHECK(strcmp(ssr_game_text(game, "GS_ShowNameL"), "Abcdefghijk") == 0);
+    ssr_game_message(game, "chooseclub.btn_Gender");
+    CHECK(ssr_tweaks_number(tweaks, "Player", "Gender") == 1 && !ssr_game_wants_text(game));
+    ssr_game_message(game, "chooseclub.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "choosenation") == 0);
+
+    // The lists: Europe, England and Wales, and England as a league.
+    int count = take_ops(game, ops, 64);
+    CHECK(has_op(ops, count, SSR_OP_LIST_ADD, "ContinentCombo", "EUROPE"));
+    CHECK(has_op(ops, count, SSR_OP_LIST_ADD, "NationCombo", "WALES"));
+    CHECK(has_op(ops, count, SSR_OP_LIST_ADD, "LeagueCombo", "ENGLAND"));
+    CHECK(!has_op(ops, count, SSR_OP_LIST_ADD, "LeagueCombo", "WALES"));
+    CHECK(has_op(ops, count, SSR_OP_TEXT, "NationText", "England"));
+    CHECK(has_op(ops, count, SSR_OP_SHOW, "PlayButton", NULL));
+    ssr_tweaks_set_number(tweaks, "Combo", "ChosenDesiredNation", 63);
+    ssr_game_message(game, "choosenation.cmb_Nation");
+    count = take_ops(game, ops, 64);
+    CHECK(has_op(ops, count, SSR_OP_TEXT, "NationText", "Wales"));
+
+    ssr_game_message(game, "choosenation.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "messagedefault") == 0);
+    const SSRCareer *career = ssr_game_career(game);
+    CHECK(career->nationId == 63 && career->clubNationId == 62 && career->gender == 1);
+    CHECK(career->clubId >= 100 && career->clubId <= 103 && career->wage == 1);
+    CHECK(strstr(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "in PRM.") != NULL);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "startransition") == 0);
+    CHECK(career->technique[0] == 1 && career->power[0] == 1);
+    ssr_game_update(game, 30);
+    CHECK(strcmp(ssr_game_screen(game), "startransition") == 0);
+    ssr_game_update(game, 30);
+    CHECK(strcmp(ssr_game_screen(game), "webpagenews") == 0);
+    count = take_ops(game, ops, 64);
+    CHECK(count == 1 && ops[0].kind == SSR_OP_TEXT && strstr(ops[0].text, "have signed Billy Abcdefghijk."));
+    ssr_game_message(game, "webpage.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Player", "Bux") == 15 && ssr_tweaks_number(tweaks, "Player", "Age") == 16);
+    CHECK(strcmp(ssr_game_text(game, "GS_PlayerClubName"), world.clubs[career->clubId - 100].tla) == 0);
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    CHECK(strcmp(ssr_game_screen(game), "mainmenu") == 0);
+
+    // The slot shows the career, and it loads again.
+    ssr_game_message(game, "mainmenu.btn_Career");
+    CHECK(ssr_tweaks_number(tweaks, "SaveSlot", "Slot0Exist") == 1);
+    CHECK(strstr(ssr_tweaks_get(tweaks, "SaveSlot", "Slot0Data"), "Billy Abcdefghijk - ") != NULL);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "SaveSlot", "Slot0ButtonText"), "Load Career") == 0);
+    ssr_game_message(game, "saveslot.btn_Slot0");
+    ssr_game_update(game, 60);
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+    ssr_game_message(game, "gamemenu.btn_Quit");
+
+    // Delete: Cancel keeps it, Ok deletes it.
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_DeleteSlot0");
+    CHECK(strcmp(ssr_game_screen(game), "message") == 0);
+    ssr_game_message(game, "message.btn_Cancel");
+    CHECK(strcmp(ssr_game_screen(game), "saveslot") == 0 && ssr_tweaks_number(tweaks, "SaveSlot", "Slot0Exist") == 1);
+    ssr_game_message(game, "saveslot.btn_DeleteSlot0");
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(ssr_tweaks_number(tweaks, "SaveSlot", "Slot0Exist") == 0);
+    ssr_game_free(game);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_starts_a_new_career();
     test_goes_between_screens();
     test_changes_and_saves_the_options();
     return TEST_RESULT();
