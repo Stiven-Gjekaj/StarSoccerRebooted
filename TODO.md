@@ -125,7 +125,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] The selection: the boss can make the player a substitute, or leave
       the player out
 - [x] The news of a cup winner and of the result (`headlineresult`)
-- [ ] The trophy log and the stat history (`Achievements`)
+- [x] The trophy log and the stat history (`Achievements`)
 - [x] The transfer at the end of the season (`DesiredTransfer`)
 
 ## 0.7 The life of the player (done)
@@ -153,8 +153,12 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       `DesiredTransfer`, `Negotiate`)
 - [ ] The digits of the cards of the negotiate game (`MechDigit`)
 - [x] Retirement (`Retirement`), the score, and the hard mode unlock
-- [ ] The history of the seasons and the trophy log. The score of the
-      retirement counts no medals and no seasons until they come.
+- [x] The history of the seasons and the trophy log, with the medals and
+      the seasons in the score of the retirement
+- [ ] The awards of the achievements screen (`CheckAchievement`, 108
+      awards, the alert `bottommessageachievement`)
+- [ ] The records of the career: the furthest goals and passes
+      (`bottommessagerecord`), the hat tricks, and the form of the career
 
 ## 0.8 Side games (done)
 
