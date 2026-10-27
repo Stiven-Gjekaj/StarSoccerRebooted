@@ -2795,7 +2795,10 @@ int ssr_scene_spawn(SSRScene *scene, const char *parent, const char *template_, 
     Gel *copy = clone_gel(model);
     if (!copy) return 0;
     copy->hidden = 0;
+    // The copy keeps its place on the screen in its new parent
+    // (c_Gel.AddChild rebases it). x is on the screen too.
     copy->x = x;
+    set_local(copy, mat_concat(mat_inverse(holder->baked), local_matrix(copy)));
     Gel *label = first_text(copy);
     if (label && text) set_shown(label, text);
     // c_GGadget.SetElementWidth(0) and (1): the gel and its text.
