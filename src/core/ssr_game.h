@@ -185,6 +185,8 @@ typedef enum {
     SSR_TICKER_WORLD_RUMOUR,
     // The top scorer of the league near the record of a season.
     SSR_TICKER_WORLD_RECORD,
+    // The next match is against the player of the last career.
+    SSR_TICKER_WORLD_FORMER,
     SSR_TICKER_KINDS,
 } SSRTickerKind;
 

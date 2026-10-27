@@ -782,6 +782,8 @@ static void people_start(SSRGame *game) {
 // with the most years. The old player stays in the world as a legend, and
 // the years of the world move back to the year of the new career. Returns
 // 0 when no other slot has a world.
+static const char *club_name(SSRGame *game, int id);
+
 static int continue_world(SSRGame *game) {
     SSRCareer *c = &game->career;
     int best = -1, bestYear = 0;
@@ -809,8 +811,18 @@ static int continue_world(SSRGame *game) {
     honours_path(game, best, path, sizeof(path));
     ssr_honours_load(&game->honours, path);
     int oldYear = ssr_career_year(&old);
-    ssr_people_add_legend(people, old.firstName, old.lastName, old.nationId, oldYear - ssr_career_age(&old), oldYear,
-                          old.apps, old.goals, old.assists);
+    // A player who did not retire plays on in the world, and the new player
+    // can meet the player. A retired player is a legend.
+    int former = !old.retired && ssr_world_club(game->world, old.clubId);
+    if (former) {
+        int skill = (ssr_career_skill(old.technique) + ssr_career_skill(old.pace) + ssr_career_skill(old.vision) +
+                     ssr_career_skill(old.setPieces) + ssr_career_skill(old.power)) / 5;
+        ssr_people_add_former(people, old.firstName, old.lastName, old.nationId, oldYear - ssr_career_age(&old),
+                              old.clubId, skill, old.apps, old.goals, old.assists);
+    } else {
+        ssr_people_add_legend(people, old.firstName, old.lastName, old.nationId, oldYear - ssr_career_age(&old), oldYear,
+                              old.apps, old.goals, old.assists);
+    }
     int shift = people->year - ssr_career_year(c);
     ssr_people_rebase(people, shift);
     for (int i = 0; i < game->honours.count; i++) game->honours.list[i].year -= shift;
@@ -824,8 +836,9 @@ static int continue_world(SSRGame *game) {
     int league = game->season ? ssr_season_actual_league(game->season, c->clubId) : 0;
     ssr_people_make_rivals(people, game->world, game->names, league, c->nationId, year - ssr_career_age(c), 3, year);
     char text[256];
-    snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentLegend"));
+    snprintf(text, sizeof(text), "%s", loc(game, former ? "SSR_MomentFormer" : "SSR_MomentLegend"));
     replace_all(text, sizeof(text), "$name", old.fullName);
+    replace_all(text, sizeof(text), "$club", club_name(game, old.clubId));
     ssr_career_add_moment(c, c->sdate, text);
     return 1;
 }
@@ -10782,6 +10795,22 @@ static int next_derby(SSRGame *game, int *home, int *away) {
     return ssr_honours_rivalry(&game->honours, *home, *away) >= SSR_RIVALRY_POINTS ? 2 : 0;
 }
 
+// The player of the last career at the club of the next match, or NULL.
+static SSRPerson *next_former(SSRGame *game) {
+    int home = 0, away = 0;
+    SSRFixture *f = game->season ? ssr_season_next_fixture(game->season) : NULL;
+    SSRSeasonComp *comp = f ? ssr_season_comp(game->season, f->compId) : NULL;
+    if (!f || !comp || comp->data->level != 0 || !game->people) return NULL;
+    home = ssr_fixture_home_team(game->season, f);
+    away = ssr_fixture_away_team(game->season, f);
+    int other = home == game->career.clubId ? away : home;
+    for (int i = 0; i < game->people->count; i++) {
+        SSRPerson *p = &game->people->list[i];
+        if (p->rival == SSR_FORMER_PLAYER && !p->retired && p->club == other) return p;
+    }
+    return NULL;
+}
+
 // The league table of the player after 3 matches or more: the first, the
 // second, and the last row. Returns the competition, or NULL.
 static SSRSeasonComp *table_story(SSRGame *game, const SSRTableRow **rows) {
@@ -10897,6 +10926,9 @@ int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
         int run = 0;
         return club && form_run(game, &run) ? ticker_counter(count) : -1;
     }
+    case SSR_TICKER_WORLD_FORMER:
+        season_in(game);
+        return club && next_former(game) ? ticker_counter(count) : -1;
     case SSR_TICKER_WORLD_CRISIS: {
         season_in(game);
         int position = 0;
@@ -11089,6 +11121,17 @@ void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_
         replace_all(text, capacity, "$club", club_name(game, team));
         snprintf(number, sizeof(number), "%d", abs(run));
         replace_all(text, capacity, "$num", number);
+        break;
+    }
+    case SSR_TICKER_WORLD_FORMER: {
+        season_in(game);
+        const SSRPerson *p = next_former(game);
+        if (!p) return;
+        char name[64];
+        snprintf(name, sizeof(name), "%s %s", p->first, p->last);
+        snprintf(text, capacity, "%s", loc(game, "SSR_TICKER_FORMER"));
+        replace_all(text, capacity, "$name", name);
+        replace_all(text, capacity, "$club", club_name(game, p->club));
         break;
     }
     case SSR_TICKER_WORLD_CRISIS: {

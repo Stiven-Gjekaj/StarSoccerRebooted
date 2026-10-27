@@ -2822,6 +2822,32 @@ static void test_starts_a_new_career(void) {
     ssr_game_message(game, "playeroftheyear.btn_Play");
     ssr_game_message(game, "message.btn_Cancel");
     CHECK(key->bank >= 2800 && key->bank <= 3400 && key->businessStake == 1000);
+    // A second career continues the world of the first. The first player
+    // did not retire, so the player plays on at the club.
+    char firstName[64];
+    snprintf(firstName, sizeof(firstName), "%s", career->firstName);
+    int firstClub = career->clubId;
+    ssr_game_message(game, "gamemenu.btn_Quit");
+    ssr_game_message(game, "packs.btn_Continue");
+    CHECK(ssr_game_settings(game)->continueWorld == 1);
+    ssr_game_message(game, "mainmenu.btn_Career");
+    ssr_game_message(game, "saveslot.btn_Slot1");
+    ssr_game_message(game, "message.btn_Ok");
+    ssr_game_message(game, "chooseclub.btn_Ok");
+    ssr_game_message(game, "chooseclub.btn_Ok");
+    ssr_game_message(game, "choosenation.btn_Ok");
+    ssr_game_message(game, "customcareer.btn_Ok");
+    fail_the_trials(game, tweaks);
+    ssr_game_message(game, "message.btn_Ok");
+    SSRPeople *world2 = ssr_game_people(game);
+    int formers = 0;
+    for (int i = 0; world2 && i < world2->count; i++) {
+        const SSRPerson *p = &world2->list[i];
+        if (p->rival == SSR_FORMER_PLAYER) formers += !p->retired && p->club == firstClub && strcmp(p->first, firstName) == 0;
+    }
+    CHECK(formers == 1);
+    career = ssr_game_career(game);
+    CHECK(career->momentCount >= 1 && strcmp(career->moments[0].text, "SSR_MomentFormer") == 0);
     ssr_game_free(game);
     ssr_tweaks_free(tweaks);
 }
