@@ -81,6 +81,9 @@ typedef struct {
     int distance;
     // 1 when the game offers the replay of a goal.
     int replays;
+    // 1 after the message that skills go down with no training. It shows
+    // once for each install (global data 11 of the game).
+    int doneLoseSkills;
 } SSRSettings;
 
 // Starts at the main menu. The game keeps the tweaks, and sets the tweaks

@@ -221,7 +221,35 @@ static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
     seasons++;
 }
 
-static int winnerPages = 0;
+static int winnerPages = 0, newsSeen = 0, dilemmasSeen = 0;
+
+// Play on the game menu: the news of the week comes first. The test
+// answers it until the fixtures show.
+static void press_play(SSRGame *game) {
+    ssr_game_message(game, "gamemenu.btn_Play");
+    for (int i = 0; i < 20 && strcmp(ssr_game_screen(game), "leaguefixtures") != 0; i++) {
+        const char *screen = ssr_game_screen(game);
+        newsSeen++;
+        if (strncmp(screen, "message", 7) == 0) {
+            ssr_game_message(game, "message.btn_Ok");
+            // A decision runs its function 2000 ms after the choice.
+            ssr_game_update(game, 130);
+        } else if (strncmp(screen, "webpage", 7) == 0) {
+            ssr_game_message(game, "webpage.btn_Ok");
+        } else if (strcmp(screen, "dilemma") == 0) {
+            dilemmasSeen++;
+            ssr_game_update(game, 130);
+            ssr_game_message(game, "dilemma.btn_relationship2");
+            ssr_game_update(game, 160);
+        } else if (strcmp(screen, "relationships") == 0) {
+            ssr_game_message(game, "relationships.btn_Home");
+        } else if (strcmp(screen, "gamemenu") == 0) {
+            ssr_game_message(game, "gamemenu.btn_Play");
+        } else {
+            break;
+        }
+    }
+}
 
 // Play on the results: the news of a cup winner shows first, once.
 static void results_play(SSRGame *game, SSRTweaks *tweaks) {
@@ -242,7 +270,7 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     float ratings[10];
     memcpy(ratings, ssr_game_career(game)->ratings, sizeof(ratings));
     // Play shows the fixtures of the round of the player first.
-    ssr_game_message(game, "gamemenu.btn_Play");
+    press_play(game);
     CHECK(strcmp(ssr_game_screen(game), "leaguefixtures") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Menu", "LeagueFixturesResults") == 0);
     int rows = take_ops(game, ops, 256);
@@ -360,7 +388,8 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(strcmp(ssr_game_screen(game), "matchstats") == 0 && !ssr_game_match(game));
     // The commentary scrolled to its last rows.
     CHECK(ssr_tweaks_number(tweaks, "Menu", "CommentaryWindowScroll") < -400);
-    CHECK(chances >= 2 && ssr_game_career(game)->apps == apps + 1);
+    // The number of chances is random. A substitute can have only one.
+    CHECK(chances >= 1 && ssr_game_career(game)->apps == apps + 1);
     // Each chance changes the rating of a skill. Later a rating can stay at
     // its end, 1 or 10, so the test asks only the first match.
     static int matches = 0;
@@ -496,7 +525,7 @@ static void not_picked_by_the_boss(SSRGame *game, SSRTweaks *tweaks, const char 
     ssr_game_message(game, "saveslot.btn_Slot0");
     ssr_game_update(game, 60);
     int apps = ssr_game_career(game)->apps;
-    ssr_game_message(game, "gamemenu.btn_Play");
+    press_play(game);
     if (strcmp(ssr_game_screen(game), "league") == 0) return;
     ssr_game_message(game, "leaguefixtures.btn_Play");
     CHECK(strcmp(ssr_game_screen(game), "messageboss") == 0);
@@ -905,6 +934,8 @@ static void test_starts_a_new_career(void) {
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 12 && seasons == 0; i++) play_a_match(game, tweaks);
     CHECK(seasons >= 1);
+    // The weeks had news: tips, and a dilemma or other news.
+    CHECK(newsSeen > 0 && ssr_game_career(game)->tipCount > 0);
     ssr_game_message(game, "gamemenu.btn_Quit");
 
     // Delete: Cancel keeps it, Ok deletes it.

@@ -12,6 +12,7 @@
 #include "ssr_match.h"
 #include "ssr_random.h"
 #include "ssr_season.h"
+#include "ssr_shop.h"
 #include "ssr_sort.h"
 #include "ssr_training.h"
 
@@ -66,6 +67,12 @@ struct SSRGame {
     // The param of the GUI message that came last (a row of a list).
     int messageParam;
     int returnState;
+    // A message with a decision (c_TScreen_Message with decision): the
+    // change of the relations that Yes and No make, and the time when the
+    // function runs, 2000 ms after the choice.
+    int decision;
+    char messageText[64];
+    int decisionEnd;
 
     // The career that plays now, and the slot that it uses.
     SSRCareer career;
@@ -292,8 +299,17 @@ static void message(SSRGame *game, const char *layout, const char *text, int can
     set_screen(game, layout);
 }
 
+static void message_relations(SSRGame *game, int state);
+
 static void close_message(SSRGame *game, int state) {
     game->returnState = state;
+    if (game->decision) {
+        // The bars move for 2000 ms, then the function runs.
+        message_relations(game, state);
+        game->decision = 0;
+        game->decisionEnd = game->now + 2000;
+        return;
+    }
     char call[64];
     snprintf(call, sizeof(call), "%s", game->messageCall);
     game->messageCall[0] = 0;
@@ -943,6 +959,13 @@ static void call_play_to_date(SSRGame *game);
 static void call_set_up_fixture(SSRGame *game);
 static void call_debut_tired(SSRGame *game);
 static void call_relation_screen(SSRGame *game);
+static void call_girl_dumps_you(SSRGame *game);
+static void call_meet_partner(SSRGame *game);
+static void call_relationship_request(SSRGame *game);
+static void call_vehicle_team(SSRGame *game);
+static void call_vehicle_partner(SSRGame *game);
+static void call_tip(SSRGame *game);
+static void call_expired_item(SSRGame *game);
 static void call_dump_partner(SSRGame *game);
 
 static void run_call(SSRGame *game, const char *name) {
@@ -964,6 +987,13 @@ static void run_call(SSRGame *game, const char *name) {
         {"SetUpFixture", call_set_up_fixture},
         {"DebutTired", call_debut_tired},
         {"DoRelationScreen", call_relation_screen},
+        {"GirlDumpsYou", call_girl_dumps_you},
+        {"MeetGirl", call_meet_partner},
+        {"DoRelationshipRequest", call_relationship_request},
+        {"VehicleBorrowedTeam", call_vehicle_team},
+        {"VehicleBorrowedGirl", call_vehicle_partner},
+        {"DoTip", call_tip},
+        {"ExpiredItem", call_expired_item},
         {"DumpGirl", call_dump_partner},
     };
     for (size_t i = 0; i < sizeof(CALLS) / sizeof(CALLS[0]); i++) {
@@ -2399,11 +2429,17 @@ static void league_home(SSRGame *game) {
 
 // GSPlayerPlay: with no match left this year the table shows, else the
 // fixtures of the next round.
+static int play_news(SSRGame *game, const SSRFixture *next);
+
 static void game_play(SSRGame *game) {
     season_in(game);
     SSRFixture *f = ssr_season_next_fixture(game->season);
     if (!f || ssr_date_year(f->sdate) > ssr_career_year(&game->career)) {
         league_screen(game, 0);
+        return;
+    }
+    if (!game->career.newsDone && play_news(game, f)) {
+        save_career(game);
         return;
     }
     leaguefixtures_screen(game, 0);
@@ -3470,6 +3506,456 @@ static void dilemma_tick(SSRGame *game) {
     dilemma_accident(game);
 }
 
+
+/* ------------------------------------------------------------- the news */
+
+// A message with a decision and the bars of the energy and of a relation
+// (SetMessageScreen with two bars and a decision).
+static void message_decision(SSRGame *game, const char *layout, const char *text, const char *call, int data,
+                             const char *name) {
+    message(game, layout, text, 1, 1, call);
+    add_op(game, SSR_OP_SHOW, "TwoBars", NULL, NULL, 0);
+    game->decision = 1;
+    game->messageData = data;
+    snprintf(game->messageText, sizeof(game->messageText), "%s", name ? name : "");
+}
+
+// c_TScreen_Message.UpdateRelationships: Yes and No of a decision.
+static void message_relations(SSRGame *game, int state) {
+    SSRCareer *c = &game->career;
+    const char *call = game->messageCall;
+    if (strcmp(call, "DoRelationshipRequest") == 0) {
+        if (state == 1) {
+            ssr_career_update_relation(c, (SSRRelation)game->messageData, 5.0f);
+            set_energy(game, c->energy - 25);
+        } else {
+            ssr_career_update_relation(c, (SSRRelation)game->messageData, -10.0f);
+        }
+    } else if (strcmp(call, "VehicleBorrowedTeam") == 0) {
+        ssr_career_update_relation(c, SSR_RELATION_TEAM, state == 1 ? 5.0f : -15.0f);
+    } else if (strcmp(call, "VehicleBorrowedGirl") == 0) {
+        ssr_career_update_relation(c, SSR_RELATION_PARTNER, state == 1 ? 5.0f : -15.0f);
+    }
+    relation_tweaks(game, 0);
+    player_tweaks(game);
+}
+
+static void decision_tick(SSRGame *game) {
+    if (game->now < game->decisionEnd) return;
+    game->decisionEnd = 0;
+    char call[64];
+    snprintf(call, sizeof(call), "%s", game->messageCall);
+    game->messageCall[0] = 0;
+    set_screen(game, game->messageReturn);
+    run_call(game, call);
+}
+
+// c_TPlayer.DoNews.
+static void do_news(SSRGame *game, const char *tag, const char *team, const char *team2) {
+    SSRCareer *c = &game->career;
+    char *text = c->headline;
+    size_t capacity = sizeof(c->headline);
+    snprintf(text, capacity, "%s", loc(game, tag));
+    if (team) replace_all(text, capacity, "$clubname", team);
+    if (team2) {
+        replace_all(text, capacity, "$opposingclubname", team2);
+        replace_all(text, capacity, "$offerclubname", team2);
+    }
+    replace_all(text, capacity, "$playername", c->fullName);
+    replace_all(text, capacity, "$lastname", c->shortName);
+}
+
+static const char *my_club_tla(SSRGame *game) {
+    const SSRClub *club = ssr_world_club(game->world, game->career.clubId);
+    return club && club->tla ? club->tla : "";
+}
+
+// GSCheckNewsGetDumped.
+static int news_get_dumped(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (!(c->relationPartner > 0 && c->relationPartner < 5)) return 0;
+    c->relationPartner = 0;
+    message(game, partner_screen(game), loc(game, "CMESSAGE_GIRLFRIENDDUMPSYOU"), 0, 1, "GirlDumpsYou");
+    return 1;
+}
+
+static void call_girl_dumps_you(SSRGame *game) {
+    do_news(game, ssr_rand(&game->random, 2) == 1 ? "CNEWS_GIRLFRIENDDUMPSYOU" : "CNEWS_GIRLFRIENDDUMPED", NULL, NULL);
+    webpage_to(game, "relationships", 0);
+}
+
+// GSCheckNewsGirlUnhappy: the partner wants time after 35 days.
+static int news_partner_unhappy(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->relationPartner <= 0 || (float)c->sdate <= c->lastSpendTimePartner + 35) return 0;
+    if (c->relationPartner < 31) {
+        ssr_career_update_relation(c, SSR_RELATION_PARTNER, -5);
+        if (c->relationTeam > c->relationBoss && c->relationTeam > c->relationFans) {
+            do_news(game, "CMESSAGE_GIRLFRIENDRAMPAGETEAM", my_club_tla(game), NULL);
+            webpage_to(game, "relationships", 0);
+            ssr_career_update_relation(c, SSR_RELATION_TEAM, -c->relationTeam / 2.0f);
+        } else if (c->relationFans > c->relationBoss && c->relationFans > c->relationTeam) {
+            do_news(game, "CMESSAGE_GIRLFRIENDRAMPAGEFANS", my_club_tla(game), NULL);
+            webpage_to(game, "relationships", 0);
+            ssr_career_update_relation(c, SSR_RELATION_FANS, -c->relationFans / 2.0f);
+        } else {
+            do_news(game, "CMESSAGE_GIRLFRIENDRAMPAGEBOSS", my_club_tla(game), NULL);
+            webpage_to(game, "relationships", 0);
+            ssr_career_update_relation(c, SSR_RELATION_BOSS, -c->relationBoss / 2.0f);
+        }
+    } else {
+        ssr_career_update_relation(c, SSR_RELATION_PARTNER, -10);
+        relation_tweaks(game, 0);
+        message_bar(game, partner_screen(game), loc(game, "CMESSAGE_LONGTIMEGIRLFRIEND"), "DoRelationScreen");
+    }
+    c->lastSpendTimePartner = (float)c->sdate;
+    return 1;
+}
+
+static int *product_array(SSRCareer *c, SSRShopType type) {
+    return type == SSR_SHOP_ITEM ? c->items : type == SSR_SHOP_VEHICLE ? c->vehicles : c->properties;
+}
+
+// c_TPlayer.CheckNewsItemExpiry: a product breaks at a wear of 1000 and goes
+// after 1100 more.
+static int news_item_expiry(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    static const char *CARE[6] = {NULL, "CMESSAGE_ITEMREPAIR", "CMESSAGE_ITEMUPGRADE", "CMESSAGE_ITEMCLEAN",
+                                  "CMESSAGE_ITEMRESTORE", "CMESSAGE_ITEMREPLACE"};
+    for (int i = 0; i < SSR_SHOP_COUNT; i++) {
+        const SSRShopItem *item = ssr_shop_item(i);
+        int *v = &product_array(c, item->type)[item->id - 1];
+        char text[512];
+        if (*v > 11100) {
+            *v = 0;
+            snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_ITEMEXPIRED"));
+            char name[64];
+            snprintf(name, sizeof(name), "%s", loc(game, item->uid));
+            upper(name);
+            replace_all(text, sizeof(text), "$item", name);
+        } else if (*v > 1000 && *v <= 10000) {
+            *v += 10000;
+            const char *tag = item->type == SSR_SHOP_VEHICLE ? CARE[1] : item->type == SSR_SHOP_PROPERTY ? CARE[4]
+                                                                                                           : CARE[item->lifeType];
+            if (item->type == SSR_SHOP_ITEM && item->lifeType == SSR_LIFE_NONE) return 0;
+            snprintf(text, sizeof(text), "%s", tag ? loc(game, tag) : "");
+            char name[64];
+            snprintf(name, sizeof(name), "%s", loc(game, item->uid));
+            replace_all(text, sizeof(text), "$item", name);
+        } else {
+            continue;
+        }
+        game->messageData = item->type;
+        message(game, "message", text, 0, 1, "ExpiredItem");
+        return 1;
+    }
+    return 0;
+}
+
+// GSCheckNewsGetGirlfriend.
+static int news_get_partner(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->relationPartner != 0) return 0;
+    if (ssr_career_lifestyle(c) < 20) {
+        char text[512];
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_GIRLFRIENDNOTIMPRESSED"));
+        if (ssr_rand(&game->random, 2) == 1) {
+            ssr_career_update_relation(c, SSR_RELATION_TEAM, -5);
+            relation_tweaks(game, 0);
+            size_t n = strlen(text);
+            snprintf(text + n, sizeof(text) - n, " %s", loc(game, "CMESSAGE_TEAMMATESRIBBING"));
+            message_bar(game, "messageteam", text, NULL);
+        } else {
+            message(game, partner_screen(game), text, 0, 1, NULL);
+        }
+        return 1;
+    }
+    message(game, partner_screen(game), loc(game, "CMESSAGE_GIRLFRIENDMEETMOBILE"), 1, 1, "MeetGirl");
+    return 1;
+}
+
+static void call_meet_partner(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (game->returnState != 1) {
+        leaguefixtures_screen(game, 0);
+        return;
+    }
+    c->relationPartner = 60;
+    c->lastSpendTimePartner = (float)c->sdate;
+    relationships_screen(game, 0, 0);
+}
+
+// GSCheckNewsGirlScandal.
+static int news_partner_scandal(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->relationPartner <= 1 || ssr_rand(&game->random, 12) != 1) return 0;
+    int k = ssr_rand(&game->random, 10);
+    int high = ssr_rand(&game->random, 2) == 1;
+    char tag[48];
+    snprintf(tag, sizeof(tag), "CNEWS_GIRLSCANDAL%s%d", high ? "HIGH" : "LOW", k);
+    float d = high ? -20.0f : -10.0f;
+    ssr_career_update_relation(c, SSR_RELATION_BOSS, d);
+    ssr_career_update_relation(c, SSR_RELATION_BOSS_INT, d);
+    do_news(game, tag, my_club_tla(game), NULL);
+    webpage_to(game, "relationships", 0);
+    return 1;
+}
+
+// GSCheckNewsEnergyRequest: a relation asks for a quarter of the energy.
+static int news_energy_request(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->energy < 25) return 0;
+    static const char *REL_TWO[5] = {"BossRelationship", "TeamRelationship", "FansRelationship",
+                                     "GirlfriendRelationship", "SponsorsRelationship"};
+    char tag[48] = "";
+    const char *layout = NULL;
+    int w = 0;
+    while (!tag[0]) {
+        w = ssr_rand2(&game->random, 0, 4);
+        if (w == 0) {
+            snprintf(tag, sizeof(tag), "CMESSAGE_BOSSREQUEST%d", ssr_rand(&game->random, 5));
+            layout = "messageboss";
+        } else if (w == 1) {
+            snprintf(tag, sizeof(tag), "CMESSAGE_TEAMREQUEST%d", ssr_rand(&game->random, 5));
+            layout = "messageteam";
+        } else if (w == 2) {
+            snprintf(tag, sizeof(tag), "CMESSAGE_FANSREQUEST%d", ssr_rand(&game->random, 5));
+            layout = "messagefans";
+        } else if (w == 3 && c->relationPartner > 0) {
+            snprintf(tag, sizeof(tag), "CMESSAGE_GIRLREQUEST%d", ssr_rand(&game->random, 5));
+            layout = partner_screen(game);
+        } else if (w == 4 && ssr_career_count_sponsors(c) > 0) {
+            snprintf(tag, sizeof(tag), "CMESSAGE_SPONSORREQUEST%d", ssr_rand(&game->random, 10));
+            layout = "messagesponsor";
+        }
+    }
+    char text[512];
+    snprintf(text, sizeof(text), "%s", loc(game, tag));
+    replace_all(text, sizeof(text), "$percent", "25");
+    relation_tweaks(game, 1);
+    message_decision(game, layout, text, "DoRelationshipRequest", w, REL_TWO[w]);
+    return 1;
+}
+
+static void call_relationship_request(SSRGame *game) {
+    game_menu(game);
+}
+
+// GSCheckNewsHappiness: a low relation makes the news, and costs stars.
+static int news_happiness(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->apps < 15) return 0;
+    int k = ssr_rand(&game->random, 3);
+    int limit = ssr_rand(&game->random, 60);
+    int which = ssr_rand(&game->random, 5);
+    const char *tag = NULL;
+    if (which == 1 && (int)c->relationBoss < limit) tag = "CNEWS_RELATIONSHIPBOSS";
+    else if (which == 2 && (int)c->relationTeam < limit) tag = "CNEWS_RELATIONSHIPTEAM";
+    else if (which == 3 && (int)c->relationFans < limit) tag = "CNEWS_RELATIONSHIPFANS";
+    else if (which == 4 && c->relationPartner > 0 && c->relationPartner < (float)limit) tag = "CNEWS_RELATIONSHIPGIRL";
+    else if (which == 5 && c->relationSponsors > 0 && (int)c->relationSponsors < limit) tag = "CNEWS_RELATIONSHIPSPONSORS";
+    if (!tag && ssr_career_happiness(c) < (float)ssr_rand(&game->random, 50)) tag = "CNEWS_RELATIONSHIPLOW";
+    if (!tag) return 0;
+    char full[48];
+    snprintf(full, sizeof(full), "%s%d", tag, k);
+    do_news(game, full, my_club_tla(game), NULL);
+    c->starRating = ssr_star_rating_add(c->starRating, -10);
+    webpage_to(game, "gamemenu", 0);
+    return 1;
+}
+
+// GSCheckNewsStyle: the press looks at the lifestyle of the player.
+static int news_style(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->apps < 10) return 0;
+    if (ssr_career_lifestyle(c) < 7) {
+        char tag[32];
+        snprintf(tag, sizeof(tag), "CNEWS_STYLELOW%d", ssr_rand(&game->random, 3));
+        do_news(game, tag, my_club_tla(game), NULL);
+        webpage_to(game, "gamemenu", 1);
+        c->starRating = ssr_star_rating_add(c->starRating, -5);
+        return 1;
+    }
+    static const char *TAGS[3] = {"CNEWS_STYLEGADGET", "CNEWS_STYLEVEHICLE", "CNEWS_STYLEPROPERTY"};
+    static const char *KEYS[3] = {"$item", "$vehicle", "$property"};
+    int t = ssr_rand(&game->random, 3);
+    SSRShopType type = (SSRShopType)t;
+    const SSRShopItem *item = ssr_shop_nth_of_type(type, ssr_rand(&game->random, ssr_shop_count_by_type(type)));
+    if (!item || product_array(c, type)[item->id - 1] <= 0) return 0;
+    do_news(game, TAGS[t - 1], my_club_tla(game), NULL);
+    replace_all(c->headline, sizeof(c->headline), KEYS[t - 1], loc(game, item->uid));
+    webpage_to(game, "gamemenu", 1);
+    return 1;
+}
+
+// GSCheckNewsBorrowVehicle: a team-mate or the partner asks for a vehicle.
+static int news_borrow_vehicle(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int any = 0;
+    for (int i = 0; i < SSR_CAREER_ITEMS; i++) any |= c->vehicles[i] > 0;
+    if (!any) return 0;
+    const SSRShopItem *v = NULL;
+    for (int i = 0; i < 10; i++) {
+        v = ssr_shop_nth_of_type(SSR_SHOP_VEHICLE, ssr_rand(&game->random, ssr_shop_count_by_type(SSR_SHOP_VEHICLE)));
+        if (v && c->vehicles[v->id - 1] > 0 && c->vehicles[v->id - 1] < 1000) break;
+    }
+    if (!v || c->vehicles[v->id - 1] == 0) return 0;
+    char text[512];
+    const char *name = loc(game, v->uid);
+    int partner = !(c->relationPartner <= 1 || ssr_rand(&game->random, 2) != 1);
+    snprintf(text, sizeof(text), "%s", loc(game, partner ? "CMESSAGE_VEHICLEBORROWGIRL" : "CMESSAGE_VEHICLEBORROWTEAM"));
+    replace_all(text, sizeof(text), "$vehicle", name);
+    relation_tweaks(game, 1);
+    message_decision(game, partner ? partner_screen(game) : "messageteam", text,
+                     partner ? "VehicleBorrowedGirl" : "VehicleBorrowedTeam", v->id, NULL);
+    // The picture of the vehicle in the box (ImageHook).
+    char image[64];
+    snprintf(image, sizeof(image), "%s_Image", v->uid);
+    add_op(game, SSR_OP_HOOK, "ImageHook", image, NULL, 0);
+    add_op(game, SSR_OP_SHOW, "ImageHook", NULL, NULL, 0);
+    return 1;
+}
+
+// The function after a vehicle loan: the vehicle can come back damaged.
+static void vehicle_returned(SSRGame *game, int partner) {
+    SSRCareer *c = &game->career;
+    int yes = game->returnState == 1;
+    int q = ssr_rand(&game->random, 4);
+    float d = q == 1 ? -10.0f : yes ? 5.0f : -15.0f;
+    SSRRelation r = partner ? SSR_RELATION_PARTNER : SSR_RELATION_TEAM;
+    ssr_career_update_relation(c, r, d);
+    relationships_screen(game, partner, 0);
+    if (!(yes && q == 1)) return;
+    int *v = &c->vehicles[game->messageData - 1];
+    *v += ssr_rand2(&game->random, 250, 850);
+    if (*v > 1100) *v = 1100;
+    relation_tweaks(game, 0);
+    message_bar(game, partner ? partner_screen(game) : "messageteam",
+                loc(game, partner ? "CMESSAGE_VEHICLEDAMAGEDGIRL2" : "CMESSAGE_VEHICLEDAMAGEDTEAM2"), NULL);
+}
+
+static void call_vehicle_team(SSRGame *game) {
+    vehicle_returned(game, 0);
+}
+
+static void call_vehicle_partner(SSRGame *game) {
+    vehicle_returned(game, 1);
+}
+
+static int compare_club_news(void *context, int a, int b) {
+    const int *randNo = context;
+    return randNo[a] - randNo[b];
+}
+
+// c_TPlayer.CheckNewsRandomClubNews: a club of the league of the player
+// gets stronger or weaker.
+static int news_random_club(SSRGame *game) {
+    SSRSeason *s = game->season;
+    if (!s) return 1;
+    int n = s->clubListCount;
+    int *order = malloc(sizeof(int) * (size_t)(n > 0 ? n : 1));
+    int *randNo = malloc(sizeof(int) * (size_t)(n > 0 ? n : 1));
+    if (!order || !randNo) {
+        free(order);
+        free(randNo);
+        return 1;
+    }
+    for (int i = 0; i < n; i++) {
+        order[i] = i;
+        randNo[i] = (int)(ssr_rnd(&game->random) * 9999.0f);
+    }
+    ssr_sort(order, n, compare_club_news, randNo, 0);
+    const SSRSeasonClub *mine = ssr_season_club(s, game->career.clubId, 0);
+    SSRSeasonClub *club = NULL;
+    for (int i = 0; i < n && mine; i++) {
+        SSRSeasonClub *c = &s->clubs[s->clubList[order[i]]];
+        if (c->data->id != game->career.clubId && c->league == mine->league) {
+            club = c;
+            break;
+        }
+    }
+    free(order);
+    free(randNo);
+    int k = ssr_rand(&game->random, 15);
+    if (!club) return 1;
+    int boost = ssr_rand(&game->random, 2) == 1;
+    club->strength += boost ? 3 : -3;
+    club->strength = club->strength < 10 ? 10 : club->strength > 95 ? 95 : club->strength;
+    char tag[48];
+    snprintf(tag, sizeof(tag), "CNEWS_RANDOMCLUB%s%d", boost ? "BOOST" : "CRISIS", k);
+    do_news(game, tag, club->data->tla, NULL);
+    webpage_to(game, "gamemenu", 0);
+    return 1;
+}
+
+// The random news of the week, by the round of the next match.
+static int random_news(SSRGame *game, const SSRFixture *next) {
+    SSRCareer *c = &game->career;
+    int r = next->round % 3;
+    if (r == 0) {
+        if (ssr_rand(&game->random, 2) == 1) {
+            return c->relationPartner == 0 ? news_get_partner(game) : news_partner_scandal(game);
+        }
+        return news_energy_request(game);
+    }
+    if (r == 1) {
+        if (ssr_rand(&game->random, 2) == 1 && news_happiness(game)) return 1;
+        c->newsDone = 1;
+        dilemma_screen(game);
+        return 1;
+    }
+    switch (ssr_rand(&game->random, 3)) {
+    case 1: return news_style(game);
+    case 2: return news_borrow_vehicle(game);
+    default: return news_random_club(game);
+    }
+}
+
+// GSPlayerPlay: the news of the week comes before the match.
+static int play_news(SSRGame *game, const SSRFixture *next) {
+    SSRCareer *c = &game->career;
+    // [I: the old pro boots (a), the transfer window (e), the captaincy
+    // (f), the sponsors (g), and the gambling (h) come with their parts.
+    // The Facebook box (b) is not in the remake.]
+    if (!game->settings.doneLoseSkills && c->apps > 3) {
+        game->settings.doneLoseSkills = 1;
+        game->settingsChanged = 1;
+        c->newsDone = 1;
+        message(game, "message", loc(game, "CMESSAGE_LOSESKILLS"), 0, 1, NULL);
+        return 1;
+    }
+    if (news_get_dumped(game) || news_partner_unhappy(game) || news_item_expiry(game)) {
+        c->newsDone = 1;
+        return 1;
+    }
+    if (random_news(game, next)) {
+        c->newsDone = 1;
+        return 1;
+    }
+    c->newsDone = 1;
+    // The pitch pack offer is a purchase, so the remake goes on to the tip.
+    if (c->tipCount < 30) {
+        c->tipCount++;
+        char tag[32], title[64];
+        snprintf(tag, sizeof(tag), "CMOBILE_TIP%d", c->tipCount);
+        snprintf(title, sizeof(title), "%s!", loc(game, "help_Tip"));
+        message(game, "message", loc(game, tag), 0, 1, "DoTip");
+        ssr_tweaks_set(game->tweaks, "Menu", "MessageTitle", title);
+        return 1;
+    }
+    return 0;
+}
+
+static void call_tip(SSRGame *game) {
+    leaguefixtures_screen(game, 0);
+}
+
+// The call "ExpiredItem": the lifestyle shop on the tab of the product
+// [I: the shop comes with its part; the game menu shows until then].
+static void call_expired_item(SSRGame *game) {
+    game_menu(game);
+}
+
 /* ------------------------------------------------------------ the pairs */
 
 // The face of each card by relation and image id (c_<X>CardAnimations).
@@ -3846,6 +4332,7 @@ int ssr_game_load_settings(SSRGame *game, const char *path) {
         if (strcmp(key, "volume") == 0 && value >= 0 && value <= 2) game->settings.volume = value;
         if (strcmp(key, "distance") == 0) game->settings.distance = value != 0;
         if (strcmp(key, "replays") == 0) game->settings.replays = value != 0;
+        if (strcmp(key, "doneloseskills") == 0) game->settings.doneLoseSkills = value != 0;
     }
     fclose(file);
     set_option_tweaks(game);
@@ -3859,8 +4346,8 @@ int ssr_game_save_settings(const SSRGame *game, const char *path) {
     snprintf(temp, sizeof(temp), "%s.new", path);
     FILE *file = fopen(temp, "wb");
     if (!file) return 0;
-    int ok = fprintf(file, "volume=%d\ndistance=%d\nreplays=%d\n", game->settings.volume, game->settings.distance,
-                     game->settings.replays) > 0;
+    int ok = fprintf(file, "volume=%d\ndistance=%d\nreplays=%d\ndoneloseskills=%d\n", game->settings.volume,
+                     game->settings.distance, game->settings.replays, game->settings.doneLoseSkills) > 0;
     ok = fclose(file) == 0 && ok;
     if (!ok || rename(temp, path) != 0) {
         remove(temp);
@@ -3953,8 +4440,19 @@ void ssr_game_key(SSRGame *game, SSRKey key) {
     }
 }
 
+static void decision_tick(SSRGame *game);
+
 void ssr_game_update(SSRGame *game, float frames) {
     if (!game) return;
+    if (game->decisionEnd) {
+        game->ticks += frames;
+        while (game->ticks >= 1 && game->decisionEnd) {
+            game->ticks -= 1;
+            game->now += 16;
+            decision_tick(game);
+        }
+        return;
+    }
     if (game->match) {
         // The match runs in ticks of 60 a second, as the game does.
         game->ticks += frames;
