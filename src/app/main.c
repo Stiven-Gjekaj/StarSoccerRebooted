@@ -350,10 +350,6 @@ static void free_chance_view(SSRApp *app) {
     ssr_ui_free(app->hudScreen);
     app->hudScene = NULL;
     app->hudScreen = NULL;
-    ssr_scene_free(app->splashScene);
-    ssr_ui_free(app->splashScreen);
-    app->splashScene = NULL;
-    app->splashScreen = NULL;
     app->pitchScene = app->tapScene = app->bannerScene = app->stadiumScene = app->stadiumStaticScene = NULL;
     app->pitchScreen = app->tapScreen = app->bannerScreen = app->stadiumScreen = app->stadiumStaticScreen = NULL;
     app->pitchName[0] = 0;
@@ -580,6 +576,32 @@ static void update_backdrop(SSRApp *app, SSRSceneEnv *env, int ms) {
     ssr_scene_update(app->backdropScene, env, ms);
 }
 
+// The banner of TQuickMessage ("splashmessage" and its kin) over any
+// screen.
+static void free_splash(SSRApp *app) {
+    ssr_scene_free(app->splashScene);
+    ssr_ui_free(app->splashScreen);
+    app->splashScene = NULL;
+    app->splashScreen = NULL;
+}
+
+static void update_splash(SSRApp *app, SSRSceneEnv *env, int ms) {
+    if (!ssr_game_splash(app->game)) {
+        if (app->splashScene) free_splash(app);
+        return;
+    }
+    // A new message in another layout opens that layout.
+    const char *layout = ssr_game_splash_layout(app->game);
+    if (app->splashScene && SDL_strcmp(app->splashName, layout) != 0) free_splash(app);
+    if (!app->splashScene) {
+        char file[64];
+        SDL_snprintf(file, sizeof(file), "%s.uis", layout);
+        SDL_strlcpy(app->splashName, layout, sizeof(app->splashName));
+        app->splashScene = open_layer(app, file, &app->splashScreen, env);
+    }
+    ssr_scene_update(app->splashScene, env, ms);
+}
+
 static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     const SSRChance *chance = ssr_game_chance(app->game);
     if (!chance || SDL_strcmp(ssr_game_screen(app->game), "matchminigame") != 0 || !app->scene) {
@@ -711,29 +733,6 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         ssr_ui_free(app->bannerScreen);
         app->bannerScene = NULL;
         app->bannerScreen = NULL;
-    }
-    // The splash message of a drill (TQuickMessage "splashmessage").
-    if (ssr_game_splash(app->game)) {
-        // A new message in another layout opens that layout.
-        const char *layout = ssr_game_splash_layout(app->game);
-        if (app->splashScene && SDL_strcmp(app->splashName, layout) != 0) {
-            ssr_scene_free(app->splashScene);
-            ssr_ui_free(app->splashScreen);
-            app->splashScene = NULL;
-            app->splashScreen = NULL;
-        }
-        if (!app->splashScene) {
-            char file[64];
-            SDL_snprintf(file, sizeof(file), "%s.uis", layout);
-            SDL_strlcpy(app->splashName, layout, sizeof(app->splashName));
-            app->splashScene = open_layer(app, file, &app->splashScreen, env);
-        }
-        ssr_scene_update(app->splashScene, env, ms);
-    } else if (app->splashScene) {
-        ssr_scene_free(app->splashScene);
-        ssr_ui_free(app->splashScreen);
-        app->splashScene = NULL;
-        app->splashScreen = NULL;
     }
     if (app->tapScene) {
         const SSRTapBall *tap = &chance->tap;
@@ -946,6 +945,7 @@ static int language_from_device(SSRApp *app) {
 
 static void load_game(SSRApp *app) {
     free_overlay(app);
+    free_splash(app);
     free_backdrop(app);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
@@ -1391,6 +1391,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
             }
         }
         update_chance_view(app, &env, ms);
+        update_splash(app, &env, ms);
         update_backdrop(app, &env, ms);
         if (app->overlayScene) ssr_scene_update(app->overlayScene, &env, ms);
         if (app->modalScene) ssr_scene_update(app->modalScene, &env, ms);
@@ -1516,6 +1517,7 @@ void SDL_AppQuit(void *state, SDL_AppResult result) {
     ssr_tweaks_free(app->tweaks);
     ssr_audio_free(app->audio);
     free_overlay(app);
+    free_splash(app);
     free_backdrop(app);
     ssr_gfx_free(app->gfx);
     ssr_world_free(app->world);
