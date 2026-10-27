@@ -17,6 +17,12 @@ typedef struct {
 // Rnd(): a float from 0 to under 1.
 float ssr_rnd(SSRRandom *r);
 
+// Rnd2(a, b): a float from a to under b.
+float ssr_rnd2(SSRRandom *r, float a, float b);
+
+// Rnd3(x): a float from 0 to under x.
+float ssr_rnd3(SSRRandom *r, float x);
+
 // Rand(n): an integer from 1 to n.
 int ssr_rand(SSRRandom *r, int n);
 

@@ -19,6 +19,10 @@ static void test_gives_the_numbers_of_the_game(void) {
     CHECK(ssr_rand_float(&r, -1, 1) == 0.5915662050247192f);
     CHECK(ssr_rand_float(&r, -1, 1) == -0.8788071870803833f);
     CHECK(r.seed == 260259477);
+
+    r.seed = SSR_RANDOM_START;
+    CHECK(ssr_rnd2(&r, 8, 10) == 9.4286155700683594f);
+    CHECK(ssr_rnd3(&r, 10) == 2.0701308250427246f);
 }
 
 int main(void) {

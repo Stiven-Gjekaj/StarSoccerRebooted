@@ -13,6 +13,14 @@ static float rnd_range(SSRRandom *r, float a, float b) {
     return value + a;
 }
 
+float ssr_rnd2(SSRRandom *r, float a, float b) {
+    return rnd_range(r, a, b);
+}
+
+float ssr_rnd3(SSRRandom *r, float x) {
+    return ssr_rnd(r) * x;
+}
+
 int ssr_rand(SSRRandom *r, int n) {
     return (int)rnd_range(r, 1.0f, (float)n + 1);
 }
