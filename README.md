@@ -12,9 +12,12 @@ It uses C99 and SDL3.
 ## Status
 
 The app runs on macOS, iOS, and Android. It imports the assets from your
-copy and runs the screens of the game from the layout files of your copy,
-with their animations: the main menu, the options, and the about screen
-work. The career and the match are not there yet.
+copy and runs the screens of the game from the layout files of your copy.
+The full career works: the trials, the matches and the chances, the
+league and the cups, the life of the player, the side games, and the
+retirement. The remake adds a world of players and managers, honours and
+records, a custom career, and data packs with real squads and crests.
+See [TODO.md](TODO.md) for the plan to 1.0.
 
 ## You need a copy of New Star Soccer
 
