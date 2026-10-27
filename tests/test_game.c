@@ -175,6 +175,52 @@ static void watch_a_replay(SSRGame *game, SSRTweaks *tweaks) {
     replays++;
 }
 
+// The end of a season: the review, the table, the awards, and the next
+// season.
+static int seasons = 0;
+
+static void finish_season(SSRGame *game, SSRTweaks *tweaks) {
+    const SSRCareer *c = ssr_game_career(game);
+    int year = ssr_career_year(c);
+    CHECK(ssr_career_week(c) == 1 && ssr_tweaks_number(tweaks, "Menu", "DisableQuitButton") == 1);
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "PlayerStats", "SeasonLeague"), "PRM") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "PlayerStats", "SeasonMatches") == c->seasonApps && c->seasonApps > 0);
+    double position = ssr_tweaks_number(tweaks, "PlayerStats", "SeasonPosition");
+    CHECK(position >= 1 && position <= 4);
+    CHECK(ssr_game_splash(game));
+    // The table opens from the review, and its Back comes back.
+    ssr_game_message(game, "seasonreview.btn_League");
+    CHECK(strcmp(ssr_game_screen(game), "league") == 0 && ssr_tweaks_number(tweaks, "Menu", "ShowLeaguePlay") == 1);
+    ssr_game_message(game, "leaguefixtures.btn_Back");
+    CHECK(strcmp(ssr_game_screen(game), "seasonreview") == 0);
+    // The awards come one at a time; the buttons show at the end.
+    ssr_game_message(game, "seasonreview.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "playeroftheyear") == 0);
+    SSRUiOp ops[64];
+    int count = take_ops(game, ops, 64);
+    CHECK(has_op(ops, count, SSR_OP_HIDE, "PlayButton", NULL));
+    int shown = 0;
+    for (int i = 0; i < 40 * 60 && !shown; i++) {
+        ssr_game_update(game, 1);
+        count = take_ops(game, ops, 64);
+        shown = has_op(ops, count, SSR_OP_SHOW, "PlayButton", NULL);
+    }
+    CHECK(shown);
+    // A player with few matches wins no award.
+    CHECK(ssr_tweaks_number(tweaks, "SeasonAwards", "TeamPlayerOfYear") == 0);
+    ssr_game_message(game, "playeroftheyear.btn_Play");
+    CHECK(strcmp(ssr_game_screen(game), "message") == 0);
+    ssr_game_message(game, "message.btn_Cancel");
+    CHECK(strcmp(ssr_game_screen(game), "startransition") == 0);
+    ssr_game_update(game, 60);
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
+    // The new season starts the counts again, the day before its first
+    // match.
+    CHECK(ssr_career_year(c) == year && c->seasonApps == 0 && c->energy == 100);
+    CHECK(ssr_career_week(c) == 6 && ssr_tweaks_number(tweaks, "Menu", "DisableQuitButton") == 0);
+    seasons++;
+}
+
 static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     SSRUiOp ops[256];
     int apps = ssr_game_career(game)->apps, bank = ssr_game_career(game)->bank;
@@ -349,6 +395,7 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(c->bank == bank + (int)ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal"));
     CHECK(ssr_tweaks_number(tweaks, "MatchReview", "EarningsTotal") >= c->wage);
     ssr_game_message(game, "matchreview.btn_Play");
+    if (strcmp(ssr_game_screen(game), "seasonreview") == 0) finish_season(game, tweaks);
     CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
 }
 
@@ -584,6 +631,9 @@ static void test_starts_a_new_career(void) {
         make_a_star(game, path);
     }
     CHECK(replays > 0);
+    // Six rounds make a season: the career played to the next one.
+    for (int i = 0; i < 12 && seasons == 0; i++) play_a_match(game, tweaks);
+    CHECK(seasons >= 1);
     ssr_game_message(game, "gamemenu.btn_Quit");
 
     // Delete: Cancel keeps it, Ok deletes it.

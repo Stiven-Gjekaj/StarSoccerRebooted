@@ -59,6 +59,12 @@ struct SSRGame {
     int reviewWaits;
     // c_TPlayer.wasPicked.
     int wasPicked;
+    // The screens of the end of the season are open
+    // (SeasonReview.m_screen != null).
+    int seasonEndMode;
+    // The player of the year screen: the stage, the time of the last stage,
+    // and the awards.
+    int potyStage, potyTime, potyCount;
     int slot;
     int slotExists[SSR_CAREER_SLOTS];
 
@@ -865,6 +871,7 @@ static void call_start_career(SSRGame *game) {
 }
 
 static void call_drink(SSRGame *game);
+static void call_season_end_transfer(SSRGame *game);
 
 static void run_call(SSRGame *game, const char *name) {
     static const struct {
@@ -880,6 +887,7 @@ static void run_call(SSRGame *game, const char *name) {
         {"DoTrial5", call_do_trial5},
         {"StartCareer", call_start_career},
         {"DrinkNRG", call_drink},
+        {"SeasonEndTransfer", call_season_end_transfer},
     };
     for (size_t i = 0; i < sizeof(CALLS) / sizeof(CALLS[0]); i++) {
         if (strcmp(CALLS[i].name, name) == 0) {
@@ -1267,10 +1275,36 @@ static void end_match(SSRGame *game) {
     f.workRate = 0;
     game->facts = f;
     ssr_aftermatch_rate(&f, &game->after);
-    c->apps++;
-    c->goals += m->goals;
-    c->assists += m->assists;
-    c->passes += m->passes;
+    // The counts of the club, or of the nation (c_TScreen_MatchStats).
+    SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, game->fixtureComp) : NULL;
+    float rating = game->after.rating;
+    int hatTrick = m->goals >= 3;
+    if (comp && comp->data->level == 1) {
+        c->intApps++;
+        c->intGoals += m->goals;
+        c->intAssists += m->assists;
+        c->intPasses += m->passes;
+        c->intHatTricks += hatTrick;
+        c->intChances += m->chances;
+        c->intStarMan += game->after.starMan;
+        c->intTotalRating += rating;
+        ssr_career_add_form(c->intForm, (int)rating);
+    } else {
+        c->apps++;
+        c->seasonApps++;
+        c->goals += m->goals;
+        c->seasonGoals += m->goals;
+        c->assists += m->assists;
+        c->seasonAssists += m->assists;
+        c->passes += m->passes;
+        c->seasonPasses += m->passes;
+        c->seasonHatTricks += hatTrick;
+        c->seasonChances += m->chances;
+        c->seasonStarMan += game->after.starMan;
+        c->seasonTotalRating += rating;
+        c->totalRating += rating;
+        ssr_career_add_form(c->form, (int)rating);
+    }
     c->energy = m->energy;
     // UpdateRating: one change of a skill rating for each chance.
     for (int i = 0; i < m->ratingCount; i++) ssr_career_update_rating(c, m->ratingIndex[i], m->ratingSuccess[i]);
@@ -1471,6 +1505,7 @@ static void stats_dismiss(SSRGame *game) {
 
 static void leaguefixtures_screen(SSRGame *game, int results);
 static void season_end(SSRGame *game);
+static void season_review(SSRGame *game);
 
 // matchstats.btn_Play: the stages that did not come run now. Then the
 // result counts in the table (c_TPlayer.MyMatchPlayed), the other teams
@@ -1544,7 +1579,8 @@ static void review_continue(SSRGame *game) {
     ssr_tweaks_set_number(game->tweaks, "Menu", "HideBootsShopTab", 0);
     game->reviewWaits = 0;
     save_career(game);
-    game_menu(game);
+    if (game->seasonEndMode) season_review(game);
+    else game_menu(game);
 }
 
 /* ------------------------------------------------- fixtures and tables */
@@ -1822,8 +1858,15 @@ static void league_list(SSRGame *game) {
 // c_TScreen_League.SetUpScreen.
 static void league_screen(SSRGame *game, int compId) {
     set_screen(game, "league");
-    ssr_tweaks_set_number(game->tweaks, "Menu", "ShowLeaguePlay", game->leagueContinue);
-    ssr_tweaks_set_number(game->tweaks, "Menu", "HomeButtonDisabled", game->leagueContinue);
+    int blocked = game->leagueContinue || game->seasonEndMode;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "ShowLeaguePlay", blocked);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "HomeButtonDisabled", blocked);
+    if (game->seasonEndMode) {
+        add_op(game, SSR_OP_SHOW, "BackButton", NULL, NULL, 0);
+        add_op(game, SSR_OP_SHOW, "HelpBackgroundNoFixtures", NULL, NULL, 0);
+        add_op(game, SSR_OP_HIDE, "HelpBackgroundFixtures", NULL, NULL, 0);
+        add_op(game, SSR_OP_HIDE, "FixturesButton", NULL, NULL, 0);
+    }
     ssr_tweaks_set_number(game->tweaks, "Menu", "LeagueFixturesScroll", 0);
     season_in(game);
     league_list(game);
@@ -1844,6 +1887,11 @@ static void league_combo(SSRGame *game) {
 static void league_home(SSRGame *game) {
     ssr_tweaks_set_number(game->tweaks, "Combo", "SeeLeagues", 0);
     game->leagueContinue = 0;
+    if (game->seasonEndMode) {
+        ssr_tweaks_set_number(game->tweaks, "Menu", "CanSavePlayer", 0);
+        set_screen(game, "seasonreview");
+        return;
+    }
     season_in(game);
     if (!game->career.retired && !ssr_season_next_fixture(game->season)) {
         int end = ssr_season_play_to(game->season, ssr_date_make(1, 1, ssr_career_year(&game->career) + 1));
@@ -1870,14 +1918,181 @@ static void game_play(SSRGame *game) {
     leaguefixtures_screen(game, 0);
 }
 
-// The end of the season: the next season starts at once [I: the season
-// review and the player of the year come next].
+// c_TCompetition.IsTopDivision: 0 when the first place goes up to a
+// league of the nation.
+static int is_top_division(SSRGame *game, const SSRSeasonComp *comp) {
+    for (int i = 0; comp && i < comp->placeCount; i++) {
+        const SSRPromotion *p = &game->world->promotions[comp->places[i]];
+        SSRSeasonComp *t = ssr_season_comp(game->season, p->promotionTo);
+        if (p->place == 1 && t && t->data->locale == 0 && t->data->level == 0 && t->data->type == 0) return 0;
+    }
+    return 1;
+}
+
+// c_TScreen_SeasonReview.SetUpScreen: the place in the league and the
+// counts of the season. The match review comes first after a match.
+static void season_review(SSRGame *game) {
+    SSRTweaks *t = game->tweaks;
+    SSRCareer *c = &game->career;
+    game->seasonEndMode = 1;
+    if (game->reviewWaits) {
+        match_review(game);
+        return;
+    }
+    ssr_tweaks_set_number(t, "Menu", "DisableQuitButton", 1);
+    set_screen(game, "seasonreview");
+    season_in(game);
+    SSRSeason *s = game->season;
+    SSRSeasonComp *comp = ssr_season_comp(s, ssr_season_actual_league(s, c->clubId));
+    SSRSeasonClub *club = ssr_season_club(s, c->clubId, 0);
+    if (!comp || !club) return;
+    int position = ssr_season_position(s, &comp->pools[0], c->clubId);
+    char text[128], place[32];
+    position_string(game, &comp->pools[0], c->clubId, place, sizeof(place));
+    if (club->league < comp->data->id && comp->data->type != 4) {
+        snprintf(text, sizeof(text), "%s", loc(game, "position_Promoted"));
+    } else if (club->league > comp->data->id && comp->data->type != 4) {
+        snprintf(text, sizeof(text), "%s", loc(game, "position_Relegated"));
+    } else {
+        snprintf(text, sizeof(text), "%s %s", loc(game, "position_Finished"), place);
+    }
+    // TQuickMessage "splashmessage" for 1500 ms.
+    for (char *p = text; *p; p++) *p = (char)toupper((unsigned char)*p);
+    ssr_tweaks_set(t, "Menu", "QuickMessage", text);
+    game->splashEnd = game->now + 1500;
+    // c_AScreen_SeasonReview.Init.
+    ssr_tweaks_set(t, "PlayerStats", "SeasonClub", club->data->tla);
+    ssr_tweaks_set(t, "PlayerStats", "SeasonLeague", comp->data->tla);
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonPosition", position);
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonWage", c->wage);
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonMatches", c->seasonApps);
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonGoals", c->seasonGoals);
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonPasses", c->seasonPasses);
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonHatTricks", c->seasonHatTricks);
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonAssists", c->seasonAssists);
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonStarMan", c->seasonStarMan);
+    int apps = c->seasonApps;
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonAverageGoals", apps ? c->seasonGoals / apps : 0);
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonAveragePasses", apps ? c->seasonPasses / apps : 0);
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonAverageAssists", apps ? c->seasonAssists / apps : 0);
+    ssr_tweaks_set_number(t, "PlayerStats", "SeasonAverageRating", apps ? c->seasonTotalRating / (float)apps : 0);
+}
+
+// The end of the season: PlayToDate reached the new year.
 static void season_end(SSRGame *game) {
+    ssr_tweaks_set_number(game->tweaks, "Menu", "CanSavePlayer", 0);
+    season_review(game);
+}
+
+static void season_review_league(SSRGame *game) {
+    league_screen(game, 0);
+}
+
+// c_TPlayer.AwardPOTY: the awards of the season need 20 matches, 15 star
+// man awards, and an average rating of 7.
+static int award_poty(SSRGame *game, int type) {
+    SSRCareer *c = &game->career;
+    int apps = c->seasonApps;
+    if (apps < 20 || c->seasonStarMan < 15) return 0;
+    float average = c->seasonTotalRating / (float)apps;
+    if (average < 7.0f) return 0;
+    SSRSeason *s = game->season;
+    SSRSeasonComp *comp = ssr_season_comp(s, ssr_season_actual_league(s, c->clubId));
+    int position = comp ? ssr_season_position(s, &comp->pools[0], c->clubId) : 99;
+    if (comp && comp->data->type == 4) position = 99;
+    int top = is_top_division(game, comp), won = 0;
+    switch (type) {
+    case 1:
+        won = c->relationFans > 80 && (average > 7.0f || c->seasonGoals + c->seasonAssists > 80);
+        break;
+    case 2:
+        won = ssr_career_age(c) < 24 && position < 9 && ((top && average >= 8.0f) || average > 7.0f);
+        break;
+    case 3:
+        won = position < 4 && ((top && average >= 8.5f) || (!top && average >= 7.5f));
+        break;
+    case 4:
+        won = c->wonMajorAward && average >= 9.0f;
+        break;
+    }
+    if (won) c->potyAwards++;
+    return won;
+}
+
+static const char *const POTY_NAMES[4] = {"TeamPlayerOfYear", "LeagueYoungPlayerOfYear", "LeaguePlayerOfYear",
+                                          "WorldPlayerOfYear"};
+
+// The row of an award shows; a player over 23 has the rows "Old".
+static void show_award_row(SSRGame *game, int award) {
+    char ref[64];
+    int young = ssr_career_age(&game->career) <= 23;
+    snprintf(ref, sizeof(ref), "%s%s", POTY_NAMES[award], young ? "" : "Old");
+    add_op(game, SSR_OP_SHOW, ref, NULL, NULL, 0);
+}
+
+// seasonreview.btn_Play: c_TScreen_PlayerOfTheYear.SetUpScreen.
+static void player_of_the_year(SSRGame *game) {
+    SSRTweaks *t = game->tweaks;
+    set_screen(game, "playeroftheyear");
+    game->potyStage = 0;
+    game->potyTime = game->now;
+    game->potyCount = 0;
+    season_in(game);
+    SSRSeasonComp *comp = ssr_season_comp(game->season, ssr_season_actual_league(game->season, game->career.clubId));
+    const SSRClub *club = ssr_world_club(game->world, game->career.clubId);
+    ssr_tweaks_set(t, "SeasonAwards", "LeagueName", comp ? comp->data->tla : "");
+    ssr_tweaks_set(t, "SeasonAwards", "TeamName", club ? club->tla : "");
+    for (int i = 0; i < 4; i++) ssr_tweaks_set_number(t, "SeasonAwards", POTY_NAMES[i], 0);
+    add_op(game, SSR_OP_HIDE, "PlayButton", NULL, NULL, 0);
+    add_op(game, SSR_OP_HIDE, "RetireButton", NULL, NULL, 0);
+}
+
+// c_TScreen_PlayerOfTheYear.Update: one award each stage.
+static void poty_tick(SSRGame *game) {
+    int step = game->touchWasDown ? 250 : 1750;
+    if (game->potyStage >= 20 || game->now <= game->potyTime + step) return;
+    game->potyTime = game->now;
+    int stage = ++game->potyStage;
+    int young = ssr_career_age(&game->career) <= 23;
+    if (stage == 1 || stage == 3 || stage == 5 || stage == 7) {
+        show_award_row(game, (stage - 1) / 2);
+    } else if (stage == 2 || stage == 4 || stage == 6 || stage == 8) {
+        int award = stage / 2 - 1;
+        int won = award_poty(game, award + 1);
+        ssr_tweaks_set_number(game->tweaks, "SeasonAwards", POTY_NAMES[award], won);
+        game->potyCount += won;
+        // A player over 23 has no young award.
+        if (stage == 2 && !young) game->potyStage += 2;
+    } else if (stage == 9) {
+        add_op(game, SSR_OP_SHOW, "PlayButton", NULL, NULL, 0);
+        add_op(game, SSR_OP_SHOW, "RetireButton", NULL, NULL, 0);
+    }
+}
+
+// c_TPlayer.NewSeason and the calls NewSeasonSetUp1 to 4.
+static void new_season(SSRGame *game) {
+    SSRTweaks *t = game->tweaks;
+    game->seasonEndMode = 0;
+    season_in(game);
     ssr_season_new_season(game->season);
+    ssr_tweaks_set_number(t, "Menu", "DisableQuitButton", 0);
     skip_to_first_match(game);
+    ssr_tweaks_set_number(t, "Menu", "CanSavePlayer", 1);
+    ssr_career_reset_season(&game->career);
     save_career(game);
-    if (game->reviewWaits) match_review(game);
-    else game_menu(game);
+    player_tweaks(game);
+    star_transition(game, "gamemenu");
+}
+
+// playeroftheyear.btn_Play: GSSeasonEndTransfer asks about a transfer.
+static void poty_play(SSRGame *game) {
+    message(game, "message", loc(game, "CMESSAGE_SEASONENDTRANSFER"), 1, 1, "SeasonEndTransfer");
+}
+
+// The answer: No keeps the club [I: the transfer screens come with the
+// life of the player; until then Yes also keeps the club].
+static void call_season_end_transfer(SSRGame *game) {
+    new_season(game);
 }
 
 static void match_play(SSRGame *game) {
@@ -2403,6 +2618,9 @@ static const Route ROUTES[] = {
     {"league.btn_Home", league_home},
     {"league.btn_League", game_league},
     {"league.cmb_League", league_combo},
+    {"seasonreview.btn_League", season_review_league},
+    {"seasonreview.btn_Play", player_of_the_year},
+    {"playeroftheyear.btn_Play", poty_play},
     {"match.btn_Play", match_play},
     {"match.btn_Time", match_speed},
     {"match.btn_WorkRate", match_work_rate},
@@ -2598,6 +2816,13 @@ void ssr_game_update(SSRGame *game, float frames) {
             game->ticks -= 1;
             game->now += 16;
             trial_tick(game);
+        }
+    } else if (strcmp(game->screen, "seasonreview") == 0 || strcmp(game->screen, "playeroftheyear") == 0) {
+        game->ticks += frames;
+        while (game->ticks >= 1) {
+            game->ticks -= 1;
+            game->now += 16;
+            if (strcmp(game->screen, "playeroftheyear") == 0) poty_tick(game);
         }
     } else if (strcmp(game->screen, "matchstats") == 0 || strcmp(game->screen, "matchreview") == 0) {
         game->ticks += frames;
