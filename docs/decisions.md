@@ -37,6 +37,12 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   NRG drinks, boots, shop items, and bets in the casino. The original also
   sold Bux in its store. The remake keeps the currency and removes only the
   store. Reason: the remake has no store, and the economy needs its cash.
+- **The casino and the races take their own random numbers.** The original
+  seeds its one random stream from the clock when a casino game or the
+  races open, and again when a career loads. The remake seeds a second
+  stream from its clock for the casino and the races, and keeps the stream
+  of the career as it is. Reason: a casino game cannot be the same twice in
+  the original, and the tests of the career must stay the same.
 
 ## New screens
 
