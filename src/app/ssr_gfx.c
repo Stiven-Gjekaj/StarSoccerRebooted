@@ -49,6 +49,14 @@ struct SSRGfx {
     float offsetX, offsetY;
     // The time of the scene that draws now, in ms.
     int gameMS;
+    // The scenes that draw in the place of an element (AttachSubscreen),
+    // and the clip of the element while one draws.
+    struct {
+        char ref[48];
+        const SSRScene *scene;
+    } hooks[4];
+    int hasOuter;
+    SDL_Rect outer;
 };
 
 SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
@@ -648,22 +656,74 @@ void ssr_gfx_set_offset(SSRGfx *gfx, float x, float y) {
     gfx->offsetY = y;
 }
 
+void ssr_gfx_attach(SSRGfx *gfx, const char *ref, const SSRScene *scene) {
+    if (!gfx || !ref) return;
+    for (int i = 0; i < 4; i++) {
+        if (!scene && gfx->hooks[i].scene && SDL_strcmp(gfx->hooks[i].ref, ref) == 0) gfx->hooks[i].scene = NULL;
+    }
+    if (!scene) return;
+    for (int i = 0; i < 4; i++) {
+        if (gfx->hooks[i].scene) continue;
+        SDL_strlcpy(gfx->hooks[i].ref, ref, sizeof(gfx->hooks[i].ref));
+        gfx->hooks[i].scene = scene;
+        return;
+    }
+}
+
+// The scene of the hook draws at the place of the area, inside its clip.
+static void draw_hook(SSRGfx *gfx, const SSRSceneItem *area, const SSRScene *sub) {
+    const SSRScene *scene = gfx->scene;
+    int gameMS = gfx->gameMS, hasOuter = gfx->hasOuter;
+    SDL_Rect outer = gfx->outer;
+    float x = gfx->offsetX, y = gfx->offsetY;
+    if (area->clipped) {
+        SDL_Rect rect = {(int)(area->clipX + x), (int)(area->clipY + y), (int)area->clipW, (int)area->clipH};
+        if (gfx->hasOuter) SDL_GetRectIntersection(&rect, &gfx->outer, &rect);
+        gfx->outer = rect;
+        gfx->hasOuter = 1;
+    }
+    gfx->offsetX = x + area->x;
+    gfx->offsetY = y + area->y;
+    ssr_gfx_draw_scene(gfx, sub);
+    gfx->offsetX = x;
+    gfx->offsetY = y;
+    gfx->hasOuter = hasOuter;
+    gfx->outer = outer;
+    gfx->scene = scene;
+    gfx->gameMS = gameMS;
+}
+
 void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene) {
     if (!gfx || !scene) return;
     gfx->scene = scene;
     gfx->gameMS = ssr_scene_time(scene);
-    // The clip changes only when the next item has another clip.
-    int clipped = 0;
+    // The clip changes only when the next item has another clip. A scene
+    // in a hook stays inside the clip of the hook.
+    int clipped = -1;
     SDL_Rect clip = {0, 0, 0, 0};
     for (int i = 0; i < ssr_scene_count(scene); i++) {
         const SSRSceneItem *item = ssr_scene_item(scene, i);
-        if (item->kind == SSR_ITEM_AREA) continue;
+        if (item->kind == SSR_ITEM_AREA) {
+            // The scenes of the hook draw in the order that they came.
+            for (int h = 0; item->ref && h < 4; h++) {
+                const SSRScene *sub = gfx->hooks[h].scene;
+                if (!sub || sub == scene || SDL_strcmp(gfx->hooks[h].ref, item->ref) != 0) continue;
+                draw_hook(gfx, item, sub);
+                clipped = -1;
+            }
+            continue;
+        }
         SDL_Rect rect = {(int)(item->clipX + gfx->offsetX), (int)(item->clipY + gfx->offsetY), (int)item->clipW,
                          (int)item->clipH};
-        if (item->clipped != clipped || (item->clipped && SDL_memcmp(&rect, &clip, sizeof(rect)) != 0)) {
-            clipped = item->clipped;
+        int on = item->clipped || gfx->hasOuter;
+        if (gfx->hasOuter) {
+            if (item->clipped) SDL_GetRectIntersection(&rect, &gfx->outer, &rect);
+            else rect = gfx->outer;
+        }
+        if (on != clipped || (on && SDL_memcmp(&rect, &clip, sizeof(rect)) != 0)) {
+            clipped = on;
             clip = rect;
-            SDL_SetRenderClipRect(gfx->renderer, clipped ? &clip : NULL);
+            SDL_SetRenderClipRect(gfx->renderer, on ? &clip : NULL);
         }
         if (item->kind == SSR_ITEM_IMAGE) {
             draw_image_item(gfx, item);
@@ -671,6 +731,6 @@ void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene) {
             draw_text_item(gfx, item);
         }
     }
-    SDL_SetRenderClipRect(gfx->renderer, NULL);
+    SDL_SetRenderClipRect(gfx->renderer, gfx->hasOuter ? &gfx->outer : NULL);
     gfx->scene = NULL;
 }

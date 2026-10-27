@@ -57,4 +57,10 @@ void ssr_gfx_set_tweaks(SSRGfx *gfx, const SSRTweaks *tweaks);
 // Draws each item of the scene.
 void ssr_gfx_draw_scene(SSRGfx *gfx, const SSRScene *scene);
 
+// c_GShell.AttachSubscreen: the scene draws in the place of the element
+// with the ref of each scene that draws, inside the clip of that element.
+// The scenes of one ref draw in the order that they came. A NULL scene
+// takes all the scenes off the ref.
+void ssr_gfx_attach(SSRGfx *gfx, const char *ref, const SSRScene *scene);
+
 #endif
