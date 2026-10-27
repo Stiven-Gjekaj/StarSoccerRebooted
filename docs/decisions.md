@@ -225,5 +225,11 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
 
 ## Identity
 
+- **The marks of New Star Games change, and nothing else of the look.**
+  The owner chose this on 2026-10-27. The new logo keeps the style of the
+  original: bold red type and a white star in a red box. The words are
+  STAR SOCCER REBOOTED. The TV, the newspaper, the sponsor, and the
+  stadium use the name SSR (SSR TV, SSR NEWS).
+
 - Display name `Star Soccer Rebooted`. Bundle ID
   `io.github.stivengjekaj.starsoccerrebooted`.
