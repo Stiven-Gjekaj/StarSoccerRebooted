@@ -179,6 +179,24 @@ static void write_floats(FILE *file, const char *name, const float *values, int 
     fputc('\n', file);
 }
 
+void ssr_career_add_form(int *form, int rating) {
+    if (!form) return;
+    for (int i = 0; i < 4; i++) form[i] = form[i + 1];
+    form[4] = rating;
+}
+
+void ssr_career_reset_season(SSRCareer *c) {
+    if (!c) return;
+    c->seasonApps = c->seasonGoals = c->seasonAssists = c->seasonPasses = 0;
+    c->seasonHatTricks = c->seasonStarMan = c->seasonChances = 0;
+    c->seasonTotalRating = 0;
+    c->wonMajorAward = 0;
+    c->energy = 100;
+    // The boss and the team forget a tenth of the relation.
+    c->relationBoss -= c->relationBoss * 0.1f;
+    c->relationTeam -= c->relationTeam * 0.1f;
+}
+
 int ssr_career_save(const SSRCareer *c, const char *path) {
     if (!c || !path) return 0;
     char temp[4096];
@@ -203,6 +221,16 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     write_ints(file, "nrg", c->nrg, 10);
     write_floats(file, "ratings", c->ratings, 10);
     fprintf(file, "apps=%d\ngoals=%d\nassists=%d\npasses=%d\n", c->apps, c->goals, c->assists, c->passes);
+    int season[7] = {c->seasonApps,      c->seasonGoals,   c->seasonAssists, c->seasonPasses,
+                     c->seasonHatTricks, c->seasonStarMan, c->seasonChances};
+    write_ints(file, "season", season, 7);
+    int national[7] = {c->intApps, c->intGoals, c->intAssists, c->intPasses, c->intHatTricks, c->intStarMan, c->intChances};
+    write_ints(file, "international", national, 7);
+    fprintf(file, "seasontotalrating=%g\ntotalrating=%g\ninttotalrating=%g\n", c->seasonTotalRating, c->totalRating,
+            c->intTotalRating);
+    write_ints(file, "form", c->form, 5);
+    write_ints(file, "intform", c->intForm, 5);
+    fprintf(file, "potyawards=%d\nwonmajoraward=%d\n", c->potyAwards, c->wonMajorAward);
     fprintf(file, "starrating=%d\n", c->starRating);
     fprintf(file, "retired=%d\n", c->retired);
     // A line ends the headline, so the save keeps its new lines as "\n".
@@ -286,6 +314,33 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "goals") == 0) c->goals = number;
         else if (strcmp(key, "assists") == 0) c->assists = number;
         else if (strcmp(key, "passes") == 0) c->passes = number;
+        else if (strcmp(key, "season") == 0) {
+            int v[7] = {0};
+            read_ints(value, v, 7);
+            c->seasonApps = v[0];
+            c->seasonGoals = v[1];
+            c->seasonAssists = v[2];
+            c->seasonPasses = v[3];
+            c->seasonHatTricks = v[4];
+            c->seasonStarMan = v[5];
+            c->seasonChances = v[6];
+        } else if (strcmp(key, "international") == 0) {
+            int v[7] = {0};
+            read_ints(value, v, 7);
+            c->intApps = v[0];
+            c->intGoals = v[1];
+            c->intAssists = v[2];
+            c->intPasses = v[3];
+            c->intHatTricks = v[4];
+            c->intStarMan = v[5];
+            c->intChances = v[6];
+        } else if (strcmp(key, "seasontotalrating") == 0) c->seasonTotalRating = real;
+        else if (strcmp(key, "totalrating") == 0) c->totalRating = real;
+        else if (strcmp(key, "inttotalrating") == 0) c->intTotalRating = real;
+        else if (strcmp(key, "form") == 0) read_ints(value, c->form, 5);
+        else if (strcmp(key, "intform") == 0) read_ints(value, c->intForm, 5);
+        else if (strcmp(key, "potyawards") == 0) c->potyAwards = number;
+        else if (strcmp(key, "wonmajoraward") == 0) c->wonMajorAward = number;
         else if (strcmp(key, "starrating") == 0) c->starRating = number;
         else if (strcmp(key, "retired") == 0) c->retired = number;
         else if (strcmp(key, "headline") == 0) {

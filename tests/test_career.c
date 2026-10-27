@@ -33,6 +33,17 @@ static void test_saves_and_loads_a_career(void) {
     c.assists = 3;
     c.passes = 40;
     c.starRating = 250;
+    c.seasonApps = 9;
+    c.seasonStarMan = 2;
+    c.seasonChances = 30;
+    c.intGoals = 4;
+    c.seasonTotalRating = 61.5f;
+    c.intTotalRating = 14;
+    ssr_career_add_form(c.form, 6);
+    ssr_career_add_form(c.form, 8);
+    c.intForm[0] = 3;
+    c.potyAwards = 2;
+    c.wonMajorAward = 1;
     snprintf(c.headline, sizeof(c.headline), "Line one\nA \\ two");
     char path[1200];
     snprintf(path, sizeof(path), "%s/slot0.txt", ssr_test_directory("career_save"));
@@ -44,6 +55,18 @@ static void test_saves_and_loads_a_career(void) {
     CHECK(strcmp(back.headline, c.headline) == 0 && strcmp(back.gameVersion, "v2.32") == 0);
     CHECK(back.apps == 12 && back.goals == 5 && back.assists == 3 && back.passes == 40);
     CHECK(back.starRating == 250 && ssr_career_star_level(&back) == 3);
+    CHECK(back.seasonApps == 9 && back.seasonStarMan == 2 && back.seasonChances == 30 && back.intGoals == 4);
+    CHECK(back.seasonTotalRating == 61.5f && back.intTotalRating == 14);
+    // The newest form is last.
+    CHECK(back.form[3] == 6 && back.form[4] == 8 && back.form[0] == 0 && back.intForm[0] == 3);
+    CHECK(back.potyAwards == 2 && back.wonMajorAward == 1);
+    // The new season starts the counts again.
+    back.energy = 20;
+    back.relationBoss = 50;
+    ssr_career_reset_season(&back);
+    CHECK(back.relationBoss == 45);
+    CHECK(back.seasonApps == 0 && back.seasonTotalRating == 0 && back.wonMajorAward == 0 && back.energy == 100);
+    CHECK(back.apps == 12 && back.potyAwards == 2 && back.form[4] == 8);
     back.sdate = 1;
     CHECK(ssr_career_age(&back) == 16);
     back.sdate = 365;

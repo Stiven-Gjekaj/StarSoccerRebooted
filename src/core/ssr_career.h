@@ -44,6 +44,17 @@ typedef struct {
     float ratings[10];
     // The matches, the goals, the assists, and the passes of the career.
     int apps, goals, assists, passes;
+    // The counts of this season of the club, and of the career with the
+    // nation (c_TPlayer.season* and int*).
+    int seasonApps, seasonGoals, seasonAssists, seasonPasses, seasonHatTricks, seasonStarMan, seasonChances;
+    float seasonTotalRating, totalRating;
+    int intApps, intGoals, intAssists, intPasses, intHatTricks, intStarMan, intChances;
+    float intTotalRating;
+    // The ratings of the last five matches, the oldest first.
+    int form[5], intForm[5];
+    // The awards of the player of the year, and 1 after a continental final
+    // won in this season.
+    int potyAwards, wonMajorAward;
     // The star rating (c_TPlayer.m_starrating). The star level is
     // starRating / 100 + 1.
     int starRating;
@@ -87,6 +98,13 @@ int ssr_career_age(const SSRCareer *career);
 // The year and the week of the career, from 1.
 int ssr_career_year(const SSRCareer *career);
 int ssr_career_week(const SSRCareer *career);
+
+// c_TPlayer.AddForm and AddInternationalForm: the newest rating goes in at
+// the end.
+void ssr_career_add_form(int *form, int rating);
+
+// c_TPlayer.ResetSeasonStats: the counts of the season start again.
+void ssr_career_reset_season(SSRCareer *career);
 
 // Writes the career to the file. The new file takes the place of the old
 // one only when it is complete. Returns 1 when it worked.
