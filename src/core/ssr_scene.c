@@ -2059,8 +2059,16 @@ static int shown(SSRScene *s, const SSRUiNode *node) {
         int show = is(m->name, "ShowIf"), not = is(m->name, "ShowIfNot");
         int and = is(m->name, "AndShowIf"), or = is(m->name, "OrShowIf");
         if (!show && !not && !and && !or) continue;
-        int value = m->argCount >= 3 ? ssr_tweaks_equals(s->env->tweaks, arg(m, 0), arg(m, 1), arg(m, 2))
-                                     : ssr_tweaks_number(s->env->tweaks, arg(m, 0), arg(m, 1)) != 0;
+        int value;
+        if (m->argCount >= 4 && ssr_tweaks_kind(s->env->tweaks, arg(m, 0), arg(m, 1)) != SSR_TWEAK_STRING) {
+            // ShowIf(Cat,Name,min,max): a number tweak in the range.
+            double v = ssr_tweaks_number(s->env->tweaks, arg(m, 0), arg(m, 1));
+            value = v >= number(s, m, 2, 0) && v <= number(s, m, 3, 0);
+        } else if (m->argCount >= 3) {
+            value = ssr_tweaks_equals(s->env->tweaks, arg(m, 0), arg(m, 1), arg(m, 2));
+        } else {
+            value = ssr_tweaks_number(s->env->tweaks, arg(m, 0), arg(m, 1)) != 0;
+        }
         if (not) value = !value;
         if (or && any) {
             result = result || value;

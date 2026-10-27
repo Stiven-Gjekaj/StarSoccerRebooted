@@ -102,10 +102,13 @@ static void test_shows_items_by_tweak(void) {
                        "\tOrShowIf(Pitch,WeatherType,2)\n"
                        "Draw:(Snow,0,0,10,10)\n"
                        "\tShowIfNot(Pitch,WeatherType,2)\n"
-                       "Draw:(Hidden,0,0,10,10) $HIDE\n";
+                       "Draw:(Hidden,0,0,10,10) $HIDE\n"
+                       "Draw:(Storm,0,0,10,10)\n"
+                       "\tShowIf(Pitch,WeatherType,1,2)\n";
     SSRUiTree *tree;
     SSRScene *scene = build(text, tweaks, &tree);
-    CHECK(ssr_scene_count(scene) == 3);
+    // ShowIf with two numbers shows for the range from the first to the second.
+    CHECK(ssr_scene_count(scene) == 4 && strcmp(ssr_scene_item(scene, 3)->image, "Storm") == 0);
     CHECK(strcmp(ssr_scene_item(scene, 0)->image, "Rain") == 0);
     CHECK(strcmp(ssr_scene_item(scene, 1)->image, "Drops") == 0);
     CHECK(strcmp(ssr_scene_item(scene, 2)->image, "Sun") == 0);
