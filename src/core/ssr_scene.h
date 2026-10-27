@@ -46,6 +46,13 @@ typedef struct {
     // right, bottom right, bottom left, x and y each) in place of the box.
     int quad;
     float corners[8];
+    // When projected is 1, the image is on a Sheet: with perspective. Its
+    // corners (top left, top right, bottom right, bottom left) are in the
+    // space of the camera, x, y, z for each. A point goes to the screen at
+    // (320 + focal * x / z, 480 + focal * y / z).
+    int projected;
+    float camera[12];
+    float focal;
     // 0xRRGGBBAA.
     uint32_t colour;
     SSRBlend blend;

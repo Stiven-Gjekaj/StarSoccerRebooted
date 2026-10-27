@@ -867,6 +867,45 @@ static void test_moves_copies_and_sorts_by_y(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// A Sheet: puts its children on a plane in 3D, with the perspective of the
+// game. The corners of the pitch land where c_GelSheet puts them.
+static void test_projects_a_sheet(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    layout = "PushOrigin:(50,50)\n"
+             "Sheet:(-593,-606,1980,-30,0,0,20)\n"
+             "{\n"
+             "\tDraw:(Grass,-50,-50,1610,1610)\n"
+             "}\n"
+             "PopOrigin\n"
+             "Sheet:(0,0,0,0,0,0,0,1,1,1,$PITCH)\n"
+             "\tset(gel.vis,false)\n"
+             "{\n"
+             "\tDraw:(Flat,10,20,30,40)\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    const SSRSceneItem *grass = find_image(scene, "Grass");
+    CHECK(grass && grass->projected);
+    // The PushOrigin moves the child on the plane, so it starts at (0, 0).
+    static const float SCREEN[8] = {-223.53f, -75.44f, 1252.15f, -75.44f, 1890.78f, 1697.55f, -595.90f, 1697.55f};
+    for (int k = 0; grass && k < 4; k++) {
+        const float *c = grass->camera + k * 3;
+        float sx = 320 + grass->focal * c[0] / c[2], sy = 480 + grass->focal * c[1] / c[2];
+        CHECK(fabsf(sx - SCREEN[k * 2]) < 0.05f && fabsf(sy - SCREEN[k * 2 + 1]) < 0.05f);
+    }
+    // A sheet that renders into a surface draws its children in place, each
+    // frame, with no perspective.
+    const SSRSceneItem *flat = find_image(scene, "Flat");
+    CHECK(flat && !flat->projected && near(flat->x, 10) && near(flat->y, 20));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // CloneTweak gives each copy its own kit: the items keep the cel colours
 // of the moment that their gel draws.
 static void test_clones_kit_colours(void) {
@@ -1054,6 +1093,7 @@ int main(void) {
     test_fills_lists_and_changes_elements();
     test_readouts_conditions_and_click_actions();
     test_converges_after_a_delay_and_on_press();
+    test_projects_a_sheet();
     test_clones_kit_colours();
     test_runs_a_block_by_a_tweak();
     test_moves_copies_and_sorts_by_y();

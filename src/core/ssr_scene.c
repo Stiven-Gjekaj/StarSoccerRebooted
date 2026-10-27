@@ -40,6 +40,8 @@ typedef enum {
     GEL_TEXT,
     GEL_RECT,
     GEL_CLIP,
+    // Sheet:: a 3D plane with perspective (c_GelSheet).
+    GEL_SHEET,
     GEL_CROWD,
     GEL_SPINE,
     GEL_ANIM,
@@ -206,6 +208,12 @@ struct Gel {
     float yDepthOffset;
     // The cel colours that CloneTweak gave in this frame: "Cel=RRGGBBAA;".
     char cels[192];
+    // GEL_SHEET: the model matrix of the plane (3 rows of 4), the focal
+    // length of the perspective (0 for a flat sheet), and 1 when it draws
+    // into a surface.
+    float trs[12];
+    float focal;
+    int rtt;
 };
 
 typedef struct {
@@ -288,6 +296,8 @@ struct SSRScene {
     int clipCount;
     // The cel colours of the gel that draws now (CloneTweak), or NULL.
     const char *cels;
+    // The sheet with perspective that the gels draw on now, or NULL.
+    const Gel *sheet;
     Gel *pressed;
     Gel *candidate;
     // The swipe (SwipePanel): the gel that the touch started on, and if the
@@ -1779,6 +1789,39 @@ static void build_node(SSRScene *s, const SSRUiNode *node, Gel *parent) {
         // An animation has no parent. Only an AnimInstance draws it.
         place_gel(s, g, NULL, 0, 0, 0);
         push_gel(&s->detached, &s->detachedCount, &s->detachedCapacity, g);
+    } else if (is(name, "Sheet") || is(name, "SHT")) {
+        // Sheet:(PosX,PosY,PosZ,RotX,RotY,RotZ,FOV,ScaleX,ScaleY,ScaleZ,RTT)
+        // (c_Sheet_Factory). The model matrix is T * Yaw(RotY) * Pitch(RotX) *
+        // Roll(RotZ) * S. The sheet has no place of its own on the screen,
+        // so its children keep their places in the layout.
+        g = new_gel(GEL_SHEET, node);
+        if (!g) return;
+        float pos[3], rot[3], scale[3];
+        for (int i = 0; i < 3; i++) {
+            pos[i] = (float)number(s, node, i, 0);
+            rot[i] = (float)number(s, node, 3 + i, 0) * PI_F / 180;
+            scale[i] = (float)number(s, node, 7 + i, 1);
+        }
+        float fov = (float)number(s, node, 6, 0);
+        float cx = cosf(rot[0]), sx = sinf(rot[0]), cy = cosf(rot[1]), sy = sinf(rot[1]);
+        float cz = cosf(rot[2]), sz = sinf(rot[2]);
+        // Pitch * Roll, then Yaw on the left. Yaw(a) is the Y rotation by -a.
+        float pr[9] = {cz, -sz, 0, cx * sz, cx * cz, -sx, sx * sz, sx * cz, cx};
+        float yaw[9] = {cy, 0, -sy, 0, 1, 0, sy, 0, cy};
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                float v = 0;
+                for (int k = 0; k < 3; k++) v += yaw[r * 3 + k] * pr[k * 3 + c];
+                g->trs[r * 4 + c] = v * scale[c];
+            }
+            g->trs[r * 4 + 3] = pos[r];
+        }
+        g->focal = fov > 0 ? 320.0f / tanf(fov / 2 * PI_F / 180) : 0;
+        g->rtt = arg(node, 10)[0] != 0;
+        place_gel(s, g, parent, 0, 0, 0);
+        // c_Gel3D.p_Bake gives identity: the children keep their places.
+        set_local(g, mat_concat(mat_inverse(parent ? parent->baked : mat_identity()), mat_identity()));
+        g->baked = mat_identity();
     } else if (is(name, "During")) {
         g = new_gel(GEL_DURING, node);
         if (!g) return;
@@ -2820,6 +2863,31 @@ static Gel *get_embed(const SSRScene *s, const char *name) {
 
 static void draw_gel_inner(SSRScene *s, Gel *g, const Frame *parent);
 
+// The item goes onto the plane of the sheet: its four corners in the space
+// of the camera, for the perspective of the renderer (c_GelSheet).
+static void project_item(SSRSceneItem *item, const Gel *sheet) {
+    if (item->kind != SSR_ITEM_IMAGE || item->projected) return;
+    float c[8];
+    if (item->quad) {
+        memcpy(c, item->corners, sizeof(c));
+    } else {
+        // The corners of the box, turned about the pivot as the renderer does.
+        float ca = cosf(item->angle * PI_F / 180), sa = sinf(item->angle * PI_F / 180);
+        static const float U[4] = {0, 1, 1, 0}, V[4] = {0, 0, 1, 1};
+        for (int k = 0; k < 4; k++) {
+            float px = item->x + item->w * U[k] - item->pivotX, py = item->y + item->h * V[k] - item->pivotY;
+            c[k * 2] = item->pivotX + px * ca + py * sa;
+            c[k * 2 + 1] = item->pivotY - px * sa + py * ca;
+        }
+    }
+    const float *m = sheet->trs;
+    for (int k = 0; k < 4; k++) {
+        for (int r = 0; r < 3; r++) item->camera[k * 3 + r] = m[r * 4] * c[k * 2] + m[r * 4 + 1] * c[k * 2 + 1] + m[r * 4 + 3];
+    }
+    item->projected = 1;
+    item->focal = sheet->focal;
+}
+
 static void draw_gel(SSRScene *s, Gel *g, const Frame *parent) {
     const char *cels = s->cels;
     g->cels[0] = 0;
@@ -2850,6 +2918,9 @@ static void draw_gel_inner(SSRScene *s, Gel *g, const Frame *parent) {
     if (g->depth != DEPTH_INHERIT) f.depth = g->depth;
     pump(s, g, g->doodads);
     if (g->cels[0]) s->cels = keep_frame(s, g->cels);
+    // The remake has no render to a surface. A sheet that renders into a
+    // surface draws its children each frame, in its place [I].
+    if (g->kind == GEL_SHEET && g->rtt) g->hidden = 0;
     if (g->hidden || g->dead) return;
     f.m = mat_concat(parent->m, local_matrix(g));
     g->baked = f.m;
@@ -2889,6 +2960,21 @@ static void draw_gel_inner(SSRScene *s, Gel *g, const Frame *parent) {
             }
         }
         break;
+    case GEL_SHEET: {
+        // The children draw with no 2D transform of the parents. A sheet with
+        // perspective gives its items the corners on its plane.
+        Frame plane = f;
+        plane.m = mat_identity();
+        const Gel *outer = s->sheet;
+        s->sheet = g->focal > 0 ? g : NULL;
+        int first = s->count;
+        draw_children(s, g, &plane);
+        if (g->focal > 0) {
+            for (int i = first; i < s->count; i++) project_item(&s->items[i], g);
+        }
+        s->sheet = outer;
+        return;
+    }
     case GEL_CLIP: {
         SSRSceneItem box;
         memset(&box, 0, sizeof(box));
