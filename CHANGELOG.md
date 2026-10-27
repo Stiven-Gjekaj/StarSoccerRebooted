@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.7.0 (2026-10-27)
+
+- The game has its own marks. The title shows the Star Soccer Rebooted
+  logo with REBOOTED under it. The TV, the stadium roof, the boards, the
+  sponsor, and the newspaper show the SSR marks.
+- The match screen shows the night stadium in the TV.
+- The Life button opens your relationships with the boss, the team, the
+  fans, your partner, and your sponsors. Spend time with them in the
+  pairs game to make the relations better.
+- Before a match the week has its news: your partner, requests of your
+  relations, dilemmas, the style news, borrowed vehicles, club news, and
+  tips. Some news asks you a question, and the bars move with your answer.
+- After some matches you give an interview. Repeat the order of the green
+  buttons to give a good answer.
+- The lifestyle shop sells items, vehicles, and properties. They wear
+  after each match, and you can repair them. Properties give energy after
+  a match. The prices show the bux icon.
+- The skills shop sells agents, trainers, boots, and NRG cans. An agent
+  makes your pay higher, a trainer gives energy, and boots make your
+  skills better in a match.
+- Your contract runs out. Talk with the boss in the negotiate game to
+  sign a new one. In the transfer window and at the end of a season other
+  clubs can make you an offer.
+- The news can bring old pro boots, the captaincy, and a sponsor.
+- At the end of a season you can retire. The retirement screen shows your
+  career and your score. Your first retirement unlocks the hard mode.
+
 ## 0.6.0 (2026-10-27)
 
 - The season runs as in the original. Your nation sets up its leagues
