@@ -103,6 +103,9 @@ struct SSRGame {
     // The competition of the table that shows, the row that the player
     // chose in it (0 none), and the team of the club fixtures screen.
     int leagueComp, leagueSelected;
+    // The squad screen: the club, and 1 when it shows the top scorers of
+    // the league.
+    int squadClub, squadScorers;
     int fixturesTeam, fixturesLevel;
     // c_TScreen_League.m_flagContinueButton: the table shows Continue.
     int leagueContinue;
@@ -3107,6 +3110,108 @@ static void league_fixtures_button(SSRGame *game) {
 }
 
 // league.btn_League on the club fixtures: the table again.
+/* ---------------------------------------------------------- the squad */
+
+static const char *const POSITIONS[SSR_POS_COUNT] = {"GK", "DF", "MF", "FW"};
+
+static int by_position(const void *a, const void *b) {
+    const SSRPerson *p = *(SSRPerson *const *)a, *q = *(SSRPerson *const *)b;
+    if (p->position != q->position) return p->position - q->position;
+    if (p->skill != q->skill) return q->skill - p->skill;
+    return p->id - q->id;
+}
+
+// A row of the squad list: the position, the name, the age or the club,
+// the skill or the matches, and the goals.
+static void squad_row(SSRGame *game, const SSRPerson *p, const char *club, const char *third, int fourth) {
+    char texts[6][64];
+    snprintf(texts[0], 64, "%s", POSITIONS[p->position]);
+    if (club) snprintf(texts[1], 64, "%c. %s (%s)", p->first[0], p->last, club);
+    else snprintf(texts[1], 64, "%c. %s", p->first[0], p->last);
+    snprintf(texts[2], 64, "%s", third);
+    snprintf(texts[3], 64, "%d", fourth);
+    snprintf(texts[4], 64, "%d", p->seasonApps);
+    snprintf(texts[5], 64, "%d", p->seasonGoals);
+    add_op(game, SSR_OP_LIST_ADD, "PlayerList", p->rival ? "RivalEntry" : "PlayerEntry", "", 0);
+    for (int k = 0; k < 6; k++) add_op(game, SSR_OP_LIST_TEXT, "PlayerList", NULL, texts[k], k + 1);
+}
+
+// The squad of the club, the best of each position first, or the top
+// scorers of the league of the club.
+static void squad_fill(SSRGame *game) {
+    SSRTweaks *t = game->tweaks;
+    add_op(game, SSR_OP_LIST_CLEAR, "PlayerList", NULL, NULL, 0);
+    ssr_tweaks_set_number(t, "Squad", "Scroll", 0);
+    const SSRClub *club = game->world ? ssr_world_club(game->world, game->squadClub) : NULL;
+    int year = ssr_career_year(&game->career);
+    SSRPerson *list[64];
+    int n = 0;
+    if (game->people && game->names && club) {
+        ssr_people_make_squad(game->people, game->world, game->names, club->id, year);
+    }
+    if (game->squadScorers) {
+        SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, game->leagueComp) : NULL;
+        int clubs[64], count = 0;
+        if (comp && comp->poolCount > 0 && comp->data->level == 0) {
+            for (int g = 0; g < comp->poolCount; g++) {
+                for (int i = 0; i < comp->pools[g].count && count < 64; i++) {
+                    clubs[count++] = game->season->rows[comp->pools[g].rows[i]].teamId;
+                }
+            }
+        }
+        n = ssr_people_top_scorers(game->people, clubs, count, list, 20);
+        ssr_tweaks_set(t, "Squad", "Title", comp ? comp->data->tla : "");
+        ssr_tweaks_set(t, "Squad", "Column3", loc(game, "Age"));
+        ssr_tweaks_set(t, "Squad", "Column4", "A");
+        ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "Team"));
+    } else {
+        n = ssr_people_squad(game->people, club ? club->id : 0, list, 64);
+        if (n > 64) n = 64;
+        qsort(list, (size_t)n, sizeof(list[0]), by_position);
+        ssr_tweaks_set(t, "Squad", "Title", club ? club->name : "");
+        ssr_tweaks_set(t, "Squad", "Column3", loc(game, "Age"));
+        ssr_tweaks_set(t, "Squad", "Column4", "SKL");
+        ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "Goals"));
+    }
+    add_op(game, SSR_OP_LIST_START, "PlayerList", NULL, NULL, 52);
+    for (int i = 0; i < n; i++) {
+        char age[16];
+        snprintf(age, sizeof(age), "%d", year - list[i]->born);
+        if (game->squadScorers) {
+            const SSRClub *of = ssr_world_club(game->world, list[i]->club);
+            squad_row(game, list[i], of ? of->tla : "", age, list[i]->seasonAssists);
+        } else {
+            squad_row(game, list[i], NULL, age, list[i]->skill);
+        }
+    }
+}
+
+// league.btn_Squad: the squad of the chosen team of the table, or of the
+// club of the player.
+static void league_squad(SSRGame *game) {
+    SSRSeasonComp *comp = ssr_season_comp(game->season, game->leagueComp);
+    int team = game->career.clubId;
+    if (comp && comp->data->type != 1 && comp->data->level == 0 && comp->poolCount > 0) {
+        int group = comp->poolCount > 1 ? ssr_season_group_of(game->season, comp, game->career.clubId) : 1;
+        SSRPool *pool = &comp->pools[group > 0 ? group - 1 : 0];
+        int row = game->leagueSelected;
+        if (row > 0 && row <= pool->count) team = game->season->rows[pool->rows[row - 1]].teamId;
+    }
+    game->squadClub = team;
+    game->squadScorers = 0;
+    set_screen(game, "squad");
+    squad_fill(game);
+}
+
+static void squad_mode(SSRGame *game) {
+    game->squadScorers = !game->squadScorers;
+    squad_fill(game);
+}
+
+static void squad_back(SSRGame *game) {
+    league_screen(game, game->leagueComp);
+}
+
 static void fixtures_league(SSRGame *game) {
     league_screen(game, game->leagueComp);
 }
@@ -8871,6 +8976,9 @@ static const Route ROUTES[] = {
     {"league.btn_Home", league_home},
     {"league.btn_League", fixtures_league},
     {"league.btn_Fixtures", league_fixtures_button},
+    {"league.btn_Squad", league_squad},
+    {"squad.btn_Mode", squad_mode},
+    {"squad.btn_Back", squad_back},
     {"league.row_team", league_row},
     {"league.cmb_League", league_combo},
     {"seasonreview.btn_League", season_review_league},

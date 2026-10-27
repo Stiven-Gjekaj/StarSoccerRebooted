@@ -1,0 +1,21 @@
+# The league has a button to the squad of the chosen club and the top
+# scorers of the league (squad.uis). It goes in the place of the comment
+# before the home button, with the comment after it.
+- //HomeButton
++ Rect:() ref:SquadButton
++ {
++ PushOrigin:(324,@n)
++ M_NavButton:(0,0,Squad,,)
++ {
++ Draw:(ILife,27,22,96,)
++ }
++ Delay(0.15)
++ ConvergeFrom(-640,0)
++ Click(league.btn_Squad)
++ <
++ PlaySnd(UISelect)
++ >
++ PopOrigin
++ }
++ ShowIf(Menu,HomeButtonDisabled,0)
++ //HomeButton

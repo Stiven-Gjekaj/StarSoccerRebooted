@@ -230,7 +230,7 @@ static void watch_a_replay(SSRGame *game, SSRTweaks *tweaks) {
 
 // The end of a season: the review, the table, the awards, and the next
 // season.
-static int seasons = 0, notPicked = 0, substitutes = 0, records = 0;
+static int seasons = 0, notPicked = 0, substitutes = 0, records = 0, squadSeen = 0;
 
 static int transfers = 0;
 
@@ -847,6 +847,25 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     int entries = 0;
     for (int i = 0; i < rows; i++) entries += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "TeamList") == 0;
     CHECK(entries == 4 && has_op(ops, rows, SSR_OP_LIST_SUB, "TeamList", NULL));
+    // The squad of the club of the player, then the top scorers of the
+    // league, then back to the table.
+    if (!squadSeen) {
+        squadSeen = 1;
+        ssr_game_message(game, "league.btn_Squad");
+        CHECK(strcmp(ssr_game_screen(game), "squad") == 0);
+        CHECK(strlen(ssr_tweaks_get(tweaks, "Squad", "Title")) > 0);
+        rows = take_ops(game, ops, 256);
+        int players = 0, scorers = 0;
+        for (int i = 0; i < rows; i++) players += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "PlayerList") == 0;
+        CHECK(players >= SSR_SQUAD_SIZE);
+        ssr_game_message(game, "squad.btn_Mode");
+        rows = take_ops(game, ops, 256);
+        for (int i = 0; i < rows; i++) scorers += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "PlayerList") == 0;
+        CHECK(scorers >= 1 && scorers <= 20 && strcmp(ssr_tweaks_get(tweaks, "Squad", "Title"), "PRM") == 0);
+        ssr_game_message(game, "squad.btn_Back");
+        CHECK(strcmp(ssr_game_screen(game), "league") == 0);
+        take_ops(game, ops, 256);
+    }
     // A row of the table, tapped two times, opens the fixtures of its team:
     // the six matches of the season, one of them played at least.
     ssr_game_message(game, "league.row_team 1");
@@ -2503,7 +2522,7 @@ static void test_starts_a_new_career(void) {
     CHECK(newsSeen > 0 && ssr_game_career(game)->tipCount > 0);
     CHECK(interviews >= 2 && interviewsWon >= 1);
     // A pass of the first match is a record of the career.
-    CHECK(records >= 1);
+    CHECK(records >= 1 && squadSeen);
     gambling_news(game, tweaks, path);
     // The player retires at the end of the next season.
     retireNow = 1;
