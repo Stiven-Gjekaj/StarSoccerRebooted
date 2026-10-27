@@ -185,11 +185,46 @@ static void test_saves_and_loads(void) {
     ssr_season_free(t);
 }
 
+static void test_counts_the_match_of_the_player(void) {
+    SSRRandom random = {SSR_RANDOM_START};
+    SSRSeason *s = new_season(&random);
+    SSRSeasonComp *one = ssr_season_comp(s, 10), *cup = ssr_season_comp(s, 30);
+    SSRFixture *next = ssr_season_next_fixture(s);
+    ssr_season_skip_to(s, next->sdate);
+    CHECK(s->player.sdate == next->sdate - 1);
+    CHECK(ssr_season_next_round(one) == 1 && ssr_season_round_date(one, 2) > next->sdate);
+    CHECK(ssr_season_comp_type(s, one) == 1 && ssr_season_comp_type(s, cup) == 2);
+    CHECK(ssr_season_actual_league(s, 102) == 10 && ssr_season_group_of(s, one, 102) == 1);
+    CHECK(ssr_season_is_relegation_place(s, one, 4) == 0 && ssr_season_is_promotion_place(s, ssr_season_comp(s, 20), 1));
+    int compId = next->compId, date = next->sdate, home = next->home, away = next->away;
+    ssr_season_my_result(s, next, 3, 1);
+    SSRFixture *found = ssr_season_find(s, compId, date, home, away);
+    CHECK(found == next && found->result == -1);
+    SSRTableRow *winner = ssr_season_row(s, &one->pools[0], home);
+    CHECK(winner->played == 1 && winner->points == 3 && winner->goalsFor == 3);
+    // The date moves to the day of the match, and the other match of the
+    // round plays.
+    int end = ssr_season_play_to(s, date);
+    CHECK(!end && s->player.sdate == date && found->result == 1);
+    CHECK(ssr_season_prev_fixture(s) == found && ssr_season_prev_round(one) == 1);
+    CHECK(winner->played == 1);
+    int rest = ssr_season_rest_days(s);
+    CHECK(rest >= 3 && rest <= 15);
+    // A draw in a cup tie with extra time ends with a winner or with
+    // penalties.
+    SSRFixture *tie = &cup->fixtures[0];
+    ssr_season_my_result(s, tie, 1, 1);
+    CHECK(tie->resultType == SSR_RESULT_EXTRA_TIME || tie->resultType == SSR_RESULT_PENALTIES);
+    CHECK(ssr_fixture_winner(s, tie) != 0);
+    ssr_season_free(s);
+}
+
 int main(void) {
     make_world();
     test_dates();
     test_sets_up_the_leagues_and_the_cup();
     test_plays_a_season();
     test_saves_and_loads();
+    test_counts_the_match_of_the_player();
     return TEST_RESULT();
 }

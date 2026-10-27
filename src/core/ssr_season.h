@@ -197,6 +197,46 @@ void ssr_season_skip_to(SSRSeason *season, int sdate);
 // is the first day of a new year).
 int ssr_season_play_to(SSRSeason *season, int sdate);
 
+// c_TPlayer.MyMatchPlayed: the score of the match of the player counts in
+// the table. A draw in a cup tie goes to extra time and penalties, or to a
+// replay, as the season plays the ties of other teams [I: the match of the
+// remake has no extra time yet].
+void ssr_season_my_result(SSRSeason *season, SSRFixture *fixture, int score1, int score2);
+
+// The fixture with the competition, the date, and the sides, or NULL. A
+// fixture keeps no fixed place in its list, so the game finds it again.
+SSRFixture *ssr_season_find(SSRSeason *season, int compId, int sdate, int home, int away);
+
+// c_TPlayer.GetPrevFixture: the last played fixture of the player, or NULL.
+SSRFixture *ssr_season_prev_fixture(SSRSeason *season);
+
+// c_TPlayer.GetRestDays: the days before the next match, from 3 to 15.
+int ssr_season_rest_days(SSRSeason *season);
+
+// c_TCompetition.GetNextRound, GetPrevRound, and GetRoundDate.
+int ssr_season_next_round(const SSRSeasonComp *comp);
+int ssr_season_prev_round(const SSRSeasonComp *comp);
+int ssr_season_round_date(const SSRSeasonComp *comp, int round);
+
+// c_TCompetition.GetCompetitionType: 1 national league, 2 national cup, 3
+// continental, 4 international, 0 other.
+int ssr_season_comp_type(SSRSeason *season, const SSRSeasonComp *comp);
+
+// c_TCompetition.AllFixturesPopulated: 1 when each fixture has both teams.
+int ssr_season_all_populated(SSRSeason *season, const SSRSeasonComp *comp);
+
+// c_TCompetition.IsPromotionPlace and IsRelegationPlace, for the colours of
+// a table.
+int ssr_season_is_promotion_place(const SSRSeason *season, const SSRSeasonComp *comp, int position);
+int ssr_season_is_relegation_place(const SSRSeason *season, const SSRSeasonComp *comp, int position);
+
+// c_TClub.GetActualLeagueId: the last national league in the play order
+// whose table has the club, or 0.
+int ssr_season_actual_league(SSRSeason *season, int clubId);
+
+// The group of the team in the competition, from 1, or 0.
+int ssr_season_group_of(SSRSeason *season, const SSRSeasonComp *comp, int teamId);
+
 // c_TPlayer.SetAllPreviousLeaguePositions: keeps the positions of each
 // table before the next round, for the arrows of the table.
 void ssr_season_keep_positions(SSRSeason *season);

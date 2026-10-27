@@ -1717,3 +1717,160 @@ int ssr_season_load(SSRSeason *s, const char *path) {
     load_places(s);
     return complete;
 }
+
+/* ------------------------------------------------- the match of the player */
+
+void ssr_season_my_result(SSRSeason *s, SSRFixture *f, int score1, int score2) {
+    if (!s || !f) return;
+    SSRSeasonComp *c = ssr_season_comp(s, f->compId);
+    SSRPool *pool = fixture_pool(s, f);
+    if (!c || !pool) return;
+    f->score1 = score1;
+    f->score2 = score2;
+    f->pen1 = f->pen2 = 0;
+    f->resultType = SSR_RESULT_NORMAL;
+    int level;
+    if (f->matchType == SSR_FIXTURE_REPLAY_ON_DRAW && score1 == score2) {
+        create_replay(s, c, f);
+    } else if (f->matchType == SSR_FIXTURE_EXTRA_TIME && score1 == score2) {
+        extra_time(s, f, &level, 0, 0);
+    } else if (f->matchType == SSR_FIXTURE_SECOND_LEG) {
+        f->resultType = SSR_RESULT_AGGREGATE;
+        const SSRFixture *one = first_leg(s, f);
+        int f1h = one ? one->score1 : 0, f1a = one ? one->score2 : 0;
+        if (f1a + score1 == f1h + score2) {
+            if (2 * f1a + score1 != 2 * score2 + f1h) f->resultType = SSR_RESULT_AWAY_GOALS;
+            else extra_time(s, f, &level, f1a, f1h);
+        }
+    }
+    f->result = -1;
+    SSRTableRow *h = ssr_season_row(s, pool, f->home), *a = ssr_season_row(s, pool, f->away);
+    if (h && a) update_points(h, a, f);
+}
+
+SSRFixture *ssr_season_find(SSRSeason *s, int compId, int sdate, int home, int away) {
+    SSRSeasonComp *c = ssr_season_comp(s, compId);
+    if (!c) return NULL;
+    for (int i = 0; i < c->fixtureCount; i++) {
+        SSRFixture *f = &c->fixtures[i];
+        if (f->sdate == sdate && f->home == home && f->away == away) return f;
+    }
+    return NULL;
+}
+
+// The last played fixture of the team before its next one.
+static SSRFixture *team_prev_fixture(SSRSeason *s, int teamId, int level) {
+    SSRFixture *next = team_next_fixture(s, teamId, level), *best = NULL;
+    for (int i = 0; i < s->compCount; i++) {
+        SSRSeasonComp *c = &s->comps[i];
+        if (c->data->level != level) continue;
+        int group = ssr_season_group_of(s, c, teamId);
+        if (group == 0) continue;
+        int id = 0;
+        SSRPool *pool = &c->pools[group - 1];
+        for (int r = 0; r < pool->count; r++) {
+            if (s->rows[pool->rows[r]].teamId == teamId) id = s->rows[pool->rows[r]].id;
+        }
+        for (int k = 0; k < c->fixtureCount; k++) {
+            SSRFixture *f = &c->fixtures[k];
+            if (f->group != group || (f->home != id && f->away != id) || f->result == 0) continue;
+            if (next && !fixture_before(f, next)) continue;
+            if (!best || fixture_before(best, f)) best = f;
+        }
+    }
+    return best;
+}
+
+SSRFixture *ssr_season_prev_fixture(SSRSeason *s) {
+    if (!s) return NULL;
+    SSRFixture *c = team_prev_fixture(s, s->player.clubId, 0);
+    SSRFixture *n = team_prev_fixture(s, s->player.nationId, 1);
+    if (s->player.careerApps > 6 && c && n) return c->sdate <= n->sdate ? n : c;
+    return c ? c : n;
+}
+
+int ssr_season_rest_days(SSRSeason *s) {
+    SSRFixture *next = ssr_season_next_fixture(s);
+    int days = next ? next->sdate - s->player.sdate - 1 : 14;
+    return days < 3 ? 3 : days > 15 ? 15 : days;
+}
+
+int ssr_season_next_round(const SSRSeasonComp *c) {
+    for (int i = 0; c && i < c->fixtureCount; i++) {
+        if (c->fixtures[i].result == 0) return c->fixtures[i].round;
+    }
+    return 0;
+}
+
+int ssr_season_prev_round(const SSRSeasonComp *c) {
+    int round = 0;
+    for (int i = 0; c && i < c->fixtureCount; i++) {
+        if (c->fixtures[i].result == 1 && c->fixtures[i].round > round) round = c->fixtures[i].round;
+    }
+    return round;
+}
+
+int ssr_season_round_date(const SSRSeasonComp *c, int round) {
+    for (int i = 0; c && i < c->fixtureCount; i++) {
+        if (c->fixtures[i].round == round) return c->fixtures[i].sdate;
+    }
+    return 0;
+}
+
+int ssr_season_comp_type(SSRSeason *s, const SSRSeasonComp *c) {
+    if (!s || !c) return 0;
+    const SSRCompetition *d = c->data;
+    if (d->level == 1) {
+        SSRSeasonNation *mine = nation(s, s->player.nationId);
+        return d->locale == 2 || (mine && d->based == mine->data->continent) ? 4 : 0;
+    }
+    if (d->level != 0) return 0;
+    if (d->locale == 1) return 3;
+    if (d->locale != 0) return 0;
+    if (d->type == 0 || d->type == 4) return 1;
+    if (d->type == 1) return 2;
+    return 0;
+}
+
+int ssr_season_all_populated(SSRSeason *s, const SSRSeasonComp *c) {
+    if (!s || !c) return 0;
+    for (int i = 0; i < c->fixtureCount; i++) {
+        SSRPool *pool = fixture_pool(s, &c->fixtures[i]);
+        if (!ssr_season_row(s, pool, c->fixtures[i].home) || !ssr_season_row(s, pool, c->fixtures[i].away)) return 0;
+    }
+    return 1;
+}
+
+static int has_place(const SSRSeason *s, const SSRSeasonComp *c, int position) {
+    for (int i = 0; c && i < c->placeCount; i++) {
+        if (s->world->promotions[c->places[i]].place == position) return 1;
+    }
+    return 0;
+}
+
+int ssr_season_is_promotion_place(const SSRSeason *s, const SSRSeasonComp *c, int position) {
+    return s && has_place(s, c, position) && position < 10;
+}
+
+int ssr_season_is_relegation_place(const SSRSeason *s, const SSRSeasonComp *c, int position) {
+    return s && has_place(s, c, position) && position > 10;
+}
+
+int ssr_season_group_of(SSRSeason *s, const SSRSeasonComp *c, int teamId) {
+    for (int g = 0; s && c && g < c->poolCount; g++) {
+        for (int r = 0; r < c->pools[g].count; r++) {
+            if (s->rows[c->pools[g].rows[r]].teamId == teamId) return g + 1;
+        }
+    }
+    return 0;
+}
+
+int ssr_season_actual_league(SSRSeason *s, int clubId) {
+    int league = 0;
+    for (int i = 0; s && i < s->compCount; i++) {
+        const SSRSeasonComp *c = &s->comps[s->compOrder[i]];
+        if (!is_league_type(c->data->type) || c->data->locale != 0 || c->data->level != 0) continue;
+        if (ssr_season_group_of(s, c, clubId)) league = c->data->id;
+    }
+    return league;
+}
