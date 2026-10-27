@@ -52,6 +52,7 @@ typedef enum {
 typedef enum {
     D_SHOW,
     D_SET_TWEAK,
+    D_COL_READOUT,
     D_CONVERGE_POS,
     D_CONVERGE_SCALE,
     D_CONVERGE_SIZE,
@@ -883,6 +884,14 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
             d->text[1] = keep(s, arg(m, 1));
             d->text[2] = keep(s, arg(m, 2));
         }
+    } else if (is(n, "ColReadout")) {
+        // The colour of the gel is the colour of the tweak, each frame.
+        d = new_doodad(D_COL_READOUT, m);
+        if (d) {
+            d->text[0] = keep(s, arg(m, 0));
+            d->text[1] = keep(s, arg(m, 1));
+        }
+        ensure_colour(g);
     } else if (is(n, "ConvergeTo") || is(n, "ConvergeFrom")) {
         d = new_doodad(D_CONVERGE_POS, m);
         if (!d) return NULL;
@@ -1519,6 +1528,14 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
     case D_SET_TWEAK:
         if (s->env->tweaks) ssr_tweaks_set(s->env->tweaks, d->text[0], d->text[1], d->text[2]);
         break;
+    case D_COL_READOUT: {
+        const char *value = ssr_tweaks_get(s->env->tweaks, d->text[0], d->text[1]);
+        char text[24];
+        snprintf(text, sizeof(text), "#%s", value[0] == '#' ? value + 1 : value);
+        Colour c;
+        if (parse_colour(text, &c)) g->colour = c;
+        break;
+    }
     case D_CONVERGE_POS:
     case D_CONVERGE_SCALE:
     case D_CONVERGE_SIZE: {
