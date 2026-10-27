@@ -696,6 +696,15 @@ static void test_converges_to_a_tweak(void) {
     CHECK(panel && near(panel->x, -640) && near(panel->y, 40));
     ssr_scene_free(scene);
     ssr_ui_free(tree);
+    // A tab sets the tweak to a sum, as "-640*2".
+    layout = "Rect:(0,0,0,0)\n"
+             "\tSetTweak(Menu,TabPos,-640*2)\n";
+    tree = ssr_ui_parse("Screen.uis", &files);
+    scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "TabPos") == -1280);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
     ssr_tweaks_free(tweaks);
 }
 

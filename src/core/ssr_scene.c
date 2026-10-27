@@ -1589,6 +1589,19 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
             d->text[0] = keep(s, arg(m, 0));
             d->text[1] = keep(s, arg(m, 1));
             d->text[2] = keep(s, arg(m, 2));
+            // A sum as "-640*2" (a macro times a number) is a number for a
+            // float tweak (Phrase.PopFloat).
+            const char *value = arg(m, 2);
+            int sum = value[0] != 0, op = 0;
+            for (const char *p = value; *p && sum; p++) {
+                sum = isdigit((unsigned char)*p) || strchr(".+-*/() ", *p) != NULL;
+                op |= p != value && strchr("+-*/", *p) != NULL;
+            }
+            if (sum && op) {
+                char number_text[32];
+                snprintf(number_text, sizeof(number_text), "%g", number(s, m, 2, 0));
+                d->text[2] = keep(s, number_text);
+            }
         }
     } else if (is(n, "ColReadout")) {
         // The colour of the gel is the colour of the tweak, each frame.
