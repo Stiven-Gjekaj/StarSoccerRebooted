@@ -174,6 +174,8 @@ typedef enum {
     // player mentors.
     SSR_TICKER_WORLD_PARTNER,
     SSR_TICKER_WORLD_MENTEE,
+    // A small club in the last eight of a cup of the nation of the player.
+    SSR_TICKER_WORLD_CUPRUN,
     SSR_TICKER_KINDS,
 } SSRTickerKind;
 

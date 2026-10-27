@@ -9756,6 +9756,50 @@ static SSRPerson *mentee(SSRGame *game) {
     return best;
 }
 
+// A small club in the last eight of a cup of the nation of the club of the
+// player: a club still in the cup with a strength 25 under the mean of the
+// others. comp gets the cup. Returns the club, or 0.
+static int cup_run(SSRGame *game, SSRSeasonComp **cup) {
+    SSRSeason *s = game->season;
+    const SSRClub *mine = game->world ? ssr_world_club(game->world, game->career.clubId) : NULL;
+    if (!s || !mine) return 0;
+    for (int i = 0; i < s->compCount; i++) {
+        SSRSeasonComp *comp = &s->comps[i];
+        if (comp->data->type != 1 || comp->data->level != 0 || comp->data->based != mine->nation) continue;
+        int last = 0;
+        for (int k = 0; k < comp->fixtureCount; k++) {
+            const SSRFixture *f = &comp->fixtures[k];
+            if (f->round >= 1 && ssr_fixture_home_team(s, f) > 0 && ssr_fixture_away_team(s, f) > 0 && f->sdate > last) {
+                last = f->sdate;
+            }
+        }
+        int teams[16], n = 0, fixtures = 0;
+        for (int k = 0; k < comp->fixtureCount; k++) {
+            const SSRFixture *f = &comp->fixtures[k];
+            if (f->sdate != last) continue;
+            fixtures++;
+            int home = ssr_fixture_home_team(s, f), away = ssr_fixture_away_team(s, f);
+            int winner = f->result == 1 ? ssr_fixture_winner(s, f) : 0;
+            if (n < 16 && (!winner || winner == f->home)) teams[n++] = home;
+            if (n < 16 && (!winner || winner == f->away)) teams[n++] = away;
+        }
+        if (fixtures == 0 || fixtures > 4 || n < 2) continue;
+        int small = 0, total = 0;
+        for (int k = 0; k < n; k++) {
+            const SSRClub *c = ssr_world_club(game->world, teams[k]);
+            if (!c) continue;
+            total += c->strength;
+            const SSRClub *best = small ? ssr_world_club(game->world, small) : NULL;
+            if (!best || c->strength < best->strength) small = c->id;
+        }
+        const SSRClub *c = ssr_world_club(game->world, small);
+        if (!c || c->strength + 25 > (total - c->strength) / (n - 1)) continue;
+        *cup = comp;
+        return small;
+    }
+    return 0;
+}
+
 // 1 for a derby, 2 for a match of a big rivalry.
 static int next_derby(SSRGame *game, int *home, int *away) {
     SSRFixture *f = game->season ? ssr_season_next_fixture(game->season) : NULL;
@@ -9865,6 +9909,11 @@ int ssr_game_ticker_priority(SSRGame *game, int kind, int *count) {
     }
     case SSR_TICKER_WORLD_MANAGER:
         return club && game->people && game->people->sackedCount > 0 ? ticker_counter(count) : -1;
+    case SSR_TICKER_WORLD_CUPRUN: {
+        season_in(game);
+        SSRSeasonComp *cup = NULL;
+        return club && cup_run(game, &cup) ? ticker_counter(count) : -1;
+    }
     case SSR_TICKER_WORLD_PARTNER:
         return club && strike_partner(game) ? ticker_counter(count) : -1;
     case SSR_TICKER_WORLD_MENTEE:
@@ -10011,6 +10060,16 @@ void ssr_game_ticker_text(SSRGame *game, int kind, int *count, char *text, size_
         replace_all(text, capacity, "$apps", value);
         SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, ssr_season_actual_league(game->season, c->clubId)) : NULL;
         replace_all(text, capacity, "$league", comp ? comp->data->tla : "");
+        break;
+    }
+    case SSR_TICKER_WORLD_CUPRUN: {
+        season_in(game);
+        SSRSeasonComp *cup = NULL;
+        int small = cup_run(game, &cup);
+        if (!small) return;
+        snprintf(text, capacity, "%s", loc(game, "SSR_TICKER_CUPRUN"));
+        replace_all(text, capacity, "$club", club_name(game, small));
+        replace_all(text, capacity, "$cup", cup->data->tla);
         break;
     }
     case SSR_TICKER_WORLD_PARTNER:
