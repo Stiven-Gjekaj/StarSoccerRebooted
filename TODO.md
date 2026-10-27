@@ -201,7 +201,8 @@ layouts that use the modifier.
 - [x] `Blend` (81): the blend factors of an image
 - [x] `FontShadow` and `ShadowCol` on a text. One layout puts a
       `FontShadow` on an element that is not a text.
-- [ ] `DownloadImage` (56): an image from the web of the game
+- [x] `DownloadImage` (56): an image from the web of the game. 4.32 has
+      no definitions, so the image stays.
 - [ ] `ScrollIndicator` (29): the bar that shows the place in a list
 - [x] `Message` (18) in the block of a click: the click sends the
       message
