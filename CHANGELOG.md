@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 (2026-10-27)
 
 - Play in all 13 languages of 4.32: English, Turkish, Brazilian
   Portuguese, Italian, Spanish, Polish, German, French, Portuguese,
