@@ -895,6 +895,19 @@ static void place_gel(SSRScene *s, Gel *g, Gel *parent, float x, float y, float 
     }
 }
 
+// A During or a Tween has no place of its own (c_GelDuring and
+// c_GelTweenRemap): it is at the start of the screen when its children
+// parse, and its children draw in the frame of its parent.
+static void place_unmoved(Gel *g, Gel *parent) {
+    g->baked = mat_identity();
+    if (parent) {
+        set_local(g, mat_inverse(parent->baked));
+        add_child(parent, g);
+    } else {
+        set_local(g, mat_identity());
+    }
+}
+
 static void bake_at_parse(Gel *g) {
     g->baked = g->parent ? mat_concat(g->parent->baked, local_matrix(g)) : local_matrix(g);
 }
@@ -1950,13 +1963,13 @@ static void build_node(SSRScene *s, const SSRUiNode *node, Gel *parent) {
             g->tfirst -= 1;
             g->tlength += 1;
         }
-        place_gel(s, g, parent, 0, 0, 0);
+        place_unmoved(g, parent);
     } else if (is(name, "Tween")) {
         g = new_gel(GEL_TWEEN, node);
         if (!g) return;
         g->tweenFrom = (float)number(s, node, 0, 0);
         g->tweenTo = (float)number(s, node, 1, 1);
-        place_gel(s, g, parent, 0, 0, 0);
+        place_unmoved(g, parent);
     } else if (is(name, "Sequence")) {
         g = new_gel(GEL_SEQUENCE, node);
         if (!g) return;
@@ -3255,6 +3268,7 @@ static void draw_gel_inner(SSRScene *s, Gel *g, const Frame *parent) {
         if (!(g->first <= af && af < g->last + 1)) return;
         float saved = s->tweenT;
         if (g->last > g->first && g->tlength != 0) s->tweenT = clampf((af - g->tfirst) / g->tlength, 0, 1);
+        f.m = parent->m;
         draw_children(s, g, &f);
         s->tweenT = saved;
         return;
@@ -3262,6 +3276,7 @@ static void draw_gel_inner(SSRScene *s, Gel *g, const Frame *parent) {
     case GEL_TWEEN: {
         float saved = s->tweenT;
         s->tweenT = lerp(g->tweenFrom, g->tweenTo, saved);
+        f.m = parent->m;
         draw_children(s, g, &f);
         s->tweenT = saved;
         return;

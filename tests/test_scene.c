@@ -1313,6 +1313,49 @@ static void test_gives_text_a_shadow(void) {
     ssr_tweaks_free(tweaks);
 }
 
+static void test_draws_a_during_in_the_frame_of_its_parent(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    // The Draw parses at 1, 4 from the start of the screen, but the During
+    // has no place, so the Draw moves with the clip.
+    layout = "Clip:(100,50,300,200)\n"
+             "{\n"
+             "\tDuring:(0,49)\n"
+             "\t{\n"
+             "\t\tDraw:(A,1,4,10,10)\n"
+             "\t}\n"
+             "\tDraw:(B,1,4,10,10)\n"
+             "}\n"
+             "PushOrigin:(20,30)\n"
+             "Rect:(0,0,0,0)\n"
+             "{\n"
+             "\tTween:(0,1)\n"
+             "\t{\n"
+             "\t\tDraw:(C,1,4,10,10)\n"
+             "\t}\n"
+             "}\n"
+             "PopOrigin\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    CHECK(ssr_scene_count(scene) == 3);
+    if (ssr_scene_count(scene) == 3) {
+        const SSRSceneItem *a = ssr_scene_item(scene, 0);
+        CHECK(strcmp(a->image, "A") == 0 && a->x == 101 && a->y == 54);
+        // A Draw that is not in a During keeps its place.
+        const SSRSceneItem *b = ssr_scene_item(scene, 1);
+        CHECK(strcmp(b->image, "B") == 0 && b->x == 1 && b->y == 4);
+        // In a Tween, the origin counts two times: in the place of the Draw,
+        // and in the frame of the Rect that the Tween is in.
+        const SSRSceneItem *c = ssr_scene_item(scene, 2);
+        CHECK(strcmp(c->image, "C") == 0 && c->x == 41 && c->y == 64);
+    }
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_lists_unknown_modifiers(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     layout = "Draw:(A,0,0,10,10)\n"
@@ -1364,5 +1407,6 @@ int main(void) {
     test_lists_unknown_modifiers();
     test_aligns_text_as_the_game();
     test_gives_text_a_shadow();
+    test_draws_a_during_in_the_frame_of_its_parent();
     return TEST_RESULT();
 }
