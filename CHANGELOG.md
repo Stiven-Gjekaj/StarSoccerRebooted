@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.14.0 (2026-10-27)
+
+- Options has a Packs screen: choose a data pack or the world of the
+  game, install a pack from a file, or remove a pack. On iOS the app
+  installs each zip file of its Documents folder.
+- The squad screen has a third list: the player and the rivals, with the
+  goals, the assists, and the skills of the season.
+- Rivals grow as fast as a player who trains.
+- The Honours screen keeps the champion and the top scorer of each league
+  in each season.
+- The squad screen has the top ribbon of the game, a centred icon, and
+  the title just above the list.
+
 ## 0.13.0 (2026-10-27)
 
 - The world has players. Each club that plays gets a squad of made-up
