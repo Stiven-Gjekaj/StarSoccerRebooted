@@ -382,6 +382,10 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     if (c->loanFrom) fprintf(file, "loanfrom=%d\n", c->loanFrom);
     if (c->charityYear) fprintf(file, "charityyear=%d\n", c->charityYear);
     if (c->businessStake) fprintf(file, "businessstake=%d\n", c->businessStake);
+    if (c->exBoss[0]) {
+        write_text(file, "exboss", c->exBoss);
+        fprintf(file, "exbossclub=%d\n", c->exBossClub);
+    }
     fprintf(file, "injury=%d\n", c->injury);
     fprintf(file, "starrating=%d\n", c->starRating);
     fprintf(file, "retired=%d\n", c->retired);
@@ -572,6 +576,8 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "loanfrom") == 0) c->loanFrom = number;
         else if (strcmp(key, "charityyear") == 0) c->charityYear = number;
         else if (strcmp(key, "businessstake") == 0) c->businessStake = number;
+        else if (strcmp(key, "exboss") == 0) read_text(value, c->exBoss, sizeof(c->exBoss));
+        else if (strcmp(key, "exbossclub") == 0) c->exBossClub = number;
         else if (strcmp(key, "position") == 0 && number >= 0 && number < SSR_CAREER_POSITIONS) c->position = number;
         else if (strcmp(key, "injury") == 0) c->injury = number;
         else if (strcmp(key, "starrating") == 0) c->starRating = number;

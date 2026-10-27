@@ -251,8 +251,18 @@ static int at_game_menu(SSRGame *game, SSRTweaks *tweaks) {
 // Yes to a transfer at the end of the season: a nation, a division, a
 // club, and the contract. A season with no club that wants the player
 // goes on with the club.
+static int exBossOffers = 0;
+
 static void transfer_at_season_end(SSRGame *game, SSRTweaks *tweaks) {
     const SSRCareer *c = ssr_game_career(game);
+    // The old boss of the player, sacked by the club, wants the player at
+    // the new club. The test says no, and the offer does not come again.
+    if (strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "SSR_ExBossOffer") == 0) {
+        exBossOffers++;
+        CHECK(c->exBossClub != 0 && c->exBossClub != c->clubId);
+        ssr_game_message(game, "message.btn_Cancel");
+        CHECK(c->exBossClub == 0 && strcmp(ssr_tweaks_get(tweaks, "Menu", "MessageBody"), "CMESSAGE_SEASONENDTRANSFER") == 0);
+    }
     // At the second end the star rating is 400: the limit is about 65, so
     // the club of strength 50 wants the player.
     if (seasons == 1) ((SSRCareer *)c)->starRating = 400;
@@ -2566,6 +2576,8 @@ static void test_starts_a_new_career(void) {
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 24 && seasons < 2; i++) play_a_match(game, tweaks);
     CHECK(seasons >= 2 && transfers == 1);
+    // The offer of the old boss comes once at most.
+    CHECK(exBossOffers <= 1);
     // The stories of the news: a crisis, a rumour, and a record. A story
     // that shows has all its names and numbers.
     int stories[3] = {SSR_TICKER_WORLD_CRISIS, SSR_TICKER_WORLD_RUMOUR, SSR_TICKER_WORLD_RECORD};

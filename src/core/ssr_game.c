@@ -1608,6 +1608,7 @@ static void call_start_career(SSRGame *game) {
 static void call_drink(SSRGame *game);
 static void call_season_end_transfer(SSRGame *game);
 static void call_loan_back(SSRGame *game);
+static void call_ex_boss_offer(SSRGame *game);
 static void call_loan_offer(SSRGame *game);
 static void call_release_clause(SSRGame *game);
 static void call_charity_gift(SSRGame *game);
@@ -1667,6 +1668,7 @@ static void run_call(SSRGame *game, const char *name) {
         {"DrinkNRG", call_drink},
         {"SeasonEndTransfer", call_season_end_transfer},
         {"LoanBack", call_loan_back},
+        {"ExBossOffer", call_ex_boss_offer},
         {"LoanOffer", call_loan_offer},
         {"ReleaseClause", call_release_clause},
         {"CharityGift", call_charity_gift},
@@ -4316,16 +4318,53 @@ static void judge_managers(SSRGame *game) {
         }
     }
     int year = ssr_career_year(&game->career);
+    SSRCareer *c = &game->career;
+    // The boss of the player before the judgement.
+    const SSRManager *old = ssr_people_manager(game->people, c->clubId);
+    SSRManager before;
+    int hadBoss = old != NULL;
+    if (old) before = *old;
     ssr_people_judge_managers(game->people, game->world, game->names, bottom, n, year);
+    const SSRClub *mine = ssr_world_club(game->world, c->clubId);
     for (int k = 0; k < game->people->sackedCount; k++) {
-        if (game->people->sacked[k] != game->career.clubId) continue;
-        const SSRManager *m = ssr_people_manager(game->people, game->career.clubId);
-        game->career.relationBoss = 50;
+        int club = game->people->sacked[k];
+        SSRManager *m = ssr_people_manager(game->people, club);
+        if (!m) continue;
+        if (club != c->clubId) {
+            // The old boss of the player takes the new job at a club of the
+            // same nation, and wants the player there.
+            const SSRClub *other = ssr_world_club(game->world, club);
+            if (c->exBoss[0] && !c->exBossClub && mine && other && other->nation == mine->nation) {
+                const char *space = strchr(c->exBoss, ' ');
+                if (space) {
+                    snprintf(m->first, sizeof(m->first), "%.*s", (int)(space - c->exBoss), c->exBoss);
+                    snprintf(m->last, sizeof(m->last), "%s", space + 1);
+                }
+                c->exBossClub = club;
+            }
+            continue;
+        }
+        c->relationBoss = 50;
         char text[256], name[64];
         snprintf(name, sizeof(name), "%s %s", m->first, m->last);
         snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentManager"));
         replace_all(text, sizeof(text), "$name", name);
         moment(game, text);
+        // The sacked boss looks for a new job.
+        if (hadBoss) {
+            snprintf(c->exBoss, sizeof(c->exBoss), "%s %s", before.first, before.last);
+            c->exBossClub = 0;
+        }
+        // An attacking boss plays the player as a striker, and a youth boss
+        // likes a young player.
+        if (m->style == SSR_STYLE_ATTACKING && c->position != SSR_CAREER_STRIKER) {
+            c->position = SSR_CAREER_STRIKER;
+            snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentNewRole"));
+            replace_all(text, sizeof(text), "$name", name);
+            moment(game, text);
+        } else if (m->style == SSR_STYLE_YOUTH && ssr_career_age(c) <= 21) {
+            c->relationBoss = 60;
+        }
     }
 }
 
@@ -4540,6 +4579,15 @@ static void poty_play(SSRGame *game) {
         message(game, "message", text, 0, 1, "LoanBack");
         return;
     }
+    // The old boss of the player wants the player at the new club.
+    const SSRClub *boss = c->exBossClub && game->world ? ssr_world_club(game->world, c->exBossClub) : NULL;
+    if (boss && boss->id != c->clubId) {
+        snprintf(text, sizeof(text), "%s", loc(game, "SSR_ExBossOffer"));
+        replace_all(text, sizeof(text), "$name", c->exBoss);
+        replace_all(text, sizeof(text), "$club", boss->name);
+        message(game, "message", text, 1, 1, "ExBossOffer");
+        return;
+    }
     const SSRClub *loan = loan_club(game);
     if (loan) {
         game->loanClub = loan->id;
@@ -4549,6 +4597,29 @@ static void poty_play(SSRGame *game) {
         return;
     }
     season_end_question(game);
+}
+
+static void signed_moment(SSRGame *game);
+
+// The call "ExBossOffer": Yes follows the old boss to the new club. The
+// offer comes once.
+static void call_ex_boss_offer(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    const SSRClub *club = game->world ? ssr_world_club(game->world, c->exBossClub) : NULL;
+    c->exBossClub = 0;
+    c->exBoss[0] = 0;
+    if (game->returnState != 1 || !club) {
+        season_end_question(game);
+        return;
+    }
+    c->clubNationId = club->nation;
+    c->clubId = club->id;
+    c->relationBoss = 70;
+    c->relationTeam = (float)ssr_rand2(&game->random, 35, 50);
+    c->relationFans = (float)ssr_rand2(&game->random, 50, 60);
+    new_season(game);
+    award(game, 34);
+    signed_moment(game);
 }
 
 static void call_loan_back(SSRGame *game) {

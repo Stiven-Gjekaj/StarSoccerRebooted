@@ -86,6 +86,10 @@ typedef struct {
     // Business and charity: the year of the last gift, and the Bux in a
     // business that pays each season.
     int charityYear, businessStake;
+    // The last boss that the club of the player sacked: the name, and the
+    // club of the new job of the boss, or 0.
+    char exBoss[64];
+    int exBossClub;
     // The nation of the player, the nation of the league, and the club.
     int nationId;
     int clubNationId;
