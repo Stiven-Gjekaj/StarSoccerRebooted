@@ -325,6 +325,7 @@ static void test_keeps_the_records(void) {
     c.clubId = 10;
     c.hatTricks = 4;
     c.worldSeed = 4242;
+    c.startAge = 24;
     c.injury = 12;
     int form[5] = {0, 0, 6, 7, 8};
     memcpy(c.careerForm, form, sizeof(form));
@@ -335,6 +336,10 @@ static void test_keeps_the_records(void) {
     snprintf(path, sizeof(path), "%s/records.txt", ssr_test_directory("career_records"));
     CHECK(ssr_career_save(&c, path) && ssr_career_load(&back, path));
     CHECK(back.worldSeed == 4242 && back.injury == 12);
+    // A custom career starts at its own age.
+    CHECK(back.startAge == 24 && ssr_career_age(&back) == ssr_career_year(&back) + 23);
+    back.startAge = 0;
+    CHECK(ssr_career_age(&back) == ssr_career_year(&back) + 15);
     CHECK(back.hatTricks == 4 && memcmp(back.careerForm, form, sizeof(form)) == 0);
     CHECK(back.seasonFurthest[0] == 300.5f && back.furthest[1] == 640 && back.intFurthest[3] == 250);
     // A hat trick comes at the 3rd, the 6th, and the 9th goal only.

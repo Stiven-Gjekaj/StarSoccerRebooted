@@ -1644,7 +1644,7 @@ static void player_tweaks(SSRGame *game) {
     ssr_tweaks_set_number(t, "Player", "Gender", c->gender);
     ssr_tweaks_set_number(t, "Player", "Bux", c->bank);
     ssr_tweaks_set_number(t, "Player", "StarBux", c->bank);
-    ssr_tweaks_set_number(t, "Player", "Age", ssr_career_year(c) + 15);
+    ssr_tweaks_set_number(t, "Player", "Age", ssr_career_age(c));
     ssr_tweaks_set_number(t, "Player", "Energy", c->energy);
     // UpdatePlayerBasicTweaks.
     ssr_tweaks_set_number(t, "Player", "Happiness", ssr_career_happiness(c));

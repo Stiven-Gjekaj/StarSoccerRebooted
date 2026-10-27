@@ -75,6 +75,9 @@ typedef struct {
     // The seed of the players of the world (ssr_people). Two careers with
     // the same seed get the same world.
     int worldSeed;
+    // The age of the player in the first year: 16, or the age that a
+    // custom career chooses. 0 is 16.
+    int startAge;
     // The nation of the player, the nation of the league, and the club.
     int nationId;
     int clubNationId;
@@ -228,7 +231,8 @@ int ssr_career_player_type_index(const char *tag);
 // The star level of the career, from 1 (c_TPlayer.GetStarLevel).
 int ssr_career_star_level(const SSRCareer *career);
 
-// The age of the player: 16 in the first year (c_TPlayer.GetAge).
+// The age of the player: 16 in the first year (c_TPlayer.GetAge), or the
+// start age of a custom career.
 int ssr_career_age(const SSRCareer *career);
 
 // The year and the week of the career, from 1.
