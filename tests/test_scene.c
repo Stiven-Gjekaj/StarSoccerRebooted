@@ -1125,6 +1125,46 @@ static void test_draws_embedded_content(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// A bar follows its tweak (c_ProgressBar), and AnimateProgress moves the
+// shown value from the value before to the new value after its delay.
+static void test_progress_bars(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "P", "Fill", 25);
+    ssr_tweaks_set_number(tweaks, "P", "Rel", 50);
+    ssr_tweaks_set_number(tweaks, "P", "Rel_Before", 20);
+    ssr_tweaks_set_number(tweaks, "P", "Rel_Displayed", 20);
+    layout = "Draw:(Fill,0,0,200,20)\n"
+             "\tProgressBar(P,Fill,0,100,20)\n"
+             "Draw:(Rel,0,40,200,20)\n"
+             "\tAnimateProgress(P,Rel,H,O,B,20,200,10,0,0,0,100)\n"
+             "\tProgressBar(P,Rel_Displayed,0,100,20)\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_update(scene, &env, 0);
+    // 20 + (200 - 20) * 0.25 = 65.
+    CHECK(fabsf(find_image(scene, "Fill")->w - 65) < 0.01f);
+    CHECK(fabsf(find_image(scene, "Rel")->w - 56) < 0.01f);
+    // The value waits 10 frames, then moves.
+    for (int i = 0; i < 9; i++) ssr_scene_update(scene, &env, 16);
+    CHECK(ssr_tweaks_number(tweaks, "P", "Rel_Displayed") == 20);
+    CHECK(ssr_tweaks_number(tweaks, "P", "Rel_Before") == 50);
+    for (int i = 0; i < 5; i++) ssr_scene_update(scene, &env, 16);
+    double shown = ssr_tweaks_number(tweaks, "P", "Rel_Displayed");
+    CHECK(shown > 20 && shown < 50);
+    for (int i = 0; i < 200; i++) ssr_scene_update(scene, &env, 16);
+    CHECK(ssr_tweaks_number(tweaks, "P", "Rel_Displayed") == 50);
+    CHECK(fabsf(find_image(scene, "Rel")->w - 110) < 0.01f);
+    // A value over the max fills the bar and no more.
+    ssr_tweaks_set_number(tweaks, "P", "Fill", 140);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(fabsf(find_image(scene, "Fill")->w - 200) < 0.01f);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
     test_draws_embedded_content();
     test_scrolls_a_list_by_a_swipe();
@@ -1150,5 +1190,6 @@ int main(void) {
     test_places_images_with_origins_and_variables();
     test_shows_items_by_tweak();
     test_text_areas_layers_and_clips();
+    test_progress_bars();
     return TEST_RESULT();
 }

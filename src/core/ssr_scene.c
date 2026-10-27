@@ -81,6 +81,8 @@ typedef enum {
     D_PLAY_ANIM,
     D_READOUT,
     D_STRING_READOUT,
+    D_PROGRESS_BAR,
+    D_ANIMATE_PROGRESS,
     D_PROVIDER,
     D_SELECTOR,
     D_INCREMENT_TWEAK,
@@ -1361,6 +1363,37 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         d->v[0] = (float)number(s, m, 5, 0);
         d->v[1] = 1.8347578e11f;
         d->v[2] = is(n, "ZeroSignedReadoutLoc") ? 2 : strncmp(n, "Signed", 6) == 0 ? 1 : 0;
+    } else if (is(n, "ProgressBar")) {
+        // c_ProgressBar: the width of the element follows a tweak, from the
+        // empty size at min to the width of the element at max. A total
+        // tweak can give the max.
+        d = new_doodad(D_PROGRESS_BAR, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+        d->v[0] = (float)number(s, m, 2, 0);
+        d->v[1] = (float)number(s, m, 3, 100);
+        d->v[2] = (float)number(s, m, 4, 4);
+        d->v[3] = g->w;
+        if (m->argCount > 6 && arg(m, 5)[0] && arg(m, 6)[0]) {
+            char pair[160];
+            snprintf(pair, sizeof(pair), "%s\x1f%s", arg(m, 5), arg(m, 6));
+            d->text[2] = keep(s, pair);
+        }
+    } else if (is(n, "AnimateProgress")) {
+        // c_AnimateProgress: the tweak Name_Displayed moves from
+        // Name_Before to Name, after the delays [I: the highlight, the
+        // overlay, and the burst gadgets are not drawn].
+        d = new_doodad(D_ANIMATE_PROGRESS, m);
+        if (!d) return NULL;
+        d->text[0] = keep(s, arg(m, 0));
+        d->text[1] = keep(s, arg(m, 1));
+        double lo = 0, hi = 0;
+        if (s->env && s->env->tweaks) ssr_tweaks_range(s->env->tweaks, d->text[0], d->text[1], &lo, &hi);
+        d->v[0] = (float)number(s, m, 7, 0);
+        d->v[1] = (float)number(s, m, 8, 0);
+        d->v[2] = (float)(int)number(s, m, 10, lo);
+        d->v[3] = (float)(int)number(s, m, 11, hi);
     } else if (is(n, "StringReadout")) {
         d = new_doodad(D_STRING_READOUT, m);
         if (!d) return NULL;
@@ -2178,6 +2211,52 @@ static void readout_text(float value, int decimals, char *out, size_t capacity) 
     snprintf(out, capacity, "%.*s", keep, text);
 }
 
+// One update of c_AnimateProgress for each frame. v holds the delay, the
+// first delay, the min, the max, the progress, the delay left, the first
+// delay left, and the wrap.
+static void animate_progress(const SSRScene *s, Doodad *d) {
+    SSRTweaks *t = s->env->tweaks;
+    char shown[96], before[96], wrapName[96];
+    snprintf(shown, sizeof(shown), "%s_Displayed", d->text[1]);
+    snprintf(before, sizeof(before), "%s_Before", d->text[1]);
+    snprintf(wrapName, sizeof(wrapName), "%s_Wrap", d->text[1]);
+    const char *group = d->text[0];
+    float lo = d->v[2], hi = d->v[3];
+    for (int frame = 0; frame < s->lerps; frame++) {
+        float source = (float)ssr_tweaks_number(t, group, d->text[1]);
+        float displayed = (float)ssr_tweaks_number(t, group, shown);
+        if (displayed == source) return;
+        float was = (float)ssr_tweaks_number(t, group, before);
+        if (was != source && d->v[7] == 0) {
+            // A new value: the bar starts again from the value before it.
+            d->v[7] = (float)ssr_tweaks_number(t, group, wrapName);
+            displayed = was;
+            ssr_tweaks_set_number(t, group, before, d->v[7] > 0 ? lo : d->v[7] < 0 ? hi : source);
+            d->v[4] = 0;
+            d->v[5] = d->v[0];
+            d->v[6] = d->v[1];
+        }
+        if (d->v[6] > 0) {
+            d->v[6] -= 1;
+        } else if (d->v[5] > 0) {
+            if (d->v[6] == 0) d->v[6] = -1;
+            d->v[5] -= 1;
+        } else {
+            d->v[4] = d->v[4] + 0.01f > 1 ? 1 : d->v[4] + 0.01f;
+            float target = d->v[7] > 0 ? hi : d->v[7] < 0 ? lo : source;
+            displayed = lerp(displayed, target, d->v[4]);
+            // A wrap ends at the end of the bar. The bar then starts again
+            // from the other end.
+            if (d->v[7] != 0 && displayed == target) {
+                if (ssr_tweaks_kind(t, group, wrapName) != SSR_TWEAK_NONE) ssr_tweaks_set_number(t, group, wrapName, 0);
+                d->v[7] = 0;
+            }
+        }
+        if (fabsf(source - displayed) < 0.1f) displayed = source;
+        ssr_tweaks_set_number(t, group, shown, displayed);
+    }
+}
+
 // The second tweak of a doodad: "Group\x1fName" in text[2].
 static double tweak_pair(const SSRScene *s, const char *pair) {
     char group[80];
@@ -2359,6 +2438,17 @@ static void update(SSRScene *s, Gel *g, Doodad *d) {
     }
     case D_STRING_READOUT:
         set_shown(g, ssr_tweaks_get(s->env->tweaks, d->text[0], d->text[1]));
+        break;
+    case D_PROGRESS_BAR: {
+        float lo = d->v[0], hi = d->v[1];
+        if (d->text[2]) hi = (float)tweak_pair(s, d->text[2]);
+        float value = (float)ssr_tweaks_number(s->env->tweaks, d->text[0], d->text[1]);
+        float v = (value < hi ? value : hi) - lo;
+        g->w = lerp(d->v[2], d->v[3], v / (hi - lo));
+        break;
+    }
+    case D_ANIMATE_PROGRESS:
+        animate_progress(s, d);
         break;
     case D_PROVIDER:
         if (s->env->provide) {
