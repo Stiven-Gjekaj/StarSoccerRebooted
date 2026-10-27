@@ -14,6 +14,12 @@ typedef struct SSRText SSRText;
 SSRText *ssr_text_load(const char *path);
 void ssr_text_free(SSRText *text);
 
+// Adds the texts of the remake: a table with a Tag column and a column for
+// each language code, for example "en" and "de". A row with no text in
+// the language takes the English text. A tag of the game keeps its text.
+// Returns the number of new tags.
+int ssr_text_add(SSRText *text, const char *contents, size_t size, const char *code);
+
 // The number of tags.
 int ssr_text_count(const SSRText *text);
 

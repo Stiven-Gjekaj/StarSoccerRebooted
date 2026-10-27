@@ -19,6 +19,9 @@ struct SSRText {
     // The texts that ssr_text_rebrand makes.
     char **owned;
     int ownedCount;
+    // The tables of the texts of the remake (ssr_text_add).
+    SSRTsv **extras;
+    int extraCount;
 };
 
 static int compare_entries(const void *a, const void *b) {
@@ -58,9 +61,51 @@ void ssr_text_free(SSRText *text) {
     if (!text) return;
     for (int i = 0; i < text->ownedCount; i++) free(text->owned[i]);
     free(text->owned);
+    for (int i = 0; i < text->extraCount; i++) ssr_tsv_free(text->extras[i]);
+    free(text->extras);
     free(text->entries);
     ssr_tsv_free(text->table);
     free(text);
+}
+
+int ssr_text_add(SSRText *text, const char *contents, size_t size, const char *code) {
+    if (!text || !contents) return 0;
+    SSRTsv *table = ssr_tsv_parse(contents, size);
+    int tagColumn = ssr_tsv_column(table, "Tag");
+    int column = code ? ssr_tsv_column(table, code) : -1;
+    if (column < 0) column = ssr_tsv_column(table, "en");
+    if (!table || tagColumn < 0 || column < 0) {
+        ssr_tsv_free(table);
+        return 0;
+    }
+    SSRTsv **extras = realloc(text->extras, sizeof(SSRTsv *) * (size_t)(text->extraCount + 1));
+    if (!extras) {
+        ssr_tsv_free(table);
+        return 0;
+    }
+    text->extras = extras;
+    text->extras[text->extraCount++] = table;
+    int rows = ssr_tsv_rows(table), added = 0;
+    SSRTextEntry *entries = realloc(text->entries, sizeof(SSRTextEntry) * (size_t)(text->count + rows + 1));
+    if (!entries) return 0;
+    text->entries = entries;
+    int before = text->count;
+    for (int row = 0; row < rows; row++) {
+        const char *tag = ssr_tsv_cell(table, row, tagColumn);
+        const char *value = ssr_tsv_cell(table, row, column);
+        if (!*tag) continue;
+        // A language with no text of its own takes the English text.
+        if (!*value) value = ssr_tsv_cell(table, row, ssr_tsv_column(table, "en"));
+        SSRTextEntry key = {tag, NULL, NULL};
+        if (bsearch(&key, text->entries, (size_t)before, sizeof(SSRTextEntry), compare_entries)) continue;
+        SSRTextEntry *entry = &text->entries[text->count++];
+        entry->tag = tag;
+        entry->male = value;
+        entry->female = "";
+        added++;
+    }
+    qsort(text->entries, (size_t)text->count, sizeof(SSRTextEntry), compare_entries);
+    return added;
 }
 
 int ssr_text_count(const SSRText *text) {

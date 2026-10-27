@@ -32,6 +32,25 @@ static void test_gets_the_text_of_a_tag(void) {
     ssr_text_free(text);
 }
 
+// The texts of the remake add new tags in the language, or in English.
+static void test_adds_the_texts_of_the_remake(void) {
+    SSRText *text = ssr_text_load(write_language());
+    static const char OWN[] = "Tag\ten\tde\n"
+                              "SSR_SQUAD\tSquad\tKader\n"
+                              "SSR_RIVAL\tRival\t\n"
+                              "Tag_Language\tNot this\tNicht\n";
+    CHECK(ssr_text_add(text, OWN, sizeof(OWN) - 1, "de") == 2);
+    CHECK(strcmp(ssr_text_get(text, "SSR_SQUAD", 0), "Kader") == 0);
+    CHECK(strcmp(ssr_text_get(text, "SSR_RIVAL", 0), "Rival") == 0);
+    CHECK(strcmp(ssr_text_get(text, "Tag_Language", 0), "English") == 0);
+    CHECK(strcmp(ssr_text_get(text, "CMESSAGE_HELLO", 1), "She scores for $teamname.") == 0);
+    // A language with no column takes English.
+    CHECK(ssr_text_add(text, "Tag\ten\nSSR_NEW\tNew\n", 19, "fr") == 1);
+    CHECK(strcmp(ssr_text_get(text, "SSR_NEW", 0), "New") == 0 && ssr_text_count(text) == 6);
+    CHECK(ssr_text_add(text, "No\ttag\n", 7, "en") == 0);
+    ssr_text_free(text);
+}
+
 static void test_formats_the_values(void) {
     const char *names[] = {"team", "teamname", "amount"};
     const char *values[] = {"WRONG", "Arsenal", "$500"};
@@ -105,6 +124,7 @@ static void test_finds_the_language_of_the_device(void) {
 int main(void) {
     test_finds_the_language_of_the_device();
     test_gets_the_text_of_a_tag();
+    test_adds_the_texts_of_the_remake();
     test_puts_the_names_of_the_remake();
     test_formats_the_values();
     return TEST_RESULT();
