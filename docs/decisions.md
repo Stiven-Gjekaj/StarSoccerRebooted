@@ -138,6 +138,18 @@ Each entry gives the reason. The owner made these choices on 2026-10-26.
   data directory, with one `name=value` a line. Reason: the app cannot
   read the saves of the original game on a phone, so the format of the
   game gives nothing.
+- **The remake keeps a career in its own file**, `saves/careerN.txt` in
+  the data directory, with one `name=value` a line and the names of the
+  fields of the game. Reason: the save of the game is one long string of
+  1136 fields in the order of the code, and nothing can read the save of
+  the original on a phone.
+- **The logic of a screen asks for changes of elements by ref**, for
+  example the text of `NationText` or a new entry in `NationCombo`. Reason:
+  the code of the game changes its gadgets by ref in the same way
+  (`c_GGadget`, `c_ACombo`).
+- **Until the match is there, the trials of a new career have no score.**
+  The skills then start at 1, as for a trial that fails. Reason: the
+  trials are matches, and the game gives no skill for a trial that fails.
 - **A reference capture of the original is good only from a fresh start.**
   The original stops the screen under a popup (the onboarding), and an
   emulator can leave the game stuck. Reason: a capture of a stuck game
