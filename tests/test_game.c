@@ -902,6 +902,15 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         int rivalRows = 0;
         for (int i = 0; i < rows; i++) rivalRows += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "PlayerList") == 0;
         CHECK(rivalRows == 4);
+        // The player changes position there, and back again.
+        CHECK(ssr_tweaks_number(tweaks, "Squad", "CanPosition") == 1);
+        int position = ssr_game_career(game)->position;
+        ssr_game_message(game, "squad.btn_Position");
+        CHECK(ssr_game_career(game)->position == (position + 1) % SSR_CAREER_POSITIONS);
+        CHECK(strcmp(ssr_tweaks_get(tweaks, "Squad", "PositionText"), "SSR_PosForward") != 0 || position == 2);
+        for (int i = 1; i < SSR_CAREER_POSITIONS; i++) ssr_game_message(game, "squad.btn_Position");
+        CHECK(ssr_game_career(game)->position == position);
+        take_ops(game, ops, 256);
         ssr_game_message(game, "squad.btn_Back");
         CHECK(strcmp(ssr_game_screen(game), "league") == 0);
         take_ops(game, ops, 256);

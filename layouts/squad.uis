@@ -221,3 +221,22 @@ PushOrigin:(324,@n)
 			PlaySnd(UISelect)
 		>
 PopOrigin
+
+// The position of the player, on the list of the rivals.
+PushOrigin:(480,@n)
+	M_NavButton:(0,0,,,)
+	{
+		Draw:(ILife,27,22,96,)
+		Text:(Position,0,104,146,60,C,C)
+			FontSize(1)
+			FontScale(0.4,0.4)
+			StringReadout(Squad,PositionText)
+	}
+		Delay(0.2)
+		ConvergeFrom(640,0)
+		Click(squad.btn_Position)
+		<
+			PlaySnd(UISelect)
+		>
+		ShowIf(Squad,CanPosition,1)
+PopOrigin

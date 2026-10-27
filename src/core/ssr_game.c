@@ -3723,7 +3723,7 @@ static void squad_fill(SSRGame *game) {
         snprintf(me.last, sizeof(me.last), "%s", c->lastName);
         me.club = c->clubId;
         me.born = year - ssr_career_age(c);
-        me.position = SSR_POS_ATTACKER;
+        me.position = c->position == SSR_CAREER_HOLDING ? SSR_POS_MIDFIELDER : SSR_POS_ATTACKER;
         me.skill = (ssr_career_skill(c->technique) + ssr_career_skill(c->pace) + ssr_career_skill(c->vision) +
                     ssr_career_skill(c->setPieces) + ssr_career_skill(c->power)) / 5;
         me.seasonApps = c->seasonApps;
@@ -3744,6 +3744,10 @@ static void squad_fill(SSRGame *game) {
         ssr_tweaks_set(t, "Squad", "Title", club ? club->name : "");
         ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "SSR_Scorers"));
     }
+    // The rivals show the player, and the player can change position there.
+    static const char *const POSITIONS[SSR_CAREER_POSITIONS] = {"SSR_PosForward", "SSR_PosStriker", "SSR_PosHolding"};
+    ssr_tweaks_set_number(t, "Squad", "CanPosition", game->squadMode == 2);
+    ssr_tweaks_set(t, "Squad", "PositionText", loc(game, POSITIONS[game->career.position % SSR_CAREER_POSITIONS]));
     add_op(game, SSR_OP_LIST_START, "PlayerList", NULL, NULL, 52);
     for (int i = 0; i < n; i++) {
         // The lists of other clubs show the full name of the club. A long
@@ -3751,6 +3755,15 @@ static void squad_fill(SSRGame *game) {
         const SSRClub *of = game->squadMode ? ssr_world_club(game->world, list[i]->club) : NULL;
         squad_row(game, list[i], of ? of->name : NULL, year);
     }
+}
+
+// squad.btn_Position: the player plays in the next position. The focus of
+// the next match follows it.
+static void squad_position(SSRGame *game) {
+    if (game->squadMode != 2) return;
+    game->career.position = (game->career.position + 1) % SSR_CAREER_POSITIONS;
+    save_career(game);
+    squad_fill(game);
 }
 
 // league.btn_Squad: the squad of the chosen team of the table, or of the
@@ -9952,6 +9965,7 @@ static const Route ROUTES[] = {
     {"squad.btn_Back", squad_back},
     {"squad.inp_Name", squad_edit},
     {"squad.btn_Honours", honours_screen},
+    {"squad.btn_Position", squad_position},
     {"honours.btn_Back", honours_back},
     {"honours.btn_Mode", honours_mode},
     {"league.row_team", league_row},
