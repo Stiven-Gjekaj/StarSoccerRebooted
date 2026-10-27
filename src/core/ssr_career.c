@@ -166,6 +166,10 @@ int ssr_career_star_level(const SSRCareer *c) {
     return c->starRating / 100 + 1;
 }
 
+int ssr_career_focus(const SSRCareer *c) {
+    return c->position == SSR_CAREER_STRIKER ? 3 : c->position == SSR_CAREER_HOLDING ? 1 : 2;
+}
+
 int ssr_career_age(const SSRCareer *c) {
     return ssr_career_year(c) + (c->startAge > 0 ? c->startAge : 16) - 1;
 }
@@ -374,6 +378,7 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     fprintf(file, "potyawards=%d\nwonmajoraward=%d\n", c->potyAwards, c->wonMajorAward);
     fprintf(file, "worldseed=%d\n", c->worldSeed);
     if (c->startAge) fprintf(file, "startage=%d\n", c->startAge);
+    if (c->position) fprintf(file, "position=%d\n", c->position);
     fprintf(file, "injury=%d\n", c->injury);
     fprintf(file, "starrating=%d\n", c->starRating);
     fprintf(file, "retired=%d\n", c->retired);
@@ -561,6 +566,7 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "wonmajoraward") == 0) c->wonMajorAward = number;
         else if (strcmp(key, "worldseed") == 0) c->worldSeed = number;
         else if (strcmp(key, "startage") == 0) c->startAge = number;
+        else if (strcmp(key, "position") == 0 && number >= 0 && number < SSR_CAREER_POSITIONS) c->position = number;
         else if (strcmp(key, "injury") == 0) c->injury = number;
         else if (strcmp(key, "starrating") == 0) c->starRating = number;
         else if (strcmp(key, "retired") == 0) c->retired = number;

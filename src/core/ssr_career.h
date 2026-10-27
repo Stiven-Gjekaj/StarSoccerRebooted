@@ -78,6 +78,9 @@ typedef struct {
     // The age of the player in the first year: 16, or the age that a
     // custom career chooses. 0 is 16.
     int startAge;
+    // The position of the player: SSR_CAREER_FORWARD as in 4.32, or a
+    // position of the remake. It gives the focus at the start of a match.
+    int position;
     // The nation of the player, the nation of the league, and the club.
     int nationId;
     int clubNationId;
@@ -234,6 +237,19 @@ int ssr_career_star_level(const SSRCareer *career);
 // The age of the player: 16 in the first year (c_TPlayer.GetAge), or the
 // start age of a custom career.
 int ssr_career_age(const SSRCareer *career);
+
+// The positions of the player.
+enum {
+    SSR_CAREER_FORWARD,
+    SSR_CAREER_STRIKER,
+    SSR_CAREER_HOLDING,
+    SSR_CAREER_POSITIONS,
+};
+
+// The focus of the player at the start of a match (1 defence, 2 balance,
+// 3 attack): a forward is balanced as in 4.32, a striker attacks, and a
+// holding midfielder defends.
+int ssr_career_focus(const SSRCareer *career);
 
 // The year and the week of the career, from 1.
 int ssr_career_year(const SSRCareer *career);

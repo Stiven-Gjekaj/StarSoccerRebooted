@@ -326,6 +326,7 @@ static void test_keeps_the_records(void) {
     c.hatTricks = 4;
     c.worldSeed = 4242;
     c.startAge = 24;
+    c.position = SSR_CAREER_HOLDING;
     c.injury = 12;
     int form[5] = {0, 0, 6, 7, 8};
     memcpy(c.careerForm, form, sizeof(form));
@@ -339,6 +340,12 @@ static void test_keeps_the_records(void) {
     // A custom career starts at its own age.
     CHECK(back.startAge == 24 && ssr_career_age(&back) == ssr_career_year(&back) + 23);
     back.startAge = 0;
+    // The position gives the focus at the start of a match.
+    CHECK(back.position == SSR_CAREER_HOLDING && ssr_career_focus(&back) == 1);
+    back.position = SSR_CAREER_STRIKER;
+    CHECK(ssr_career_focus(&back) == 3);
+    back.position = SSR_CAREER_FORWARD;
+    CHECK(ssr_career_focus(&back) == 2);
     CHECK(ssr_career_age(&back) == ssr_career_year(&back) + 15);
     CHECK(back.hatTricks == 4 && memcmp(back.careerForm, form, sizeof(form)) == 0);
     CHECK(back.seasonFurthest[0] == 300.5f && back.furthest[1] == 640 && back.intFurthest[3] == 250);
