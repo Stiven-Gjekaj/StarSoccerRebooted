@@ -141,9 +141,11 @@ A file `crests/<club id>.png` is the crest of the club. The crest takes
 the place of the shield of the club on the screens of the match and on
 the fixtures of the club.
 
-- The app cuts the image to a circle and puts a white ring around it.
-  Give a square image with the crest in the middle, for example 256 by
-  256 pixels.
+- The crest goes on the round face of the badge, under its chrome ring.
+  The face is turned a little to the side and bends like a dome, so the
+  edge of the crest bends away.
+- Give a square image with the crest in the middle, for example 256 by
+  256 pixels. The app uses the circle in the middle of the image.
 - A transparent part of the image shows white.
 
 ## The players of the world
