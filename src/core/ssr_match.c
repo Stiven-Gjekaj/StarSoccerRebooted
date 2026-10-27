@@ -127,6 +127,8 @@ void ssr_match_start(SSRMatch *m, const SSRMatchSetup *setup, const char *(*loca
     // c_TMatch: the stadium by the strength of the home team.
     float home = setup->homeStrength;
     m->stadiumSize = home >= 90 ? 4 : home >= 75 ? 3 : home >= 55 ? 2 : home >= 35 ? 1 : 0;
+    // [I: a cup final of the remake is in the biggest stadium.]
+    if (setup->bigMatch == SSR_BIG_FINAL) m->stadiumSize = 4;
     set_up_chances(m, random);
     // The wind at kick-off.
     int top = setup->starLevel / 2;
@@ -150,6 +152,8 @@ int ssr_match_play(SSRMatch *m, int now) {
         if (m->minute == 0) {
             say(m, 0, "Kick Off", 0, 0);
             if (m->setup.weather == 1) say(m, 0, text_of(m, "SSR_MatchRain"), 0, 0);
+            if (m->setup.bigMatch == SSR_BIG_FINAL) say(m, 0, text_of(m, "SSR_MatchFinal"), 0, 0);
+            if (m->setup.bigMatch == SSR_BIG_MUST_WIN) say(m, 0, text_of(m, "SSR_MatchMustWin"), 0, 0);
         }
         return 0;
     case SSR_MATCH_PENALTIES:
@@ -690,6 +694,8 @@ SSRChanceSetup ssr_match_chance_setup(const SSRMatch *m, int technique, int powe
     c.minute = m->minute;
     c.teamStrength = s->myTeam == 1 ? s->homeStrength : s->awayStrength;
     c.opponentStrength = s->myTeam == 1 ? s->awayStrength : s->homeStrength;
+    // [I: the pressure of a big match: the other team raises its game.]
+    if (s->bigMatch != SSR_BIG_NONE) c.opponentStrength *= s->bigMatch == SSR_BIG_FINAL ? 1.08f : 1.05f;
     c.power = power;
     c.technique = technique;
     c.vision = s->vision;

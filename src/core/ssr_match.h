@@ -67,7 +67,20 @@ typedef struct {
     // The weather of the remake: 0 dry, 1 rain. A wet pitch lets the ball
     // roll further (SSRChanceSetup.weather).
     int weather;
+    // A big match of the remake (SSR_BIG_*): the stadium is full, and the
+    // other team raises its game.
+    int bigMatch;
 } SSRMatchSetup;
+
+// The big matches of the remake.
+enum {
+    SSR_BIG_NONE,
+    // A league match near the end of the season that the club must win:
+    // for the title, for promotion, or to stay up.
+    SSR_BIG_MUST_WIN,
+    // The final of a cup.
+    SSR_BIG_FINAL,
+};
 
 // One row of the commentary.
 typedef struct {

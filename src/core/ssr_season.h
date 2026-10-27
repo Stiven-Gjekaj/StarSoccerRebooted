@@ -177,6 +177,8 @@ int ssr_fixture_away_team(SSRSeason *season, const SSRFixture *fixture);
 // The table id of the winner and of the loser of a played fixture, or 0.
 int ssr_fixture_winner(SSRSeason *season, const SSRFixture *fixture);
 int ssr_fixture_loser(SSRSeason *season, const SSRFixture *fixture);
+// 1 when the competition is the final of a cup (IsCupFinal(false)).
+int ssr_season_is_final(SSRSeason *season, const SSRSeasonComp *comp);
 // 1 when the club or nation team won the final of the cup with the
 // played fixture (IsCupFinal(false), and not a first leg).
 int ssr_season_won_final(SSRSeason *season, const SSRSeasonComp *comp, const SSRFixture *fixture, int team);

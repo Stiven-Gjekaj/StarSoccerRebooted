@@ -2071,6 +2071,28 @@ static void match_ball_tweak(SSRGame *game) {
     ssr_tweaks_set_number(game->tweaks, "Match", "MatchBall", ball - 1);
 }
 
+// The rounds at the end of a league season that make a big match.
+#define MUST_WIN_ROUNDS 3
+
+// A big match of the remake: a cup final, or a league match near the end of
+// the season for a club in the top two places or the bottom three.
+static int big_match(SSRGame *game, SSRSeasonComp *comp, const SSRFixture *f, SSRPool *pool, int tableId) {
+    if (ssr_season_is_final(game->season, comp)) return SSR_BIG_FINAL;
+    if (comp->data->type != 0 || pool->count < 6) return SSR_BIG_NONE;
+    int left = 0;
+    for (int k = 0; k < comp->fixtureCount; k++) {
+        const SSRFixture *x = &comp->fixtures[k];
+        left += x->group == f->group && x->result == 0 && (x->home == tableId || x->away == tableId);
+    }
+    if (left > MUST_WIN_ROUNDS) return SSR_BIG_NONE;
+    int teamId = 0;
+    for (int r = 0; r < pool->count; r++) {
+        if (game->season->rows[pool->rows[r]].id == tableId) teamId = game->season->rows[pool->rows[r]].teamId;
+    }
+    int position = ssr_season_position(game->season, pool, teamId);
+    return position >= 1 && (position <= 2 || position > pool->count - 3) ? SSR_BIG_MUST_WIN : SSR_BIG_NONE;
+}
+
 static void start_match(SSRGame *game) {
     season_in(game);
     SSRFixture *f = ssr_season_next_fixture(game->season);
@@ -2132,6 +2154,7 @@ static void start_match(SSRGame *game) {
         s.weather = ssr_rand(&r, 80) < far && ssr_rand(&r, 4) == 1;
     }
     ssr_tweaks_set_number(game->tweaks, "Pitch", "WeatherType", s.weather ? 3 : 0);
+    s.bigMatch = big_match(game, comp, f, pool, homeIsMine ? f->home : f->away);
     ssr_match_start(game->match, &s, game->localise, game->context, &game->random);
     game->commentaryCount = 0;
     SSRTweaks *t = game->tweaks;
@@ -2349,6 +2372,16 @@ static void end_match(SSRGame *game) {
             if (ssr_world_is_derby(game->world, a, b) || ssr_honours_rivalry(&game->honours, a, b) >= SSR_RIVALRY_POINTS) {
                 game->after.fans = game->after.fans * 3 / 2;
             }
+        }
+        // A big match counts more for the fans and the boss: two times in a
+        // final, and half as much again in a match that the club must win.
+        int big = game->match ? game->match->setup.bigMatch : SSR_BIG_NONE;
+        if (big == SSR_BIG_FINAL) {
+            game->after.fans *= 2;
+            game->after.boss *= 2;
+        } else if (big == SSR_BIG_MUST_WIN) {
+            game->after.fans = game->after.fans * 3 / 2;
+            game->after.boss = game->after.boss * 3 / 2;
         }
     }
     // The counts of the club, or of the nation (c_TScreen_MatchStats).

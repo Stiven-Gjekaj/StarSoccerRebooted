@@ -1292,6 +1292,10 @@ static int is_cup_final(SSRSeason *s, const SSRSeasonComp *c, int playOff) {
     return 1;
 }
 
+int ssr_season_is_final(SSRSeason *s, const SSRSeasonComp *c) {
+    return s && c && is_cup_final(s, c, 0);
+}
+
 int ssr_season_won_final(SSRSeason *s, const SSRSeasonComp *c, const SSRFixture *f, int team) {
     if (!s || !c || !f || team == 0 || f->result == 0 || f->matchType == SSR_FIXTURE_FIRST_LEG) return 0;
     if (!is_cup_final(s, c, 0)) return 0;

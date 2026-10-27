@@ -314,6 +314,31 @@ static void test_plays_in_the_rain(void) {
     CHECK(rain == 1 && ssr_match_chance_setup(&m, 50, 50, 1).weather == 1);
 }
 
+// A cup final is in the biggest stadium, says so at the kick-off, and the
+// other team raises its game. A match that the club must win says so too.
+static void test_plays_a_big_match(void) {
+    SSRMatch plain, final, must;
+    SSRRandom random = {11};
+    SSRMatchSetup s = setup_for();
+    s.homeStrength = 20;
+    ssr_match_start(&plain, &s, localise, NULL, &random);
+    s.bigMatch = SSR_BIG_FINAL;
+    ssr_match_start(&final, &s, localise, NULL, &random);
+    s.bigMatch = SSR_BIG_MUST_WIN;
+    ssr_match_start(&must, &s, localise, NULL, &random);
+    CHECK(plain.stadiumSize == 0 && final.stadiumSize == 4 && must.stadiumSize == 0);
+    float a = ssr_match_chance_setup(&plain, 50, 50, 1).opponentStrength;
+    CHECK(ssr_match_chance_setup(&final, 50, 50, 1).opponentStrength > a);
+    CHECK(ssr_match_chance_setup(&must, 50, 50, 1).opponentStrength > a);
+    ssr_match_play(&final, 0);
+    ssr_match_play(&must, 0);
+    SSRMatchLine line;
+    int said = 0;
+    while (ssr_match_take_line(&final, &line)) said += strcmp(line.text, "SSR_MatchFinal") == 0;
+    while (ssr_match_take_line(&must, &line)) said += strcmp(line.text, "SSR_MatchMustWin") == 0;
+    CHECK(said == 2);
+}
+
 static void test_the_captain_draws_runs(void) {
     SSRMatch m;
     SSRRandom random = {11};
@@ -338,6 +363,7 @@ int main(void) {
     test_counts_the_posts_and_the_late_goals();
     test_a_team_behind_pushes();
     test_plays_in_the_rain();
+    test_plays_a_big_match();
     test_plays_a_match();
     test_a_cup_tie_goes_to_extra_time_and_penalties();
     test_counts_the_goals_of_the_player();
