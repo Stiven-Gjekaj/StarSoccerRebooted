@@ -6,3 +6,8 @@ build/
 *.apk
 *.xapk
 *.ipa
+
+# Android build files
+android/.gradle/
+android/app/.cxx/
+android/local.properties

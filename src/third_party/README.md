@@ -22,3 +22,7 @@ change in the code that uses them.
   `a466dbe88fe2576d46c43877d602f3d66b8561a7`. The license is public
   domain or MIT-0. The app uses it for the sounds of an IPA. The SHA-256 of
   the file is `390e4e0ef0cff80fb86ebf1b461d6947cfa4ed699a4fe107e5a5e69a47db2950`.
+- `android/app/src/main/java/org/libsdl/app/`: the Java part of SDL 3.4.18
+  for Android, from `android-project` of the SDL source. The license is
+  zlib. Do not change the files. Put each change in
+  `StarSoccerActivity.java`.

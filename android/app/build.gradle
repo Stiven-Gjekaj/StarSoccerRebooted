@@ -1,0 +1,42 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The version comes from the project line of CMakeLists.txt.
+def cmakeText = file('../../CMakeLists.txt').text
+def appVersion = (cmakeText =~ /project\(StarSoccerRebooted VERSION ([0-9.]+)/)[0][1]
+def versionParts = appVersion.tokenize('.').collect { it.toInteger() }
+
+android {
+    namespace = "io.github.stivengjekaj.starsoccerrebooted"
+    compileSdk 36
+    ndkVersion = "30.0.16248370"
+    defaultConfig {
+        applicationId "io.github.stivengjekaj.starsoccerrebooted"
+        minSdkVersion 24
+        targetSdkVersion 36
+        versionCode versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
+        versionName appVersion
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_PLATFORM=android-24", "-DANDROID_STL=c++_static"
+                abiFilters 'arm64-v8a', 'x86_64'
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path '../../CMakeLists.txt'
+            version '3.31.6'
+        }
+    }
+    lint {
+        abortOnError = false
+    }
+}

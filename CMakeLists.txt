@@ -51,8 +51,17 @@ target_include_directories(ssr_core PRIVATE src/third_party)
 target_link_libraries(ssr_core PUBLIC ZLIB::ZLIB)
 target_compile_options(ssr_core PRIVATE -Wall -Wextra)
 
-# The app. On macOS it is an app bundle.
-add_executable(ssr MACOSX_BUNDLE src/app/main.c src/app/ssr_gfx.c src/app/ssr_audio.c)
+# The app. On macOS it is an app bundle. On Android it is libmain.so, which
+# the activity of SDL loads.
+set(SSR_APP_SOURCES src/app/main.c src/app/ssr_gfx.c src/app/ssr_audio.c)
+if(ANDROID)
+    # SDL has C++ code on Android, so the library links the C++ runtime.
+    enable_language(CXX)
+    add_library(ssr SHARED ${SSR_APP_SOURCES})
+    set_target_properties(ssr PROPERTIES LINKER_LANGUAGE CXX)
+else()
+    add_executable(ssr MACOSX_BUNDLE ${SSR_APP_SOURCES})
+endif()
 target_link_libraries(ssr PRIVATE ssr_core ${SSR_SDL})
 target_compile_options(ssr PRIVATE -Wall -Wextra)
 target_compile_definitions(ssr PRIVATE SSR_VERSION="${PROJECT_VERSION}")
@@ -77,6 +86,9 @@ set_target_properties(ssr PROPERTIES
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
 )
+if(ANDROID)
+    set_target_properties(ssr PROPERTIES OUTPUT_NAME main)
+endif()
 
 # The tests run on the computer that builds the app.
 if(IOS OR ANDROID)
