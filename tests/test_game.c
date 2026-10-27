@@ -2686,11 +2686,33 @@ static void test_starts_a_new_career(void) {
     ssr_game_message(game, "customcareer.btn_Skill");
     for (int i = 0; i < 3; i++) ssr_game_message(game, "customcareer.btn_Skill");
     CHECK(strcmp(ssr_game_text(game, "GS_CustomSkill"), "30") == 0);
+    // A striker at the strongest club of the league, with 100 Bux.
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomPosition"), "SSR_PosForward") == 0);
+    ssr_game_message(game, "customcareer.btn_PositionDown");
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomPosition"), "SSR_PosHolding") == 0);
+    ssr_game_message(game, "customcareer.btn_Position");
+    ssr_game_message(game, "customcareer.btn_Position");
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomPosition"), "SSR_PosStriker") == 0);
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomClub"), "SSR_CustomSkillTrials") == 0);
+    ssr_game_message(game, "customcareer.btn_ClubDown");
+    ssr_game_message(game, "customcareer.btn_Club");
+    ssr_game_message(game, "customcareer.btn_Club");
+    int strongest = 0;
+    for (int i = 0; i < world.clubCount; i++) {
+        if (!strongest || world.clubs[i].strength > ssr_world_club(&world, strongest)->strength) strongest = world.clubs[i].id;
+    }
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomClub"), ssr_world_club(&world, strongest)->name) == 0);
+    ssr_game_message(game, "customcareer.btn_BuxDown");
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomBux"), "2000") == 0);
+    ssr_game_message(game, "customcareer.btn_Bux");
+    ssr_game_message(game, "customcareer.btn_Bux");
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomBux"), "100") == 0);
     ssr_game_message(game, "customcareer.btn_Ok");
     fail_the_trials(game, tweaks);
     ssr_game_message(game, "message.btn_Ok");
     career = ssr_game_career(game);
     CHECK(strcmp(ssr_game_screen(game), "startransition") == 0 && career->startAge == 20);
+    CHECK(career->position == SSR_CAREER_STRIKER && career->clubId == strongest && career->bank >= 100);
     CHECK(ssr_career_age(career) == 20 && ssr_tweaks_number(tweaks, "Player", "Age") == 20);
     CHECK(ssr_career_skill(career->technique) >= 30 && ssr_career_skill(career->power) >= 30);
     CHECK(ssr_career_skill(career->pace) >= 30 && ssr_career_skill(career->vision) >= 30);

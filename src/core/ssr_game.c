@@ -197,6 +197,11 @@ struct SSRGame {
     // the five skills has at the least at the start (0: the trials give
     // the skills).
     int customAge, customSkill;
+    // The position, the first club (0: the game chooses it, or an index
+    // from 1 into customClubs), and the index of the first Bux.
+    int customPosition, customClub, customBux;
+    int customClubs[512];
+    int customClubCount;
     // 0 no name, 1 the first name, 2 the last name takes the keyboard.
     int typing;
     // The seed that the player types on the world screen.
@@ -1284,15 +1289,43 @@ static const SSRClub *first_club(SSRGame *game, int nation) {
 #define CUSTOM_SKILL_STEP 10
 #define CUSTOM_SKILL_MAX 70
 
+// The Bux at the start of a custom career. The first is the Bux of 4.32.
+static const int CUSTOM_BUX[4] = {15, 100, 500, 2000};
+
+static int stronger_club(const void *a, const void *b) {
+    const SSRClub *x = *(const SSRClub *const *)a, *y = *(const SSRClub *const *)b;
+    if (x->strength != y->strength) return y->strength - x->strength;
+    return strcmp(x->name, y->name);
+}
+
+static int league_duration(const SSRWorld *world, int league);
+
 static void nation_ok(SSRGame *game) {
     if (!game->canPlay || !game->world) return;
     game->customAge = CUSTOM_AGE_MIN;
     game->customSkill = 0;
+    game->customPosition = SSR_CAREER_FORWARD;
+    game->customClub = 0;
+    game->customBux = 0;
+    // The clubs of the leagues of the nation, the strongest first.
+    const SSRWorld *world = game->world;
+    int nation = chosen(game, "ChosenDesiredLeague");
+    const SSRClub *clubs[512];
+    int n = 0;
+    for (int i = 0; i < world->clubCount && n < 512; i++) {
+        const SSRClub *c = &world->clubs[i];
+        if (c->nation == nation && c->league > 0 && c->bTeamOf == 0 && league_duration(world, c->league) > 0) clubs[n++] = c;
+    }
+    qsort(clubs, (size_t)n, sizeof(clubs[0]), stronger_club);
+    for (int i = 0; i < n; i++) game->customClubs[i] = clubs[i]->id;
+    game->customClubCount = n;
     set_screen(game, "customcareer");
     ssr_tweaks_set(game->tweaks, "Custom", "Title", loc(game, "SSR_CustomTitle"));
     ssr_tweaks_set(game->tweaks, "Custom", "AgeLabel", loc(game, "SSR_CustomAge"));
     ssr_tweaks_set(game->tweaks, "Custom", "SkillLabel", loc(game, "SSR_CustomSkill"));
-    ssr_tweaks_set(game->tweaks, "Custom", "Help", loc(game, "SSR_CustomHelp"));
+    ssr_tweaks_set(game->tweaks, "Custom", "PositionLabel", loc(game, "SSR_CustomPosition"));
+    ssr_tweaks_set(game->tweaks, "Custom", "ClubLabel", loc(game, "SSR_CustomClub"));
+    ssr_tweaks_set(game->tweaks, "Custom", "BuxLabel", loc(game, "SSR_CustomBux"));
 }
 
 static void custom_age(SSRGame *game) {
@@ -1311,6 +1344,30 @@ static void custom_skill_down(SSRGame *game) {
     game->customSkill = game->customSkill <= 0 ? CUSTOM_SKILL_MAX : game->customSkill - CUSTOM_SKILL_STEP;
 }
 
+static void custom_position(SSRGame *game) {
+    game->customPosition = (game->customPosition + 1) % SSR_CAREER_POSITIONS;
+}
+
+static void custom_position_down(SSRGame *game) {
+    game->customPosition = (game->customPosition + SSR_CAREER_POSITIONS - 1) % SSR_CAREER_POSITIONS;
+}
+
+static void custom_club(SSRGame *game) {
+    game->customClub = (game->customClub + 1) % (game->customClubCount + 1);
+}
+
+static void custom_club_down(SSRGame *game) {
+    game->customClub = (game->customClub + game->customClubCount) % (game->customClubCount + 1);
+}
+
+static void custom_bux(SSRGame *game) {
+    game->customBux = (game->customBux + 1) % 4;
+}
+
+static void custom_bux_down(SSRGame *game) {
+    game->customBux = (game->customBux + 3) % 4;
+}
+
 static void custom_ok(SSRGame *game) {
     if (!game->canPlay || !game->world) return;
     int league = chosen(game, "ChosenDesiredLeague");
@@ -1324,8 +1381,15 @@ static void custom_ok(SSRGame *game) {
     horses_for_career(game);
     game->career.nationId = chosen(game, "ChosenDesiredNation");
     game->career.startAge = game->customAge > CUSTOM_AGE_MIN ? game->customAge : 0;
-    // LoadDataAndStartTrial: the game chooses the club.
+    game->career.position = game->customPosition;
+    game->career.bank = CUSTOM_BUX[game->customBux % 4];
+    // LoadDataAndStartTrial: the game chooses the club. A custom career can
+    // choose it.
     const SSRClub *club = first_club(game, league);
+    if (game->customClub > 0 && game->customClub <= game->customClubCount) {
+        const SSRClub *own = ssr_world_club(game->world, game->customClubs[game->customClub - 1]);
+        if (own) club = own;
+    }
     if (!club) return;
     game->career.clubId = club->id;
     // SetUpCompetitionsAll comes after the choice of the club (CSPEC 7).
@@ -2138,7 +2202,7 @@ static void start_match(SSRGame *game) {
     s.awayStrength = (float)away.strength;
     s.myTeam = homeIsMine ? 1 : 2;
     s.playerName = c->shortName;
-    s.focus = 2;
+    s.focus = ssr_career_focus(c);
     s.workRate = 2;
     s.energy = c->energy;
     s.age = ssr_career_age(c);
@@ -9866,6 +9930,12 @@ static const Route ROUTES[] = {
     {"customcareer.btn_Skill", custom_skill},
     {"customcareer.btn_SkillDown", custom_skill_down},
     {"customcareer.btn_Ok", custom_ok},
+    {"customcareer.btn_Position", custom_position},
+    {"customcareer.btn_PositionDown", custom_position_down},
+    {"customcareer.btn_Club", custom_club},
+    {"customcareer.btn_ClubDown", custom_club_down},
+    {"customcareer.btn_Bux", custom_bux},
+    {"customcareer.btn_BuxDown", custom_bux_down},
     {"customcareer.btn_Back", choose_nation},
     {"webpage.btn_Ok", webpage_ok},
     {"gamemenu.btn_Quit", quit_career},
@@ -10659,6 +10729,18 @@ const char *ssr_game_text(SSRGame *game, const char *name) {
     }
     if (strcmp(name, "GS_CustomAge") == 0) {
         snprintf(game->shown, sizeof(game->shown), "%d", game->customAge);
+        return game->shown;
+    }
+    if (strcmp(name, "GS_CustomPosition") == 0) {
+        static const char *const TAGS[SSR_CAREER_POSITIONS] = {"SSR_PosForward", "SSR_PosStriker", "SSR_PosHolding"};
+        return loc(game, TAGS[game->customPosition % SSR_CAREER_POSITIONS]);
+    }
+    if (strcmp(name, "GS_CustomClub") == 0) {
+        if (game->customClub == 0 || game->customClub > game->customClubCount) return loc(game, "SSR_CustomSkillTrials");
+        return club_name(game, game->customClubs[game->customClub - 1]);
+    }
+    if (strcmp(name, "GS_CustomBux") == 0) {
+        snprintf(game->shown, sizeof(game->shown), "%d", CUSTOM_BUX[game->customBux % 4]);
         return game->shown;
     }
     if (strcmp(name, "GS_CustomSkill") == 0) {

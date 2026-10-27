@@ -1,7 +1,7 @@
-// The custom career: the age and the skills of the player at the start.
-// A screen of the remake. It comes after the choice of the nation, before
-// the trials. The minus and the plus buttons change each value, and a tap
-// on a value also goes up.
+// The custom career: the age, the skills, the position, the first club,
+// and the Bux of the player at the start. A screen of the remake. It comes
+// after the choice of the nation, before the trials. The minus and the plus
+// buttons change each value, and a tap on a value also goes up.
 
 UnsortedLayer:(AfterGloss,1)
 
@@ -24,10 +24,10 @@ Rect:()
 
 // The top of the buttons at the bottom.
 Set:(@n=[@B-960]*0.7+744)
-// The top of the title. The title, the values, and the help go in the
+// The top of the title. The title and the values (632 high) go in the
 // middle between the ribbon and the buttons at the bottom. The value comes
 // from a frame of the screen.
-Set:(@m=[@n+156]*0.5-308)
+Set:(@m=[@n+156]*0.5-378)
 
 // The title.
 PushOrigin:(60,@m)
@@ -47,24 +47,24 @@ PushOrigin:(60,@m)
 		ConvergeFrom(-640,0)
 PopOrigin
 
-PushOrigin:(13,@m+102)
-	Rect:(0,0,614,120)
+PushOrigin:(13,@m+96)
+	Rect:(0,0,614,100)
 	{
-		Draw:(GreyRecess,0,0,614,120)
-		Text:(LABEL,10,4,594,44,C,,#BBDDBBFF)
+		Draw:(GreyRecess,0,0,614,100)
+		Text:(LABEL,10,2,594,38,C,,#BBDDBBFF)
 			Layer(AfterGloss)
 			FontSize(1)
-			FontScale(0.45,0.45)
+			FontScale(0.4,0.4)
 			StringReadout(Custom,AgeLabel)
 	}
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(23,@m+150)
-	Rect:(0,0,110,62)
+PushOrigin:(23,@m+134)
+	Rect:(0,0,110,56)
 	{
-		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,62)
-		Text:(-,0,0,110,58,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,56)
+		Text:(-,0,0,110,52,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -75,13 +75,13 @@ PushOrigin:(23,@m+150)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(145,@m+150)
-	Rect:(0,0,350,62)
+PushOrigin:(145,@m+134)
+	Rect:(0,0,350,56)
 	{
-		Text:(00,0,0,350,58,C,,#FFFFFFFF)
+		Text:(00,0,0,350,52,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
-			FontScale(0.6,0.6)
+			FontScale(0.5,0.5)
 			GS_CustomAge()
 	}
 		Click(customcareer.btn_Age)
@@ -90,12 +90,12 @@ PushOrigin:(145,@m+150)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(507,@m+150)
-	Rect:(0,0,110,62)
+PushOrigin:(507,@m+134)
+	Rect:(0,0,110,56)
 	{
-		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,62)
-		Text:(+,0,0,110,58,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,56)
+		Text:(+,0,0,110,52,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -107,24 +107,24 @@ PushOrigin:(507,@m+150)
 		ConvergeFrom(-640,0)
 PopOrigin
 
-PushOrigin:(13,@m+242)
-	Rect:(0,0,614,120)
+PushOrigin:(13,@m+204)
+	Rect:(0,0,614,100)
 	{
-		Draw:(GreyRecess,0,0,614,120)
-		Text:(LABEL,10,4,594,44,C,,#BBDDBBFF)
+		Draw:(GreyRecess,0,0,614,100)
+		Text:(LABEL,10,2,594,38,C,,#BBDDBBFF)
 			Layer(AfterGloss)
 			FontSize(1)
-			FontScale(0.45,0.45)
+			FontScale(0.4,0.4)
 			StringReadout(Custom,SkillLabel)
 	}
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(23,@m+290)
-	Rect:(0,0,110,62)
+PushOrigin:(23,@m+242)
+	Rect:(0,0,110,56)
 	{
-		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,62)
-		Text:(-,0,0,110,58,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,56)
+		Text:(-,0,0,110,52,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -135,13 +135,13 @@ PushOrigin:(23,@m+290)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(145,@m+290)
-	Rect:(0,0,350,62)
+PushOrigin:(145,@m+242)
+	Rect:(0,0,350,56)
 	{
-		Text:(00,0,0,350,58,C,,#FFFFFFFF)
+		Text:(00,0,0,350,52,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
-			FontScale(0.6,0.6)
+			FontScale(0.5,0.5)
 			GS_CustomSkill()
 	}
 		Click(customcareer.btn_Skill)
@@ -150,12 +150,12 @@ PushOrigin:(145,@m+290)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(507,@m+290)
-	Rect:(0,0,110,62)
+PushOrigin:(507,@m+242)
+	Rect:(0,0,110,56)
 	{
-		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,62)
-		Text:(+,0,0,110,58,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,56)
+		Text:(+,0,0,110,52,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -167,16 +167,183 @@ PushOrigin:(507,@m+290)
 		ConvergeFrom(-640,0)
 PopOrigin
 
-// The help.
-PushOrigin:(13,@m+382)
-	Rect:(0,0,614,110)
+PushOrigin:(13,@m+312)
+	Rect:(0,0,614,100)
 	{
-		Text:(HELP,20,0,574,110,C,,#BBDDBBFF)
+		Draw:(GreyRecess,0,0,614,100)
+		Text:(LABEL,10,2,594,38,C,,#BBDDBBFF)
 			Layer(AfterGloss)
 			FontSize(1)
-			FontScale(0.38,0.38)
-			StringReadout(Custom,Help)
+			FontScale(0.4,0.4)
+			StringReadout(Custom,PositionLabel)
 	}
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(23,@m+350)
+	Rect:(0,0,110,56)
+	{
+		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,56)
+		Text:(-,0,0,110,52,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_PositionDown)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(145,@m+350)
+	Rect:(0,0,350,56)
+	{
+		Text:(00,0,0,350,52,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.5,0.5)
+			GS_CustomPosition()
+	}
+		Click(customcareer.btn_Position)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(507,@m+350)
+	Rect:(0,0,110,56)
+	{
+		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,56)
+		Text:(+,0,0,110,52,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_Position)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+
+PushOrigin:(13,@m+420)
+	Rect:(0,0,614,100)
+	{
+		Draw:(GreyRecess,0,0,614,100)
+		Text:(LABEL,10,2,594,38,C,,#BBDDBBFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.4,0.4)
+			StringReadout(Custom,ClubLabel)
+	}
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(23,@m+458)
+	Rect:(0,0,110,56)
+	{
+		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,56)
+		Text:(-,0,0,110,52,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_ClubDown)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(145,@m+458)
+	Rect:(0,0,350,56)
+	{
+		Text:(00,0,0,350,52,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.5,0.5)
+			GS_CustomClub()
+	}
+		Click(customcareer.btn_Club)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(507,@m+458)
+	Rect:(0,0,110,56)
+	{
+		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,56)
+		Text:(+,0,0,110,52,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_Club)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+
+PushOrigin:(13,@m+528)
+	Rect:(0,0,614,100)
+	{
+		Draw:(GreyRecess,0,0,614,100)
+		Text:(LABEL,10,2,594,38,C,,#BBDDBBFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.4,0.4)
+			StringReadout(Custom,BuxLabel)
+	}
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(23,@m+566)
+	Rect:(0,0,110,56)
+	{
+		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,56)
+		Text:(-,0,0,110,52,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_BuxDown)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(145,@m+566)
+	Rect:(0,0,350,56)
+	{
+		Text:(00,0,0,350,52,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.5,0.5)
+			GS_CustomBux()
+	}
+		Click(customcareer.btn_Bux)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(507,@m+566)
+	Rect:(0,0,110,56)
+	{
+		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,56)
+		Text:(+,0,0,110,52,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_Bux)
+		<
+			PlaySnd(UISelect)
+		>
 		ConvergeFrom(-640,0)
 PopOrigin
 
