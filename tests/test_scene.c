@@ -1723,6 +1723,22 @@ static void test_follows_a_spine_slot(void) {
     ssr_spine_free(testSpine);
 }
 
+// FontStyle() gives the shadow of a text its colour and its offset
+// (c_FontStyleHelper).
+static void test_styles_the_shadow_of_a_text(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRUiTree *tree;
+    SSRScene *scene = build("TextBox:(Title,0,0,600,100,,,#FFFFFFFF)\n"
+                            "\tFontStyle(#FF0000FF,4,6)\n",
+                            tweaks, &tree);
+    const SSRSceneItem *title = find_text(scene, "Title");
+    CHECK(title && title->shadow && near(title->shadowX, 4) && near(title->shadowY, 6));
+    CHECK(title && title->shadowColour == 0xFF0000FFu);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_scrolls_a_list_by_a_swipe(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRUiTree *tree;
@@ -2110,6 +2126,7 @@ int main(void) {
     test_spawns_an_emitter_at_a_point();
     test_sets_the_place_on_the_screen();
     test_follows_a_spine_slot();
+    test_styles_the_shadow_of_a_text();
     test_sends_the_messages_of_an_update();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();

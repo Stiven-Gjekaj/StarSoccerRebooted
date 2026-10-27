@@ -1424,6 +1424,14 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
             g->shadowY = (float)number(s, m, 1, g->shadowY);
             if (g->shadowX == 0 && g->shadowY == 0) g->shadow = 0;
         }
+    } else if (is(n, "FontStyle") && g->kind == GEL_TEXT) {
+        // FontStyle(colour,x,y): the shadow of the text takes the colour and
+        // the offset (c_FontStyleHelper). With no colour, the shadow has the
+        // colours of the text.
+        g->shadow = 1;
+        g->hasShadowColour = parse_colour(arg(m, 0), &g->shadowColour);
+        g->shadowX = (float)number(s, m, 1, 0);
+        g->shadowY = (float)number(s, m, 2, 0);
     } else if (is(n, "ShadowCol") && g->kind == GEL_TEXT) {
         if (g->shadow) g->hasShadowColour = parse_colour(arg(m, 0), &g->shadowColour);
     } else if (is(n, "Padding") && g->kind == GEL_TEXT) {
