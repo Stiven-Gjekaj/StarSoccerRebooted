@@ -378,7 +378,8 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
       (`world/Players.txt`)
 - [x] A pack changes only the rows and the columns that it gives
 - [ ] Stadiums in a pack
-- [ ] The first community pack: the season 2025/26
+- [x] The first community pack: the season 2025/26 for the four English
+      leagues (`community/season-2025-26`)
 - [x] An editor in the app, first step: a tap on the name of a club on the
       squad screen renames it. The edit goes into the pack "custom".
 - [ ] An editor for the leagues, the kits, and the players
