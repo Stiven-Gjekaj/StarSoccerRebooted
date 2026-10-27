@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.0 (2026-10-27)
+
+- Choose the match ball for each match type in the match balls overlay.
+  Each ball has its own speed, bounce, weight, and curl, and the pitch
+  shows the colour of its patches.
+- The career keeps a trophy log and the history of each season. The
+  achievements screen shows the trophies and the clubs. The retirement
+  score counts the medals and the seasons.
+- A skill loses a level when the player does not train it for too long.
+  A trainer warns the player first.
+- The ticker shows the news of the career, and a touch on the tape speeds
+  it up.
+- When the energy is too low for an activity, the NRG overlays open.
+- The message of a dilemma accident shows the bar of the skill.
+- The commentary text is in the middle of its box, as in 4.32. All text
+  boxes place their lines as in 4.32.
+- Round letters sit on the baseline as in 4.32.
+- Two messages in a row go back to the screen under them.
+
 ## 0.9.0 (2026-10-27)
 
 - Play in all 13 languages of 4.32: English, Turkish, Brazilian
