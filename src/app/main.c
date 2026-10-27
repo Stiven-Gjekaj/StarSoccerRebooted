@@ -687,6 +687,16 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         }
         app->ballCopy = ssr_scene_spawn(app->scene, "MatchPitch", "Ball", 0, NULL, 0);
         ssr_scene_spawn_show(app->scene, app->ballCopy, "BallTip", 0);
+        // ABall.SetColour: the patches of the ball of the match. The tweaks
+        // have colours for the six free balls only; the others keep the
+        // colour of the template.
+        int matchBall = (int)ssr_tweaks_number(app->tweaks, "Match", "MatchBall");
+        if (matchBall >= 0 && matchBall <= 5) {
+            char patches[32];
+            SDL_snprintf(patches, sizeof(patches), "BallPatches%d", matchBall);
+            ssr_scene_spawn_clone(app->scene, app->ballCopy, "Patches", "MatchColours", patches);
+            for (int i = 0; i < 40; i++) ssr_scene_spawn_clone(app->scene, app->trail[i], "Patches", "MatchColours", patches);
+        }
         app->arrowCopy = ssr_scene_spawn(app->scene, "MatchPitch", "Arrow", 0, NULL, 0);
     }
     for (int i = 0; i < chance->players.count && i < SSR_PLAYERS_MAX; i++) {
