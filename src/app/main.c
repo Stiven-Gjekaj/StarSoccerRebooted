@@ -721,6 +721,21 @@ static void apply_op(SSRApp *app, SSRScene *s, const SSRUiOp *o) {
     case SSR_OP_ANIM:
         ssr_scene_anim(s, op.ref, (float)SDL_atof(op.text), op.id);
         break;
+    case SSR_OP_LIST_ADD_AT:
+        ssr_scene_list_add_at(s, op.ref, op.ref2, (float)op.id);
+        break;
+    case SSR_OP_ENTRY_CHILD:
+        ssr_scene_entry_child(s, op.ref, op.text, op.ref2);
+        break;
+    case SSR_OP_ENTRY_VAR:
+    case SSR_OP_ENTRY_BAR: {
+        char *sep = SDL_strchr(op.text, op.kind == SSR_OP_ENTRY_VAR ? '=' : ',');
+        if (!sep) break;
+        *sep = 0;
+        if (op.kind == SSR_OP_ENTRY_VAR) ssr_scene_entry_var(s, op.ref, op.ref2, op.text, sep + 1);
+        else ssr_scene_entry_bar(s, op.ref, op.ref2, op.text, sep + 1);
+        break;
+    }
     case SSR_OP_HOOK:
         ssr_scene_set_hook(s, op.ref, op.ref2);
         break;

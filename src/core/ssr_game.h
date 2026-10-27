@@ -57,6 +57,17 @@ typedef enum {
     // The elements ref2 inside the element ref show when id is 1, and take
     // the text when it is not "".
     SSR_OP_SUB,
+    // The list ref gets a copy of the template ref2 at the x in id.
+    SSR_OP_LIST_ADD_AT,
+    // The part text (the entry when "") of the last entry of the list ref
+    // gets a copy of the template ref2.
+    SSR_OP_ENTRY_CHILD,
+    // The strvar of the part ref2 of the last entry of the list ref takes a
+    // value. text is "name=value".
+    SSR_OP_ENTRY_VAR,
+    // The ProgressBar of the part ref2 of the last entry of the list ref
+    // follows a tweak. text is "Group,Name".
+    SSR_OP_ENTRY_BAR,
 } SSRUiOpKind;
 
 typedef struct {
