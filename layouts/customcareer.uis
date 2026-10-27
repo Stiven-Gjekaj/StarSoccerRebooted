@@ -24,9 +24,13 @@ Rect:()
 
 // The top of the buttons at the bottom.
 Set:(@n=[@B-960]*0.7+744)
+// The top of the title. The title, the values, and the help go in the
+// middle between the ribbon and the buttons at the bottom. The value comes
+// from a frame of the screen.
+Set:(@m=[@n+156]*0.5-308)
 
 // The title.
-PushOrigin:(60,128)
+PushOrigin:(60,@m)
 	Rect:(0,0,500,76)
 	{
 		Draw:(ButtonShadow,18,8,500,76,,#FFFFFF80)
@@ -43,7 +47,7 @@ PushOrigin:(60,128)
 		ConvergeFrom(-640,0)
 PopOrigin
 
-PushOrigin:(13,230)
+PushOrigin:(13,@m+102)
 	Rect:(0,0,614,120)
 	{
 		Draw:(GreyRecess,0,0,614,120)
@@ -55,7 +59,7 @@ PushOrigin:(13,230)
 	}
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(23,278)
+PushOrigin:(23,@m+150)
 	Rect:(0,0,110,62)
 	{
 		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
@@ -71,7 +75,7 @@ PushOrigin:(23,278)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(145,278)
+PushOrigin:(145,@m+150)
 	Rect:(0,0,350,62)
 	{
 		Text:(00,0,0,350,58,C,,#FFFFFFFF)
@@ -86,7 +90,7 @@ PushOrigin:(145,278)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(507,278)
+PushOrigin:(507,@m+150)
 	Rect:(0,0,110,62)
 	{
 		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
@@ -103,7 +107,7 @@ PushOrigin:(507,278)
 		ConvergeFrom(-640,0)
 PopOrigin
 
-PushOrigin:(13,370)
+PushOrigin:(13,@m+242)
 	Rect:(0,0,614,120)
 	{
 		Draw:(GreyRecess,0,0,614,120)
@@ -115,7 +119,7 @@ PushOrigin:(13,370)
 	}
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(23,418)
+PushOrigin:(23,@m+290)
 	Rect:(0,0,110,62)
 	{
 		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
@@ -131,7 +135,7 @@ PushOrigin:(23,418)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(145,418)
+PushOrigin:(145,@m+290)
 	Rect:(0,0,350,62)
 	{
 		Text:(00,0,0,350,58,C,,#FFFFFFFF)
@@ -146,7 +150,7 @@ PushOrigin:(145,418)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(507,418)
+PushOrigin:(507,@m+290)
 	Rect:(0,0,110,62)
 	{
 		Draw:(ButtonShadow,6,6,110,62,,#FFFFFF80)
@@ -164,7 +168,7 @@ PushOrigin:(507,418)
 PopOrigin
 
 // The help.
-PushOrigin:(13,510)
+PushOrigin:(13,@m+382)
 	Rect:(0,0,614,110)
 	{
 		Text:(HELP,20,0,574,110,C,,#BBDDBBFF)
