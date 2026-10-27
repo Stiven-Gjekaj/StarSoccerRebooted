@@ -15,9 +15,9 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] Decode JPG images (the backgrounds)
 - [x] Load the atlases of the interface (`NewGUI/Atlases`)
 - [x] Draw text with the TTF fonts of the game (`Fonts`)
-- [ ] Draw the star of `Fonts.txt` (`Inject:`) and the glyph tables of
-      the other alphabets (`Fonts/Glyphs`). This moves to 1.0, with the
-      languages.
+- [x] Draw the star of `Fonts.txt` (`Inject:`): the bux icon in a text
+- [ ] The glyph tables of the other alphabets (`Fonts/Glyphs`). This
+      moves to 1.0, with the languages.
 - [x] Play the sounds (OGG from an APK, MP3 from an IPA). The game has no
       music.
 - [x] Read the screen layouts (`.uis`, `.uih`) and draw a screen from them
