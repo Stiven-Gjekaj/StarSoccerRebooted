@@ -18,8 +18,11 @@ int ssr_fs_resolve(const char *path, char *out, size_t capacity) {
 
 #include <dirent.h>
 #include <strings.h>
+#include <sys/stat.h>
 
-// Finds each part of the path in its directory, in any case.
+// Finds each part of the path in its directory, in any case. A system can
+// refuse to list a directory above the app, as Android does for /data.
+// Then the part counts as it is, when it is there.
 int ssr_fs_resolve(const char *path, char *out, size_t capacity) {
     if (!path || !out || capacity == 0) return 0;
     size_t length = strlen(path);
@@ -41,8 +44,18 @@ int ssr_fs_resolve(const char *path, char *out, size_t capacity) {
         part[partLength] = 0;
 
         DIR *dir = opendir(used ? out : ".");
-        if (!dir) return 0;
         const char *found = NULL;
+        if (!dir) {
+            char asIs[4096];
+            struct stat info;
+            snprintf(asIs, sizeof(asIs), "%s%s%s", out, used && out[used - 1] != '/' ? "/" : "", part);
+            if (stat(asIs, &info) != 0 || strlen(asIs) + 1 > capacity) return 0;
+            strcpy(out, asIs);
+            used = strlen(out);
+            p += partLength;
+            while (*p == '/') p++;
+            continue;
+        }
         struct dirent *entry;
         char name[256];
         while ((entry = readdir(dir)) != NULL) {
