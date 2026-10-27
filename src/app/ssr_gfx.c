@@ -283,7 +283,10 @@ static SDL_Texture *atlas_texture_for(SSRGfx *gfx, const SSRAtlasImage *image) {
     return atlas_texture_kind(gfx, image, 0);
 }
 
-// The atlases hold the images by the names of the Img: lines. The file of
+static SDL_Texture *own_art(SSRGfx *gfx, const char *name);
+
+// The atlases hold the images by the names of the Img: lines. An image of
+// the remake that is not in the atlases has the size of its file. The file of
 // an Img: line is only there when the atlases do not have the name.
 int ssr_gfx_image_size(SSRGfx *gfx, const char *name, const char *file, float *w, float *h) {
     if (!gfx) return 0;
@@ -293,7 +296,9 @@ int ssr_gfx_image_size(SSRGfx *gfx, const char *name, const char *file, float *w
         *h = (float)image->originalHeight;
         return 1;
     }
-    SDL_Texture *texture = file ? ssr_gfx_texture(gfx, file) : NULL;
+    SDL_Texture *texture = own_art(gfx, name);
+    if (texture) return SDL_GetTextureSize(texture, w, h);
+    texture = file ? ssr_gfx_texture(gfx, file) : NULL;
     return texture && SDL_GetTextureSize(texture, w, h);
 }
 
