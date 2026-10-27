@@ -333,7 +333,7 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     fprintf(file, "potyawards=%d\nwonmajoraward=%d\n", c->potyAwards, c->wonMajorAward);
     fprintf(file, "starrating=%d\n", c->starRating);
     fprintf(file, "retired=%d\n", c->retired);
-    fprintf(file, "newsdone=%d\n", c->newsDone);
+    fprintf(file, "newsdone=%d\ntipcount=%d\n", c->newsDone, c->tipCount);
     write_text(file, "headline", c->headline);
     write_text(file, "headlineresult", c->headlineResult);
     int ok = !ferror(file);
@@ -450,6 +450,7 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "starrating") == 0) c->starRating = number;
         else if (strcmp(key, "retired") == 0) c->retired = number;
         else if (strcmp(key, "newsdone") == 0) c->newsDone = number;
+        else if (strcmp(key, "tipcount") == 0) c->tipCount = number;
         else if (strcmp(key, "headline") == 0) read_text(value, c->headline, sizeof(c->headline));
         else if (strcmp(key, "headlineresult") == 0) read_text(value, c->headlineResult, sizeof(c->headlineResult));
     }

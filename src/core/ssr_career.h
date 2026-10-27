@@ -104,6 +104,8 @@ typedef struct {
     // 1 when the news of this match week is done: the next Play goes to
     // the match (c_TPlayer.newsdone).
     int newsDone;
+    // The number of tips that the game menu showed (c_TPlayer.tipcount).
+    int tipCount;
     char gameVersion[16];
 } SSRCareer;
 
