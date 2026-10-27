@@ -64,6 +64,13 @@ typedef struct {
     int macroDepth;
     const char *file;
     int line;
+    // PushParent() keeps the element that takes the next block and the next
+    // modifiers. PopParent() gives it back: then it takes them in place of
+    // the last element of its block, until a new element comes there.
+    SSRUiNode *pushed[MAX_DEPTH];
+    int pushedCount;
+    SSRUiNode *forced;
+    SSRUiNode *forcedIn;
 } Parser;
 
 static char *copy_text(const char *text, size_t length) {
@@ -195,6 +202,7 @@ static Frame *top(Parser *p) {
 
 static SSRUiNode *last_element(Parser *p) {
     SSRUiNode *target = top(p)->target;
+    if (p->forced && p->forcedIn == target) return p->forced;
     for (int i = target->childCount - 1; i >= 0; i--) {
         if (target->children[i]->flags & SSR_UI_ELEMENT) return target->children[i];
     }
@@ -414,16 +422,29 @@ static void parse_statement(Parser *p, const char *line) {
         } else if (*line == '!') {
             flags |= SSR_UI_BANG;
         } else if (*line == ':') {
-            flags |= SSR_UI_DOT;
+            flags |= SSR_UI_DOT | SSR_UI_REARM;
         } else {
             break;
         }
     }
     while (*line == '{' || *line == '}' || *line == '<' || *line == '>') {
-        if (*line == '{') open_block(p, 0);
-        if (*line == '}') close_block(p, 0);
-        if (*line == '<') open_block(p, 1);
-        if (*line == '>') close_block(p, 1);
+        if (line[0] == '{' && line[1] == '{') {
+            // "{{" is one block. Its children are in the box of the element.
+            open_block(p, 0);
+            if (top(p)->owner) top(p)->owner->flags |= SSR_UI_BOXED;
+            line++;
+        } else if (line[0] == '}' && line[1] == '}') {
+            close_block(p, 0);
+            line++;
+        } else if (*line == '{') {
+            open_block(p, 0);
+        } else if (*line == '}') {
+            close_block(p, 0);
+        } else if (*line == '<') {
+            open_block(p, 1);
+        } else if (*line == '>') {
+            close_block(p, 1);
+        }
         line++;
         while (isspace((unsigned char)*line)) line++;
     }
@@ -492,6 +513,14 @@ static void parse_statement(Parser *p, const char *line) {
             argCount = 0;
             ref = NULL;
             SSRUiNode *owner = (flags & SSR_UI_ELEMENT) || is_command(node->name) ? NULL : last_element(p);
+            if (strcmp(node->name, "PushParent") == 0 && p->pushedCount < MAX_DEPTH) {
+                p->pushed[p->pushedCount++] = last_element(p);
+            } else if (strcmp(node->name, "PopParent") == 0 && p->pushedCount > 0) {
+                p->forced = p->pushed[--p->pushedCount];
+                p->forcedIn = top(p)->target;
+            } else if ((flags & SSR_UI_ELEMENT) && p->forcedIn == top(p)->target) {
+                p->forced = NULL;
+            }
             if (owner) {
                 push_child(&owner->modifiers, &owner->modifierCount, node);
             } else {

@@ -20,6 +20,11 @@
 #define SSR_UI_BANG 4u
 // The line had "$HIDE": the element starts hidden.
 #define SSR_UI_HIDE 8u
+// The block of the element began with "{{": the children are in the box of
+// the element, as if in a PushOrigin.
+#define SSR_UI_BOXED 16u
+// The line began with ':': a later Press() or NoPress() can run it again.
+#define SSR_UI_REARM 32u
 
 typedef struct SSRUiNode SSRUiNode;
 

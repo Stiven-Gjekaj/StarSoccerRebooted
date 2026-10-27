@@ -144,7 +144,54 @@ static void test_reports_problems(void) {
     CHECK(parse(files, "Nothing.uis") == NULL);
 }
 
+// The button macros of the game end with PushParent() and PopParent(). Then
+// the block and the modifiers after the macro go to the inner element.
+static void test_pushes_and_pops_the_parent(void) {
+    const MemoryFile files[] = {
+        {"Screen.uis",
+         "Rect:(5,5,90,40)\n"
+         "\tPress()\n"
+         "{\n"
+         "\tRect:(0,0,100,50) ref:Inner\n"
+         "\t{\n"
+         "\t\tDraw:(GreenButton,0,0,100,50)\n"
+         "\t}\n"
+         "\tPushParent()\n"
+         "}\n"
+         "PopParent()\n"
+         "{\n"
+         "\tText:(Play,0,0,100,50)\n"
+         "}\n"
+         "\tDelay(0.1)\n"
+         ":Click(play)\n"
+         "Draw:(Next,0,0)\n"
+         "\tAdditive()\n"
+         "{{\n"
+         "\tDraw:(Boxed,0,0)\n"
+         "}}\n"},
+        {NULL, NULL},
+    };
+    SSRUiTree *tree = parse(files, "Screen.uis");
+    const SSRUiNode *root = ssr_ui_root(tree);
+    const SSRUiNode *outer = child(root, 0);
+    CHECK(outer && is(outer, "Rect") && outer->modifierCount == 1);
+    const SSRUiNode *inner = outer ? child(outer, 0) : NULL;
+    CHECK(inner && inner->ref && strcmp(inner->ref, "Inner") == 0);
+    CHECK(inner && inner->childCount == 2 && is(inner->children[1], "Text"));
+    CHECK(inner && inner->modifierCount == 2 && is(inner->modifiers[0], "Delay"));
+    CHECK(inner && (inner->modifiers[1]->flags & SSR_UI_REARM));
+    const SSRUiNode *next = NULL;
+    for (int i = 0; i < root->childCount; i++) {
+        if (is(root->children[i], "Draw")) next = root->children[i];
+    }
+    CHECK(next && next->modifierCount == 1 && (next->flags & SSR_UI_BOXED));
+    CHECK(next && next->childCount == 1 && is(next->children[0], "Draw"));
+    CHECK(ssr_ui_problem_count(tree) == 0);
+    ssr_ui_free(tree);
+}
+
 int main(void) {
+    test_pushes_and_pops_the_parent();
     test_reads_elements_modifiers_and_blocks();
     test_expands_imports_macros_and_constants();
     test_reports_problems();
