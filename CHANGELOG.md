@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.8.0 (2026-10-27)
+
+- The Life screen opens the casino. Choose a stake from 1 to 50 bux and
+  play blackjack, roulette, or the slot machine.
+- Blackjack deals from one deck. The dealer stands on 17. A win pays two
+  times the stake, and a tie gives the stake back.
+- Roulette has a wheel with 0 and 00. Bet on red, black, green, or a
+  dozen, and watch the ball fall into a pocket.
+- The slot machine pays 3 times the stake for two of the same, and 7 times
+  for three.
+- The races: bet on one of six horses, at odds from 2/1 to 12/1. With the
+  stable from the lifestyle shop, buy horses in the market, train them,
+  race them for a prize, and sell them.
+- Bets cost energy, and gambling has news: your team mates can ask you to
+  the casino, the boss can hear of it, and a player under 18 can be caught.
+- More of the marks of New Star Games change: the shirt and the back of
+  the cards of the pairs game, the title without the TM, and the names in
+  the text ("SSR-" boots and balls).
+- The Android app shows the art of the remake.
+- The slot reels, the flips of the cards, and other animations with a
+  frame range such as "19>" draw as in the original.
+
 ## 0.7.0 (2026-10-27)
 
 - The game has its own marks. The title shows the Star Soccer Rebooted
