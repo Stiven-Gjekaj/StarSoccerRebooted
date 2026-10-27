@@ -186,7 +186,8 @@ place of the atlas image with the same name (`art/NewStarLogo.png`).
 - [x] The TV of the match (`MapNSGTVLogo`) and the sponsor of the match
       (`NSGamesLogo`)
 - [x] The newspaper (`NSNewsLogo`, `CLHeaderNewsLogo`)
-- [ ] The boards and the roof of the stadiums ("NEW STAR GAMES", "NSS")
+- [x] The boards and the roof of the stadiums (`BannerTopS2`,
+      `BannerFrontAbv`)
 - [ ] The other marks: `BannerFrontLogo`, `LogoStrip`, `CLNewStar`, the
       sponsor images of `Images/`
 
