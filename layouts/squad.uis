@@ -22,20 +22,21 @@ M_Footer:(OFF,,,)
 Rect:()
 	ShowIf(Menu,DisableQuitButton,0)
 {
-	M_Header:(-40,@T,ILife,24,22,100,198,14)
+	M_Header:(-40,@T,ILife,32,36,88,198,14)
 	Import:(quitmenu.uih)
 }
 Rect:()
 	ShowIf(Menu,DisableQuitButton,1)
 {
-	M_Header:(-40,@T,ILife,24,22,100,198,14,YES)
+	M_Header:(-40,@T,ILife,32,36,88,198,14,YES)
 }
 
 // The top of the buttons at the bottom.
 Set:(@n=[@B-960]*0.7+744)
 
-// The title: the name of the club or of the league.
-PushOrigin:(122,120+[@T*0.3])
+// The title: the name of the club or of the league, in the middle just
+// above the list.
+PushOrigin:(60,128)
 	Rect:(0,0,500,76)
 	{
 		Draw:(ButtonShadow,18,8,500,76,,#FFFFFF80)
