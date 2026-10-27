@@ -1,0 +1,128 @@
+// Tests ssr_match with matches that the test makes and plays.
+
+#include <stdio.h>
+#include <string.h>
+
+#include "ssr_match.h"
+#include "ssr_test.h"
+
+static const char *localise(void *context, const char *tag) {
+    (void)context;
+    if (strncmp(tag, "CMATCHTEXT_CHANCEFORPLAYER", 26) == 0 && strlen(tag) <= 28) return "$playername collects the ball";
+    if (strcmp(tag, "CMATCHTEXT_CHANCEMISSED") == 0) return "Chance missed";
+    if (strncmp(tag, "CCHANCESTAGE_SHOOT", 18) == 0) return "$teamname have a chance to score...";
+    return tag;
+}
+
+static SSRMatchSetup setup_for(void) {
+    SSRMatchSetup s = {.homeName = "AAA",
+                       .awayName = "BBB",
+                       .homeStrength = 60,
+                       .awayStrength = 50,
+                       .myTeam = 1,
+                       .playerName = "Smith",
+                       .focus = 2,
+                       .workRate = 2,
+                       .energy = 100,
+                       .age = 17,
+                       .relationTeam = 75,
+                       .relationBoss = 75,
+                       .setPieces = 10,
+                       .vision = 20,
+                       .careerApps = 3,
+                       .starLevel = 1};
+    return s;
+}
+
+typedef struct {
+    int lines, kickOff, halfTime, fullTime, goals, chances, misses;
+    char last[256];
+} Seen;
+
+// Plays the match to its end. Each chance of the player ends with result.
+static void play(SSRMatch *m, SSRRandom *random, SSRChanceResult result, Seen *seen) {
+    memset(seen, 0, sizeof(*seen));
+    int now = 0;
+    ssr_match_play(m, now);
+    for (int frame = 0; frame < 200000 && m->state != SSR_MATCH_FULL_TIME; frame++) {
+        now += 16;
+        SSRMatchEvent event = ssr_match_update(m, now, random);
+        if (event == SSR_MATCH_EVENT_CHANCE) {
+            seen->chances++;
+            SSRChance chance;
+            memset(&chance, 0, sizeof(chance));
+            chance.result = result;
+            chance.info.chanceType = m->chanceType;
+            ssr_match_chance_done(m, &chance, now, random);
+        }
+        if (event == SSR_MATCH_EVENT_HALF_TIME) ssr_match_play(m, now);
+        SSRMatchLine line;
+        while (ssr_match_take_line(m, &line)) {
+            seen->lines++;
+            seen->kickOff += strcmp(line.text, "Kick Off") == 0;
+            seen->halfTime += strncmp(line.text, "Half Time", 9) == 0 && strcmp(line.minute, "45") == 0;
+            seen->fullTime += strncmp(line.text, "Full Time", 9) == 0 && strcmp(line.minute, "90") == 0;
+            seen->goals += line.goal;
+            seen->misses += strcmp(line.text, "Chance missed") == 0;
+            CHECK(strstr(line.text, "$playername") == NULL && strstr(line.text, "$teamname") == NULL);
+            snprintf(seen->last, sizeof(seen->last), "%s", line.text);
+        }
+    }
+}
+
+static void test_plays_a_match(void) {
+    SSRMatch m;
+    SSRRandom random = {SSR_RANDOM_START};
+    SSRMatchSetup s = setup_for();
+    ssr_match_start(&m, &s, localise, NULL, &random);
+    int marked = 0;
+    for (int i = 0; i < 120; i++) marked += m.playerChance[i] != 0;
+    CHECK(marked >= 3);
+    CHECK(m.state == SSR_MATCH_PREMATCH && m.textSpeed == 800);
+    Seen seen;
+    play(&m, &random, SSR_RESULT_MISSED, &seen);
+    CHECK(m.state == SSR_MATCH_FULL_TIME && m.minute == 90);
+    CHECK(seen.kickOff == 1 && seen.halfTime == 1 && seen.fullTime == 1);
+    // The player has two sure chances, one in each half.
+    CHECK(seen.chances >= 2 && seen.misses == seen.chances);
+    char full[64];
+    snprintf(full, sizeof(full), "Full Time %d - %d", m.score[1], m.score[2]);
+    CHECK(strcmp(seen.last, full) == 0);
+    CHECK(seen.goals == m.score[1] + m.score[2]);
+    CHECK(m.energy < 100 && m.energy > 0);
+    CHECK(ssr_match_play(&m, 0) == 1);
+}
+
+static void test_counts_the_goals_of_the_player(void) {
+    SSRMatch m;
+    SSRRandom random = {99};
+    SSRMatchSetup s = setup_for();
+    s.myTeam = 2;
+    ssr_match_start(&m, &s, localise, NULL, &random);
+    Seen seen;
+    play(&m, &random, SSR_RESULT_GOAL, &seen);
+    CHECK(m.goals == seen.chances && m.score[2] >= m.goals);
+    CHECK(m.ratingCount >= m.goals);
+}
+
+static void test_a_tired_player_comes_off(void) {
+    SSRMatch m;
+    SSRRandom random = {7};
+    SSRMatchSetup s = setup_for();
+    s.energy = 10;
+    s.workRate = 3;
+    ssr_match_start(&m, &s, localise, NULL, &random);
+    Seen seen;
+    play(&m, &random, SSR_RESULT_MISSED, &seen);
+    CHECK(m.setup.subTime < 0 && !ssr_match_on_pitch(&m));
+    // 0.75 * 1.5 = 1.125 each minute: 1 is left after 8 minutes, so the
+    // player comes off in the 9th.
+    CHECK(m.setup.subTime == -9);
+}
+
+int main(void) {
+    test_plays_a_match();
+    test_counts_the_goals_of_the_player();
+    test_a_tired_player_comes_off();
+    return TEST_RESULT();
+}
