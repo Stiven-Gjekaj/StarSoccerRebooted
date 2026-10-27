@@ -4514,7 +4514,9 @@ static int news_captaincy(SSRGame *game, const SSRFixture *next) {
     if (next->level == 0) {
         const char *team = my_club_tla(game);
         if (c->captain != 1 && c->captain != 3) {
-            if (c->seasonApps <= 4 || c->apps < 25) return 0;
+            // The matches for the club: the history of the club and the
+            // matches of the career, as the game adds them.
+            if (c->seasonApps <= 4 || ssr_career_history_apps(c, team) + c->apps < 25) return 0;
             float avg = c->seasonTotalRating / (float)c->seasonApps;
             int tell = year > 1 && c->seasonApps % 20 == 0;
             const char *no = level < (int)club_strength(game) / 6 ? "CMESSAGE_NOTCAPTAIN_STARRATING"
@@ -5953,8 +5955,10 @@ static void sign_contract(SSRGame *game) {
         game_menu(game);
         message(game, "message", text, 0, 1, "SignNewContract");
     } else {
-        // A transfer in the window.
+        // A transfer in the window. The stat history gets the row of the
+        // old club first.
         int old = c->clubId;
+        ssr_career_add_history(c, ssr_career_year(c), my_club_tla(game));
         c->clubId = o->clubId;
         c->debut = 1;
         if (rel) c->relationBoss = (float)*rel;
