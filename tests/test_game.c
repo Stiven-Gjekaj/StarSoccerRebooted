@@ -864,6 +864,12 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         rows = take_ops(game, ops, 256);
         for (int i = 0; i < rows; i++) scorers += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "PlayerList") == 0;
         CHECK(scorers >= 1 && scorers <= 20 && strcmp(ssr_tweaks_get(tweaks, "Squad", "Title"), "PRM") == 0);
+        // The third list: the player and the three rivals.
+        ssr_game_message(game, "squad.btn_Mode");
+        rows = take_ops(game, ops, 256);
+        int rivalRows = 0;
+        for (int i = 0; i < rows; i++) rivalRows += ops[i].kind == SSR_OP_LIST_ADD && strcmp(ops[i].ref, "PlayerList") == 0;
+        CHECK(rivalRows == 4);
         ssr_game_message(game, "squad.btn_Back");
         CHECK(strcmp(ssr_game_screen(game), "league") == 0);
         take_ops(game, ops, 256);

@@ -110,9 +110,9 @@ struct SSRGame {
     // The competition of the table that shows, the row that the player
     // chose in it (0 none), and the team of the club fixtures screen.
     int leagueComp, leagueSelected;
-    // The squad screen: the club, and 1 when it shows the top scorers of
-    // the league.
-    int squadClub, squadScorers;
+    // The squad screen: the club, and the list: 0 the squad, 1 the top
+    // scorers of the league, 2 the player and the rivals.
+    int squadClub, squadMode;
     int fixturesTeam, fixturesLevel;
     // c_TScreen_League.m_flagContinueButton: the table shows Continue.
     int leagueContinue;
@@ -3200,6 +3200,14 @@ static int by_position(const void *a, const void *b) {
     return p->id - q->id;
 }
 
+// The most goals of the season first, then the most assists.
+static int by_season(const void *a, const void *b) {
+    const SSRPerson *p = *(SSRPerson *const *)a, *q = *(SSRPerson *const *)b;
+    if (p->seasonGoals != q->seasonGoals) return q->seasonGoals - p->seasonGoals;
+    if (p->seasonAssists != q->seasonAssists) return q->seasonAssists - p->seasonAssists;
+    return q->seasonApps - p->seasonApps;
+}
+
 // A row of the squad list: the position, the name, the age or the club,
 // the skill or the matches, and the goals.
 static void squad_row(SSRGame *game, const SSRPerson *p, const char *club, int year) {
@@ -3226,7 +3234,8 @@ static void squad_fill(SSRGame *game) {
     if (game->people && game->names && club) {
         ssr_people_make_squad(game->people, game->world, game->names, club->id, year);
     }
-    if (game->squadScorers) {
+    SSRPerson me;
+    if (game->squadMode == 1) {
         SSRSeasonComp *comp = game->season ? ssr_season_comp(game->season, game->leagueComp) : NULL;
         int clubs[64], count = 0;
         if (comp && comp->poolCount > 0 && comp->data->level == 0) {
@@ -3238,6 +3247,29 @@ static void squad_fill(SSRGame *game) {
         }
         n = ssr_people_top_scorers(game->people, clubs, count, list, 20);
         ssr_tweaks_set(t, "Squad", "Title", comp ? comp->data->tla : "");
+        ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "SSR_Rivals"));
+    } else if (game->squadMode == 2) {
+        // The player of the user, as a row of the same kind, with the mean
+        // of the five skills.
+        const SSRCareer *c = &game->career;
+        memset(&me, 0, sizeof(me));
+        snprintf(me.first, sizeof(me.first), "%s", c->firstName);
+        snprintf(me.last, sizeof(me.last), "%s", c->lastName);
+        me.club = c->clubId;
+        me.born = year - ssr_career_age(c);
+        me.position = SSR_POS_ATTACKER;
+        me.skill = (ssr_career_skill(c->technique) + ssr_career_skill(c->pace) + ssr_career_skill(c->vision) +
+                    ssr_career_skill(c->setPieces) + ssr_career_skill(c->power)) / 5;
+        me.seasonApps = c->seasonApps;
+        me.seasonGoals = c->seasonGoals;
+        me.seasonAssists = c->seasonAssists;
+        list[n++] = &me;
+        for (int i = 0; game->people && i < game->people->count && n < 64; i++) {
+            SSRPerson *p = &game->people->list[i];
+            if (p->rival && !p->retired) list[n++] = p;
+        }
+        qsort(list, (size_t)n, sizeof(list[0]), by_season);
+        ssr_tweaks_set(t, "Squad", "Title", loc(game, "SSR_Rivals"));
         ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "SSR_Squad"));
     } else {
         n = ssr_people_squad(game->people, club ? club->id : 0, list, 64);
@@ -3248,9 +3280,9 @@ static void squad_fill(SSRGame *game) {
     }
     add_op(game, SSR_OP_LIST_START, "PlayerList", NULL, NULL, 52);
     for (int i = 0; i < n; i++) {
-        // The top scorers show the full name of the club. A long name moves
-        // from side to side in its box.
-        const SSRClub *of = game->squadScorers ? ssr_world_club(game->world, list[i]->club) : NULL;
+        // The lists of other clubs show the full name of the club. A long
+        // name moves from side to side in its box.
+        const SSRClub *of = game->squadMode ? ssr_world_club(game->world, list[i]->club) : NULL;
         squad_row(game, list[i], of ? of->name : NULL, year);
     }
 }
@@ -3267,13 +3299,13 @@ static void league_squad(SSRGame *game) {
         if (row > 0 && row <= pool->count) team = game->season->rows[pool->rows[row - 1]].teamId;
     }
     game->squadClub = team;
-    game->squadScorers = 0;
+    game->squadMode = 0;
     set_screen(game, "squad");
     squad_fill(game);
 }
 
 static void squad_mode(SSRGame *game) {
-    game->squadScorers = !game->squadScorers;
+    game->squadMode = (game->squadMode + 1) % 3;
     squad_fill(game);
 }
 

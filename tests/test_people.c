@@ -154,6 +154,12 @@ static void test_makes_rivals(void) {
         CHECK(people->list[i].club == 10 || people->list[i].club == 11);
     }
     CHECK(ssr_people_make_rivals(people, world, names, 555, 1, -15, 3, 1) == 0);
+    // A rival grows fast to the skill that the rival can reach.
+    int id = people->list[0].id, start = people->list[0].skill;
+    CHECK(start >= 8 && start <= 20 && people->list[0].potential >= 70);
+    for (int year = 2; year <= 6; year++) ssr_people_new_season(people, world, names, year);
+    const SSRPerson *rival = ssr_people_find(people, id);
+    CHECK(rival->skill >= start + (rival->potential - start) / 2);
     ssr_people_free(people);
     ssr_names_free(names);
     ssr_world_free(world);

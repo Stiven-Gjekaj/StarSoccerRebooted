@@ -348,8 +348,9 @@ int ssr_people_make_rivals(SSRPeople *people, const SSRWorld *world, const SSRNa
         p->nation = ssr_rand(&people->random, 2) == 1 ? nation : p->nation;
         p->born = born;
         p->rival = 1;
-        // A rival starts as a youth player with a big future.
-        p->skill = ssr_rand2(&people->random, 25, 40);
+        // A rival starts as a youth player with a big future, at the level
+        // of a new player of the user.
+        p->skill = ssr_rand2(&people->random, 8, 20);
         p->potential = ssr_rand2(&people->random, 70, 95);
         made++;
     }
@@ -365,6 +366,9 @@ static void grow(SSRPerson *p, SSRRandom *r, int age) {
     else if (age <= 28) change = ssr_rand2(r, 0, 3);
     else if (age <= 31) change = ssr_rand2(r, -1, 1);
     else change = -ssr_rand2(r, 1, 4);
+    // A rival grows as fast as a player who trains: a quarter of the way
+    // to the skill to reach each year until 23.
+    if (p->rival && age <= 23 && (p->potential - p->skill) / 4 > change) change = (p->potential - p->skill) / 4;
     if (change > 0) change = p->skill + change > p->potential ? p->potential - p->skill : change;
     p->skill = clamp(p->skill + change, 1, 100);
 }
