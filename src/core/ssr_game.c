@@ -1790,6 +1790,7 @@ static void end_match(SSRGame *game) {
         c->seasonPasses += m->passes;
         c->seasonHatTricks += hatTrick;
         c->seasonChances += m->chances;
+        c->chances += m->chances;
         c->seasonStarMan += game->after.starMan;
         c->starMan += game->after.starMan;
         c->seasonTotalRating += rating;

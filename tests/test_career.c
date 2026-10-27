@@ -39,6 +39,7 @@ static void test_saves_and_loads_a_career(void) {
     c.assists = 3;
     c.passes = 40;
     c.starMan = 4;
+    c.chances = 21;
     c.starRating = 250;
     c.seasonApps = 9;
     c.seasonStarMan = 2;
@@ -96,7 +97,7 @@ static void test_saves_and_loads_a_career(void) {
     CHECK(back.technique[0] == 3 && back.power[99] == 7 && fabsf(back.ratings[4] - 6.5f) < 1e-6f);
     CHECK(back.bank == 15 && back.relationFans == 75 && back.nrg[1] == 1);
     CHECK(strcmp(back.headline, c.headline) == 0 && strcmp(back.gameVersion, "v2.32") == 0);
-    CHECK(back.apps == 12 && back.goals == 5 && back.assists == 3 && back.passes == 40 && back.starMan == 4);
+    CHECK(back.apps == 12 && back.goals == 5 && back.assists == 3 && back.passes == 40 && back.starMan == 4 && back.chances == 21);
     CHECK(back.starRating == 250 && ssr_career_star_level(&back) == 3);
     CHECK(back.seasonApps == 9 && back.seasonStarMan == 2 && back.seasonChances == 30 && back.intGoals == 4);
     CHECK(back.seasonTotalRating == 61.5f && back.intTotalRating == 14);

@@ -132,9 +132,9 @@ typedef struct {
     // The energy drinks of each kind.
     int nrg[10];
     float ratings[10];
-    // The matches, the goals, the assists, the passes, and the star man
-    // awards of the career with the clubs.
-    int apps, goals, assists, passes, starMan;
+    // The matches, the goals, the assists, the passes, the star man
+    // awards, and the chances of the career with the clubs.
+    int apps, goals, assists, passes, starMan, chances;
     // The counts of this season of the club, and of the career with the
     // nation (c_TPlayer.season* and int*).
     int seasonApps, seasonGoals, seasonAssists, seasonPasses, seasonHatTricks, seasonStarMan, seasonChances;
