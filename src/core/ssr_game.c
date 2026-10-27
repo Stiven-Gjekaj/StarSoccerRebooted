@@ -2895,17 +2895,24 @@ static const char *retire_ref(const char *name) {
     return strcmp(name, "CareerPlayerOfYear") == 0 ? "CareerPlayerofYear" : name;
 }
 
-// c_AScreen_Retirement.SetScore: the score with commas.
-static void retirement_score(SSRGame *game, int score) {
+// GetStringNumberWithCommas: 1234567 is "1,234,567".
+static void number_with_commas(int value, char *out, size_t capacity) {
     char digits[16], text[24];
-    snprintf(digits, sizeof(digits), "%d", score < 0 ? -score : score);
+    snprintf(digits, sizeof(digits), "%d", value < 0 ? -value : value);
     size_t n = strlen(digits), o = 0;
-    if (score < 0) text[o++] = '-';
+    if (value < 0) text[o++] = '-';
     for (size_t i = 0; i < n; i++) {
         if (i > 0 && (n - i) % 3 == 0) text[o++] = ',';
         text[o++] = digits[i];
     }
     text[o] = 0;
+    snprintf(out, capacity, "%s", text);
+}
+
+// c_AScreen_Retirement.SetScore: the score with commas.
+static void retirement_score(SSRGame *game, int score) {
+    char text[24];
+    number_with_commas(score, text, sizeof(text));
     ssr_tweaks_set(game->tweaks, "PlayerStats", "CareerScore", text);
 }
 
