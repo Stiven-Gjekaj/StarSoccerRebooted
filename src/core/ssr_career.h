@@ -44,6 +44,9 @@ typedef struct {
     float ratings[10];
     // The matches, the goals, the assists, and the passes of the career.
     int apps, goals, assists, passes;
+    // The star rating (c_TPlayer.m_starrating). The star level is
+    // starRating / 100 + 1.
+    int starRating;
     int retired;
     // The news that the next screen shows, or "".
     char headline[512];
@@ -59,6 +62,12 @@ void ssr_career_create(SSRCareer *career, const char *first, const char *last, i
 // The value of a skill: the sum of its levels, from 1 to 100
 // (GSPlayerUtility.GetSkill).
 int ssr_career_skill(const int *levels);
+
+// The star level of the career, from 1 (c_TPlayer.GetStarLevel).
+int ssr_career_star_level(const SSRCareer *career);
+
+// The age of the player: 16 in the first year (c_TPlayer.GetAge).
+int ssr_career_age(const SSRCareer *career);
 
 // The year and the week of the career, from 1.
 int ssr_career_year(const SSRCareer *career);

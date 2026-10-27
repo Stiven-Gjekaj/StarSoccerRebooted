@@ -45,6 +45,14 @@ void ssr_career_create(SSRCareer *c, const char *first, const char *last, int ge
     copy_name(c->gameVersion, sizeof(c->gameVersion), "v2.32");
 }
 
+int ssr_career_star_level(const SSRCareer *c) {
+    return c->starRating / 100 + 1;
+}
+
+int ssr_career_age(const SSRCareer *c) {
+    return ssr_career_year(c) + 15;
+}
+
 int ssr_career_year(const SSRCareer *c) {
     return (c->sdate - 1) / 364 + 1;
 }
@@ -89,6 +97,7 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     write_ints(file, "nrg", c->nrg, 10);
     write_floats(file, "ratings", c->ratings, 10);
     fprintf(file, "apps=%d\ngoals=%d\nassists=%d\npasses=%d\n", c->apps, c->goals, c->assists, c->passes);
+    fprintf(file, "starrating=%d\n", c->starRating);
     fprintf(file, "retired=%d\n", c->retired);
     // A line ends the headline, so the save keeps its new lines as "\n".
     fputs("headline=", file);
@@ -171,6 +180,7 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "goals") == 0) c->goals = number;
         else if (strcmp(key, "assists") == 0) c->assists = number;
         else if (strcmp(key, "passes") == 0) c->passes = number;
+        else if (strcmp(key, "starrating") == 0) c->starRating = number;
         else if (strcmp(key, "retired") == 0) c->retired = number;
         else if (strcmp(key, "headline") == 0) {
             size_t used = 0;

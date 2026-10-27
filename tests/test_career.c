@@ -32,6 +32,7 @@ static void test_saves_and_loads_a_career(void) {
     c.goals = 5;
     c.assists = 3;
     c.passes = 40;
+    c.starRating = 250;
     snprintf(c.headline, sizeof(c.headline), "Line one\nA \\ two");
     char path[1200];
     snprintf(path, sizeof(path), "%s/slot0.txt", ssr_test_directory("career_save"));
@@ -42,6 +43,11 @@ static void test_saves_and_loads_a_career(void) {
     CHECK(back.bank == 15 && back.relationFans == 75 && back.nrg[1] == 1);
     CHECK(strcmp(back.headline, c.headline) == 0 && strcmp(back.gameVersion, "v2.32") == 0);
     CHECK(back.apps == 12 && back.goals == 5 && back.assists == 3 && back.passes == 40);
+    CHECK(back.starRating == 250 && ssr_career_star_level(&back) == 3);
+    back.sdate = 1;
+    CHECK(ssr_career_age(&back) == 16);
+    back.sdate = 365;
+    CHECK(ssr_career_age(&back) == 17);
     snprintf(path, sizeof(path), "%s/none.txt", ssr_test_directory("career_save"));
     CHECK(!ssr_career_load(&back, path));
 }
