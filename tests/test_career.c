@@ -64,6 +64,14 @@ static void test_saves_and_loads_a_career(void) {
     // No shopping trip runs in a new career.
     CHECK(c.teamShopping == -1);
     c.teamShopping = 2;
+    CHECK(c.expiredBoots == -1 && ssr_career_agent(&c) == 0 && ssr_career_trainer(&c) == 0);
+    c.agent[0] = 51;
+    c.trainer[1] = 9;
+    c.trainer[2] = 0;
+    c.bootId = 21;
+    c.bootUses = 4;
+    c.oldProBoots = 21;
+    c.ballCup = 3;
     snprintf(c.headline, sizeof(c.headline), "Line one\nA \\ two");
     // A new career has no news in its first week.
     CHECK(c.newsDone == 1);
@@ -95,6 +103,9 @@ static void test_saves_and_loads_a_career(void) {
     CHECK(back.lastSpendTimePartner == 28 && back.lastSpendTimeFriends == 28);
     CHECK(back.sponsors[3] == 9 && back.sponsors[0] == 0);
     CHECK(back.teamShopping == 2);
+    CHECK(ssr_career_agent(&back) == 1 && ssr_career_trainer(&back) == 2 && back.agent[0] == 51);
+    CHECK(back.bootId == 21 && back.bootUses == 4 && back.expiredBoots == -1 && back.oldProBoots == 21);
+    CHECK(back.ballCup == 3 && back.ballLeague == 0);
     CHECK(back.items[0] == 120 && back.vehicles[19] == 10500 && back.properties[4] == 1);
     // The new season starts the counts again.
     back.energy = 20;

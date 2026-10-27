@@ -69,6 +69,18 @@ typedef struct {
     // A shopping trip with the team-mates: -1 none, else the purchases of
     // the trip so far (c_TPlayer.teammatesshoppingcount).
     int teamShopping;
+    // The agent and the trainer of each level: the matches left plus 1,
+    // or 0 (c_TPlayer.iapAgent1..3 and iapTrainer1..3).
+    int agent[3], trainer[3];
+    // The boots that the player wears (0 none) and their matches left, the
+    // boots that ran out (-1 none), the boots before a trial, a trial,
+    // the old pro boots of the last offer, a free trial, and the matches
+    // with no boots.
+    int bootId, bootUses, expiredBoots, currentBootId, currentBootUses, tryingBoots;
+    int oldProBoots, tryBoots, noBootsMatches;
+    // The match ball of each kind of match: league, cup, continental, and
+    // international (0 is the default ball).
+    int ballLeague, ballCup, ballContinent, ballInternational;
     // 1 before the first match of the career (c_TPlayer.m_debut).
     int debut;
     // The day of the last message of the nation that did not pick the
@@ -152,6 +164,11 @@ int ssr_career_week(const SSRCareer *career);
 // c_TPlayer.AddForm and AddInternationalForm: the newest rating goes in at
 // the end.
 void ssr_career_add_form(int *form, int rating);
+
+// GSPlayerUtility.GotAgent and GotTrainer: the level of the agent or of the
+// trainer, 3 to 1, or 0.
+int ssr_career_agent(const SSRCareer *career);
+int ssr_career_trainer(const SSRCareer *career);
 
 // GSPlayerUtility.UpdateRelationship: the relation changes by the amount
 // and stays from 1 to 100.

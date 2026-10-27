@@ -43,6 +43,7 @@ void ssr_career_create(SSRCareer *c, const char *first, const char *last, int ge
     c->lastSpendTimeFriends = c->lastSpendTimePartner = 28;
     c->newsDone = 1;
     c->teamShopping = -1;
+    c->expiredBoots = -1;
     c->energy = 100;
     c->nrg[0] = c->nrg[1] = c->nrg[2] = 1;
     for (int i = 0; i < 10; i++) c->ratings[i] = 5;
@@ -214,6 +215,14 @@ static void write_floats(FILE *file, const char *name, const float *values, int 
     fputc('\n', file);
 }
 
+int ssr_career_agent(const SSRCareer *c) {
+    return c->agent[2] > 0 ? 3 : c->agent[1] > 0 ? 2 : c->agent[0] > 0 ? 1 : 0;
+}
+
+int ssr_career_trainer(const SSRCareer *c) {
+    return c->trainer[2] > 0 ? 3 : c->trainer[1] > 0 ? 2 : c->trainer[0] > 0 ? 1 : 0;
+}
+
 static float *relation_field(SSRCareer *c, SSRRelation relation) {
     switch (relation) {
     case SSR_RELATION_BOSS: return &c->relationBoss;
@@ -314,6 +323,13 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     write_ints(file, "vehicles", c->vehicles, SSR_CAREER_ITEMS);
     write_ints(file, "properties", c->properties, SSR_CAREER_ITEMS);
     fprintf(file, "teammatesshoppingcount=%d\n", c->teamShopping);
+    write_ints(file, "agents", c->agent, 3);
+    write_ints(file, "trainers", c->trainer, 3);
+    int boots[9] = {c->bootId,       c->bootUses,   c->expiredBoots,   c->currentBootId, c->currentBootUses,
+                    c->tryingBoots,  c->oldProBoots, c->tryBoots,      c->noBootsMatches};
+    write_ints(file, "boots", boots, 9);
+    int balls[4] = {c->ballLeague, c->ballCup, c->ballContinent, c->ballInternational};
+    write_ints(file, "balls", balls, 4);
     fprintf(file, "debut=%d\nintnotpickedmsg=%d\n", c->debut, c->intNotPickedMessage);
     write_ints(file, "technique", c->technique, SSR_CAREER_SKILL_LEVELS);
     write_ints(file, "pace", c->pace, SSR_CAREER_SKILL_LEVELS);
@@ -369,8 +385,9 @@ int ssr_career_load(SSRCareer *c, const char *path) {
     FILE *file = ssr_fs_open(path, "rb");
     if (!file) return 0;
     memset(c, 0, sizeof(*c));
-    // An older save has no shopping trip.
+    // An older save has no shopping trip and no boots that ran out.
     c->teamShopping = -1;
+    c->expiredBoots = -1;
     static char line[4096];
     while (fgets(line, sizeof(line), file)) {
         line[strcspn(line, "\r\n")] = 0;
@@ -413,6 +430,28 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "vehicles") == 0) read_ints(value, c->vehicles, SSR_CAREER_ITEMS);
         else if (strcmp(key, "properties") == 0) read_ints(value, c->properties, SSR_CAREER_ITEMS);
         else if (strcmp(key, "teammatesshoppingcount") == 0) c->teamShopping = number;
+        else if (strcmp(key, "agents") == 0) read_ints(value, c->agent, 3);
+        else if (strcmp(key, "trainers") == 0) read_ints(value, c->trainer, 3);
+        else if (strcmp(key, "boots") == 0) {
+            int v[9] = {0, 0, -1, 0, 0, 0, 0, 0, 0};
+            read_ints(value, v, 9);
+            c->bootId = v[0];
+            c->bootUses = v[1];
+            c->expiredBoots = v[2];
+            c->currentBootId = v[3];
+            c->currentBootUses = v[4];
+            c->tryingBoots = v[5];
+            c->oldProBoots = v[6];
+            c->tryBoots = v[7];
+            c->noBootsMatches = v[8];
+        } else if (strcmp(key, "balls") == 0) {
+            int v[4] = {0};
+            read_ints(value, v, 4);
+            c->ballLeague = v[0];
+            c->ballCup = v[1];
+            c->ballContinent = v[2];
+            c->ballInternational = v[3];
+        }
         else if (strcmp(key, "debut") == 0) c->debut = number;
         else if (strcmp(key, "intnotpickedmsg") == 0) c->intNotPickedMessage = number;
         else if (strcmp(key, "technique") == 0) read_ints(value, c->technique, SSR_CAREER_SKILL_LEVELS);
