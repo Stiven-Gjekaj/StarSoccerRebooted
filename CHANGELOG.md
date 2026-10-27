@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.24.0 (2026-10-27)
+
+- The scrolling boards of the pitch have the marks of SSR: the sponsor
+  board, the name of the game, and the boots board.
+
 ## 0.23.0 (2026-10-27)
 
 - Rain: some matches are in the rain, more often far from the equator.
