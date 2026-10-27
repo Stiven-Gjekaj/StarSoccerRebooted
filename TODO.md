@@ -35,9 +35,16 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       particle emitters, the crowd, layers, and the colour stack
 - [x] The time base of the game: frames of 60 a second
 - [x] Slanted text, the cels of an image, additive and gloss blends
+- [x] Embedded draws (`Embed:`, `DrawEmbedded:`), readouts, selectors,
+      `if` and `else`, the actions of a click, lists that scroll with a
+      swipe, and lists that the code fills from a template
+- [ ] The expression language of the layouts: `set(...)`, `fmt()`,
+      `oneof()`, `lerp()`, `rgba()`, `slotcol()`, and `%` variables
+- [ ] The shells: the news ticker (`ShowShell(Ticker)`, `ticker.uis`),
+      the borders, and the overlays
 - [ ] The rest of the layout commands: font shadows (`FontShadow`), the
-      fade of a screen (`Dissolve:`), global emitters, cached and embedded
-      draws (`DrawCached:`, `Embed:`), and the 3D models of the match
+      fade of a screen (`Dissolve:`), global emitters, cached draws
+      (`DrawCached:`), and the 3D models of the match
 - [x] The rule of the game for a line that is wider than its box: it
       moves from side to side inside the box
 
@@ -47,17 +54,26 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] Build for Android. The app imports the game that is installed on
       the device.
 - [x] Touch input, and the mouse as touch on the desktop
-- [ ] Save files in the data directory of each platform. This moves to
-      0.4, with the first save.
+- [x] Save files in the data directory of each platform. They came with
+      0.4.
 
 ## 0.4 A new career
 
-- [ ] Save files in the data directory of each platform
-- [ ] Main menu and save slots (`MainMenu`, `SaveSlot`)
-- [ ] Make a player: name, nation, look (`ChooseNation`)
-- [ ] Choose a league and a club (`ChooseLeague`, `ChooseClub`)
-- [ ] Skills and the first contract (`Skills`, `SkillChoice`, `Contract`)
-- [ ] The game menu between matches (`GameMenu`)
+- [x] Save files in the data directory of each platform
+- [x] Main menu, options, and save slots (`MainMenu`, `Options`,
+      `SaveSlot`): load, delete, and new career
+- [x] Make a player: name, gender, nation (`ChooseClub`, `ChooseNation`).
+      In the modern look the gender is the look.
+- [x] The league country. The game chooses the club, as in the original
+      (`GetProspectiveClubs`).
+- [x] The first contract and the start skills. The original has no
+      contract screen for a new career.
+- [ ] The five trials that set the first skills. They need the match, so
+      they come in 0.5. Until then the skills start at 1.
+- [x] The news of the first contract and the star transition (`WebPage`,
+      `StarTransition`)
+- [ ] The game menu between matches (`GameMenu`): it shows the player
+      and quits to the main menu. Its buttons open screens of later parts.
 
 ## 0.5 The match
 
