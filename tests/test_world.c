@@ -168,6 +168,19 @@ static void test_edits_and_saves_the_clubs(void) {
     CHECK(b && strcmp(b->name, "Harbour Town") == 0 && strcmp(b->tla, "HARBOR") == 0);
     CHECK(b && b->strength == a->strength && b->away.shirt1 == a->away.shirt1 && b->bTeamOf == a->bTeamOf);
     CHECK(b && fabs(b->latitude - a->latitude) < 1e-6 && ssr_world_club(back, 916)->bTeamOf == 915);
+    // The kit and the name of the league change, and a pack keeps them.
+    CHECK(ssr_world_set_club_kit(back, 915, 0x00FF00, 0x000000, 0xFFFFFF) && !ssr_world_set_club_kit(back, 1, 0, 0, 0));
+    CHECK(ssr_world_set_competition_name(back, 2270, "Harbour League") && !ssr_world_set_competition_name(back, 9, "X"));
+    CHECK(ssr_world_save_clubs(back, path));
+    char comps[1200];
+    snprintf(comps, sizeof(comps), "%s/Competitions.txt", pack);
+    CHECK(ssr_world_save_competition_names(back, comps));
+    SSRWorld *again = ssr_world_load_pack(set, pack);
+    const SSRClub *c = again ? ssr_world_club(again, 915) : NULL;
+    CHECK(c && c->home.shirt1 == 0x00FF00 && c->home.shirt2 == 0 && c->home.shorts == 0xFFFFFF);
+    CHECK(again && strcmp(ssr_world_competition(again, 2270)->tla, "Harbour League") == 0);
+    CHECK(again && ssr_world_competition(again, 2270)->duration == 38);
+    ssr_world_free(again);
     ssr_world_free(back);
     ssr_world_free(world);
 }

@@ -457,6 +457,34 @@ static void put_cell(FILE *file, const char *text) {
     for (const char *p = text ? text : ""; *p; p++) fputc(*p == '\t' || *p == '\n' || *p == '\r' ? ' ' : *p, file);
 }
 
+int ssr_world_set_club_kit(SSRWorld *world, int id, SSRColor shirt1, SSRColor shirt2, SSRColor shorts) {
+    SSRClub *club = world ? (SSRClub *)ssr_world_club(world, id) : NULL;
+    if (!club) return 0;
+    club->home.shirt1 = shirt1;
+    club->home.shirt2 = shirt2;
+    club->home.shorts = shorts;
+    return 1;
+}
+
+int ssr_world_set_competition_name(SSRWorld *world, int id, const char *name) {
+    SSRCompetition *comp = world ? (SSRCompetition *)ssr_world_competition(world, id) : NULL;
+    if (!comp || !name || !*name) return 0;
+    comp->tla = keep(world, name);
+    return 1;
+}
+
+int ssr_world_save_competition_names(const SSRWorld *world, const char *path) {
+    FILE *file = world && path ? fopen(path, "wb") : NULL;
+    if (!file) return 0;
+    fputs("id\ttla\n", file);
+    for (int i = 0; i < world->competitionCount; i++) {
+        fprintf(file, "%d\t", world->competitions[i].id);
+        put_cell(file, world->competitions[i].tla);
+        fputc('\n', file);
+    }
+    return fclose(file) == 0;
+}
+
 int ssr_world_save_clubs(const SSRWorld *world, const char *path) {
     FILE *file = world && path ? fopen(path, "wb") : NULL;
     if (!file) return 0;

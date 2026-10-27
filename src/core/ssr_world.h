@@ -155,6 +155,15 @@ int ssr_world_is_derby(const SSRWorld *world, int a, int b);
 // The editor: a new name and a new tla for a club. A NULL keeps the old
 // text. Returns 1 when the club is there.
 int ssr_world_set_club_name(SSRWorld *world, int id, const char *name, const char *tla);
+// The editor: new colours of the home kit of a club. Returns 1 when the
+// club is there.
+int ssr_world_set_club_kit(SSRWorld *world, int id, SSRColor shirt1, SSRColor shirt2, SSRColor shorts);
+// The editor: a new name of a competition (its tla). Returns 1 when the
+// competition is there.
+int ssr_world_set_competition_name(SSRWorld *world, int id, const char *name);
+// Writes the names of the competitions as a Competitions.txt of a pack,
+// with the columns id and tla. Returns 1 on success.
+int ssr_world_save_competition_names(const SSRWorld *world, const char *path);
 // Writes the clubs as a Clubs.txt of the data set. Returns 1 on success.
 int ssr_world_save_clubs(const SSRWorld *world, const char *path);
 
