@@ -9,6 +9,8 @@
 // Set SSR_PRESS to "x,y" to press that point of the screen 1.5 seconds
 // after the first frame. More presses go after ';', 1.5 seconds apart, and
 // "type:text" types the text. Set SSR_WINDOW to "WxH" for the size of the window in points.
+// Set SSR_AUTOCHANCE to "dx,dy" to play each chance of the player with a
+// drag of (dx, dy) from the ball.
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -377,7 +379,9 @@ static void load_game(SSRApp *app) {
     ssr_game_free(app->game);
     app->game = ssr_game_create(app->tweaks);
     ssr_game_set_data(app->game, app->world, translate, app, app->saveDirectory);
-    ssr_game_set_seed(app->game, (int)SDL_GetTicks());
+    // SSR_SEED fixes the random numbers, so that a test run is the same each time.
+    const char *seed = SDL_getenv("SSR_SEED");
+    ssr_game_set_seed(app->game, seed && *seed ? SDL_atoi(seed) : (int)SDL_GetTicks());
     ssr_game_load_settings(app->game, app->settingsPath);
     apply_settings(app);
     app->gameScreen = ssr_game_screen_version(app->game);
@@ -614,6 +618,34 @@ static SSRSceneEnv scene_env(SSRApp *app) {
     return env;
 }
 
+// SSR_AUTOCHANCE="dx,dy" plays each chance of the player for a test: it
+// drags from the ball by (dx, dy), and taps the tap ball at its centre when
+// the ball is near the middle of the screen.
+static void auto_chance(SSRApp *app) {
+    const char *setting = SDL_getenv("SSR_AUTOCHANCE");
+    const SSRChance *chance = ssr_game_chance(app->game);
+    static int step = 0;
+    float dx = 0, dy = 0;
+    if (!setting || SDL_sscanf(setting, "%f,%f", &dx, &dy) != 2 || !chance) {
+        step = 0;
+        return;
+    }
+    if (chance->state == SSR_CHANCE_AIM) {
+        if (step == 0) ssr_game_touch(app->game, 1, chance->ball.x, chance->ball.y);
+        if (step > 0 && step < 20) ssr_game_touch(app->game, 1, chance->ball.x + dx, chance->ball.y + dy);
+        if (step >= 20) ssr_game_touch(app->game, 0, chance->ball.x + dx, chance->ball.y + dy);
+        step++;
+    } else if (chance->state == SSR_CHANCE_TAP) {
+        const SSRTapBall *tap = &chance->tap;
+        int near = tap->x > 200 && tap->x < 440;
+        ssr_game_touch(app->game, near && step % 2 == 0, tap->x, tap->y);
+        step++;
+    } else {
+        ssr_game_touch(app->game, 0, 0, 0);
+        step = 0;
+    }
+}
+
 SDL_AppResult SDL_AppIterate(void *state) {
     SSRApp *app = state;
     SDL_SetRenderDrawColor(app->renderer, 34, 120, 52, 255);
@@ -685,6 +717,8 @@ SDL_AppResult SDL_AppIterate(void *state) {
             if (!item) SDL_Log("Pressed nothing at %g,%g", x, y);
         }
     }
+
+    auto_chance(app);
 
     const char *shot = SDL_getenv("SSR_SHOT");
     const char *shotMs = SDL_getenv("SSR_SHOT_MS");
