@@ -690,9 +690,6 @@ static int wrap_lines(FontSlot *slot, const char *text, float width, char lines[
     return count;
 }
 
-// The space inside a text box (c_GelText.m_padding).
-#define TEXT_PADDING 5.0f
-
 // A line that is wider than its box moves from side to side in it, at the
 // time of the game (c_GelText.DoBounceScroll): 300 units each 6 seconds.
 static float bounce_scroll(int gameMS, float overflow) {
@@ -743,15 +740,15 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
         }
         float width = ssr_font_measure(slot->font, lines[i]) * scaleX;
         float x;
-        int scroll = !item->wrap && item->w > 0 && width > item->w - TEXT_PADDING * 2;
+        int scroll = !item->wrap && item->w > 0 && width > item->w - item->padding * 2;
         if (scroll) {
-            float centre = (item->w - width) / 2 + bounce_scroll(gfx->gameMS, width - (item->w - TEXT_PADDING * 2));
-            float low = item->w - TEXT_PADDING + rightLean - width, high = TEXT_PADDING;
+            float centre = (item->w - width) / 2 + bounce_scroll(gfx->gameMS, width - (item->w - item->padding * 2));
+            float low = item->w - item->padding + rightLean - width, high = item->padding;
             x = centre < low ? low : centre > high ? high : centre;
         } else if (item->alignX == 'L') {
-            x = TEXT_PADDING + config->padLeft;
+            x = item->padding + config->padLeft;
         } else if (item->alignX == 'R') {
-            x = item->w - (TEXT_PADDING + config->padRight) + rightLean - width;
+            x = item->w - (item->padding + config->padRight) + rightLean - width;
         } else {
             x = (item->w - width) / 2;
         }
@@ -761,8 +758,8 @@ static void draw_text_item(SSRGfx *gfx, const SSRSceneItem *item) {
         if (clipped) SDL_GetRenderClipRect(gfx->renderer, &outer);
         if (scroll) {
             // The line shows only inside the padding of its box.
-            float left = item->x + TEXT_PADDING + gfx->offsetX;
-            float right = item->x + item->w + rightLean - TEXT_PADDING + gfx->offsetX;
+            float left = item->x + item->padding + gfx->offsetX;
+            float right = item->x + item->w + rightLean - item->padding + gfx->offsetX;
             SDL_Rect rect = {(int)left, -100000, (int)(right - left), 200000};
             if (clipped) SDL_GetRectIntersection(&rect, &outer, &rect);
             SDL_SetRenderClipRect(gfx->renderer, &rect);

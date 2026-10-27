@@ -178,6 +178,8 @@ struct Gel {
     float fontScaleX, fontScaleY;
     int wrap;
     float italic;
+    // GEL_TEXT: the space between the sides of the box and the text.
+    float padding;
     // GEL_TEXT: the shadow of the text (the first c_StyleElement), with its
     // offset in units of the font. hasShadowColour is 0 when the shadow
     // takes the colours of the text.
@@ -663,6 +665,7 @@ static Gel *new_gel(GelKind kind, const SSRUiNode *node) {
     g->font = 0;
     g->fontScaleX = g->fontScaleY = 1;
     g->italic = -0.25f;
+    g->padding = 5;
     // Each text of the game has a shadow (c_TextFR_Factory): 2 units down
     // and to the right, in black at half the alpha of the text.
     g->shadow = 1;
@@ -1403,6 +1406,8 @@ static Doodad *make_doodad(SSRScene *s, Gel *g, const SSRUiNode *m, int *show) {
         }
     } else if (is(n, "ShadowCol") && g->kind == GEL_TEXT) {
         if (g->shadow) g->hasShadowColour = parse_colour(arg(m, 0), &g->shadowColour);
+    } else if (is(n, "Padding") && g->kind == GEL_TEXT) {
+        g->padding = (float)number(s, m, 0, 0);
     } else if (is(n, "Italicise")) {
         g->italic = (float)number(s, m, 0, -0.25);
     } else if (is(n, "WrapX") && g->kind == GEL_TEXT) {
@@ -3043,6 +3048,7 @@ static void draw_text(SSRScene *s, const Gel *g, const Frame *f) {
     item->fontScaleY = g->fontScaleY * mat_scale_y(f->m);
     item->wrap = g->wrap;
     item->italic = g->italic;
+    item->padding = g->padding;
     item->colour = colour_rgba(f->colour);
     item->blend = g->blend;
     if (g->shadow) {
