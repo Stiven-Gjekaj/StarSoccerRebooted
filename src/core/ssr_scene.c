@@ -47,6 +47,8 @@ typedef enum {
     GEL_TWEEN,
     GEL_SEQUENCE,
     GEL_EMITTER,
+    GEL_EMBED,
+    GEL_DRAW_EMBEDDED,
 } GelKind;
 
 typedef enum {
@@ -234,6 +236,13 @@ struct SSRScene {
     int layerCount;
     // "@x" is vars['x'] (c_MathUtils.m_SimpleVars).
     double vars[128];
+    // Embed:(Name) puts its gel here when it draws, and
+    // DrawEmbedded:(Name) draws the children of that gel (c_GelEmbed).
+    struct {
+        const char *name;
+        Gel *gel;
+    } embeds[32];
+    int embedCount;
     // The random numbers of the emitters. The crowds have their own.
     SSRRandom random;
 
@@ -1435,6 +1444,11 @@ static void build_node(SSRScene *s, const SSRUiNode *node, Gel *parent) {
             place_gel(s, draw, g, 0, 0, 0);
             target = draw;
         }
+    } else if (is(name, "Embed") || is(name, "DrawEmbedded")) {
+        g = new_gel(is(name, "Embed") ? GEL_EMBED : GEL_DRAW_EMBEDDED, node);
+        if (!g) return;
+        g->name = keep(s, arg(node, 0));
+        place_gel(s, g, parent, 0, 0, 0);
     } else if (is(name, "Emitter")) {
         g = new_gel(GEL_EMITTER, node);
         if (!g) return;
@@ -2344,8 +2358,44 @@ static void draw_sequence(SSRScene *s, Gel *g, const Frame *f) {
 
 // Draws the gel and its children as c_Gel.Draw: the doodads run, then the
 // gel bakes its transform and colour and queues its packet.
+static void set_embed(SSRScene *s, const char *name, Gel *g) {
+    for (int i = 0; i < s->embedCount; i++) {
+        if (strcmp(s->embeds[i].name, name) == 0) {
+            s->embeds[i].gel = g;
+            return;
+        }
+    }
+    if (s->embedCount < 32) {
+        s->embeds[s->embedCount].name = name;
+        s->embeds[s->embedCount++].gel = g;
+    }
+}
+
+static Gel *get_embed(const SSRScene *s, const char *name) {
+    for (int i = 0; i < s->embedCount; i++) {
+        if (strcmp(s->embeds[i].name, name) == 0) return s->embeds[i].gel;
+    }
+    return NULL;
+}
+
 static void draw_gel(SSRScene *s, Gel *g, const Frame *parent) {
     if (g->dead) return;
+    if (g->kind == GEL_EMBED) {
+        // It draws nothing. A DrawEmbedded draws its children.
+        pump(s, g, g->doodads);
+        if (!g->hidden) set_embed(s, g->name, g);
+        return;
+    }
+    if (g->kind == GEL_DRAW_EMBEDDED) {
+        // The children of the embed draw in the frame of the parent.
+        Gel *embed = get_embed(s, g->name);
+        pump(s, g, g->doodads);
+        if (!embed || g->hidden) return;
+        Frame f = *parent;
+        if (g->layer >= 0) f.layer = g->layer;
+        draw_children(s, embed, &f);
+        return;
+    }
     Frame f = *parent;
     if (g->layer >= 0) f.layer = g->layer;
     if (g->depth != DEPTH_INHERIT) f.depth = g->depth;

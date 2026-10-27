@@ -760,7 +760,40 @@ static void test_scrolls_a_list_by_a_swipe(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// Embed:(Name) draws nothing. DrawEmbedded:(Name) draws the children of
+// the embed that showed last, as the agent panel of the game menu does.
+static void test_draws_embedded_content(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_number(tweaks, "Menu", "OwnedAgent", 1);
+    SSRUiTree *tree;
+    SSRScene *scene = build("PushOrigin:(100,0)\n"
+                            "DrawEmbedded:(AgentEmbed)\n"
+                            "PopOrigin\n"
+                            "Rect:(0,0,0,0)\n"
+                            "\tSelector(Menu,OwnedAgent)\n"
+                            "{\n"
+                            "\tEmbed:(AgentEmbed)\n"
+                            "\t{\n"
+                            "\t\tDraw:(NoAgent,10,0,10,10)\n"
+                            "\t}\n"
+                            "\tEmbed:(AgentEmbed)\n"
+                            "\t{\n"
+                            "\t\tDraw:(Agent1,10,0,10,10)\n"
+                            "\t}\n"
+                            "}\n",
+                            tweaks, &tree);
+    // The first frame has no embed yet when the DrawEmbedded draws.
+    CHECK(ssr_scene_count(scene) == 0);
+    SSRSceneEnv env = test_env(tweaks);
+    ssr_scene_update(scene, &env, 16);
+    CHECK(ssr_scene_count(scene) == 1 && find_image(scene, "Agent1") && near(find_image(scene, "Agent1")->x, 10));
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 int main(void) {
+    test_draws_embedded_content();
     test_scrolls_a_list_by_a_swipe();
     test_fills_lists_and_changes_elements();
     test_readouts_conditions_and_click_actions();
