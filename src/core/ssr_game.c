@@ -69,6 +69,8 @@ struct SSRGame {
     int now;
     float ticks;
     int chanceEnd;
+    // The banner of the result of a chance shows until this time.
+    int bannerEnd;
     SSRTapTouch touch;
     int touchWasDown;
     // The rows of the commentary. The screen shows them again when it
@@ -895,6 +897,42 @@ static void match_lines(SSRGame *game) {
     if (added) scroll_commentary(game);
 }
 
+// c_MatchChance.m_ShowBanner: the code of the result for scoreanim.uis,
+// and the wait before the match goes on (SplashMessage.Delay*SplashMsg).
+static void show_banner(SSRGame *game) {
+    const SSRChance *c = game->chance;
+    int code = -2, wait = 1500;
+    switch (c->result) {
+    case SSR_RESULT_GOAL:
+        code = 0;
+        wait = 1000;
+        break;
+    case SSR_RESULT_ASSIST:
+        code = 1;
+        wait = 1000;
+        break;
+    case SSR_RESULT_PASS:
+        code = 2;
+        wait = 1000;
+        break;
+    case SSR_RESULT_SAVED:
+        code = -1;
+        wait = 1000;
+        break;
+    case SSR_RESULT_OFFSIDE:
+        code = -3;
+        wait = 1000;
+        break;
+    default:
+        break;
+    }
+    ssr_tweaks_set_number(game->tweaks, "Minigames", "Outcome", code);
+    ssr_tweaks_set_number(game->tweaks, "Chance", "IsHead", c->info.chanceType == 9 || c->info.chanceType == 10);
+    // The quick message shows for 2 seconds.
+    game->bannerEnd = game->now + 2000;
+    game->chanceEnd = game->now + wait;
+}
+
 static void start_chance(SSRGame *game) {
     free(game->chance);
     game->chance = calloc(1, sizeof(SSRChance));
@@ -915,8 +953,7 @@ static void match_tick(SSRGame *game) {
         game->touchWasDown = touch.down;
         ssr_chance_update(game->chance, game->now, &touch, &game->random);
         if (game->chance->state == SSR_CHANCE_OVER) {
-            // The result shows for a moment (SplashMessage.Delay*SplashMsg).
-            if (game->chanceEnd == 0) game->chanceEnd = game->now + 1500;
+            if (game->chanceEnd == 0) show_banner(game);
             if (game->now >= game->chanceEnd) {
                 ssr_match_chance_done(game->match, game->chance, game->now, &game->random);
                 free(game->chance);
@@ -1190,4 +1227,8 @@ void ssr_game_touch(SSRGame *game, int down, float x, float y) {
     game->touch.down = down;
     game->touch.x = x;
     game->touch.y = y;
+}
+
+int ssr_game_banner(const SSRGame *game) {
+    return game && game->now < game->bannerEnd;
 }

@@ -129,6 +129,14 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
                 }
             }
             ssr_game_touch(game, 0, 0, 0);
+            // The chance ends with a banner of its result.
+            for (int i = 0; i < 2000 && ssr_game_chance(game) && chance->state != SSR_CHANCE_OVER; i++) {
+                ssr_game_update(game, 1);
+            }
+            ssr_game_update(game, 1);
+            CHECK(ssr_game_banner(game));
+            int outcome = (int)ssr_tweaks_number(tweaks, "Minigames", "Outcome");
+            CHECK(outcome >= -3 && outcome <= 2);
         }
         if (ssr_tweaks_number(tweaks, "Match", "MatchState") == 2 || ssr_tweaks_number(tweaks, "Match", "MatchState") == 3) {
             ssr_game_message(game, "match.btn_Play");
