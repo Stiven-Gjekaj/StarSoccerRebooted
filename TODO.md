@@ -38,7 +38,8 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [ ] The rest of the layout commands: font shadows (`FontShadow`), the
       fade of a screen (`Dissolve:`), global emitters, cached and embedded
       draws (`DrawCached:`, `Embed:`), and the 3D models of the match
-- [ ] The rule of the game that makes text smaller to fit its box
+- [x] The rule of the game for a line that is wider than its box: it
+      moves from side to side inside the box
 
 ## 0.3 Platforms (done)
 
