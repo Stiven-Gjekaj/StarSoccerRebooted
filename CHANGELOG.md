@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.18.0 (2026-10-27)
+
+- An injured player chooses: play with pain, at a risk of a longer
+  injury, or rest. The comeback after an injury shows an alert.
+- The ticker tells of the strike partner and of a young team mate that
+  the player mentors. A good team spirit helps the young player grow.
+- Options has a World screen (it was Packs). It also types the seed of
+  the world of the next career, so that friends can share a world, and
+  chooses a challenge: the pace at the maximum, or no Bux and no NRG.
+- The Honours screen shows the seed of the world of the career.
+
 ## 0.17.0 (2026-10-27)
 
 - Rivalries grow between clubs that race for a title and between clubs
