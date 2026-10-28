@@ -97,6 +97,10 @@ typedef struct {
     // The drills of the skills that the player tried since the last match
     // (c_TPlayer.m_trainingattempts).
     int trainingAttempts;
+    // The difficulty that a custom career chooses, from
+    // SSR_CAREER_DIFFICULTY_MIN (very easy) to SSR_CAREER_DIFFICULTY_MAX
+    // (very hard). 0 is normal: the other teams of 4.32.
+    int difficulty;
     // The best practice score, and the practices since the last match
     // (c_TPlayer.m_practicerecord and m_practicecount).
     int practiceRecord, practiceCount;
@@ -278,6 +282,13 @@ enum {
 // stops the attacks of the team, so the position gives its mix of
 // moments, not the focus.
 int ssr_career_focus(const SSRCareer *career);
+
+#define SSR_CAREER_DIFFICULTY_MIN -2
+#define SSR_CAREER_DIFFICULTY_MAX 2
+
+// The part of its strength that the other team gets at the difficulty of
+// the career: 0.8 (very easy) to 1.2 (very hard), and 1 at normal.
+float ssr_career_difficulty_factor(const SSRCareer *career);
 
 // The year and the week of the career, from 1.
 int ssr_career_year(const SSRCareer *career);

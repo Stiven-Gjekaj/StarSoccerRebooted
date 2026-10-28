@@ -171,6 +171,13 @@ int ssr_career_focus(const SSRCareer *c) {
     return 2;
 }
 
+float ssr_career_difficulty_factor(const SSRCareer *c) {
+    int d = c->difficulty < SSR_CAREER_DIFFICULTY_MIN   ? SSR_CAREER_DIFFICULTY_MIN
+            : c->difficulty > SSR_CAREER_DIFFICULTY_MAX ? SSR_CAREER_DIFFICULTY_MAX
+                                                        : c->difficulty;
+    return 1 + 0.1f * (float)d;
+}
+
 int ssr_career_age(const SSRCareer *c) {
     return ssr_career_year(c) + (c->startAge > 0 ? c->startAge : 16) - 1;
 }
@@ -387,6 +394,7 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     if (c->trainingAttempts) fprintf(file, "trainingattempts=%d\n", c->trainingAttempts);
     if (c->practiceRecord) fprintf(file, "practicerecord=%d\n", c->practiceRecord);
     if (c->practiceCount) fprintf(file, "practicecount=%d\n", c->practiceCount);
+    if (c->difficulty) fprintf(file, "difficulty=%d\n", c->difficulty);
     if (c->exBoss[0]) {
         write_text(file, "exboss", c->exBoss);
         fprintf(file, "exbossclub=%d\n", c->exBossClub);
@@ -585,6 +593,7 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "trainingattempts") == 0) c->trainingAttempts = number;
         else if (strcmp(key, "practicerecord") == 0) c->practiceRecord = number;
         else if (strcmp(key, "practicecount") == 0) c->practiceCount = number;
+        else if (strcmp(key, "difficulty") == 0) c->difficulty = number;
         else if (strcmp(key, "exboss") == 0) read_text(value, c->exBoss, sizeof(c->exBoss));
         else if (strcmp(key, "exbossclub") == 0) c->exBossClub = number;
         else if (strcmp(key, "role") == 0 && number >= 0 && number < SSR_CAREER_POSITIONS) c->position = number;

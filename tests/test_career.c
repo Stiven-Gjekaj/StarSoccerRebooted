@@ -333,6 +333,7 @@ static void test_keeps_the_records(void) {
     c.trainingAttempts = 2;
     c.practiceRecord = 14;
     c.practiceCount = 1;
+    c.difficulty = -1;
     c.businessStake = 700;
     snprintf(c.exBoss, sizeof(c.exBoss), "Ann Lake");
     c.exBossClub = 810;
@@ -367,6 +368,14 @@ static void test_keeps_the_records(void) {
     CHECK(back.loanFrom == 915 && back.charityYear == 3 && back.businessStake == 700);
     CHECK(back.tutorials == (SSR_TUTORIAL_CONTROL | SSR_TUTORIAL_SWERVE) && back.trainingAttempts == 2);
     CHECK(back.practiceRecord == 14 && back.practiceCount == 1);
+    // The difficulty: easy makes the other teams 10 percent weaker. A
+    // career with no difficulty is normal, and the factor stops at very hard.
+    CHECK(back.difficulty == -1 && fabsf(ssr_career_difficulty_factor(&back) - 0.9f) < 1e-5f);
+    CHECK(old.difficulty == -1);
+    SSRCareer normal = {0};
+    CHECK(ssr_career_difficulty_factor(&normal) == 1);
+    normal.difficulty = 7;
+    CHECK(fabsf(ssr_career_difficulty_factor(&normal) - 1.2f) < 1e-5f);
     CHECK(strcmp(back.exBoss, "Ann Lake") == 0 && back.exBossClub == 810);
     back.startAge = 0;
     // Each position starts a match with the balanced focus.
