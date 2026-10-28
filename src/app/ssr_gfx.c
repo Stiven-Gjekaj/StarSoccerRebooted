@@ -82,6 +82,8 @@ struct SSRGfx {
     float holeX, holeY, holeWidth, holeHeight, holeLean;
 };
 
+static void sort_files(char **files, int count);
+
 SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
     SSRGfx *gfx = SDL_calloc(1, sizeof(SSRGfx));
     if (!gfx) return NULL;
@@ -131,6 +133,7 @@ SSRGfx *ssr_gfx_create(SDL_Renderer *renderer, const char *gameDirectory) {
     const char *base = SDL_GetBasePath();
     SDL_snprintf(path, sizeof(path), "%sart", base ? base : "");
     gfx->art = SDL_GlobDirectory(path, "*.png", 0, &gfx->artCount);
+    sort_files(gfx->art, gfx->artCount);
     return gfx;
 }
 
@@ -235,22 +238,34 @@ SDL_Texture *ssr_gfx_texture(SSRGfx *gfx, const char *name) {
     return cached_texture(gfx, name, path, 0);
 }
 
+static int compare_files(const void *a, const void *b) {
+    return SDL_strcmp(*(char *const *)a, *(char *const *)b);
+}
+
+// Sorts the names of the files of an art directory, for has_file.
+static void sort_files(char **files, int count) {
+    if (files && count > 1) SDL_qsort(files, (size_t)count, sizeof(char *), compare_files);
+}
+
+// 1 when the sorted names hold the file.
+static int has_file(char **files, int count, const char *file) {
+    return files && count > 0 && SDL_bsearch(&file, files, (size_t)count, sizeof(char *), compare_files) != NULL;
+}
+
 // The art of the remake (art/<name>.png) takes the place of the atlas
-// image with the name. It fills the full box of the original image.
+// image with the name. It fills the full box of the original image. Each
+// image of a screen asks for it each frame, so the names are sorted.
 static SDL_Texture *own_art(SSRGfx *gfx, const char *name) {
     if (!name || !name[0]) return NULL;
     char file[256];
     SDL_snprintf(file, sizeof(file), "%s.png", name);
-    for (int i = 0; i < gfx->packArtCount; i++) {
-        if (SDL_strcmp(gfx->packArt[i], file) != 0) continue;
+    if (has_file(gfx->packArt, gfx->packArtCount, file)) {
         char key[256], path[2400];
         SDL_snprintf(key, sizeof(key), "pack:%s", name);
         SDL_snprintf(path, sizeof(path), "%s/art/%s", gfx->packDirectory, file);
         return cached_texture(gfx, key, path, 1);
     }
-    int found = 0;
-    for (int i = 0; i < gfx->artCount && !found; i++) found = SDL_strcmp(gfx->art[i], file) == 0;
-    if (!found) return NULL;
+    if (!has_file(gfx->art, gfx->artCount, file)) return NULL;
     char key[256], path[2400];
     SDL_snprintf(key, sizeof(key), "art:%s", name);
     const char *base = SDL_GetBasePath();
@@ -1005,6 +1020,7 @@ void ssr_gfx_set_pack(SSRGfx *gfx, const char *directory) {
     char path[2100];
     SDL_snprintf(path, sizeof(path), "%s/art", directory);
     gfx->packArt = SDL_GlobDirectory(path, "*.png", 0, &gfx->packArtCount);
+    sort_files(gfx->packArt, gfx->packArtCount);
 }
 
 void ssr_gfx_set_offset(SSRGfx *gfx, float x, float y) {
