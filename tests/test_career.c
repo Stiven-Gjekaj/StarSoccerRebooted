@@ -326,7 +326,7 @@ static void test_keeps_the_records(void) {
     c.hatTricks = 4;
     c.worldSeed = 4242;
     c.startAge = 24;
-    c.position = SSR_CAREER_HOLDING;
+    c.position = SSR_CAREER_GOALKEEPER;
     c.loanFrom = 915;
     c.charityYear = 3;
     c.businessStake = 700;
@@ -342,15 +342,33 @@ static void test_keeps_the_records(void) {
     snprintf(path, sizeof(path), "%s/records.txt", ssr_test_directory("career_records"));
     CHECK(ssr_career_save(&c, path) && ssr_career_load(&back, path));
     CHECK(back.worldSeed == 4242 && back.injury == 12);
+    // A save of 0.27 kept a striker (1) or a holding midfielder (2).
+    static SSRCareer old;
+    old = c;
+    old.position = 0;
+    char oldPath[1200];
+    snprintf(oldPath, sizeof(oldPath), "%s/old.txt", ssr_test_directory("career_old_position"));
+    CHECK(ssr_career_save(&old, oldPath));
+    FILE *file = fopen(oldPath, "a");
+    fputs("position=2\n", file);
+    fclose(file);
+    CHECK(ssr_career_load(&old, oldPath) && old.position == SSR_CAREER_MIDFIELDER);
+    CHECK(ssr_career_save(&old, oldPath));
+    file = fopen(oldPath, "a");
+    fputs("position=1\n", file);
+    fclose(file);
+    CHECK(ssr_career_load(&old, oldPath) && old.position == SSR_CAREER_FORWARD);
     // A custom career starts at its own age.
     CHECK(back.startAge == 24 && ssr_career_age(&back) == ssr_career_year(&back) + 23);
     CHECK(back.loanFrom == 915 && back.charityYear == 3 && back.businessStake == 700);
     CHECK(strcmp(back.exBoss, "Ann Lake") == 0 && back.exBossClub == 810);
     back.startAge = 0;
     // The position gives the focus at the start of a match.
-    CHECK(back.position == SSR_CAREER_HOLDING && ssr_career_focus(&back) == 1);
-    back.position = SSR_CAREER_STRIKER;
-    CHECK(ssr_career_focus(&back) == 3);
+    CHECK(back.position == SSR_CAREER_GOALKEEPER && ssr_career_focus(&back) == 1);
+    back.position = SSR_CAREER_DEFENDER;
+    CHECK(ssr_career_focus(&back) == 1);
+    back.position = SSR_CAREER_MIDFIELDER;
+    CHECK(ssr_career_focus(&back) == 2);
     back.position = SSR_CAREER_FORWARD;
     CHECK(ssr_career_focus(&back) == 2);
     CHECK(ssr_career_age(&back) == ssr_career_year(&back) + 15);

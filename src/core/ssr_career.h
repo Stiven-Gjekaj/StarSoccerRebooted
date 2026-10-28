@@ -247,17 +247,20 @@ int ssr_career_star_level(const SSRCareer *career);
 // start age of a custom career.
 int ssr_career_age(const SSRCareer *career);
 
-// The positions of the player.
+// The positions of the player. A forward is the player of 4.32. Each
+// position gives its own mix of the moments of a match: a forward has more
+// attacking moments, a midfielder more moments in the middle, a defender
+// more defensive moments, and a goalkeeper only saves.
 enum {
     SSR_CAREER_FORWARD,
-    SSR_CAREER_STRIKER,
-    SSR_CAREER_HOLDING,
+    SSR_CAREER_MIDFIELDER,
+    SSR_CAREER_DEFENDER,
+    SSR_CAREER_GOALKEEPER,
     SSR_CAREER_POSITIONS,
 };
 
 // The focus of the player at the start of a match (1 defence, 2 balance,
-// 3 attack): a forward is balanced as in 4.32, a striker attacks, and a
-// holding midfielder defends.
+// 3 attack): a defender and a goalkeeper defend, the others are balanced.
 int ssr_career_focus(const SSRCareer *career);
 
 // The year and the week of the career, from 1.

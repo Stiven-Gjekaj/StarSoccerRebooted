@@ -167,7 +167,7 @@ int ssr_career_star_level(const SSRCareer *c) {
 }
 
 int ssr_career_focus(const SSRCareer *c) {
-    return c->position == SSR_CAREER_STRIKER ? 3 : c->position == SSR_CAREER_HOLDING ? 1 : 2;
+    return c->position == SSR_CAREER_DEFENDER || c->position == SSR_CAREER_GOALKEEPER ? 1 : 2;
 }
 
 int ssr_career_age(const SSRCareer *c) {
@@ -378,7 +378,7 @@ int ssr_career_save(const SSRCareer *c, const char *path) {
     fprintf(file, "potyawards=%d\nwonmajoraward=%d\n", c->potyAwards, c->wonMajorAward);
     fprintf(file, "worldseed=%d\n", c->worldSeed);
     if (c->startAge) fprintf(file, "startage=%d\n", c->startAge);
-    if (c->position) fprintf(file, "position=%d\n", c->position);
+    if (c->position) fprintf(file, "role=%d\n", c->position);
     if (c->loanFrom) fprintf(file, "loanfrom=%d\n", c->loanFrom);
     if (c->charityYear) fprintf(file, "charityyear=%d\n", c->charityYear);
     if (c->businessStake) fprintf(file, "businessstake=%d\n", c->businessStake);
@@ -578,7 +578,9 @@ int ssr_career_load(SSRCareer *c, const char *path) {
         else if (strcmp(key, "businessstake") == 0) c->businessStake = number;
         else if (strcmp(key, "exboss") == 0) read_text(value, c->exBoss, sizeof(c->exBoss));
         else if (strcmp(key, "exbossclub") == 0) c->exBossClub = number;
-        else if (strcmp(key, "position") == 0 && number >= 0 && number < SSR_CAREER_POSITIONS) c->position = number;
+        else if (strcmp(key, "role") == 0 && number >= 0 && number < SSR_CAREER_POSITIONS) c->position = number;
+        // A save of 0.27 had a striker (1) or a holding midfielder (2).
+        else if (strcmp(key, "position") == 0) c->position = number == 2 ? SSR_CAREER_MIDFIELDER : SSR_CAREER_FORWARD;
         else if (strcmp(key, "injury") == 0) c->injury = number;
         else if (strcmp(key, "starrating") == 0) c->starRating = number;
         else if (strcmp(key, "retired") == 0) c->retired = number;

@@ -969,7 +969,8 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         int position = ssr_game_career(game)->position;
         ssr_game_message(game, "squad.btn_Position");
         CHECK(ssr_game_career(game)->position == (position + 1) % SSR_CAREER_POSITIONS);
-        CHECK(strcmp(ssr_tweaks_get(tweaks, "Squad", "PositionText"), "SSR_PosForward") != 0 || position == 2);
+        CHECK(strcmp(ssr_tweaks_get(tweaks, "Squad", "PositionText"), "SSR_PosForward") != 0 ||
+              position == SSR_CAREER_POSITIONS - 1);
         for (int i = 1; i < SSR_CAREER_POSITIONS; i++) ssr_game_message(game, "squad.btn_Position");
         CHECK(ssr_game_career(game)->position == position);
         take_ops(game, ops, 256);
@@ -2773,13 +2774,13 @@ static void test_starts_a_new_career(void) {
     ssr_game_message(game, "customcareer.btn_Skill");
     for (int i = 0; i < 3; i++) ssr_game_message(game, "customcareer.btn_Skill");
     CHECK(strcmp(ssr_game_text(game, "GS_CustomSkill"), "30") == 0);
-    // A striker at the strongest club of the league, with 100 Bux.
+    // A midfielder at the strongest club of the league, with 100 Bux.
     CHECK(strcmp(ssr_game_text(game, "GS_CustomPosition"), "SSR_PosForward") == 0);
     ssr_game_message(game, "customcareer.btn_PositionDown");
-    CHECK(strcmp(ssr_game_text(game, "GS_CustomPosition"), "SSR_PosHolding") == 0);
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomPosition"), "SSR_PosGoalkeeper") == 0);
     ssr_game_message(game, "customcareer.btn_Position");
     ssr_game_message(game, "customcareer.btn_Position");
-    CHECK(strcmp(ssr_game_text(game, "GS_CustomPosition"), "SSR_PosStriker") == 0);
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomPosition"), "SSR_PosMidfielder") == 0);
     CHECK(strcmp(ssr_game_text(game, "GS_CustomClub"), "SSR_CustomSkillTrials") == 0);
     ssr_game_message(game, "customcareer.btn_ClubDown");
     ssr_game_message(game, "customcareer.btn_Club");
@@ -2799,7 +2800,7 @@ static void test_starts_a_new_career(void) {
     ssr_game_message(game, "message.btn_Ok");
     career = ssr_game_career(game);
     CHECK(strcmp(ssr_game_screen(game), "startransition") == 0 && career->startAge == 20);
-    CHECK(career->position == SSR_CAREER_STRIKER && career->clubId == strongest && career->bank >= 100);
+    CHECK(career->position == SSR_CAREER_MIDFIELDER && career->clubId == strongest && career->bank >= 100);
     CHECK(ssr_career_age(career) == 20 && ssr_tweaks_number(tweaks, "Player", "Age") == 20);
     CHECK(ssr_career_skill(career->technique) >= 30 && ssr_career_skill(career->power) >= 30);
     CHECK(ssr_career_skill(career->pace) >= 30 && ssr_career_skill(career->vision) >= 30);

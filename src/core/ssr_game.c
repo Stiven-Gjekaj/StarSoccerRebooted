@@ -3807,7 +3807,9 @@ static void squad_fill(SSRGame *game) {
         snprintf(me.last, sizeof(me.last), "%s", c->lastName);
         me.club = c->clubId;
         me.born = year - ssr_career_age(c);
-        me.position = c->position == SSR_CAREER_HOLDING ? SSR_POS_MIDFIELDER : SSR_POS_ATTACKER;
+        static const int AS_PERSON[SSR_CAREER_POSITIONS] = {SSR_POS_ATTACKER, SSR_POS_MIDFIELDER, SSR_POS_DEFENDER,
+                                                             SSR_POS_KEEPER};
+        me.position = AS_PERSON[c->position % SSR_CAREER_POSITIONS];
         me.skill = (ssr_career_skill(c->technique) + ssr_career_skill(c->pace) + ssr_career_skill(c->vision) +
                     ssr_career_skill(c->setPieces) + ssr_career_skill(c->power)) / 5;
         me.seasonApps = c->seasonApps;
@@ -3829,7 +3831,8 @@ static void squad_fill(SSRGame *game) {
         ssr_tweaks_set(t, "Squad", "ModeText", loc(game, "SSR_Scorers"));
     }
     // The rivals show the player, and the player can change position there.
-    static const char *const POSITIONS[SSR_CAREER_POSITIONS] = {"SSR_PosForward", "SSR_PosStriker", "SSR_PosHolding"};
+    static const char *const POSITIONS[SSR_CAREER_POSITIONS] = {"SSR_PosForward", "SSR_PosMidfielder", "SSR_PosDefender",
+                                                                     "SSR_PosGoalkeeper"};
     ssr_tweaks_set_number(t, "Squad", "CanPosition", game->squadMode == 2);
     ssr_tweaks_set_number(t, "Squad", "CanKit", game->squadMode == 0);
     ssr_tweaks_set(t, "Squad", "PositionText", loc(game, POSITIONS[game->career.position % SSR_CAREER_POSITIONS]));
@@ -4527,10 +4530,10 @@ static void judge_managers(SSRGame *game) {
             snprintf(c->exBoss, sizeof(c->exBoss), "%s %s", before.first, before.last);
             c->exBossClub = 0;
         }
-        // An attacking boss plays the player as a striker, and a youth boss
+        // An attacking boss plays a midfielder up front, and a youth boss
         // likes a young player.
-        if (m->style == SSR_STYLE_ATTACKING && c->position != SSR_CAREER_STRIKER) {
-            c->position = SSR_CAREER_STRIKER;
+        if (m->style == SSR_STYLE_ATTACKING && c->position == SSR_CAREER_MIDFIELDER) {
+            c->position = SSR_CAREER_FORWARD;
             snprintf(text, sizeof(text), "%s", loc(game, "SSR_MomentNewRole"));
             replace_all(text, sizeof(text), "$name", name);
             moment(game, text);
@@ -11441,7 +11444,8 @@ const char *ssr_game_text(SSRGame *game, const char *name) {
         return game->shown;
     }
     if (strcmp(name, "GS_CustomPosition") == 0) {
-        static const char *const TAGS[SSR_CAREER_POSITIONS] = {"SSR_PosForward", "SSR_PosStriker", "SSR_PosHolding"};
+        static const char *const TAGS[SSR_CAREER_POSITIONS] = {"SSR_PosForward", "SSR_PosMidfielder", "SSR_PosDefender",
+                                                                     "SSR_PosGoalkeeper"};
         return loc(game, TAGS[game->customPosition % SSR_CAREER_POSITIONS]);
     }
     if (strcmp(name, "GS_CustomClub") == 0) {
