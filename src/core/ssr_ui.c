@@ -64,6 +64,9 @@ typedef struct {
     int macroDepth;
     const char *file;
     int line;
+    // The last PopOrigin, and the macro depth where it is.
+    const SSRUiNode *popOrigin;
+    int popOriginDepth;
     // PushParent() keeps the element that takes the next block and the next
     // modifiers. PopParent() gives it back: then it takes them in place of
     // the last element of its block, until a new element comes there.
@@ -204,6 +207,13 @@ static Frame *top(Parser *p) {
 static SSRUiNode *last_element(Parser *p) {
     SSRUiNode *target = top(p)->target;
     if (p->forced && p->forcedIn == target) return p->forced;
+    // A block after PopOrigin is not in the element before the PopOrigin.
+    // It gets a group of its own (choosenation.uis, the list of leagues). A
+    // block after a macro that ends with PopOrigin stays in its element.
+    if (target->childCount > 0 && target->children[target->childCount - 1] == p->popOrigin &&
+        p->popOriginDepth == p->macroDepth) {
+        return NULL;
+    }
     for (int i = target->childCount - 1; i >= 0; i--) {
         if (target->children[i]->flags & SSR_UI_ELEMENT) return target->children[i];
     }
@@ -552,6 +562,10 @@ static void parse_statement(Parser *p, const char *line) {
                 p->forcedIn = top(p)->target;
             } else if ((flags & SSR_UI_ELEMENT) && p->forcedIn == top(p)->target) {
                 p->forced = NULL;
+            }
+            if (!(flags & SSR_UI_ELEMENT) && strcmp(node->name, "PopOrigin") == 0) {
+                p->popOrigin = node;
+                p->popOriginDepth = p->macroDepth;
             }
             if (owner) {
                 push_child(&owner->modifiers, &owner->modifierCount, node);

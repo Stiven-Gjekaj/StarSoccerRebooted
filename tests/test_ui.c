@@ -193,6 +193,45 @@ static void test_pushes_and_pops_the_parent(void) {
     ssr_ui_free(tree);
 }
 
+// A block after PopOrigin gets a group of its own. It is not in the element
+// before the PopOrigin.
+static void test_opens_a_group_after_pop_origin(void) {
+    const MemoryFile files[] = {
+        {"Screen.uis",
+         "PushOrigin:(98,194)\n"
+         "\tDraw:(Back,0,0,444,599)\n"
+         "PopOrigin()\n"
+         "{\n"
+         "\tRect:(-10,0,0,0) ref:List\n"
+         "}\n"
+         "Macro:(M_Bar)\n"
+         "\tDraw:(Bar,0,0)\n"
+         "\tPopOrigin\n"
+         "EndM\n"
+         "M_Bar:()\n"
+         "{\n"
+         "\tText:(Buy,0,0)\n"
+         "}\n"},
+        {NULL, NULL},
+    };
+    SSRUiTree *tree = parse(files, "Screen.uis");
+    const SSRUiNode *root = ssr_ui_root(tree);
+    const SSRUiNode *draw = NULL, *group = NULL, *bar = NULL;
+    for (int i = 0; root && i < root->childCount; i++) {
+        const SSRUiNode *node = root->children[i];
+        if (is(node, "Draw") && strcmp(node->args[0], "Back") == 0) draw = node;
+        if (is(node, "Draw") && strcmp(node->args[0], "Bar") == 0) bar = node;
+        if (is(node, "Group")) group = node;
+    }
+    CHECK(draw && draw->childCount == 0);
+    CHECK(group && group->childCount == 1 && is(child(group, 0), "Rect"));
+    // A block after a macro that ends with PopOrigin is in the last element
+    // of the macro.
+    CHECK(bar && bar->childCount == 1 && is(child(bar, 0), "Text"));
+    CHECK(ssr_ui_problem_count(tree) == 0);
+    ssr_ui_free(tree);
+}
+
 static void test_keeps_quoted_text_whole(void) {
     const MemoryFile files[] = {
         {"q.uis", "Group:(0,0)\n\tset(gel.text,\"(\"::fmt(%c,X)::\", \"::\")\") ref:Q\n"},
@@ -267,6 +306,7 @@ static void test_puts_a_patch_on_a_layout(void) {
 int main(void) {
     test_puts_a_patch_on_a_layout();
     test_nests_branch_blocks();
+    test_opens_a_group_after_pop_origin();
     test_keeps_quoted_text_whole();
     test_pushes_and_pops_the_parent();
     test_reads_elements_modifiers_and_blocks();
