@@ -2385,6 +2385,20 @@ static void train_a_skill(SSRGame *game, SSRTweaks *tweaks) {
     memset(c->technique, 0, sizeof(c->technique));
     for (int i = 0; i < 5; i++) c->lastTrained[i] = c->sdate - 30;
     int lastTechnique = c->lastTrained[2];
+    // A vision of 60 shows the tutorial of the offside rule once, then the
+    // skills.
+    int vision[SSR_CAREER_SKILL_LEVELS];
+    memcpy(vision, c->vision, sizeof(vision));
+    memset(c->vision, 0, sizeof(c->vision));
+    for (int i = 0; i < 20; i++) c->vision[i] = 3;
+    c->tutorials &= ~SSR_TUTORIAL_OFFSIDE;
+    ssr_game_message(game, "gamemenu.btn_Skills");
+    CHECK(strcmp(ssr_game_screen(game), "information") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Information", "InformationType") == 5);
+    ssr_game_message(game, "information.btn_Back");
+    CHECK(strcmp(ssr_game_screen(game), "skills") == 0);
+    memcpy(c->vision, vision, sizeof(vision));
+    ssr_game_message(game, "skills.btn_Home");
     ssr_game_message(game, "gamemenu.btn_Skills");
     CHECK(strcmp(ssr_game_screen(game), "skills") == 0);
     SSRUiOp ops[512];

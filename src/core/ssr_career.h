@@ -16,6 +16,8 @@
 // The tutorials of the boots (Tutorial, ControlInfo and SwerveInfo).
 #define SSR_TUTORIAL_CONTROL 1
 #define SSR_TUTORIAL_SWERVE 2
+// The tutorial of the offside rule (Tutorial, OffsideInfo).
+#define SSR_TUTORIAL_OFFSIDE 4
 // The lifestyle shop sells 60 products (c_TShopItem.CountAllItems).
 #define SSR_CAREER_SHOP_PRODUCTS 60
 
@@ -90,7 +92,7 @@ typedef struct {
     // business that pays each season.
     int charityYear, businessStake;
     // The tutorials that the player saw (the tweaks Tutorial of the game):
-    // SSR_TUTORIAL_CONTROL and SSR_TUTORIAL_SWERVE.
+    // SSR_TUTORIAL_CONTROL, SSR_TUTORIAL_SWERVE, and SSR_TUTORIAL_OFFSIDE.
     int tutorials;
     // The drills of the skills that the player tried since the last match
     // (c_TPlayer.m_trainingattempts).

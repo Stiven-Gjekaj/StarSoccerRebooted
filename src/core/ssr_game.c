@@ -1602,6 +1602,11 @@ static void call_trial_done(SSRGame *game) {
 
 /* -------------------------------------------------------- the training */
 
+// The kinds of the information screen (Information.InformationType).
+enum { INFO_CAPTAIN = 1, INFO_SWERVE = 2, INFO_CONTROL = 3, INFO_OFFSIDE = 5 };
+static void information_screen(SSRGame *game, int type, const char *next);
+static void skills_shop(SSRGame *game, const char *tab);
+
 static void not_enough_energy(SSRGame *game, const char *activity, float need);
 static void save_career(SSRGame *game);
 
@@ -1738,10 +1743,19 @@ static void skill_choice(SSRGame *game, int type) {
     skill_buttons(game);
 }
 
-// c_TScreen_Skills.SetUpScreen.
+// The vision that shows the tutorial of the offside rule.
+#define OFFSIDE_VISION 60
+
+// c_TScreen_Skills.SetUpScreen and UpdateSkills: the skills, and the
+// tutorial of the offside rule once the vision reaches 60.
 static void skills_screen(SSRGame *game) {
+    SSRCareer *c = &game->career;
     player_tweaks(game);
     set_screen(game, "skills");
+    if (ssr_career_skill(c->vision) >= OFFSIDE_VISION && !(c->tutorials & SSR_TUTORIAL_OFFSIDE)) {
+        c->tutorials |= SSR_TUTORIAL_OFFSIDE;
+        information_screen(game, INFO_OFFSIDE, "skills");
+    }
 }
 
 static void skills_pace(SSRGame *game) {
@@ -1980,10 +1994,6 @@ static void call_train_horse(SSRGame *game);
 static void call_sell_horse(SSRGame *game);
 static void call_captain_tutorial(SSRGame *game);
 
-// The kinds of the information screen (Information.InformationType).
-enum { INFO_CAPTAIN = 1, INFO_SWERVE = 2, INFO_CONTROL = 3 };
-static void information_screen(SSRGame *game, int type, const char *next);
-static void skills_shop(SSRGame *game, const char *tab);
 
 static void run_call(SSRGame *game, const char *name) {
     static const struct {
@@ -7299,10 +7309,11 @@ static void info_kit(SSRGame *game, const char *player, const char *team, int st
 }
 
 // c_AScreen_Information.SetUpTeamColours and SetUpPlayers: the kits of the
-// example of the captain. The first three players wear the kit of the
+// example of the captain or of the offside rule (the players
+// InfoPlayer<example>1 to 5). The first three players wear the kit of the
 // other team, the last two the kit of the team, and the keeper a keeper
 // shirt.
-static void info_kits(SSRGame *game) {
+static void info_kits(SSRGame *game, const char *example) {
     static const char *const COPY[6][2] = {{"OppTeamShirt1", "Team1ShirtA"}, {"OppTeamShirt2", "Team1ShirtB"},
                                            {"OppTeamPants", "Team1Pants"},   {"MyTeamShirt1", "Team2ShirtA"},
                                            {"MyTeamShirt2", "Team2ShirtB"},  {"MyTeamPants", "Team2Pants"}};
@@ -7314,26 +7325,33 @@ static void info_kits(SSRGame *game) {
     int style2 = (int)ssr_tweaks_number(game->tweaks, "Information", "Team2Style");
     char player[48], shirt[48];
     for (int i = 1; i <= 5; i++) {
-        snprintf(player, sizeof(player), "InfoPlayerCL_TutCaptain%d", i);
+        snprintf(player, sizeof(player), "InfoPlayer%s%d", example, i);
         info_kit(game, player, i <= 3 ? "OppTeam" : "MyTeam", i <= 3 ? style1 : style2);
     }
     snprintf(shirt, sizeof(shirt), "MatchColours,KeeperShirt%d",
              (int)ssr_tweaks_number(game->tweaks, "Information", "KeeperStyle"));
-    add_op(game, SSR_OP_CLONE, "InfoPlayerCL_TutCaptainKeeper", "Shirt", shirt, 0);
+    snprintf(player, sizeof(player), "InfoPlayer%sKeeper", example);
+    add_op(game, SSR_OP_CLONE, player, "Shirt", shirt, 0);
 }
 
 // c_TScreen_Information.SetUpScreen: a tutorial with a picture. next is
-// the screen after Ok: "tutswrv" (the swerve tutorial), "gamemenu", or ""
-// (the boots shop).
+// the screen after Ok: "tutswrv" (the swerve tutorial), "gamemenu",
+// "skills", or "" (the boots shop).
 static void information_screen(SSRGame *game, int type, const char *next) {
-    static const char *const TAGS[4] = {"", "CMESSAGE_CAPTAINTUT", "CMESSAGE_BOOTSSWRVTUT", "CMESSAGE_BOOTSCONTROLTUT"};
+    static const char *const TAGS[6] = {"",
+                                        "CMESSAGE_CAPTAINTUT",
+                                        "CMESSAGE_BOOTSSWRVTUT",
+                                        "CMESSAGE_BOOTSCONTROLTUT",
+                                        "CMESSAGE_PITCH_WEATHER_PACK",
+                                        "CMESSAGE_OFFSIDETUT"};
     snprintf(game->infoNext, sizeof(game->infoNext), "%s", next);
     ssr_tweaks_set(game->tweaks, "Menu", "MessageBody", loc(game, TAGS[type]));
     ssr_tweaks_set_number(game->tweaks, "Information", "InformationType", type);
     // c_AScreen_Information.OnActive closes the shop overlay.
     game->overlay[0] = 0;
     set_screen(game, "information");
-    if (type == INFO_CAPTAIN) info_kits(game);
+    if (type == INFO_CAPTAIN) info_kits(game, "CL_TutCaptain");
+    if (type == INFO_OFFSIDE) info_kits(game, "CL_TutOffside");
 }
 
 // c_Information.ShowBootsControl and ShowBootsSwerve: each shows once in a
@@ -7385,6 +7403,8 @@ static void information_back(SSRGame *game) {
         info_boots(game, INFO_SWERVE, "");
     } else if (strcmp(game->infoNext, "gamemenu") == 0) {
         game_menu(game);
+    } else if (strcmp(game->infoNext, "skills") == 0) {
+        skills_screen(game);
     } else {
         game_menu(game);
         skills_shop(game, "Boots");
