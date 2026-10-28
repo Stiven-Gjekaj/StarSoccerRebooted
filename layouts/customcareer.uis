@@ -1,7 +1,8 @@
 // The custom career: the age, the skills, the position, the first club,
-// and the Bux of the player at the start. A screen of the remake. It comes
-// after the choice of the nation, before the trials. The minus and the plus
-// buttons change each value, and a tap on a value also goes up.
+// the Bux of the player at the start, and the difficulty. A screen of the
+// remake. It comes after the choice of the nation, before the trials. The
+// minus and the plus buttons change each value, and a tap on a value also
+// goes up.
 
 UnsortedLayer:(AfterGloss,1)
 
@@ -24,7 +25,7 @@ Rect:()
 
 // The top of the buttons at the bottom.
 Set:(@n=[@B-960]*0.7+744)
-// The top of the title. The title and the values (632 high) go in the
+// The top of the title. The title and the six values (624 high) go in the
 // middle between the ribbon and the buttons at the bottom. The value comes
 // from a frame of the screen.
 Set:(@m=[@n+156]*0.5-378)
@@ -48,10 +49,10 @@ PushOrigin:(60,@m)
 PopOrigin
 
 PushOrigin:(13,@m+96)
-	Rect:(0,0,614,100)
+	Rect:(0,0,614,86)
 	{
-		Draw:(GreyRecess,0,0,614,100)
-		Text:(LABEL,10,2,594,38,C,,#BBDDBBFF)
+		Draw:(GreyRecess,0,0,614,86)
+		Text:(LABEL,10,0,594,34,C,,#BBDDBBFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
@@ -59,12 +60,12 @@ PushOrigin:(13,@m+96)
 	}
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(23,@m+134)
-	Rect:(0,0,110,56)
+PushOrigin:(23,@m+128)
+	Rect:(0,0,110,50)
 	{
-		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,56)
-		Text:(-,0,0,110,52,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(-,0,0,110,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -75,10 +76,10 @@ PushOrigin:(23,@m+134)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(145,@m+134)
-	Rect:(0,0,350,56)
+PushOrigin:(145,@m+128)
+	Rect:(0,0,350,50)
 	{
-		Text:(00,0,0,350,52,C,,#FFFFFFFF)
+		Text:(00,0,0,350,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.5,0.5)
@@ -90,12 +91,12 @@ PushOrigin:(145,@m+134)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(507,@m+134)
-	Rect:(0,0,110,56)
+PushOrigin:(507,@m+128)
+	Rect:(0,0,110,50)
 	{
-		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,56)
-		Text:(+,0,0,110,52,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(+,0,0,110,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -107,11 +108,11 @@ PushOrigin:(507,@m+134)
 		ConvergeFrom(-640,0)
 PopOrigin
 
-PushOrigin:(13,@m+204)
-	Rect:(0,0,614,100)
+PushOrigin:(13,@m+184)
+	Rect:(0,0,614,86)
 	{
-		Draw:(GreyRecess,0,0,614,100)
-		Text:(LABEL,10,2,594,38,C,,#BBDDBBFF)
+		Draw:(GreyRecess,0,0,614,86)
+		Text:(LABEL,10,0,594,34,C,,#BBDDBBFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
@@ -119,12 +120,12 @@ PushOrigin:(13,@m+204)
 	}
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(23,@m+242)
-	Rect:(0,0,110,56)
+PushOrigin:(23,@m+216)
+	Rect:(0,0,110,50)
 	{
-		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,56)
-		Text:(-,0,0,110,52,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(-,0,0,110,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -135,10 +136,10 @@ PushOrigin:(23,@m+242)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(145,@m+242)
-	Rect:(0,0,350,56)
+PushOrigin:(145,@m+216)
+	Rect:(0,0,350,50)
 	{
-		Text:(00,0,0,350,52,C,,#FFFFFFFF)
+		Text:(00,0,0,350,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.5,0.5)
@@ -150,12 +151,12 @@ PushOrigin:(145,@m+242)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(507,@m+242)
-	Rect:(0,0,110,56)
+PushOrigin:(507,@m+216)
+	Rect:(0,0,110,50)
 	{
-		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,56)
-		Text:(+,0,0,110,52,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(+,0,0,110,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -167,11 +168,11 @@ PushOrigin:(507,@m+242)
 		ConvergeFrom(-640,0)
 PopOrigin
 
-PushOrigin:(13,@m+312)
-	Rect:(0,0,614,100)
+PushOrigin:(13,@m+272)
+	Rect:(0,0,614,86)
 	{
-		Draw:(GreyRecess,0,0,614,100)
-		Text:(LABEL,10,2,594,38,C,,#BBDDBBFF)
+		Draw:(GreyRecess,0,0,614,86)
+		Text:(LABEL,10,0,594,34,C,,#BBDDBBFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
@@ -179,12 +180,12 @@ PushOrigin:(13,@m+312)
 	}
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(23,@m+350)
-	Rect:(0,0,110,56)
+PushOrigin:(23,@m+304)
+	Rect:(0,0,110,50)
 	{
-		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,56)
-		Text:(-,0,0,110,52,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(-,0,0,110,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -195,10 +196,10 @@ PushOrigin:(23,@m+350)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(145,@m+350)
-	Rect:(0,0,350,56)
+PushOrigin:(145,@m+304)
+	Rect:(0,0,350,50)
 	{
-		Text:(00,0,0,350,52,C,,#FFFFFFFF)
+		Text:(00,0,0,350,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.5,0.5)
@@ -210,12 +211,12 @@ PushOrigin:(145,@m+350)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(507,@m+350)
-	Rect:(0,0,110,56)
+PushOrigin:(507,@m+304)
+	Rect:(0,0,110,50)
 	{
-		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,56)
-		Text:(+,0,0,110,52,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(+,0,0,110,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -227,11 +228,11 @@ PushOrigin:(507,@m+350)
 		ConvergeFrom(-640,0)
 PopOrigin
 
-PushOrigin:(13,@m+420)
-	Rect:(0,0,614,100)
+PushOrigin:(13,@m+360)
+	Rect:(0,0,614,86)
 	{
-		Draw:(GreyRecess,0,0,614,100)
-		Text:(LABEL,10,2,594,38,C,,#BBDDBBFF)
+		Draw:(GreyRecess,0,0,614,86)
+		Text:(LABEL,10,0,594,34,C,,#BBDDBBFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
@@ -239,12 +240,12 @@ PushOrigin:(13,@m+420)
 	}
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(23,@m+458)
-	Rect:(0,0,110,56)
+PushOrigin:(23,@m+392)
+	Rect:(0,0,110,50)
 	{
-		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,56)
-		Text:(-,0,0,110,52,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(-,0,0,110,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -255,10 +256,10 @@ PushOrigin:(23,@m+458)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(145,@m+458)
-	Rect:(0,0,350,56)
+PushOrigin:(145,@m+392)
+	Rect:(0,0,350,50)
 	{
-		Text:(00,0,0,350,52,C,,#FFFFFFFF)
+		Text:(00,0,0,350,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.5,0.5)
@@ -270,12 +271,12 @@ PushOrigin:(145,@m+458)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(507,@m+458)
-	Rect:(0,0,110,56)
+PushOrigin:(507,@m+392)
+	Rect:(0,0,110,50)
 	{
-		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,56)
-		Text:(+,0,0,110,52,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(+,0,0,110,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -287,11 +288,11 @@ PushOrigin:(507,@m+458)
 		ConvergeFrom(-640,0)
 PopOrigin
 
-PushOrigin:(13,@m+528)
-	Rect:(0,0,614,100)
+PushOrigin:(13,@m+448)
+	Rect:(0,0,614,86)
 	{
-		Draw:(GreyRecess,0,0,614,100)
-		Text:(LABEL,10,2,594,38,C,,#BBDDBBFF)
+		Draw:(GreyRecess,0,0,614,86)
+		Text:(LABEL,10,0,594,34,C,,#BBDDBBFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.4,0.4)
@@ -299,12 +300,12 @@ PushOrigin:(13,@m+528)
 	}
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(23,@m+566)
-	Rect:(0,0,110,56)
+PushOrigin:(23,@m+480)
+	Rect:(0,0,110,50)
 	{
-		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,56)
-		Text:(-,0,0,110,52,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(-,0,0,110,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
@@ -315,10 +316,10 @@ PushOrigin:(23,@m+566)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(145,@m+566)
-	Rect:(0,0,350,56)
+PushOrigin:(145,@m+480)
+	Rect:(0,0,350,50)
 	{
-		Text:(00,0,0,350,52,C,,#FFFFFFFF)
+		Text:(00,0,0,350,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.5,0.5)
@@ -330,17 +331,77 @@ PushOrigin:(145,@m+566)
 		>
 		ConvergeFrom(-640,0)
 PopOrigin
-PushOrigin:(507,@m+566)
-	Rect:(0,0,110,56)
+PushOrigin:(507,@m+480)
+	Rect:(0,0,110,50)
 	{
-		Draw:(ButtonShadow,6,6,110,56,,#FFFFFF80)
-		Draw:(GreenButton,0,0,110,56)
-		Text:(+,0,0,110,52,C,,#FFFFFFFF)
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(+,0,0,110,46,C,,#FFFFFFFF)
 			Layer(AfterGloss)
 			FontSize(1)
 			FontScale(0.7,0.7)
 	}
 		Click(customcareer.btn_Bux)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+
+PushOrigin:(13,@m+536)
+	Rect:(0,0,614,86)
+	{
+		Draw:(GreyRecess,0,0,614,86)
+		Text:(LABEL,10,0,594,34,C,,#BBDDBBFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.4,0.4)
+			StringReadout(Custom,DifficultyLabel)
+	}
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(23,@m+568)
+	Rect:(0,0,110,50)
+	{
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(-,0,0,110,46,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_DifficultyDown)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(145,@m+568)
+	Rect:(0,0,350,50)
+	{
+		Text:(00,0,0,350,46,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.5,0.5)
+			GS_CustomDifficulty()
+	}
+		Click(customcareer.btn_Difficulty)
+		<
+			PlaySnd(UISelect)
+		>
+		ConvergeFrom(-640,0)
+PopOrigin
+PushOrigin:(507,@m+568)
+	Rect:(0,0,110,50)
+	{
+		Draw:(ButtonShadow,6,6,110,50,,#FFFFFF80)
+		Draw:(GreenButton,0,0,110,50)
+		Text:(+,0,0,110,46,C,,#FFFFFFFF)
+			Layer(AfterGloss)
+			FontSize(1)
+			FontScale(0.7,0.7)
+	}
+		Click(customcareer.btn_Difficulty)
 		<
 			PlaySnd(UISelect)
 		>

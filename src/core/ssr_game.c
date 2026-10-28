@@ -209,6 +209,8 @@ struct SSRGame {
     // The position, the first club (0: the game chooses it, or an index
     // from 1 into customClubs), and the index of the first Bux.
     int customPosition, customClub, customBux;
+    // The difficulty of the custom career (SSRCareer.difficulty).
+    int customDifficulty;
     int customClubs[512];
     int customClubCount;
     // The club of the loan that the boss offers.
@@ -1390,6 +1392,7 @@ static void nation_ok(SSRGame *game) {
     game->customPosition = SSR_CAREER_FORWARD;
     game->customClub = 0;
     game->customBux = 0;
+    game->customDifficulty = 0;
     // The clubs of the leagues of the nation, the strongest first.
     const SSRWorld *world = game->world;
     int nation = chosen(game, "ChosenDesiredLeague");
@@ -1409,6 +1412,7 @@ static void nation_ok(SSRGame *game) {
     ssr_tweaks_set(game->tweaks, "Custom", "PositionLabel", loc(game, "SSR_CustomPosition"));
     ssr_tweaks_set(game->tweaks, "Custom", "ClubLabel", loc(game, "SSR_CustomClub"));
     ssr_tweaks_set(game->tweaks, "Custom", "BuxLabel", loc(game, "SSR_CustomBux"));
+    ssr_tweaks_set(game->tweaks, "Custom", "DifficultyLabel", loc(game, "SSR_CustomDifficulty"));
 }
 
 static void custom_age(SSRGame *game) {
@@ -1451,6 +1455,16 @@ static void custom_bux_down(SSRGame *game) {
     game->customBux = (game->customBux + 3) % 4;
 }
 
+static void custom_difficulty(SSRGame *game) {
+    game->customDifficulty = game->customDifficulty >= SSR_CAREER_DIFFICULTY_MAX ? SSR_CAREER_DIFFICULTY_MIN
+                                                                                 : game->customDifficulty + 1;
+}
+
+static void custom_difficulty_down(SSRGame *game) {
+    game->customDifficulty = game->customDifficulty <= SSR_CAREER_DIFFICULTY_MIN ? SSR_CAREER_DIFFICULTY_MAX
+                                                                                 : game->customDifficulty - 1;
+}
+
 static void custom_ok(SSRGame *game) {
     if (!game->canPlay || !game->world) return;
     int league = chosen(game, "ChosenDesiredLeague");
@@ -1466,6 +1480,7 @@ static void custom_ok(SSRGame *game) {
     game->career.startAge = game->customAge > CUSTOM_AGE_MIN ? game->customAge : 0;
     game->career.position = game->customPosition;
     game->career.bank = CUSTOM_BUX[game->customBux % 4];
+    game->career.difficulty = game->customDifficulty;
     // LoadDataAndStartTrial: the game chooses the club. A custom career can
     // choose it.
     const SSRClub *club = first_club(game, league);
@@ -11080,6 +11095,8 @@ static const Route ROUTES[] = {
     {"customcareer.btn_ClubDown", custom_club_down},
     {"customcareer.btn_Bux", custom_bux},
     {"customcareer.btn_BuxDown", custom_bux_down},
+    {"customcareer.btn_Difficulty", custom_difficulty},
+    {"customcareer.btn_DifficultyDown", custom_difficulty_down},
     {"customcareer.btn_Back", choose_nation},
     {"webpage.btn_Ok", webpage_ok},
     {"gamemenu.btn_Quit", quit_career},
@@ -12123,6 +12140,11 @@ const char *ssr_game_text(SSRGame *game, const char *name) {
     if (strcmp(name, "GS_CustomBux") == 0) {
         snprintf(game->shown, sizeof(game->shown), "%d", CUSTOM_BUX[game->customBux % 4]);
         return game->shown;
+    }
+    if (strcmp(name, "GS_CustomDifficulty") == 0) {
+        static const char *const TAGS[] = {"SSR_DiffVeryEasy", "SSR_DiffEasy", "SSR_DiffNormal", "SSR_DiffHard",
+                                           "SSR_DiffVeryHard"};
+        return loc(game, TAGS[game->customDifficulty - SSR_CAREER_DIFFICULTY_MIN]);
     }
     if (strcmp(name, "GS_CustomSkill") == 0) {
         if (game->customSkill == 0) return loc(game, "SSR_CustomSkillTrials");

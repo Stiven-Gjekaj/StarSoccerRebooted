@@ -3051,12 +3051,23 @@ static void test_starts_a_new_career(void) {
     ssr_game_message(game, "customcareer.btn_Bux");
     ssr_game_message(game, "customcareer.btn_Bux");
     CHECK(strcmp(ssr_game_text(game, "GS_CustomBux"), "100") == 0);
+    // The difficulty starts at normal, and goes round at each end.
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomDifficulty"), "SSR_DiffNormal") == 0);
+    ssr_game_message(game, "customcareer.btn_Difficulty");
+    ssr_game_message(game, "customcareer.btn_Difficulty");
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomDifficulty"), "SSR_DiffVeryHard") == 0);
+    ssr_game_message(game, "customcareer.btn_Difficulty");
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomDifficulty"), "SSR_DiffVeryEasy") == 0);
+    ssr_game_message(game, "customcareer.btn_DifficultyDown");
+    ssr_game_message(game, "customcareer.btn_DifficultyDown");
+    CHECK(strcmp(ssr_game_text(game, "GS_CustomDifficulty"), "SSR_DiffHard") == 0);
     ssr_game_message(game, "customcareer.btn_Ok");
     fail_the_trials(game, tweaks);
     ssr_game_message(game, "message.btn_Ok");
     career = ssr_game_career(game);
     CHECK(strcmp(ssr_game_screen(game), "startransition") == 0 && career->startAge == 20);
     CHECK(career->position == SSR_CAREER_MIDFIELDER && career->clubId == strongest && career->bank >= 100);
+    CHECK(career->difficulty == 1);
     CHECK(ssr_career_age(career) == 20 && ssr_tweaks_number(tweaks, "Player", "Age") == 20);
     CHECK(ssr_career_skill(career->technique) >= 30 && ssr_career_skill(career->power) >= 30);
     CHECK(ssr_career_skill(career->pace) >= 30 && ssr_career_skill(career->vision) >= 30);

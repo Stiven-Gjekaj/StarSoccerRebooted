@@ -76,6 +76,12 @@ SSR_MatchSnow	It snows. The ball stops quickly in the snow.	Es schneit. Der Ball
 SSR_CustomPosition	Position	Position	Poste	Posición	Ruolo	Posição	Posição	Mevki	Pozycja
 SSR_CustomClub	First club	Erster Verein	Premier club	Primer club	Primo club	Primeiro clube	Primeiro clube	İlk kulüp	Pierwszy klub
 SSR_CustomBux	Bux at the start	Bux beim Start	Bux au départ	Bux al inicio	Bux all'inizio	Bux no início	Bux no início	Başlangıç Bux	Bux na starcie
+SSR_CustomDifficulty	Difficulty	Schwierigkeit	Difficulté	Dificultad	Difficoltà	Dificuldade	Dificuldade	Zorluk	Poziom trudności
+SSR_DiffVeryEasy	Very easy	Sehr leicht	Très facile	Muy fácil	Molto facile	Muito fácil	Muito fácil	Çok kolay	Bardzo łatwy
+SSR_DiffEasy	Easy	Leicht	Facile	Fácil	Facile	Fácil	Fácil	Kolay	Łatwy
+SSR_DiffNormal	Normal	Normal	Normal	Normal	Normale	Normal	Normal	Normal	Normalny
+SSR_DiffHard	Hard	Schwer	Difficile	Difícil	Difficile	Difícil	Difícil	Zor	Trudny
+SSR_DiffVeryHard	Very hard	Sehr schwer	Très difficile	Muy difícil	Molto difficile	Muito difícil	Muito difícil	Çok zor	Bardzo trudny
 SSR_PosForward	Forward	Stürmer	Attaquant	Delantero	Attaccante	Atacante	Avançado	Forvet	Napastnik
 SSR_TICKER_CRISIS	Crisis at $club: the big club is $num in the table.	Krise bei $club: Der große Verein ist nur auf Platz $num.	Crise à $club : le grand club est $num au classement.	Crisis en el $club: el grande es $num en la tabla.	Crisi al $club: il grande club è $num in classifica.	Crise no $club: o grande clube é o $num na tabela.	Crise no $club: o grande clube é $num na tabela.	$club krizde: büyük kulüp ligde $num. sırada.	Kryzys w $club: wielki klub jest na $num. miejscu.
 SSR_TICKER_RUMOUR	Rumours link $name of $club with a move to $big.	Gerüchten zufolge wechselt $name von $club zu $big.	Les rumeurs envoient $name ($club) à $big.	Los rumores sitúan a $name ($club) en el $big.	Si parla di $name del $club al $big.	Rumores ligam $name, do $club, ao $big.	Rumores ligam $name, do $club, ao $big.	Söylentilere göre $club oyuncusu $name, $big yolunda.	Plotki łączą $name z $club z przejściem do $big.
