@@ -147,6 +147,13 @@ static void test_scores_in_the_far_corner(void) {
     // Drag down and to the left: the shot goes up and to the right.
     play(&c, 320 - 25, 308 + 70, &random);
     CHECK(c.result == SSR_RESULT_GOAL && c.ball.inGoal && c.ball.x > 320);
+    // The ball goes on into the net after the chance ends, and the net holds
+    // it.
+    float lineY = c.ball.y;
+    SSRTapTouch none = {0};
+    for (int i = 0; i < 60; i++) ssr_chance_update(&c, c.now + 16, &none, &random);
+    CHECK(c.ball.y < lineY - 5 && c.ball.y >= c.goal.back);
+    CHECK(c.ball.x >= c.goal.left && c.ball.x <= c.goal.right);
 }
 
 static void test_misses_a_wide_shot(void) {

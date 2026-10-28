@@ -829,10 +829,19 @@ void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRando
     case SSR_CHANCE_DEFEND:
         defend(c, touch, random);
         break;
-    case SSR_CHANCE_OVER:
+    case SSR_CHANCE_OVER: {
+        // c_TBall.m_Update: the dead ball moves on until the chance ends. A
+        // goal hits the net. A ball that the keeper caught has no power.
+        SSRBall *b = &c->ball;
+        if (b->power > 0 || b->inGoal) {
+            int training = c->info.training;
+            int noGoal = is_pass_chance(c->info.chanceType) || c->info.chanceType == 12 || training == 2 || training == 6;
+            ssr_ball_update(b, noGoal ? NULL : &c->goal, random);
+        }
         // The players stop, and the keeper picks up the ball.
         update_players(c, random);
         break;
+    }
     }
     c->touchWasDown = touch->down;
 }
