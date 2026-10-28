@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.32.0 (2026-10-28)
+
+- The Practice button of the skills screen starts the practice: shots at
+  the goal from further away at each level, past keepers, defenders, and
+  walls. The practice keeps the record of the player, and the first
+  practice after a match with a good score gives a prize: cash, a better
+  relation, or the offer of a sponsor.
+
 ## 0.31.0 (2026-10-28)
 
 - The Skills button of the game menu opens the skills. Each skill has a
