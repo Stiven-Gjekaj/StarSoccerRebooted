@@ -125,7 +125,7 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] The training of the skills (`Skills`, `SkillChoice`): the 20
       levels of the drill of each skill, the stars of each level, three
       drills a day, and the energy of a drill
-- [ ] The practice of the skills screen (`SetUpTraining(7)`): the arcade
+- [x] The practice of the skills screen (`SetUpTraining(7)`): the arcade
       shots with keepers and walls, the record, and the prizes
 
 ## 0.6 The season
@@ -215,9 +215,14 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 The content of 4.32 in 1.0 is the content of the new look. The classic
 look is not in the remake.
 
-- [ ] All the content of 4.32
+- [x] All the content of 4.32. Each screen of the new look that a player
+      of 4.32 can reach opens in the remake. Only the screens of the debug
+      console (`hack`, `starman`), the keyboard of the game (the remake
+      uses the keyboard of the device), and the screens of real money and
+      advertisements stay out.
 - [x] All the languages of 4.32, with the star glyph and the glyph tables
-- [ ] All the features in this file
+- [x] All the features in this file. The 2026 data pack is a separate
+      project, not a part of the app.
 - [x] A test harness that compares the rules with the original code
       (`scripts/rules-check.sh`): the random numbers, the colours of the
       roulette, the prices and prizes of the horses, and the star level
