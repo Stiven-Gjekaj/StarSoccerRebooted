@@ -909,7 +909,9 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
         // A drill shows its lives, with no quit button (ShowTraining).
         int training = ssr_game_training(app->game) != NULL;
         if (app->hudScene) ssr_scene_set_visible(app->hudScene, "TrainingHUD", training);
-        if (app->hudScene) ssr_scene_set_visible(app->hudScene, "QuitButton", 0);
+        // Only the first QuitButton hides: the button of the replay
+        // (controlpanel.uih) has the same name, and it ends the replay.
+        if (app->hudScene) ssr_scene_spawn_set(app->hudScene, 0, "QuitButton#0", SSR_GEL_VIS, 0);
         // A match chance shows the names and the score (ShowGame).
         if (app->hudScene) ssr_scene_set_visible(app->hudScene, "GameHUD", !training);
         show_wind(app, chance);
