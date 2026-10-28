@@ -372,6 +372,67 @@ static void test_plays_in_the_stadium_of_a_pack(void) {
     CHECK(named == 1);
 }
 
+// Plays the matches of a position. Each moment of the player ends with the
+// result, and the test counts the kinds of the moments: defence, middle,
+// and attack. A won moment in defence counts in the match.
+static void moments_of(int position, SSRChanceResult result, int counts[3], int *defends, int *conceded) {
+    counts[0] = counts[1] = counts[2] = 0;
+    *defends = *conceded = 0;
+    for (int seed = 1; seed <= 30; seed++) {
+        SSRMatch m;
+        SSRRandom random = {seed};
+        SSRMatchSetup s = setup_for();
+        s.position = position;
+        s.blocks = 1;
+        ssr_match_start(&m, &s, localise, NULL, &random);
+        int now = 0, before = 0;
+        ssr_match_play(&m, now);
+        for (int frame = 0; frame < 400000 && m.state != SSR_MATCH_FULL_TIME; frame++) {
+            now += 16;
+            SSRMatchEvent event = ssr_match_update(&m, now, &random);
+            if (event == SSR_MATCH_EVENT_CHANCE && m.shootoutNumber == 0) {
+                int t = m.chanceType;
+                int defence = t == SSR_CHANCE_SAVE || t == SSR_CHANCE_BLOCK;
+                counts[defence ? 0 : t == 8 || t == 11 || t == 1 || t == 9 ? 1 : 2]++;
+                SSRChance chance;
+                memset(&chance, 0, sizeof(chance));
+                chance.result = defence ? result : SSR_RESULT_MISSED;
+                chance.info.chanceType = t;
+                before = m.score[2];
+                ssr_match_chance_done(&m, &chance, now, &random);
+                *conceded += m.score[2] - before;
+            } else if (event == SSR_MATCH_EVENT_CHANCE) {
+                SSRChance chance;
+                memset(&chance, 0, sizeof(chance));
+                chance.result = SSR_RESULT_MISSED;
+                ssr_match_chance_done(&m, &chance, now, &random);
+            }
+            if (event == SSR_MATCH_EVENT_HALF_TIME) ssr_match_play(&m, now);
+            SSRMatchLine line;
+            while (ssr_match_take_line(&m, &line)) {
+            }
+        }
+        *defends += m.defends;
+    }
+}
+
+// The positions: a goalkeeper has only saves, a defender has the most
+// moments in defence, a midfielder the most in the middle, and a forward
+// the most in attack. A lost save is a goal of the other team.
+static void test_gives_the_moments_of_a_position(void) {
+    int c[4][3], defends, conceded;
+    moments_of(3, SSR_RESULT_DEFENDED, c[3], &defends, &conceded);
+    CHECK(c[3][0] > 0 && c[3][1] == 0 && c[3][2] == 0 && defends == c[3][0] && conceded == 0);
+    moments_of(3, SSR_RESULT_CONCEDED, c[3], &defends, &conceded);
+    CHECK(defends == 0 && conceded == c[3][0]);
+    moments_of(2, SSR_RESULT_DEFENDED, c[2], &defends, &conceded);
+    CHECK(c[2][0] > c[2][1] && c[2][1] > c[2][2]);
+    moments_of(1, SSR_RESULT_DEFENDED, c[1], &defends, &conceded);
+    CHECK(c[1][1] > c[1][0] && c[1][1] > c[1][2]);
+    moments_of(0, SSR_RESULT_DEFENDED, c[0], &defends, &conceded);
+    CHECK(c[0][2] > c[0][0] && c[0][0] > 0);
+}
+
 static void test_the_captain_draws_runs(void) {
     SSRMatch m;
     SSRRandom random = {11};
@@ -399,6 +460,7 @@ int main(void) {
     test_plays_in_the_snow();
     test_plays_a_big_match();
     test_plays_in_the_stadium_of_a_pack();
+    test_gives_the_moments_of_a_position();
     test_plays_a_match();
     test_a_cup_tie_goes_to_extra_time_and_penalties();
     test_counts_the_goals_of_the_player();

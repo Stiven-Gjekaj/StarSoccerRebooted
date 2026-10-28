@@ -2279,6 +2279,8 @@ static void start_match(SSRGame *game) {
     s.myTeam = homeIsMine ? 1 : 2;
     s.playerName = c->shortName;
     s.focus = ssr_career_focus(c);
+    s.position = c->position;
+    s.blocks = !game->settings.classicRealism;
     s.workRate = 2;
     s.energy = c->energy;
     s.age = ssr_career_age(c);
@@ -2509,6 +2511,8 @@ static void end_match(SSRGame *game) {
     f.passes = m->passes;
     f.chances = m->chances;
     f.dribbles = m->dribbles;
+    // The saves and the blocks of the remake count as intercepts.
+    f.intercepts = m->defends;
     f.shotsOnTarget = m->shotsOnTarget;
     f.score1 = m->score[1];
     f.score2 = m->score[2];

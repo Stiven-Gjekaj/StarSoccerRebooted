@@ -75,6 +75,11 @@ typedef struct {
     // and the seats, or 0. The seats choose the size of the stadium.
     const char *stadium;
     int capacity;
+    // The position of the player (SSR_CAREER_*): it chooses the mix of the
+    // moments. 0, a forward, has the moments of 4.32, and a few blocks
+    // when blocks is 1.
+    int position;
+    int blocks;
 } SSRMatchSetup;
 
 // The big matches of the remake.
@@ -116,6 +121,8 @@ typedef struct {
     int playerChance[120];
     // The stats of the player in this match.
     int goals, assists, passes, chances, shotChances, dribbles, shotsOnTarget;
+    // The moments in defence that the player won: saves and blocks.
+    int defends;
     // UpdateYardage: the furthest goal, pass, headed goal, and headed pass
     // of the match in pixels.
     float furthest[4];

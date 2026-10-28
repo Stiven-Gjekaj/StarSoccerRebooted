@@ -296,8 +296,48 @@ static int chance_type_for_player(SSRMatch *m, SSRRandom *random) {
     return 0;
 }
 
+// The positions of the remake (SSR_CAREER_*): a midfielder, a defender,
+// and a goalkeeper.
+#define POSITION_MIDFIELDER 1
+#define POSITION_DEFENDER 2
+#define POSITION_GOALKEEPER 3
+
+// A moment in defence: the other team attacks, and the player defends.
+static void defence_for_player(SSRMatch *m, int type, SSRRandom *random) {
+    m->chances--;
+    m->stage = 4;
+    m->chanceType = type;
+    m->attacking = m->setup.myTeam == 1 ? 2 : 1;
+    (void)random;
+    say(m, 1, type == SSR_CHANCE_SAVE ? "SSR_MatchSaveChance" : "SSR_MatchBlockChance", m->attacking, 0);
+}
+
+// The mix of the moments of a position of the remake, in percent: defence,
+// then the middle (passes, dribbles, and runs). The rest is attack. A
+// forward keeps the moments of 4.32, with a few blocks.
+static const int MIX[4][2] = {{10, 0}, {20, 60}, {60, 30}, {100, 0}};
+
 // c_TMatch.m_ChanceForPlayer: a build-up chance, or a shot.
 static void chance_for_player(SSRMatch *m, int lastChance, SSRRandom *random) {
+    int position = m->setup.position;
+    if (position > 0 && position < 4 && !lastChance) {
+        int r = ssr_rand(random, 100);
+        if (r <= MIX[position][0]) {
+            defence_for_player(m, position == POSITION_GOALKEEPER ? SSR_CHANCE_SAVE : SSR_CHANCE_BLOCK, random);
+            return;
+        }
+        if (r <= MIX[position][0] + MIX[position][1]) {
+            // A moment in the middle: a pass, a dribble, or a run.
+            static const int MIDDLE[3] = {8, 11, 1};
+            m->stage = 4;
+            m->chanceType = MIDDLE[ssr_rand(random, 3) - 1];
+            text_chance_for_player(m, random);
+            return;
+        }
+    } else if (position == 0 && !lastChance && m->setup.blocks && ssr_rand(random, 100) <= MIX[0][0]) {
+        defence_for_player(m, SSR_CHANCE_BLOCK, random);
+        return;
+    }
     m->stage = 4;
     int n = m->setup.focus == 1 ? 100 : m->setup.focus == 3 ? 2 : 5;
     if (ssr_rand(random, n) != 1 && m->playerInBuildup != 1 && (m->minute <= 87 || m->minute >= 91) &&
@@ -319,6 +359,8 @@ static void chance_shoot(SSRMatch *m, SSRRandom *random) {
 // Who takes a set piece: 1 the player by the skill, 2 the captain claims
 // it, 0 another player.
 static int taker(SSRMatch *m, int skillDraw, SSRRandom *random) {
+    // [I: a goalkeeper of the remake takes no set piece.]
+    if (m->setup.position == POSITION_GOALKEEPER) return 0;
     if (m->setup.setPieces > skillDraw) return 1;
     int c = m->setup.captain, level = m->setup.level;
     if ((level == 0 && (c == 1 || (c == 3 && ssr_rand(random, 4) == 1))) ||
@@ -649,7 +691,7 @@ static SSRMatchEvent shootout_step(SSRMatch *m, int now, SSRRandom *random) {
     switch (m->stage) {
     case 6: {
         int n = m->shootoutNumber;
-        if (ssr_match_on_pitch(m) && m->attacking == m->setup.myTeam &&
+        if (ssr_match_on_pitch(m) && m->attacking == m->setup.myTeam && m->setup.position != POSITION_GOALKEEPER &&
             (n == m->penaltyTaker || n == m->penaltyTaker + 1)) {
             m->stage = 8;
             say(m, 0, "CMATCHTEXT_PENALTYSTEPUPPLAYER", m->attacking, 0);
@@ -880,7 +922,23 @@ void ssr_match_chance_done(SSRMatch *m, const SSRChance *c, int now, SSRRandom *
         rate(m, rating_of(c), 0);
         say(m, 0, pass ? "CMATCHTEXT_PASSBAD" : "CMATCHTEXT_CHANCEMISSED", m->setup.myTeam, 0);
         break;
+    case SSR_RESULT_DEFENDED:
+        // A save or a block ends the attack of the other team.
+        m->defends++;
+        m->matchTick = now + 3 * m->textSpeed;
+        say(m, 0, c->info.chanceType == SSR_CHANCE_SAVE ? "SSR_MatchSaved" : "SSR_MatchBlocked", m->setup.myTeam, 0);
+        break;
+    case SSR_RESULT_CONCEDED:
+        m->matchTick = now + 3 * m->textSpeed;
+        cpu_goal(m, "CMATCHTEXT_GOAL", fresh(random, 35, &m->lastGoal));
+        break;
     default:
+        if (c->info.chanceType == SSR_CHANCE_SAVE || c->info.chanceType == SSR_CHANCE_BLOCK) {
+            // The shot of the other team went wide, or the keeper of the
+            // team stopped it.
+            say(m, 0, "SSR_MatchShotWide", m->attacking, 0);
+            break;
+        }
         rate(m, rating_of(c), 0);
         say(m, 0, "CMATCHTEXT_CHANCEMISSED", m->setup.myTeam, 0);
         break;
