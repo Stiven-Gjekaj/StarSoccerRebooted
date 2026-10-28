@@ -602,6 +602,9 @@ static void press_play(SSRGame *game) {
         } else if (strcmp(screen, "contract") == 0) {
             // An offer in the transfer window: the player stays.
             ssr_game_message(game, "contract.btn_Reject");
+        } else if (strcmp(screen, "information") == 0) {
+            // The tutorial of the captain after the armband.
+            ssr_game_message(game, "information.btn_Back");
         } else if (strcmp(screen, "gamemenu") == 0) {
             ssr_game_message(game, "gamemenu.btn_Play");
         } else {
@@ -2134,6 +2137,26 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     ssr_game_message(game, "message.btn_Ok");
     CHECK(now->bootId == 1 && now->bootUses == 5 && now->bank == 107);
     ssr_game_message(game, "PurchaseAnim.Close");
+    // Boots with swerve show their tutorial once (CheckPostPurchaseInfo),
+    // and Ok goes back to the boots of the shop.
+    ((SSRCareer *)now)->bank += 1000;
+    ssr_tweaks_set(tweaks, "Menu", "ItemString", "Boot_23");
+    ssr_game_message(game, "shopoverlay.buy");
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(now->bootId == 23 && strcmp(ssr_game_screen(game), "information") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Information", "InformationType") == 2);
+    CHECK(now->tutorials == SSR_TUTORIAL_SWERVE && ssr_game_overlay(game)[0] == 0);
+    ssr_game_message(game, "PurchaseAnim.Close");
+    ssr_game_message(game, "information.btn_Back");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0);
+    ssr_tweaks_set(tweaks, "Menu", "ItemString", "Boot_23");
+    ssr_game_message(game, "shopoverlay.buy");
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "information") != 0 && strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0);
+    ssr_game_message(game, "PurchaseAnim.Close");
+    // The checks after this one count from the bank and the awards before.
+    ((SSRCareer *)now)->bank = 107;
+    ((SSRCareer *)now)->awards[67] = 0;
     // A can of NRG Classic costs 2 at star level 1, and the overlay stays.
     ssr_game_message(game, "shop.tab.nrg");
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "NRG_1") == 0);
@@ -2279,7 +2302,7 @@ static void gambling_news(SSRGame *game, SSRTweaks *tweaks, const char *path) {
 // The club makes the player captain: a good season, 25 matches for the
 // club, and good relations. The armband gives its award, and one more at
 // 18 or younger (CheckCaptaincy).
-static void become_captain(SSRGame *game, const char *path) {
+static void become_captain(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     static SSRCareer before;
     before = *ssr_game_career(game);
     SSRCareer c = before;
@@ -2309,7 +2332,19 @@ static void become_captain(SSRGame *game, const char *path) {
     }
     CHECK(now && now->captain == 1 && strcmp(ssr_game_screen(game), "messageboss") == 0);
     CHECK(now->awards[80] > 0 && (now->awards[119] > 0) == (ssr_career_age(now) <= 18));
+    ssr_tweaks_set(tweaks, "Information", "Team2ShirtA", "112233FF");
+    SSRUiOp kit[512];
+    take_ops(game, kit, 512);
     ssr_game_message(game, "message.btn_Ok");
+    // The information screen of the captain follows, with the kits of the
+    // example: the fourth player wears the kit of the team.
+    CHECK(strcmp(ssr_game_screen(game), "information") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Information", "InformationType") == 1);
+    int kits = take_ops(game, kit, 512);
+    CHECK(has_op(kit, kits, SSR_OP_CLONE, "InfoPlayerCL_TutCaptain4", "MatchColours,MyTeamShirt1"));
+    CHECK(strcmp(ssr_tweaks_get(tweaks, "MatchColours", "MyTeamShirt1"), "112233FF") == 0);
+    ssr_game_message(game, "information.btn_Back");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0);
     // The other tests go on with the career from before.
     news_week(game, path, &before);
 }
@@ -2325,7 +2360,13 @@ static void get_old_boots_and_a_sponsor(SSRGame *game, SSRTweaks *tweaks, const 
     CHECK(strcmp(ssr_game_screen(game), "message") == 0 && now->oldProBoots == 21 && now->newsDone == 1);
     ssr_game_message(game, "message.btn_Ok");
     CHECK(now->bootId == 21 && now->bootUses == 5 && strcmp(ssr_game_modal(game), "PurchaseAnim") == 0);
+    // The old pro boots have control: their tutorial shows, then the boots
+    // of the shop.
+    CHECK(strcmp(ssr_game_screen(game), "information") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Information", "InformationType") == 3);
     ssr_game_message(game, "PurchaseAnim.Close");
+    ssr_game_message(game, "information.btn_Back");
+    CHECK(strcmp(ssr_game_screen(game), "gamemenu") == 0 && strcmp(ssr_game_overlay(game), "SkillsShopOverlay") == 0);
     // A player of star level 3 with no sponsors gets the first offer.
     c = *ssr_game_career(game);
     c.starRating = 260;
@@ -2672,7 +2713,7 @@ static void test_starts_a_new_career(void) {
     go_shopping(game, tweaks, path);
     hire_and_kit_out(game, tweaks, path);
     get_old_boots_and_a_sponsor(game, tweaks, path);
-    become_captain(game, path);
+    become_captain(game, tweaks, path);
     renew_the_contract(game, tweaks, path);
     // Six rounds make a season: the career played to the next one.
     for (int i = 0; i < 24 && seasons < 2; i++) play_a_match(game, tweaks);

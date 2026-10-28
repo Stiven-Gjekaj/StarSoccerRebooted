@@ -232,6 +232,9 @@ struct SSRGame {
     // The layout of the overlay over the screen, and of the modal overlay
     // over it, or "".
     char overlay[48];
+    // The screen after the information screen (c_TScreen_Information
+    // m_nextscreen).
+    char infoNext[16];
     char modal[48];
     // The headline that the news page shows, and the screen after it.
     char news[512];
@@ -1714,6 +1717,12 @@ static void call_teammates_shopping(SSRGame *game);
 static void call_racing_return(SSRGame *game);
 static void call_train_horse(SSRGame *game);
 static void call_sell_horse(SSRGame *game);
+static void call_captain_tutorial(SSRGame *game);
+
+// The kinds of the information screen (Information.InformationType).
+enum { INFO_CAPTAIN = 1, INFO_SWERVE = 2, INFO_CONTROL = 3 };
+static void information_screen(SSRGame *game, int type, const char *next);
+static void skills_shop(SSRGame *game, const char *tab);
 
 static void run_call(SSRGame *game, const char *name) {
     static const struct {
@@ -1772,6 +1781,7 @@ static void run_call(SSRGame *game, const char *name) {
         {"TrainerGet", call_trainer_get},
         {"BootsExpired", call_boots_expired},
         {"DumpGirl", call_dump_partner},
+        {"CaptainTutorial", call_captain_tutorial},
     };
     for (size_t i = 0; i < sizeof(CALLS) / sizeof(CALLS[0]); i++) {
         if (strcmp(CALLS[i].name, name) == 0) {
@@ -6673,6 +6683,11 @@ static void call_old_pro_boots(SSRGame *game) {
         c->tryBoots = 1;
         ssr_tweaks_set(game->tweaks, "Products", "PurchaseOverlayMessage", loc(game, "Item_Received"));
         snprintf(game->modal, sizeof(game->modal), "PurchaseAnim");
+        // The old pro boots always show their information screen.
+        const SSRBoot *boot = ssr_shop_boot(c->bootId);
+        int control = boot ? boot->control : 0;
+        if (control == 2 || control == 3) information_screen(game, INFO_SWERVE, "");
+        else information_screen(game, INFO_CONTROL, "");
     }
     save_career(game);
 }
@@ -6689,11 +6704,13 @@ static void captain_award(SSRGame *game, int nation) {
     if (ssr_career_age(&game->career) <= 18) award(game, 119);
 }
 
+// The message of the captaincy goes on to the information screen of the
+// captain (CaptainTutorial).
 static void captain_message(SSRGame *game, const char *tag, const char *team) {
     char text[512];
     snprintf(text, sizeof(text), "%s", loc(game, tag));
     replace_all(text, sizeof(text), "$teamname", team);
-    message(game, "messageboss", text, 0, 1, NULL);
+    message(game, "messageboss", text, 0, 1, strcmp(tag, "CMESSAGE_CAPTAINCY") == 0 ? "CaptainTutorial" : NULL);
 }
 
 // c_TPlayer.CheckCaptaincy: the club and the nation make the player
@@ -7000,6 +7017,117 @@ static void call_expired_item(SSRGame *game) {
     lifestyle_shop(game, game->messageData);
 }
 
+
+/* ------------------------------------------------- the information */
+
+// c_GSPlayerAnimations.SetTeamCols: the kit of a team on a player of the
+// information screen. A style of 2 has stripes, 8 hoops, and 10 sleeves
+// of the second colour. The other parts take the first colour of the
+// shirt, so that they do not show.
+static void info_kit(SSRGame *game, const char *player, const char *team, int style) {
+    char shirt1[32], shirt2[32], pants[32];
+    snprintf(shirt1, sizeof(shirt1), "MatchColours,%sShirt1", team);
+    snprintf(shirt2, sizeof(shirt2), "MatchColours,%sShirt2", team);
+    snprintf(pants, sizeof(pants), "MatchColours,%sPants", team);
+    add_op(game, SSR_OP_CLONE, player, "Shirt", shirt1, 0);
+    add_op(game, SSR_OP_CLONE, player, "Pants", pants, 0);
+    add_op(game, SSR_OP_CLONE, player, "Sleeves", style == 10 ? shirt2 : shirt1, 0);
+    add_op(game, SSR_OP_CLONE, player, "Stripes", style == 2 ? shirt2 : shirt1, 0);
+    add_op(game, SSR_OP_CLONE, player, "Hoops", style == 8 ? shirt2 : shirt1, 0);
+}
+
+// c_AScreen_Information.SetUpTeamColours and SetUpPlayers: the kits of the
+// example of the captain. The first three players wear the kit of the
+// other team, the last two the kit of the team, and the keeper a keeper
+// shirt.
+static void info_kits(SSRGame *game) {
+    static const char *const COPY[6][2] = {{"OppTeamShirt1", "Team1ShirtA"}, {"OppTeamShirt2", "Team1ShirtB"},
+                                           {"OppTeamPants", "Team1Pants"},   {"MyTeamShirt1", "Team2ShirtA"},
+                                           {"MyTeamShirt2", "Team2ShirtB"},  {"MyTeamPants", "Team2Pants"}};
+    for (int i = 0; i < 6; i++) {
+        const char *colour = ssr_tweaks_get(game->tweaks, "Information", COPY[i][1]);
+        if (colour && *colour) ssr_tweaks_set(game->tweaks, "MatchColours", COPY[i][0], colour);
+    }
+    int style1 = (int)ssr_tweaks_number(game->tweaks, "Information", "Team1Style");
+    int style2 = (int)ssr_tweaks_number(game->tweaks, "Information", "Team2Style");
+    char player[48], shirt[48];
+    for (int i = 1; i <= 5; i++) {
+        snprintf(player, sizeof(player), "InfoPlayerCL_TutCaptain%d", i);
+        info_kit(game, player, i <= 3 ? "OppTeam" : "MyTeam", i <= 3 ? style1 : style2);
+    }
+    snprintf(shirt, sizeof(shirt), "MatchColours,KeeperShirt%d",
+             (int)ssr_tweaks_number(game->tweaks, "Information", "KeeperStyle"));
+    add_op(game, SSR_OP_CLONE, "InfoPlayerCL_TutCaptainKeeper", "Shirt", shirt, 0);
+}
+
+// c_TScreen_Information.SetUpScreen: a tutorial with a picture. next is
+// the screen after Ok: "tutswrv" (the swerve tutorial), "gamemenu", or ""
+// (the boots shop).
+static void information_screen(SSRGame *game, int type, const char *next) {
+    static const char *const TAGS[4] = {"", "CMESSAGE_CAPTAINTUT", "CMESSAGE_BOOTSSWRVTUT", "CMESSAGE_BOOTSCONTROLTUT"};
+    snprintf(game->infoNext, sizeof(game->infoNext), "%s", next);
+    ssr_tweaks_set(game->tweaks, "Menu", "MessageBody", loc(game, TAGS[type]));
+    ssr_tweaks_set_number(game->tweaks, "Information", "InformationType", type);
+    // c_AScreen_Information.OnActive closes the shop overlay.
+    game->overlay[0] = 0;
+    set_screen(game, "information");
+    if (type == INFO_CAPTAIN) info_kits(game);
+}
+
+// c_Information.ShowBootsControl and ShowBootsSwerve: each shows once in a
+// career.
+static void info_boots(SSRGame *game, int type, const char *next) {
+    game->career.tutorials |= type == INFO_CONTROL ? SSR_TUTORIAL_CONTROL : SSR_TUTORIAL_SWERVE;
+    information_screen(game, type, next);
+}
+
+// c_TPlayer.CheckPostPurchaseInfo: the tutorial of new boots with control
+// (1), swerve (2), or both (3). Gives 1 when a tutorial shows. For both,
+// the control tutorial goes on to the swerve tutorial, and the game does
+// not mark the control tutorial as seen.
+static int post_purchase_info(SSRGame *game, int control) {
+    int seen = game->career.tutorials;
+    int controlSeen = (seen & SSR_TUTORIAL_CONTROL) != 0, swerveSeen = (seen & SSR_TUTORIAL_SWERVE) != 0;
+    if (control == 1) {
+        if (controlSeen) return 0;
+        info_boots(game, INFO_CONTROL, "");
+        return 1;
+    }
+    if (control == 2) {
+        if (swerveSeen) return 0;
+        info_boots(game, INFO_SWERVE, "");
+        return 1;
+    }
+    if (control != 3) return 0;
+    if (!controlSeen && !swerveSeen) {
+        information_screen(game, INFO_CONTROL, "tutswrv");
+        return 1;
+    }
+    if (!controlSeen) {
+        info_boots(game, INFO_CONTROL, "");
+        return 1;
+    }
+    if (swerveSeen) return 0;
+    info_boots(game, INFO_SWERVE, "");
+    return 1;
+}
+
+// CaptainTutorial: c_Information.ShowCaptaincy after the message.
+static void call_captain_tutorial(SSRGame *game) {
+    information_screen(game, INFO_CAPTAIN, "gamemenu");
+}
+
+// information.btn_Back: c_TScreen_Information.ButtonBack.
+static void information_back(SSRGame *game) {
+    if (strcmp(game->infoNext, "tutswrv") == 0) {
+        info_boots(game, INFO_SWERVE, "");
+    } else if (strcmp(game->infoNext, "gamemenu") == 0) {
+        game_menu(game);
+    } else {
+        game_menu(game);
+        skills_shop(game, "Boots");
+    }
+}
 
 /* ---------------------------------------------------------- the interview */
 
@@ -7970,10 +8098,9 @@ static void buy_boots(SSRGame *game, int id) {
     update_bank(game, -boot->price);
     award(game, 26);
     if (boot->control > 0) award(game, 66);
+    int informed = boot->control > 0 && post_purchase_info(game, boot->control);
     save_career(game);
-    // [I: the information screen of the control and swerve boots comes
-    // with the tutorials.]
-    skills_shop(game, "Boots");
+    if (!informed) skills_shop(game, "Boots");
     skill_purchased(game);
 }
 
@@ -10372,6 +10499,7 @@ static const Route ROUTES[] = {
     {"interview.btn_ok", interview_ok},
     {"debug.interview", interview_screen},
     {"debug.dilemma", dilemma_screen},
+    {"debug.vision", call_captain_tutorial},
     {"gamemenu.btn_Contract", game_contract},
     {"desiredtransfer.btn_Ok", desired_ok},
     {"desiredtransfer.btn_Back", desired_back},
@@ -10401,6 +10529,7 @@ static const Route ROUTES[] = {
     {"UpsellMsg.DrinkNRG", shop_drink},
     {"UpsellMsg.CloseLifestyle", shop_close_lifestyle},
     {"PurchaseAnim.Close", purchase_close},
+    {"information.btn_Back", information_back},
     {"Repair.Cancel", repair_cancel},
     {"Repair.Confirm", repair_confirm},
     {"Repair.All", repair_all},

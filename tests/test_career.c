@@ -329,6 +329,7 @@ static void test_keeps_the_records(void) {
     c.position = SSR_CAREER_GOALKEEPER;
     c.loanFrom = 915;
     c.charityYear = 3;
+    c.tutorials = SSR_TUTORIAL_CONTROL | SSR_TUTORIAL_SWERVE;
     c.businessStake = 700;
     snprintf(c.exBoss, sizeof(c.exBoss), "Ann Lake");
     c.exBossClub = 810;
@@ -361,6 +362,7 @@ static void test_keeps_the_records(void) {
     // A custom career starts at its own age.
     CHECK(back.startAge == 24 && ssr_career_age(&back) == ssr_career_year(&back) + 23);
     CHECK(back.loanFrom == 915 && back.charityYear == 3 && back.businessStake == 700);
+    CHECK(back.tutorials == (SSR_TUTORIAL_CONTROL | SSR_TUTORIAL_SWERVE));
     CHECK(strcmp(back.exBoss, "Ann Lake") == 0 && back.exBossClub == 810);
     back.startAge = 0;
     // Each position starts a match with the balanced focus.

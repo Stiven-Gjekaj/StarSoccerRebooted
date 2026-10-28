@@ -13,6 +13,9 @@
 // The places of the lifestyle items, the vehicles, and the properties.
 // The game uses the first 20.
 #define SSR_CAREER_ITEMS 50
+// The tutorials of the boots (Tutorial, ControlInfo and SwerveInfo).
+#define SSR_TUTORIAL_CONTROL 1
+#define SSR_TUTORIAL_SWERVE 2
 // The lifestyle shop sells 60 products (c_TShopItem.CountAllItems).
 #define SSR_CAREER_SHOP_PRODUCTS 60
 
@@ -86,6 +89,9 @@ typedef struct {
     // Business and charity: the year of the last gift, and the Bux in a
     // business that pays each season.
     int charityYear, businessStake;
+    // The tutorials that the player saw (the tweaks Tutorial of the game):
+    // SSR_TUTORIAL_CONTROL and SSR_TUTORIAL_SWERVE.
+    int tutorials;
     // The last boss that the club of the player sacked: the name, and the
     // club of the new job of the boss, or 0.
     char exBoss[64];
