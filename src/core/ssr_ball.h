@@ -45,6 +45,8 @@ typedef struct {
     int postHit;
     int overBar;
     int hitOutsideSideNet;
+    // 1 after the ball hits a net (c_TBall.m_donenetsound).
+    int netHit;
     int bounces;
     int kicks;
     // 1 keeps a slow ball alive while the players still run (c_TBall.m_Update).

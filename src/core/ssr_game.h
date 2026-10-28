@@ -342,6 +342,8 @@ int ssr_game_banner(const SSRGame *game);
 int ssr_game_splash(const SSRGame *game);
 // The next sound that the logic asks for (a name of Sounds.txt), or NULL.
 const char *ssr_game_take_sound(SSRGame *game);
+// The same, and the volume of the sound, from 0 to 1.
+const char *ssr_game_take_sound_at(SSRGame *game, float *volume);
 // The layout of the splash message, for example "splashmessagebux".
 const char *ssr_game_splash_layout(const SSRGame *game);
 // The layout of the alert at the bottom of the screen that shows now, for

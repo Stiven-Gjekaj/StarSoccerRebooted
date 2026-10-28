@@ -161,6 +161,7 @@ static void hit_net(SSRBall *ball, int side, SSRRandom *random) {
     }
     ball->direction = (float)(atan2((double)s, (double)c) * (double)R2D);
     ball->windForce = 0;
+    ball->netHit = 1;
 }
 
 static void goal_scored(SSRBall *ball) {
@@ -217,6 +218,7 @@ static void check_goal(SSRBall *ball, const SSRGoal *g, SSRRandom *random) {
         if (ball->y < back) {
             ball->y = back;
             ball->power *= 0.95f;
+            ball->netHit = 1;
         }
         if (ball->x < left) ball->x = left;
         if (ball->x > right) ball->x = right;
@@ -225,6 +227,7 @@ static void check_goal(SSRBall *ball, const SSRGoal *g, SSRRandom *random) {
             ball->z = roof;
             ball->zVelocity *= 0.95f;
             ball->power *= 0.95f;
+            ball->netHit = 1;
         }
     }
 }

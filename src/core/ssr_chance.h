@@ -11,6 +11,8 @@
 #include "ssr_players.h"
 #include "ssr_tapball.h"
 
+#define SSR_CHANCE_SOUNDS 8
+
 typedef enum {
     // The player drags from the ball to aim.
     SSR_CHANCE_AIM,
@@ -110,6 +112,11 @@ typedef struct {
     int now;
     // 1 for each warning beep of the tap ball, and for the kick sound.
     int beep, kicked;
+    // The sounds of the last update, by their names in Sounds.txt or their
+    // files, and their volumes from 0 to 1 (c_AudioManager.Play).
+    const char *sounds[SSR_CHANCE_SOUNDS];
+    float soundVolumes[SSR_CHANCE_SOUNDS];
+    int soundCount;
     // The dribble: 1 after the first touch, the swipe (c_SwipeDetector),
     // and the speed of the ball.
     int dribbling, swiping;

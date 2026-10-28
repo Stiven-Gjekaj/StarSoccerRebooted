@@ -299,6 +299,7 @@ struct SSRGame {
     // The sounds that the logic asks for, by their names in Sounds.txt
     // (AudioManager.Play).
     const char *sounds[16];
+    float soundVolumes[16];
     int soundCount;
     // The splash message ("Success!", "Fail!") shows until this time, in
     // its layout (TQuickMessage).
@@ -398,11 +399,21 @@ static void add_op(SSRGame *game, SSRUiOpKind kind, const char *ref, const char 
     op->id = id;
 }
 
-// AudioManager.Play: the app plays the sound.
-static void play_sound(SSRGame *game, const char *name) {
+// AudioManager.Play: the app plays the sound at the volume, from 0 to 1.
+static void play_sound_at(SSRGame *game, const char *name, float volume) {
     if (game->soundCount < (int)(sizeof(game->sounds) / sizeof(game->sounds[0]))) {
-        game->sounds[game->soundCount++] = name;
+        game->sounds[game->soundCount] = name;
+        game->soundVolumes[game->soundCount++] = volume;
     }
+}
+
+static void play_sound(SSRGame *game, const char *name) {
+    play_sound_at(game, name, 1);
+}
+
+// The sounds of the last update of a chance.
+static void chance_sounds(SSRGame *game, const SSRChance *chance) {
+    for (int i = 0; i < chance->soundCount; i++) play_sound_at(game, chance->sounds[i], chance->soundVolumes[i]);
 }
 
 // TQuickMessage.Create: the text of Menu.QuickMessage shows in the layout
@@ -1571,6 +1582,7 @@ static void trial_tick(SSRGame *game) {
     touch.hit = touch.down && !game->touchWasDown;
     game->touchWasDown = touch.down;
     ssr_training_update(t, game->now, &touch, &game->random);
+    chance_sounds(game, &t->chance);
     // c_TrialHud.m_Update: the hint goes after the first aim.
     if (t->chance.kicking == 1) ssr_tweaks_set(game->tweaks, "Menu", "MGTrialStep", "1aim");
     ssr_tweaks_set_number(game->tweaks, "Menu", "Lifecount", t->lives);
@@ -5748,6 +5760,7 @@ static void match_tick(SSRGame *game) {
         touch.hit = touch.down && !game->touchWasDown;
         game->touchWasDown = touch.down;
         ssr_chance_update(game->chance, game->now, &touch, &game->random);
+        chance_sounds(game, game->chance);
         record_replay(game);
         if (game->chance->state == SSR_CHANCE_OVER) {
             if (game->chanceEnd == 0) show_banner(game);
@@ -12494,9 +12507,15 @@ int ssr_game_splash(const SSRGame *game) {
 }
 
 const char *ssr_game_take_sound(SSRGame *game) {
+    return ssr_game_take_sound_at(game, NULL);
+}
+
+const char *ssr_game_take_sound_at(SSRGame *game, float *volume) {
     if (!game || game->soundCount == 0) return NULL;
     const char *sound = game->sounds[0];
+    if (volume) *volume = game->soundVolumes[0];
     memmove(game->sounds, game->sounds + 1, (size_t)(game->soundCount - 1) * sizeof(const char *));
+    memmove(game->soundVolumes, game->soundVolumes + 1, (size_t)(game->soundCount - 1) * sizeof(float));
     game->soundCount--;
     return sound;
 }

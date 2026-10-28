@@ -307,8 +307,33 @@ static void check_offside(SSRChance *c) {
     }
 }
 
+static float clamp_volume(float volume, float low) {
+    return volume < low ? low : volume > 1 ? 1 : volume;
+}
+
+// c_AudioManager.Play: the app plays the sound after the update.
+static void sound(SSRChance *c, const char *name, float volume) {
+    if (c->soundCount >= SSR_CHANCE_SOUNDS) return;
+    c->sounds[c->soundCount] = name;
+    c->soundVolumes[c->soundCount++] = volume;
+}
+
+// c_TBall.m_Update: moves the ball, and plays the sounds of its bounce, of
+// a post, of the net, and of a goal.
+static void move_ball(SSRChance *c, const SSRGoal *goal, SSRRandom *random) {
+    SSRBall *b = &c->ball;
+    int bounces = b->bounces, postHit = b->postHit, inGoal = b->inGoal, netHit = b->netHit;
+    ssr_ball_update(b, goal, random);
+    float volume = clamp_volume(b->power * 0.2f, 0.1f);
+    if (b->bounces > bounces && b->zVelocity > 0.5f) sound(c, "BallBounce", volume);
+    if (b->postHit && !postHit) sound(c, "BallColGoalPost", volume);
+    if (b->netHit && !netHit) sound(c, "Sounds/HitNet", volume);
+    if (b->inGoal && !inGoal && c->info.training == 0) sound(c, "Sounds/CrowdGoal", 1);
+}
+
 static void kick(SSRChance *c, int by, float direction, float power, float dip, float curl, float height, int header) {
     ssr_ball_kick(&c->ball, direction, power, dip, curl, height, header);
+    sound(c, power > 65 ? "BallKickLong" : "BallKickShort", clamp_volume(c->ball.power, 0.35f));
     c->kicking = 2;
     c->kickTime = c->now;
     c->lastTouchedBy = by;
@@ -412,6 +437,7 @@ static void check_players(SSRChance *c, SSRRandom *random) {
                 finish(c, SSR_RESULT_SAVED);
             } else {
                 // The keeper pushes the ball away. It can still go in.
+                sound(c, "BallParry", clamp_volume(b->power * 0.2f, 0.1f));
                 b->direction = b->x > p->x ? ssr_rand_float(random, 5, 45) : ssr_rand_float(random, 135, 175);
                 b->power *= 0.3f;
                 b->y = p->y + 4;
@@ -728,7 +754,7 @@ static void defend(SSRChance *c, const SSRTapTouch *touch, SSRRandom *random) {
         }
         return;
     }
-    ssr_ball_update(b, &c->goal, random);
+    move_ball(c, &c->goal, random);
     if (b->outcome == SSR_BALL_GOAL) {
         finish(c, SSR_RESULT_CONCEDED);
         return;
@@ -768,12 +794,15 @@ static void defend(SSRChance *c, const SSRTapTouch *touch, SSRRandom *random) {
 void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRandom *random) {
     c->now = now;
     c->beep = c->kicked = 0;
+    c->soundCount = 0;
     switch (c->state) {
     case SSR_CHANCE_AIM:
         aim(c, touch, random);
         break;
     case SSR_CHANCE_TAP: {
         SSRTapBallEvent event = ssr_tapball_update(&c->tap, now, touch, c->setup.controlBoots, &c->beep);
+        if (c->beep) sound(c, "Sounds/StopWatchBeep", 1);
+        if (event == SSR_TAPBALL_TAPPED) sound(c, "BallTap", 1);
         if (event == SSR_TAPBALL_KICK) {
             float direction, power, dip, curl, height;
             int header;
@@ -796,7 +825,7 @@ void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRando
             int training = c->info.training;
         int noGoal = is_pass_chance(c->info.chanceType) || c->info.chanceType == 12 || training == 2 || training == 6;
         int postHit = b->postHit;
-        ssr_ball_update(b, noGoal ? NULL : &c->goal, random);
+        move_ball(c, noGoal ? NULL : &c->goal, random);
         if (!postHit && b->postHit && c->lastTouchedBy == 0) {
             c->shotsOnTarget++;
             c->postHits++;
@@ -836,7 +865,7 @@ void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRando
         if (b->power > 0 || b->inGoal) {
             int training = c->info.training;
             int noGoal = is_pass_chance(c->info.chanceType) || c->info.chanceType == 12 || training == 2 || training == 6;
-            ssr_ball_update(b, noGoal ? NULL : &c->goal, random);
+            move_ball(c, noGoal ? NULL : &c->goal, random);
         }
         // The players stop, and the keeper picks up the ball.
         update_players(c, random);

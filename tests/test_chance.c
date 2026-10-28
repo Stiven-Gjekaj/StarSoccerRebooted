@@ -32,24 +32,38 @@ static void still_tap_ball(SSRChance *c) {
     c->tap.depth = c->tap.depthAccel = 1;
 }
 
+// The names of the sounds of the updates since the test cleared it.
+static char heard[1024];
+
+static void update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRandom *random) {
+    ssr_chance_update(c, now, touch, random);
+    for (int i = 0; i < c->soundCount; i++) {
+        CHECK(c->soundVolumes[i] > 0 && c->soundVolumes[i] <= 1);
+        if (strlen(heard) + strlen(c->sounds[i]) + 2 < sizeof(heard)) {
+            strcat(heard, c->sounds[i]);
+            strcat(heard, ";");
+        }
+    }
+}
+
 // Aims from the ball to (dragX, dragY), taps the big ball at its centre,
 // and plays the chance to its end. Gives the number of ticks.
 static int play(SSRChance *c, float dragX, float dragY, SSRRandom *random) {
     int now = 1000, ticks = 0;
     SSRTapTouch touch = {c->ball.x, c->ball.y, 1, 1};
-    ssr_chance_update(c, now += 16, &touch, random);
+    update(c, now += 16, &touch, random);
     touch.hit = 0;
     touch.x = dragX;
     touch.y = dragY;
-    for (int i = 0; i < 10; i++) ssr_chance_update(c, now += 16, &touch, random);
+    for (int i = 0; i < 10; i++) update(c, now += 16, &touch, random);
     touch.down = 0;
-    ssr_chance_update(c, now += 16, &touch, random);
+    update(c, now += 16, &touch, random);
     if (c->state != SSR_CHANCE_TAP) return -1;
     SSRTapTouch tap = {320, 810, 1, 1};
-    ssr_chance_update(c, now += 16, &tap, random);
+    update(c, now += 16, &tap, random);
     SSRTapTouch none = {0};
     while (c->state != SSR_CHANCE_OVER && ticks < 2000) {
-        ssr_chance_update(c, now += 16, &none, random);
+        update(c, now += 16, &none, random);
         ticks++;
     }
     return ticks;
@@ -138,6 +152,7 @@ static void test_shoots_a_penalty(void) {
 }
 
 static void test_scores_in_the_far_corner(void) {
+    heard[0] = 0;
     SSRRandom random = {SSR_RANDOM_START};
     SSRChance c;
     SSRChanceSetup s = setup_for(4);
@@ -151,9 +166,14 @@ static void test_scores_in_the_far_corner(void) {
     // it.
     float lineY = c.ball.y;
     SSRTapTouch none = {0};
-    for (int i = 0; i < 60; i++) ssr_chance_update(&c, c.now + 16, &none, &random);
+    for (int i = 0; i < 60; i++) update(&c, c.now + 16, &none, &random);
     CHECK(c.ball.y < lineY - 5 && c.ball.y >= c.goal.back);
     CHECK(c.ball.x >= c.goal.left && c.ball.x <= c.goal.right);
+    // The tap, the kick, the crowd, and the net make sounds.
+    CHECK(strstr(heard, "BallTap;") != NULL);
+    CHECK(strstr(heard, "BallKickShort;") != NULL || strstr(heard, "BallKickLong;") != NULL);
+    CHECK(strstr(heard, "Sounds/CrowdGoal;") != NULL);
+    CHECK(strstr(heard, "Sounds/HitNet;") != NULL);
 }
 
 static void test_misses_a_wide_shot(void) {
