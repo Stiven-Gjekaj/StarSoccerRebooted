@@ -88,6 +88,9 @@ typedef enum {
     // The bars with the ref follow the tweak "Group,Name" in text. id is
     // the top of the bar, or 0 to keep it.
     SSR_OP_BAR_SOURCE,
+    // The CloneTweak doodads ref2 inside the element ref take the tweak
+    // "Group,Name" in text.
+    SSR_OP_CLONE,
 } SSRUiOpKind;
 
 typedef struct {

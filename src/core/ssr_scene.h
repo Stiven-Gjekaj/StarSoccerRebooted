@@ -308,6 +308,9 @@ void ssr_scene_spawn_anim(SSRScene *scene, int id, const char *ref, const char *
 // The CloneTweak doodads with the ref in the copy take their value from the
 // tweak group,name.
 void ssr_scene_spawn_clone(SSRScene *scene, int id, const char *ref, const char *group, const char *name);
+// The CloneTweak doodads ref inside the first element with the ref element
+// take their value from the tweak group,name (c_GSPlayerAnimations.SwapCol).
+void ssr_scene_clone_in(SSRScene *scene, const char *element, const char *ref, const char *group, const char *name);
 // Sets a property of the copy, or of the element ref inside it: "ref" is
 // the first gel with the ref, "ref#n" is the element n of the ref (as
 // c_GGadget.GetElement), and NULL is the copy.

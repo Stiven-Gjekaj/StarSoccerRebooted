@@ -4194,12 +4194,11 @@ void ssr_scene_place(SSRScene *scene, const char *ref, float x, float y, float s
     g->sx = g->sy = scale;
 }
 
-void ssr_scene_spawn_clone(SSRScene *scene, int id, const char *ref, const char *group, const char *name) {
-    Gel *g = spawned(scene, id);
-    if (!g || !ref) return;
+// The CloneTweak doodads with the ref in g and in its children take their
+// value from the tweak group,name.
+static void clone_below(SSRScene *scene, Gel *g, const char *ref, const char *group, const char *name) {
     char source[160];
     snprintf(source, sizeof(source), "%s\x1f%s", group, name);
-    // The CloneTweak doodads with the ref in the copy and in its children.
     Gel *stack[64];
     int count = 0;
     stack[count++] = g;
@@ -4210,6 +4209,18 @@ void ssr_scene_spawn_clone(SSRScene *scene, int id, const char *ref, const char 
         }
         for (int i = 0; i < at->childCount && count < 64; i++) stack[count++] = at->children[i];
     }
+}
+
+void ssr_scene_spawn_clone(SSRScene *scene, int id, const char *ref, const char *group, const char *name) {
+    Gel *g = spawned(scene, id);
+    if (!g || !ref) return;
+    clone_below(scene, g, ref, group, name);
+}
+
+void ssr_scene_clone_in(SSRScene *scene, const char *element, const char *ref, const char *group, const char *name) {
+    Gel *g = scene && element ? find_ref_first(scene, element) : NULL;
+    if (!g || !ref || !group || !name) return;
+    clone_below(scene, g, ref, group, name);
 }
 
 // The last entry that the code added to the list, or NULL. "list@n" is

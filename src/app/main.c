@@ -1067,6 +1067,13 @@ static void apply_op(SSRApp *app, SSRScene *s, const SSRUiOp *o) {
     case SSR_OP_ELEMENT_COLOUR:
         ssr_scene_set_element_colour(s, op.ref, op.id, op.text);
         break;
+    case SSR_OP_CLONE: {
+        char *sep = SDL_strchr(op.text, ',');
+        if (!sep) break;
+        *sep = 0;
+        ssr_scene_clone_in(s, op.ref, op.ref2, op.text, sep + 1);
+        break;
+    }
     case SSR_OP_BAR_SOURCE: {
         char *sep = SDL_strchr(op.text, ',');
         if (!sep) break;

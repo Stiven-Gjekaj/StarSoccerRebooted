@@ -1395,6 +1395,44 @@ static void test_clones_kit_colours(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// ssr_scene_clone_in gives a kit to one element of the screen, and the
+// other elements with the same CloneTweak keep theirs.
+static void test_clones_a_kit_in_an_element(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    ssr_tweaks_set_kind(tweaks, "MatchColours", "MyShirt", "FF0000FF", SSR_TWEAK_COLOUR);
+    ssr_tweaks_set_kind(tweaks, "MatchColours", "OppShirt", "0000FFFF", SSR_TWEAK_COLOUR);
+    layout = "Rect:(0,0) ref:InfoPlayer1\n"
+             "{\n"
+             "\tDraw:(Body,0,0,10,10)\n"
+             "\t\tCloneTweak(MatchColours,OppShirt,CelColours,Shirt) ref:Shirt\n"
+             "}\n"
+             "Rect:(100,0) ref:InfoPlayer2\n"
+             "{\n"
+             "\tDraw:(Body,0,0,10,10)\n"
+             "\t\tCloneTweak(MatchColours,OppShirt,CelColours,Shirt) ref:Shirt\n"
+             "}\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    ssr_scene_clone_in(scene, "InfoPlayer2", "Shirt", "MatchColours", "MyShirt");
+    ssr_scene_update(scene, &env, 0);
+    // The bodies draw in the order of the file: the first player, then the
+    // second.
+    const char *kits[2] = {NULL, NULL};
+    int bodies = 0;
+    for (int i = 0; i < ssr_scene_count(scene); i++) {
+        const SSRSceneItem *item = ssr_scene_item(scene, i);
+        if (item->image && strcmp(item->image, "Body") == 0 && bodies < 2) kits[bodies++] = item->cels;
+    }
+    CHECK(bodies == 2 && kits[0] && kits[1]);
+    CHECK(kits[0] && strstr(kits[0], "Shirt=0000FFFF;") != NULL);
+    CHECK(kits[1] && strstr(kits[1], "Shirt=FF0000FF;") != NULL);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 // DoIf runs its block while the tweak is in its range, or has its text.
 static void test_runs_a_block_by_a_tweak(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
@@ -2317,6 +2355,7 @@ int main(void) {
     test_converges_after_a_delay_and_on_press();
     test_projects_a_sheet();
     test_clones_kit_colours();
+    test_clones_a_kit_in_an_element();
     test_runs_a_block_by_a_tweak();
     test_moves_copies_and_sorts_by_y();
     test_runs_expressions();
