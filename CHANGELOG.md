@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.29.0 (2026-10-28)
+
+- Four positions: goalkeeper, defender, midfielder, and forward. Each
+  position has its own mix of the moments of a match. A goalkeeper has
+  only saves, a defender mostly blocks, a midfielder mostly moments in the
+  middle, and a forward the moments of 4.32 with a few blocks.
+- Two new moments in defence: the save, where the player is the keeper,
+  and the block, where the player stops a pass to a forward. A tap sends
+  the player to the point.
+- The pack browser (macOS, Windows, and Linux): Options, World, Get packs
+  lists the packs of the index of the packs, and a tap downloads, checks,
+  and installs a pack.
+- The packs screen shows the list of the packs after an install again.
+
 ## 0.28.0 (2026-10-28)
 
 - Data packs can give the stadiums of the clubs (`world/Stadiums.txt`):
