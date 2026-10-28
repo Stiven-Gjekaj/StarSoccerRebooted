@@ -651,6 +651,35 @@ static void test_sends_the_messages_of_an_update(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// Event:(frame,message) in an animation sends the message once, when the
+// frame of the animation passes the frame (c_GelEvent).
+static void test_sends_the_message_of_an_event(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    layout = "Animation:(30,Clamp) ref:CloseAnim\n"
+             "{\n"
+             "\tEvent:(10,PurchaseAnim.Close)\n"
+             "}\n"
+             "AnimInstance:(0,0,CloseAnim)\n";
+    SSRUiFiles files = {read_layout, NULL};
+    SSRUiTree *tree = ssr_ui_parse("Screen.uis", &files);
+    SSRSceneEnv env = test_env(tweaks);
+    SSRScene *scene = ssr_scene_open(tree, &env);
+    int sent = 0, at = -1;
+    for (int i = 0; i < 40; i++) {
+        ssr_scene_update(scene, &env, 17);
+        const char *message;
+        while ((message = ssr_scene_take_message(scene)) != NULL) {
+            sent += strcmp(message, "PurchaseAnim.Close") == 0;
+            if (at < 0) at = i;
+        }
+    }
+    CHECK(sent == 1);
+    CHECK(at >= 8 && at <= 11);
+    ssr_scene_free(scene);
+    ssr_ui_free(tree);
+    ssr_tweaks_free(tweaks);
+}
+
 static void test_moves_the_target_of_a_converge(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     layout = "Rect:(0,0,0,0) ref:Badge\n"
@@ -2383,6 +2412,7 @@ int main(void) {
     test_calls_a_function_of_a_gel();
     test_restarts_emitters_when_shown();
     test_sends_the_messages_of_an_update();
+    test_sends_the_message_of_an_event();
     test_copies_a_template_into_a_hook();
     test_sends_the_message_of_a_click_block();
     test_builds_a_shop_button();

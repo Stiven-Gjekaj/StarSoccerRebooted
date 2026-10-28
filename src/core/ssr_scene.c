@@ -50,6 +50,9 @@ typedef enum {
     GEL_TWEEN,
     GEL_SEQUENCE,
     GEL_EMITTER,
+    // Event:(frame,message): the message goes to the logic when the frame of
+    // the animation passes the frame (c_GelEvent).
+    GEL_EVENT,
     GEL_EMBED,
     GEL_DRAW_EMBEDDED,
 } GelKind;
@@ -2242,6 +2245,12 @@ static void build_node(SSRScene *s, const SSRUiNode *node, Gel *parent) {
             g->tlength += 1;
         }
         place_unmoved(g, parent);
+    } else if (is(name, "Event")) {
+        g = new_gel(GEL_EVENT, node);
+        if (!g) return;
+        g->first = (float)number(s, node, 0, 0);
+        g->name = keep(s, arg(node, 1));
+        place_unmoved(g, parent);
     } else if (is(name, "Tween")) {
         g = new_gel(GEL_TWEEN, node);
         if (!g) return;
@@ -3734,6 +3743,15 @@ static void draw_gel_inner(SSRScene *s, Gel *g, const Frame *parent) {
     case GEL_EMITTER:
         run_emitter(s, g);
         break;
+    case GEL_EVENT: {
+        // c_GelEvent.Draw: the frame of this draw passes the frame of the
+        // event.
+        float af = s->animFrame, step = s->frameDelta * (s->instance ? s->instance->speed : 1);
+        if (af - step < g->first && g->first <= af && g->name[0] && s->messageCount < 8) {
+            s->messages[s->messageCount++] = g->name;
+        }
+        return;
+    }
     default:
         break;
     }

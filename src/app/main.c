@@ -1788,8 +1788,11 @@ SDL_AppResult SDL_AppIterate(void *state) {
         // The messages of the layout in this update go to the game, as a
         // click does (for example, a card that has slid).
         const char *sent;
-        while (app->scene && (sent = ssr_scene_take_message(app->scene)) != NULL) {
-            if (!ssr_game_message(app->game, sent)) SDL_Log("No logic for %s.", sent);
+        SSRScene *senders[3] = {app->scene, app->overlayScene, app->modalScene};
+        for (int i = 0; i < 3; i++) {
+            while (senders[i] && (sent = ssr_scene_take_message(senders[i])) != NULL) {
+                if (!ssr_game_message(app->game, sent)) SDL_Log("No logic for %s.", sent);
+            }
         }
         ssr_game_update(app->game, ms * 60 / 1000.0f);
         follow_game(app);
