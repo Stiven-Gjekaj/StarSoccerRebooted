@@ -1,0 +1,19 @@
+# The first row of the match stats: the chances, or the saves of a
+# goalkeeper (MatchStats, DefendKind 1) and the blocks of a defender
+# (DefendKind 2).
+- M_StatLine:(1,Chances,Chances,0)
++ Rect:()
++ ShowIf(MatchStats,DefendKind,0)
++ {
++ M_StatLine:(1,Chances,Chances,0)
++ }
++ Rect:()
++ ShowIf(MatchStats,DefendKind,1)
++ {
++ M_StatLine:(1,SSR_StatSaves,Defends,0)
++ }
++ Rect:()
++ ShowIf(MatchStats,DefendKind,2)
++ {
++ M_StatLine:(1,SSR_StatBlocks,Defends,0)
++ }

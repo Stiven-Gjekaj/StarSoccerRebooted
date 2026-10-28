@@ -2529,6 +2529,11 @@ static void end_match(SSRGame *game) {
     f.workRate = 0;
     f.fair = !game->settings.classicRealism;
     game->facts = f;
+    // The first row of the match stats: the chances, or the saves of a
+    // goalkeeper and the blocks of a defender.
+    int kind = c->position == SSR_CAREER_GOALKEEPER ? 1 : c->position == SSR_CAREER_DEFENDER ? 2 : 0;
+    ssr_tweaks_set_number(game->tweaks, "MatchStats", "DefendKind", kind);
+    ssr_tweaks_set_number(game->tweaks, "MatchStats", "Defends", 0);
     ssr_aftermatch_rate(&f, &game->after);
     // Match context: the fans care more about a derby or a match of a big
     // rivalry. The change of the relation of the fans is half as big again.
@@ -2645,6 +2650,7 @@ static void stats_stage(SSRGame *game) {
     switch (stage) {
     case 1:
         ssr_tweaks_set_number(t, "MatchStats", "Chances", f->chances);
+        ssr_tweaks_set_number(t, "MatchStats", "Defends", f->intercepts);
         break;
     case 2:
         ssr_tweaks_set_number(t, "MatchStats", "Goals", f->goals);

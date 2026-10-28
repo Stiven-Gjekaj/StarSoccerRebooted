@@ -730,6 +730,17 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
             CHECK(ssr_tweaks_number(tweaks, "Match", "MatchBall") == ball - 1);
             ballChecked = 1;
         }
+        if (chance && chance->state == SSR_CHANCE_DEFEND) {
+            // A moment in defence: run at the ball until the moment ends.
+            chances++;
+            CHECK(strcmp(ssr_game_screen(game), "matchminigame") == 0);
+            for (int i = 0; i < 3000 && chance->state == SSR_CHANCE_DEFEND; i++) {
+                ssr_game_touch(game, 1, chance->ball.x, chance->ball.y);
+                ssr_game_update(game, 1);
+            }
+            ssr_game_touch(game, 0, 0, 0);
+            CHECK(chance->state == SSR_CHANCE_OVER);
+        }
         if (chance && chance->state == SSR_CHANCE_DRIBBLE) {
             // A dribble: swipe up the screen until the chance ends.
             chances++;
@@ -814,8 +825,14 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(ssr_tweaks_number(tweaks, "Match", "Outcome") == 0);
     ssr_game_update(game, 1);
     CHECK(ssr_tweaks_number(tweaks, "MatchStats", "StatStage") == 1);
-    // One chance can hold two mini-games: a pass, then a shot.
-    CHECK(ssr_tweaks_number(tweaks, "MatchStats", "Chances") >= 1);
+    // One chance can hold two mini-games: a pass, then a shot. A goalkeeper
+    // has saves and no chances.
+    if (c->position == SSR_CAREER_GOALKEEPER) {
+        CHECK(ssr_tweaks_number(tweaks, "MatchStats", "Chances") == 0);
+        CHECK(ssr_tweaks_number(tweaks, "MatchStats", "Defends") >= 0);
+    } else {
+        CHECK(ssr_tweaks_number(tweaks, "MatchStats", "Chances") >= 1);
+    }
     CHECK(ssr_tweaks_number(tweaks, "MatchStats", "Goals") == -1);
     // 750 ms is 47 ticks of 16 ms.
     ssr_game_update(game, 48);
@@ -2733,6 +2750,13 @@ static void test_starts_a_new_career(void) {
     CHECK(interviews >= 2 && interviewsWon >= 1);
     // A pass of the first match is a record of the career.
     CHECK(records >= 1 && squadSeen && moments == 1);
+    // A match as a goalkeeper: only saves, and the first row of the match
+    // stats counts them.
+    CHECK(ssr_tweaks_number(tweaks, "MatchStats", "DefendKind") == 0);
+    ((SSRCareer *)ssr_game_career(game))->position = SSR_CAREER_GOALKEEPER;
+    play_a_match(game, tweaks);
+    CHECK(ssr_tweaks_number(tweaks, "MatchStats", "DefendKind") == 1);
+    ((SSRCareer *)ssr_game_career(game))->position = SSR_CAREER_FORWARD;
     gambling_news(game, tweaks, path);
     // The player retires at the end of the next season.
     retireNow = 1;

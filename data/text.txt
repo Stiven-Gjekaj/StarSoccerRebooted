@@ -119,3 +119,5 @@ SSR_MatchBlockChance	$teamname attack. $playername must stop the pass!	$teamname
 SSR_MatchSaved	What a save by $playername!	Was für eine Parade von $playername!	Quel arrêt de $playername !	¡Qué parada de $playername!	Che parata di $playername!	Que defesa de $playername!	Que defesa de $playername!	$playername'den ne kurtarış!	Co za obrona $playername!
 SSR_MatchBlocked	$playername wins the ball back.	$playername erobert den Ball zurück.	$playername récupère le ballon.	$playername recupera el balón.	$playername recupera il pallone.	$playername recupera a bola.	$playername recupera a bola.	$playername topu geri kazanıyor.	$playername odzyskuje piłkę.
 SSR_MatchShotWide	The shot of $teamname goes wide.	Der Schuss von $teamname geht daneben.	Le tir de $teamname passe à côté.	El disparo de $teamname se va fuera.	Il tiro di $teamname finisce fuori.	O chute de $teamname vai para fora.	O remate de $teamname sai ao lado.	$teamname'in şutu dışarı gidiyor.	Strzał $teamname jest niecelny.
+SSR_StatSaves	Saves	Paraden	Arrêts	Paradas	Parate	Defesas	Defesas	Kurtarışlar	Obrony
+SSR_StatBlocks	Blocks	Blocks	Interceptions	Bloqueos	Interventi	Desarmes	Cortes	Engellemeler	Bloki
