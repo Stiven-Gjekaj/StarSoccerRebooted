@@ -90,6 +90,9 @@ endif()
 # assets/icon.png.
 if(IOS)
     target_sources(ssr PRIVATE ${CMAKE_SOURCE_DIR}/cmake/ios/Assets.xcassets)
+    # The Resources phase of Xcode compiles the catalog into the icon.
+    set_source_files_properties(${CMAKE_SOURCE_DIR}/cmake/ios/Assets.xcassets PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources)
     set_target_properties(ssr PROPERTIES XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME AppIcon)
 elseif(APPLE)
     target_sources(ssr PRIVATE ${CMAKE_SOURCE_DIR}/cmake/macos/AppIcon.icns)
