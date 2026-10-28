@@ -118,9 +118,20 @@ static const char *write_atlases(void) {
     for (int i = 0; i < 12; i++) put_float(&key, 0.5f);
     put_float(&key, -1.0f);
 
-    // One cel chain, then the end.
+    // The cel chains, then the end. The second chain of "Plain" takes the
+    // place of the first.
     put_string(&key, "Plain");
     put_string(&key, "Shadow");
+    put_string(&key, "");
+    put_string(&key, "Zulu");
+    put_string(&key, "Zone");
+    put_string(&key, "");
+    put_string(&key, "Alpha");
+    put_string(&key, "Arm");
+    put_string(&key, "");
+    put_string(&key, "Plain");
+    put_string(&key, "Shadow");
+    put_string(&key, "Gloss");
     put_string(&key, "");
     put_string(&key, "");
     write_bytes(directory, "Key.key", key.data, key.size);
@@ -165,8 +176,11 @@ static void test_reads_the_key(void) {
     CHECK(ssr_atlas_page(atlases, 1)->width == 4 && ssr_atlas_page(atlases, 1)->imageCount == 3);
 
     const char *cels[4];
-    CHECK(ssr_atlas_cels(atlases, "Plain", cels, 4) == 1 && strcmp(cels[0], "Shadow") == 0);
+    CHECK(ssr_atlas_cels(atlases, "Plain", cels, 4) == 2 && strcmp(cels[1], "Gloss") == 0);
+    CHECK(ssr_atlas_cels(atlases, "Alpha", cels, 4) == 1 && strcmp(cels[0], "Arm") == 0);
+    CHECK(ssr_atlas_cels(atlases, "Zulu", cels, 4) == 1 && strcmp(cels[0], "Zone") == 0);
     CHECK(ssr_atlas_cels(atlases, "Sliced", cels, 4) == 0);
+    CHECK(ssr_atlas_cels(atlases, "Zz", cels, 4) == 0);
     const SSRAtlasImage *plain = ssr_atlas_find(atlases, "Plain");
     CHECK(plain && plain->kind == SSR_ATLAS_PLAIN && plain->page == 1 && plain->frame == 0);
     CHECK(plain && plain->unpackCount == 1 && plain->unpacks[0].x == 1 && plain->unpacks[0].width == 2);

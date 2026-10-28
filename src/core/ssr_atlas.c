@@ -39,6 +39,9 @@ struct SSRAtlases {
     // The cel groups of the key files: a base image and its cels.
     CelGroup *cels;
     int celCount;
+    // The cel group indexes, sorted by base. Of the groups with the same
+    // base, the last group of the key files comes first.
+    int *celsByBase;
 };
 
 // The key reader. Each value starts at a multiple of its size from the
@@ -285,6 +288,12 @@ static int compare_names(const void *a, const void *b) {
     return strcmp(sort_context->images[*(const int *)a].name, sort_context->images[*(const int *)b].name);
 }
 
+static int compare_bases(const void *a, const void *b) {
+    int i = *(const int *)a, j = *(const int *)b;
+    int order = strcmp(sort_context->cels[i].base, sort_context->cels[j].base);
+    return order != 0 ? order : j - i;
+}
+
 SSRAtlases *ssr_atlas_load(const char *directory, const char *const *keys, int keyCount) {
     SSRAtlases *a = calloc(1, sizeof(SSRAtlases));
     if (!a) return NULL;
@@ -308,7 +317,8 @@ SSRAtlases *ssr_atlas_load(const char *directory, const char *const *keys, int k
     }
     a->rle = calloc(a->pageCount ? (size_t)a->pageCount : 1, sizeof(RlePage));
     a->byName = malloc((a->imageCount ? (size_t)a->imageCount : 1) * sizeof(int));
-    if (!a->rle || !a->byName) {
+    a->celsByBase = malloc((a->celCount ? (size_t)a->celCount : 1) * sizeof(int));
+    if (!a->rle || !a->byName || !a->celsByBase) {
         ssr_atlas_free(a);
         return NULL;
     }
@@ -322,6 +332,8 @@ SSRAtlases *ssr_atlas_load(const char *directory, const char *const *keys, int k
     for (int i = 0; i < a->imageCount; i++) a->byName[i] = i;
     sort_context = a;
     qsort(a->byName, (size_t)a->imageCount, sizeof(int), compare_names);
+    for (int i = 0; i < a->celCount; i++) a->celsByBase[i] = i;
+    qsort(a->celsByBase, (size_t)a->celCount, sizeof(int), compare_bases);
     sort_context = NULL;
     return a;
 }
@@ -339,6 +351,7 @@ void ssr_atlas_free(SSRAtlases *a) {
     }
     free(a->rle);
     free(a->byName);
+    free(a->celsByBase);
     for (int i = 0; i < a->celCount; i++) free(a->cels[i].names);
     free(a->cels);
     for (int i = 0; i < a->stringCount; i++) free(a->strings[i]);
@@ -365,13 +378,20 @@ const SSRAtlasImage *ssr_atlas_image(const SSRAtlases *a, int index) {
 
 int ssr_atlas_cels(const SSRAtlases *a, const char *base, const char **names, int max) {
     if (!a || !base) return 0;
-    for (int i = a->celCount - 1; i >= 0; i--) {
-        if (strcmp(a->cels[i].base, base) != 0) continue;
-        int n = a->cels[i].count < max ? a->cels[i].count : max;
-        for (int k = 0; k < n; k++) names[k] = a->cels[i].names[k];
-        return a->cels[i].count;
+    // The first group with the base in the sorted index: the last group
+    // of the key files.
+    int low = 0, high = a->celCount;
+    while (low < high) {
+        int middle = (low + high) / 2;
+        if (strcmp(a->cels[a->celsByBase[middle]].base, base) < 0) low = middle + 1;
+        else high = middle;
     }
-    return 0;
+    if (low >= a->celCount) return 0;
+    const CelGroup *group = &a->cels[a->celsByBase[low]];
+    if (strcmp(group->base, base) != 0) return 0;
+    int n = group->count < max ? group->count : max;
+    for (int k = 0; k < n; k++) names[k] = group->names[k];
+    return group->count;
 }
 
 const SSRAtlasImage *ssr_atlas_find(const SSRAtlases *a, const char *name) {
