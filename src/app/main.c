@@ -940,8 +940,14 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
             app->trail[i] = ssr_scene_spawn(app->scene, "MatchPitch", "Ball", 0, NULL, 0);
             app->trailTime[i] = 0;
             ssr_scene_spawn_show(app->scene, app->trail[i], NULL, 0);
-            ssr_scene_spawn_show(app->scene, app->trail[i], "Ball", 0);
             ssr_scene_spawn_show(app->scene, app->trail[i], "BallTip", 0);
+            // A copy of the trail shows only the ball: its shadows (the
+            // elements 1 to 5 of the ball) stay hidden.
+            for (int e = 1; e <= 5; e++) {
+                char element[16];
+                SDL_snprintf(element, sizeof(element), "Ball#%d", e);
+                ssr_scene_spawn_set(app->scene, app->trail[i], element, SSR_GEL_VIS, 0);
+            }
         }
         // The objects of a drill (c_ATraining.m_CreateItems).
         const SSRTraining *drill = ssr_game_training(app->game);
