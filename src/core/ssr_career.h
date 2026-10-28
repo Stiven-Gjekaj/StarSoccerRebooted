@@ -92,6 +92,9 @@ typedef struct {
     // The tutorials that the player saw (the tweaks Tutorial of the game):
     // SSR_TUTORIAL_CONTROL and SSR_TUTORIAL_SWERVE.
     int tutorials;
+    // The drills of the skills that the player tried since the last match
+    // (c_TPlayer.m_trainingattempts).
+    int trainingAttempts;
     // The last boss that the club of the player sacked: the name, and the
     // club of the new job of the boss, or 0.
     char exBoss[64];

@@ -235,6 +235,9 @@ struct SSRGame {
     // The screen after the information screen (c_TScreen_Information
     // m_nextscreen).
     char infoNext[16];
+    // The drill type of the skill choice screen (c_TScreen_SkillChoice
+    // m_skill).
+    int skillType;
     char modal[48];
     // The headline that the news page shows, and the screen after it.
     char news[512];
@@ -1522,8 +1525,14 @@ static void call_do_trial5(SSRGame *game) {
 
 // TrainingSuccess and TrainingFailure: a success writes the lives that are
 // left into the first level of the skill. Then the next trial, or the end.
+static void end_training(SSRGame *game);
+
 static void end_trial(SSRGame *game) {
     SSRTraining *t = game->training;
+    if (t->trial == 0) {
+        end_training(game);
+        return;
+    }
     int trial = t->trial, won = t->over == 1;
     if (won) {
         SSRCareer *c = &game->career;
@@ -1590,6 +1599,258 @@ static void call_trial_done(SSRGame *game) {
     ssr_tweaks_set_number(game->tweaks, "Menu", "TrialCompleteIncrement", 1);
     message(game, "message", "", 0, 1, "StartCareer");
 }
+
+/* -------------------------------------------------------- the training */
+
+static void not_enough_energy(SSRGame *game, const char *activity, float need);
+static void save_career(SSRGame *game);
+
+// GSGetMaxTrainingDrills, and fuseparam_maxtrainingperday.
+#define TRAINING_DRILLS 20
+#define TRAINING_PER_DAY 3
+// The tweak Match,MinEnergyTraining when the tweaks have no value.
+#define TRAINING_MIN_ENERGY 40
+
+// The drill types of SetUpTraining for the skills: technique 2, set
+// pieces 3, power 4, pace 5, and vision 6.
+static int *drill_levels(SSRCareer *c, int type) {
+    switch (type) {
+    case 2: return c->technique;
+    case 3: return c->setPieces;
+    case 4: return c->power;
+    case 5: return c->pace;
+    case 6: return c->vision;
+    }
+    return NULL;
+}
+
+// The row of a drill type in lastTrained and deplete.
+static int drill_row(int type) {
+    switch (type) {
+    case 5: return 0;
+    case 4: return 1;
+    case 2: return 2;
+    case 6: return 3;
+    case 3: return 4;
+    }
+    return -1;
+}
+
+// The row of a drill type in the bars of skillchoice.uis (SkillChosen).
+static int drill_bar(int type) {
+    switch (type) {
+    case 5: return 1;
+    case 4: return 2;
+    case 6: return 3;
+    case 3: return 4;
+    case 2: return 5;
+    }
+    return 0;
+}
+
+// c_TPlayer.GetEnergyCostSkills: the least energy, and one more for each
+// year above 20 (above 15 in the hard mode). The trainer takes his part
+// off.
+static int training_energy_cost(SSRGame *game) {
+    const SSRCareer *c = &game->career;
+    float least = (float)ssr_tweaks_number(game->tweaks, "Match", "MinEnergyTraining");
+    float f = least > 0 ? least : TRAINING_MIN_ENERGY;
+    float over = (float)(ssr_career_age(c) - (c->hardMode ? 15 : 20));
+    if (over >= 0) f += over;
+    f = f < 0 ? 0 : f > 100 ? 100 : f;
+    static const int REDUCE[4] = {0, 15, 20, 25};
+    int trainer = ssr_career_trainer(c);
+    return (int)(f - (float)REDUCE[trainer >= 0 && trainer <= 3 ? trainer : 0] * (f / 100.0f));
+}
+
+// c_TPlayer.CountSkillsTrainedToday.
+static int skills_trained_today(const SSRCareer *c) {
+    int n = 0;
+    for (int i = 0; i < 5; i++) n += c->lastTrained[i] == c->sdate;
+    return n;
+}
+
+// c_TPlayer.GetStringLastTrained: the days since the last training of the
+// skill of the drill type.
+static void last_trained_text(SSRGame *game, int type, char *out, size_t capacity) {
+    int row = drill_row(type);
+    int days = row >= 0 ? game->career.sdate - game->career.lastTrained[row] : -1;
+    if (days < 0) days = -1;
+    char number[16];
+    if (days > 14) {
+        snprintf(out, capacity, "%s", loc(game, "lasttrained_Weeks_RESKIN"));
+        snprintf(number, sizeof(number), "%d", days / 7);
+        replace_all(out, capacity, "$num", number);
+    } else if (days > 7) {
+        snprintf(out, capacity, "%s", loc(game, "lasttrained_Week_RESKIN"));
+    } else if (days > 1) {
+        snprintf(out, capacity, "%s", loc(game, "lasttrained_Days_RESKIN"));
+        snprintf(number, sizeof(number), "%d", days);
+        replace_all(out, capacity, "$num", number);
+    } else if (days == 1) {
+        snprintf(out, capacity, "%s", loc(game, "lasttrained_Day_RESKIN"));
+    } else if (days == 0) {
+        snprintf(out, capacity, "%s", loc(game, "lasttrained_Today_RESKIN"));
+    } else {
+        snprintf(out, capacity, "%s", loc(game, "lasttrained_Never"));
+    }
+}
+
+// The level button of a drill can start: the first level, a level with
+// fewer than 3 stars, the level after a level with stars, and the last
+// level after it has stars (c_AScreen_SkillChoice.ResetButtons).
+static int drill_open(const int *levels, int i) {
+    int stars = levels[i], before = i > 0 ? levels[i - 1] : 0;
+    return (i == 0 && stars < 3) || (stars > 0 && stars < 3) || (before > 0 && stars == 0) ||
+           (i == TRAINING_DRILLS - 1 && stars > 0);
+}
+
+// c_AScreen_SkillChoice.ResetButtons: the stars of each level button
+// (the elements 2 to 4 gold, 5 to 7 grey), and the colour of the button.
+static void skill_buttons(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    const int *levels = drill_levels(c, game->skillType);
+    if (!levels) return;
+    // ElementMask: 225 no star, 197 one, 141 two, 29 three.
+    static const int MASKS[4] = {225, 197, 141, 29};
+    char ref[48];
+    for (int i = 0; i < TRAINING_DRILLS; i++) {
+        int stars = levels[i] < 0 ? 0 : levels[i] > 3 ? 3 : levels[i];
+        for (int e = 1; e <= 7; e++) {
+            snprintf(ref, sizeof(ref), "SkillChoiceButton%d#%d", i + 1, e);
+            add_op(game, SSR_OP_GEL, ref, NULL, (MASKS[stars] >> e) & 1 ? "1" : "0", SSR_GEL_VIS);
+        }
+        snprintf(ref, sizeof(ref), "SkillChoiceButton%d", i + 1);
+        int open = drill_open(levels, i) && !c->retired;
+        add_op(game, SSR_OP_ELEMENT_COLOUR, ref, NULL, open ? "FFFFFFFF" : "80808080", 0);
+    }
+    char text[128];
+    last_trained_text(game, game->skillType, text, sizeof(text));
+    ssr_tweaks_set(game->tweaks, "Menu", "SkillLastTrained", text);
+}
+
+// c_TScreen_SkillChoice.SetUpScreen: the levels of the drill of a skill.
+static void skill_choice(SSRGame *game, int type) {
+    game->skillType = type == 8 ? 5 : type;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "SkillChosen", drill_bar(game->skillType));
+    player_tweaks(game);
+    set_screen(game, "skillchoice");
+    skill_buttons(game);
+}
+
+// c_TScreen_Skills.SetUpScreen.
+static void skills_screen(SSRGame *game) {
+    player_tweaks(game);
+    set_screen(game, "skills");
+}
+
+static void skills_pace(SSRGame *game) {
+    skill_choice(game, 5);
+}
+
+static void skills_power(SSRGame *game) {
+    skill_choice(game, 4);
+}
+
+static void skills_technique(SSRGame *game) {
+    skill_choice(game, 2);
+}
+
+static void skills_vision(SSRGame *game) {
+    skill_choice(game, 6);
+}
+
+static void skills_set_pieces(SSRGame *game) {
+    skill_choice(game, 3);
+}
+
+// c_TScreen_SkillChoice.ButtonSkill: the drill of the level, at most three
+// skills and three drills a day, with the energy of the training.
+static void skill_level(SSRGame *game, int level) {
+    SSRCareer *c = &game->career;
+    int *levels = drill_levels(c, game->skillType);
+    if (!levels || level < 1 || level > TRAINING_DRILLS) return;
+    if (levels[level - 1] >= 3) {
+        play_sound(game, "CError");
+        return;
+    }
+    if (c->trainingAttempts >= TRAINING_PER_DAY || skills_trained_today(c) >= TRAINING_PER_DAY) {
+        play_sound(game, "CError");
+        char text[512], number[8];
+        snprintf(text, sizeof(text), "%s", loc(game, "CMESSAGE_TRAINEDTOOMUCH"));
+        snprintf(number, sizeof(number), "%d", TRAINING_PER_DAY);
+        replace_all(text, sizeof(text), "$num", number);
+        message(game, "message", text, 0, 1, NULL);
+        return;
+    }
+    if (!drill_open(levels, level - 1) || c->retired) {
+        play_sound(game, "CError");
+        return;
+    }
+    int cost = training_energy_cost(game);
+    if (c->energy < (float)cost) {
+        not_enough_energy(game, "Skill", (float)cost);
+        return;
+    }
+    if (!game->training) game->training = calloc(1, sizeof(SSRTraining));
+    if (!game->training) return;
+    SSRTrainingPlayer player = {.power = ssr_career_skill(c->power),
+                                .technique = ssr_career_skill(c->technique),
+                                .pace = ssr_career_skill(c->pace),
+                                .starLevel = ssr_career_star_level(c)};
+    ssr_training_start(game->training, game->skillType, level, 3, 0, &player, &game->random);
+    game->trainingMessage = NULL;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "Lifecount", game->training->lives);
+    ssr_tweaks_set_number(game->tweaks, "Training", "TrainingType", game->training->training);
+    c->trainingAttempts++;
+    set_screen(game, "matchminigame");
+}
+
+// TrainingSuccess and TrainingFailure of a drill of the skills screen: a
+// success gives the level its stars (the lives that are left) and trains
+// the skill today. Each drill costs its energy. Then the levels again.
+static void end_training(SSRGame *game) {
+    SSRTraining *t = game->training;
+    SSRCareer *c = &game->career;
+    int type = game->skillType, level = t->level;
+    if (t->over == 1) {
+        int *levels = drill_levels(c, type);
+        int row = drill_row(type);
+        if (levels && level >= 1 && level <= TRAINING_DRILLS) levels[level - 1] = t->lives;
+        if (row >= 0) c->lastTrained[row] = c->deplete[row] = c->sdate;
+    }
+    float energy = c->energy - (float)training_energy_cost(game);
+    c->energy = energy < 0 ? 0 : energy;
+    free(game->training);
+    game->training = NULL;
+    save_career(game);
+    skill_choice(game, type);
+}
+
+#define LEVEL(n)                                                                                                       \
+    static void skill_level_##n(SSRGame *game) {                                                                       \
+        skill_level(game, n);                                                                                          \
+    }
+LEVEL(1)
+LEVEL(2)
+LEVEL(3)
+LEVEL(4)
+LEVEL(5)
+LEVEL(6)
+LEVEL(7)
+LEVEL(8)
+LEVEL(9)
+LEVEL(10)
+LEVEL(11)
+LEVEL(12)
+LEVEL(13)
+LEVEL(14)
+LEVEL(15)
+LEVEL(16)
+LEVEL(17)
+LEVEL(18)
+LEVEL(19)
+LEVEL(20)
 
 // GSPlayerUtility.UpdateRelationship: the relation changes, then a club
 // relation, the sponsors, the partner, or the happiness at 100 unlocks its
@@ -3365,6 +3626,7 @@ static void match_recovery(SSRGame *game) {
     c->gambling = c->gambling - 5 < 0 ? 0 : c->gambling - 5;
     if (game->caughtGambling > 0) game->caughtGambling--;
     c->spentTime = 0;
+    c->trainingAttempts = 0;
     int n = ssr_career_count_sponsors(c);
     if (n > 0) update_relation(game, SSR_RELATION_SPONSORS, (float)n * -0.65f);
     if (game->horsesLoaded) ssr_horses_recover(&game->horses, &game->random);
@@ -10680,6 +10942,35 @@ static const Route ROUTES[] = {
     {"matchstats.btn_Play", stats_continue},
     {"matchreview.btn_Play", review_continue},
     {"skills.btn_Ratings", ratings_open},
+    {"gamemenu.btn_Skills", skills_screen},
+    {"skills.btn_Home", game_menu},
+    {"skills.btn_NRG", drink_button},
+    {"skills.btn_Pace", skills_pace},
+    {"skills.btn_Power", skills_power},
+    {"skills.btn_Technique", skills_technique},
+    {"skills.btn_Vision", skills_vision},
+    {"skills.btn_SetPieces", skills_set_pieces},
+    {"skillchoice.btn_Home", skills_screen},
+    {"skillchoice.btn_Level1", skill_level_1},
+    {"skillchoice.btn_Level2", skill_level_2},
+    {"skillchoice.btn_Level3", skill_level_3},
+    {"skillchoice.btn_Level4", skill_level_4},
+    {"skillchoice.btn_Level5", skill_level_5},
+    {"skillchoice.btn_Level6", skill_level_6},
+    {"skillchoice.btn_Level7", skill_level_7},
+    {"skillchoice.btn_Level8", skill_level_8},
+    {"skillchoice.btn_Level9", skill_level_9},
+    {"skillchoice.btn_Level10", skill_level_10},
+    {"skillchoice.btn_Level11", skill_level_11},
+    {"skillchoice.btn_Level12", skill_level_12},
+    {"skillchoice.btn_Level13", skill_level_13},
+    {"skillchoice.btn_Level14", skill_level_14},
+    {"skillchoice.btn_Level15", skill_level_15},
+    {"skillchoice.btn_Level16", skill_level_16},
+    {"skillchoice.btn_Level17", skill_level_17},
+    {"skillchoice.btn_Level18", skill_level_18},
+    {"skillchoice.btn_Level19", skill_level_19},
+    {"skillchoice.btn_Level20", skill_level_20},
     {"matchchance.btn_WatchReplay", watch_replay},
     {"matchchance.btn_SkipReplay", skip_replay},
     {"watchreplay.exit", skip_replay},

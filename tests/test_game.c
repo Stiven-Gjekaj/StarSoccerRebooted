@@ -2349,6 +2349,92 @@ static void become_captain(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     news_week(game, path, &before);
 }
 
+// Plays the drill that runs until it ends: each shot aims from the ball by
+// (dx, dy), and each tap hits the middle of the tap ball.
+static void play_a_drill(SSRGame *game, float dx, float dy) {
+    for (int i = 0; i < 200000 && ssr_game_training(game); i++) {
+        const SSRTraining *t = ssr_game_training(game);
+        const SSRChance *c = &t->chance;
+        if (t->instruction) {
+            ssr_game_touch(game, 1, 320, 900);
+            ssr_game_update(game, 1);
+            ssr_game_touch(game, 0, 320, 900);
+        } else if (c->state == SSR_CHANCE_AIM && c->kicking == 0) {
+            ssr_game_touch(game, 1, c->ball.x, c->ball.y);
+            ssr_game_update(game, 1);
+            ssr_game_touch(game, 1, c->ball.x + dx, c->ball.y + dy);
+            ssr_game_update(game, 10);
+            ssr_game_touch(game, 0, c->ball.x + dx, c->ball.y + dy);
+        } else if (c->state == SSR_CHANCE_TAP && !c->tap.touching && c->tap.tapX == 0) {
+            ssr_game_touch(game, 1, c->tap.x, c->tap.y);
+            ssr_game_update(game, 1);
+            ssr_game_touch(game, 0, c->tap.x, c->tap.y);
+        }
+        ssr_game_update(game, 1);
+    }
+}
+
+// The skills screen trains a skill: the levels of a drill, a failed drill
+// that costs the energy, the limit of three drills, and a drill with no
+// energy.
+static void train_a_skill(SSRGame *game, SSRTweaks *tweaks) {
+    SSRCareer *c = (SSRCareer *)ssr_game_career(game);
+    c->energy = 100;
+    c->trainingAttempts = 0;
+    c->retired = 0;
+    memset(c->technique, 0, sizeof(c->technique));
+    for (int i = 0; i < 5; i++) c->lastTrained[i] = c->sdate - 30;
+    int lastTechnique = c->lastTrained[2];
+    ssr_game_message(game, "gamemenu.btn_Skills");
+    CHECK(strcmp(ssr_game_screen(game), "skills") == 0);
+    SSRUiOp ops[512];
+    take_ops(game, ops, 512);
+    ssr_game_message(game, "skills.btn_Technique");
+    CHECK(strcmp(ssr_game_screen(game), "skillchoice") == 0);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "SkillChosen") == 5);
+    // The first level can start, the second waits for the stars of the
+    // first.
+    int count = take_ops(game, ops, 512);
+    CHECK(has_op(ops, count, SSR_OP_ELEMENT_COLOUR, "SkillChoiceButton1", "FFFFFFFF"));
+    CHECK(has_op(ops, count, SSR_OP_ELEMENT_COLOUR, "SkillChoiceButton2", "80808080"));
+    // No star: the grey stars (5 to 7) show, the gold ones (2 to 4) do not.
+    CHECK(has_op(ops, count, SSR_OP_GEL, "SkillChoiceButton1#2", "0"));
+    CHECK(has_op(ops, count, SSR_OP_GEL, "SkillChoiceButton1#5", "1"));
+    ssr_game_message(game, "skillchoice.btn_Level2");
+    CHECK(strcmp(ssr_game_screen(game), "skillchoice") == 0 && !ssr_game_training(game));
+    ssr_game_message(game, "skillchoice.btn_Level1");
+    const SSRTraining *t = ssr_game_training(game);
+    CHECK(strcmp(ssr_game_screen(game), "matchminigame") == 0);
+    CHECK(t && t->training == 2 && t->level == 1 && t->trial == 0 && c->trainingAttempts == 1);
+    // A shot far to the side fails the drill. The skill gets no stars,
+    // and the drill costs its energy.
+    play_a_drill(game, 60, 0);
+    CHECK(strcmp(ssr_game_screen(game), "skillchoice") == 0);
+    CHECK(c->technique[0] == 0 && c->lastTrained[2] == lastTechnique && c->energy < 100);
+    // A shot up through the gate passes the drill: the stars are the lives
+    // that are left, and the skill is trained today.
+    c->energy = 100;
+    ssr_game_message(game, "skillchoice.btn_Level1");
+    play_a_drill(game, 0, 60);
+    CHECK(strcmp(ssr_game_screen(game), "skillchoice") == 0);
+    CHECK(c->technique[0] >= 1 && c->technique[0] <= 3 && c->lastTrained[2] == c->sdate);
+    // Three drills in a day are the limit.
+    CHECK(c->trainingAttempts == 2);
+    c->trainingAttempts = 3;
+    ssr_game_message(game, "skillchoice.btn_Level2");
+    CHECK(strcmp(ssr_game_screen(game), "message") == 0 && !ssr_game_training(game));
+    ssr_game_message(game, "message.btn_Ok");
+    // With no energy the drill does not start, and the energy drinks show.
+    c->trainingAttempts = 0;
+    c->energy = 0;
+    ssr_game_message(game, "skillchoice.btn_Level2");
+    CHECK(!ssr_game_training(game) && ssr_game_overlay(game)[0] != 0);
+    c->energy = 100;
+    ssr_game_message(game, "skillchoice.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "skills") == 0);
+    ssr_game_message(game, "skills.btn_Home");
+}
+
 // The news before a match: the old boots of an ex pro, then a sponsor.
 static void get_old_boots_and_a_sponsor(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     SSRCareer c = *ssr_game_career(game);
@@ -2712,6 +2798,7 @@ static void test_starts_a_new_career(void) {
     go_to_the_races(game, tweaks, path);
     go_shopping(game, tweaks, path);
     hire_and_kit_out(game, tweaks, path);
+    train_a_skill(game, tweaks);
     get_old_boots_and_a_sponsor(game, tweaks, path);
     become_captain(game, tweaks, path);
     renew_the_contract(game, tweaks, path);
