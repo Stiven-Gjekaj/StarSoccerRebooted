@@ -28,7 +28,9 @@ static void test_reads_the_sound_list(void) {
                "// Snd:(Old,Sounds/Old)\r\n"
                "Snd:(AudienceCheer,Sounds/CrowdCheer_0)\r\n"
                "Snd:(AudienceCheer,Sounds/CrowdCheer_1)\r\n"
-               "Snd:(Missing,Sounds/NoFile)\r\n");
+               "Snd:(Missing,Sounds/NoFile)\r\n"
+               "Alias:(Cheer,AudienceCheer)\r\n"
+               "Alias:(Nothing,NoName)\r\n");
     write_text(directory, "Sounds/Beep.ogg", "x");
     write_text(directory, "Sounds/CrowdCheer_0.mp3", "x");
     write_text(directory, "Sounds/CrowdCheer_1.ogg", "x");
@@ -43,6 +45,10 @@ static void test_reads_the_sound_list(void) {
     CHECK(ssr_sounds_count(sounds, "Old") == 0);
     CHECK(ssr_sounds_count(sounds, "Missing") == 0);
     CHECK(ssr_sounds_file(sounds, "AudienceCheer", 2) == NULL);
+    // An alias plays the files of the other name.
+    CHECK(ssr_sounds_count(sounds, "Cheer") == 2);
+    CHECK(strcmp(ssr_sounds_file(sounds, "Cheer", 1), "Sounds/CrowdCheer_1.ogg") == 0);
+    CHECK(ssr_sounds_count(sounds, "Nothing") == 0);
 
     // The files hold no sound.
     char path[1200];

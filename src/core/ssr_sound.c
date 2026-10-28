@@ -58,6 +58,23 @@ static void add(SSRSounds *sounds, const char *name, size_t nameLength, const ch
     sounds->count++;
 }
 
+// Alias:(Name,Other): the name plays the files of the other name. The list
+// gives the other name before the alias.
+static void alias(SSRSounds *sounds, char *text) {
+    char *comma = strchr(text, ',');
+    char *end = comma ? strchr(comma, ')') : NULL;
+    if (!comma || !end) return;
+    *end = 0;
+    char *other = comma + 1;
+    while (isspace((unsigned char)*other)) other++;
+    int count = sounds->count;
+    for (int i = 0; i < count; i++) {
+        if (strcmp(sounds->entries[i].name, other) == 0) {
+            add(sounds, text, (size_t)(comma - text), sounds->entries[i].file);
+        }
+    }
+}
+
 SSRSounds *ssr_sounds_load(const char *gameDirectory) {
     char path[4096];
     snprintf(path, sizeof(path), "%s/Sounds/Sounds.txt", gameDirectory);
@@ -68,6 +85,10 @@ SSRSounds *ssr_sounds_load(const char *gameDirectory) {
     while (sounds && fgets(line, sizeof(line), file)) {
         char *p = line;
         while (isspace((unsigned char)*p)) p++;
+        if (strncmp(p, "Alias:(", 7) == 0) {
+            alias(sounds, p + 7);
+            continue;
+        }
         if (strncmp(p, "Snd:(", 5) != 0) continue;
         p += 5;
         char *comma = strchr(p, ',');
