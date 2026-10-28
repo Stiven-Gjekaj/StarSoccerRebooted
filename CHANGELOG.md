@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.30.0 (2026-10-28)
+
+- The match stats show the saves of a goalkeeper and the blocks of a
+  defender.
+- Each position starts a match with the balanced focus, so that the team
+  of a defender or a goalkeeper still attacks.
+- The Work Rate button shows during a match again. The Focus button shows
+  in the classic mode only. In the real mode the position of the player
+  gives the mix of the moments.
+- The commentary of a match is taller on a tall screen, and the window of
+  the match stays in the middle of the screen.
+- The ball has soft shadows from the floodlights, on the pitch and under
+  the tap ball.
+
 ## 0.29.0 (2026-10-28)
 
 - Four positions: goalkeeper, defender, midfielder, and forward. Each
