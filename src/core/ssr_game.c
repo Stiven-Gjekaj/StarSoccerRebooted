@@ -5513,10 +5513,13 @@ static void call_season_end_transfer(SSRGame *game) {
 static void match_play(SSRGame *game) {
     if (!game->match) return;
     int kickOff = game->match->state == SSR_MATCH_PREMATCH;
+    int halfTime = game->match->state == SSR_MATCH_HALF_TIME;
     if (ssr_match_play(game->match, game->now)) {
         end_match(game);
         return;
     }
+    // c_TMatch.m_StartMatch: the whistle of the kick off of each half.
+    if (kickOff || halfTime) play_sound(game, "Whistle");
     // The name plates slide together and show the score
     // (c_AScreen_Match.m_ButtonPlay).
     if (kickOff) add_op(game, SSR_OP_ANIM, "NameBar", NULL, "1", 0);
@@ -5772,6 +5775,8 @@ static void match_tick(SSRGame *game) {
     match_lines(game);
     match_tweaks(game);
     if (event == SSR_MATCH_EVENT_CHANCE) start_chance(game);
+    if (event == SSR_MATCH_EVENT_HALF_TIME) play_sound(game, "WhistleHT");
+    if (event == SSR_MATCH_EVENT_FULL_TIME) play_sound(game, "WhistleFT");
     if (event == SSR_MATCH_EVENT_HALF_TIME || event == SSR_MATCH_EVENT_FULL_TIME) match_state(game);
 }
 

@@ -741,8 +741,13 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         ssr_game_message(game, "packs.btn_Realism");
     }
     ssr_tweaks_set_number(tweaks, "Match", "Daytime", 1);
+    while (ssr_game_take_sound(game)) {
+    }
     ssr_game_message(game, "match.btn_Play");
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 0);
+    // The referee blows the whistle at the kick off.
+    const char *whistle = ssr_game_take_sound(game);
+    CHECK(whistle && strcmp(whistle, "Whistle") == 0);
     // The footer moves one tab of 720 units, so that the buttons show.
     CHECK(ssr_tweaks_number(tweaks, "Menu", "MatchScreenFooter") == -720);
     // The matches are at night, so the ball has the night shadows.
@@ -755,9 +760,14 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(count >= 1 && has_op(ops, count, SSR_OP_LIST_ADD, "CommentaryTable", "Kick Off"));
     // The kick-off has no minute: its stopwatch hides.
     CHECK(has_op(ops, count, SSR_OP_LIST_SUB, "CommentaryTable", ""));
-    int chances = 0, frames = 0;
+    int chances = 0, frames = 0, halfTime = 0, fullTime = 0, kicks = 0;
     while (strcmp(ssr_game_screen(game), "matchstats") != 0 && frames < 200000) {
         frames++;
+        for (const char *sound; (sound = ssr_game_take_sound(game)) != NULL;) {
+            halfTime += strcmp(sound, "WhistleHT") == 0;
+            fullTime += strcmp(sound, "WhistleFT") == 0;
+            kicks += strncmp(sound, "BallKick", 8) == 0;
+        }
         ssr_game_update(game, 1);
         take_ops(game, ops, 64);
         if (ssr_game_replaying(game) == 1) watch_a_replay(game, tweaks);
@@ -834,6 +844,10 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         }
     }
     CHECK(strcmp(ssr_game_screen(game), "matchstats") == 0 && !ssr_game_match(game));
+    // The whistles of the half time and the full time, and the kicks of the
+    // chances.
+    for (const char *sound; (sound = ssr_game_take_sound(game)) != NULL;) fullTime += strcmp(sound, "WhistleFT") == 0;
+    CHECK(halfTime == 1 && fullTime == 1 && kicks >= 1);
     // The first match of the career is the debut: an alert of a moment.
     if (apps == 0) {
         int id = 0;
