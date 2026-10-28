@@ -22,7 +22,8 @@
 // on to the match review. Each of them
 // also watches the replay of a goal. Set SSR_SHOT_SCREEN
 // to a screen name to save the frame SSR_SHOT_MS after that screen opens,
-// or SSR_SHOT_REPLAY to save it 1.5 s after the first replay starts.
+// or SSR_SHOT_REPLAY to save it 1.5 s after the first replay starts. Set
+// SSR_SHOT_EVERY to save SSR_SHOT_COUNT frames that many ms apart.
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -1919,10 +1920,29 @@ SDL_AppResult SDL_AppIterate(void *state) {
         wait = screenSeen && SDL_GetTicks() - screenSeen >= (Uint64)wait ? 0 : 1 << 30;
     }
     if (shot && *shot && SDL_GetTicks() - firstFrame >= (Uint64)wait) {
+        // SSR_SHOT_EVERY saves SSR_SHOT_COUNT frames (8 if not set) that many
+        // milliseconds apart, as shot-1.png, shot-2.png, and on.
+        const char *every = SDL_getenv("SSR_SHOT_EVERY");
+        const char *countText = SDL_getenv("SSR_SHOT_COUNT");
+        int gap = every ? SDL_atoi(every) : 0, count = countText ? SDL_atoi(countText) : 8;
+        static int taken = 0;
+        static Uint64 lastShot = 0;
+        if (gap > 0 && taken > 0 && SDL_GetTicks() - lastShot < (Uint64)gap) {
+            SDL_RenderPresent(app->renderer);
+            return SDL_APP_CONTINUE;
+        }
+        char path[1024];
+        if (gap > 0) SDL_snprintf(path, sizeof(path), "%.*s-%d.png", (int)(strlen(shot) - 4), shot, ++taken);
+        else SDL_snprintf(path, sizeof(path), "%s", shot);
         SDL_Surface *frame = SDL_RenderReadPixels(app->renderer, NULL);
-        bool saved = frame && SDL_SavePNG(frame, shot);
+        bool saved = frame && SDL_SavePNG(frame, path);
         SDL_DestroySurface(frame);
         if (!saved) SDL_Log("The frame was not saved: %s", SDL_GetError());
+        if (saved && gap > 0 && taken < count) {
+            lastShot = SDL_GetTicks();
+            SDL_RenderPresent(app->renderer);
+            return SDL_APP_CONTINUE;
+        }
         return saved ? SDL_APP_SUCCESS : SDL_APP_FAILURE;
     }
     SDL_RenderPresent(app->renderer);
