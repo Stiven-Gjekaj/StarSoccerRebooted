@@ -51,7 +51,8 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       and Overlay2) are in the remake. The tutorial shell is empty in
       4.32, and the purchase overlay is for real money.
 - [x] The information screens of the tutorials (`TScreen_Information`):
-      the captaincy, and the first boots with control or with swerve
+      the captaincy, the first boots with control or with swerve, and the
+      offside rule when the vision reaches 60
 - [x] The rest of the layout commands: font shadows (`FontShadow`), the
       fade of a screen (`Dissolve:`), global emitters, cached draws
       (`DrawCached:`), and the 3D models of the match. No layout of the
@@ -121,6 +122,11 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       skill and the relation boosts, and the bolts
 - [x] The five trials of a new career: the drills of technique, set
       pieces, power, dribbling, and vision, with their lives and hints
+- [x] The training of the skills (`Skills`, `SkillChoice`): the 20
+      levels of the drill of each skill, the stars of each level, three
+      drills a day, and the energy of a drill
+- [ ] The practice of the skills screen (`SetUpTraining(7)`): the arcade
+      shots with keepers and walls, the record, and the prizes
 
 ## 0.6 The season
 
