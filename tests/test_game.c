@@ -662,6 +662,7 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     }
     CHECK(strcmp(ssr_game_screen(game), "match") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 1);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "MatchScreenFooter") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchCompetition") == 1);
     CHECK(strlen(ssr_tweaks_get(tweaks, "MatchColours", "Badge1Col1")) == 8);
     // The kit button goes round four kit pairs, and back to the first.
@@ -720,6 +721,8 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     }
     ssr_game_message(game, "match.btn_Play");
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 0);
+    // The footer moves one tab of 720 units, so that the buttons show.
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "MatchScreenFooter") == -720);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MaximiseScreen") == 1);
     int kick = take_ops(game, ops, 64);
     CHECK(has_op(ops, kick, SSR_OP_ANIM, "NameBar", "1"));

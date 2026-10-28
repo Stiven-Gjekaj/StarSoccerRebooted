@@ -1954,6 +1954,9 @@ static void match_tweaks(SSRGame *game) {
     ssr_tweaks_set_number(t, "Player", "Energy", m->energy);
 }
 
+// The width of one tab of the layouts (?TAB_WIDTH? of JDButtonMacros.uis).
+#define MATCH_FOOTER_TAB 720
+
 // The Match.MatchState of the layout: 1 before the kick-off, 0 while the
 // clock runs, 2 at half time, 3 at the end.
 static void match_state(SSRGame *game) {
@@ -1962,7 +1965,9 @@ static void match_state(SSRGame *game) {
     if (game->match->state == SSR_MATCH_HALF_TIME || game->match->state == SSR_MATCH_PENALTIES) state = 2;
     if (game->match->state == SSR_MATCH_FULL_TIME) state = 3;
     ssr_tweaks_set_number(game->tweaks, "Match", "MatchState", state);
-    ssr_tweaks_set_number(game->tweaks, "Menu", "MatchScreenFooter", state == 0 ? -1 : 0);
+    // The footer of the layout moves one tab (TAB_WIDTH, 720) to the left
+    // while the clock runs. Then the work rate and focus buttons show.
+    ssr_tweaks_set_number(game->tweaks, "Menu", "MatchScreenFooter", state == 0 ? -MATCH_FOOTER_TAB : 0);
     // While the clock runs, the commentary fills the screen
     // (c_AScreen_Match.m_ButtonPlay and m_DoHalfEnd).
     ssr_tweaks_set_number(game->tweaks, "Match", "MaximiseScreen", state == 0);
