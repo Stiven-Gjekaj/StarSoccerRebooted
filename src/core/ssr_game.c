@@ -2321,6 +2321,9 @@ static void player_tweaks(SSRGame *game) {
     ssr_tweaks_set_number(t, "Player", "EarningsWage", c->wage);
     // c_TScreen_GameMenu.UpdateMainBoots: the boots that the player wears.
     ssr_tweaks_set_number(t, "Menu", "OwnedBoot", c->bootId);
+    // UpdatePanels: the level of the agent and of the trainer.
+    ssr_tweaks_set_number(t, "Menu", "OwnedAgent", ssr_career_agent(c));
+    ssr_tweaks_set_number(t, "Menu", "OwnedTrainer", ssr_career_trainer(c));
     ssr_tweaks_set_number(t, "Player", "EarningsBonusGoals", c->goalBonus);
     ssr_tweaks_set_number(t, "Player", "EarningsBonusAssists", c->assistBonus);
     snprintf(text, sizeof(text), "%d", c->wage);

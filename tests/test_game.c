@@ -2141,6 +2141,8 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     CHECK(now->awards[74] > 0);
     ssr_game_message(game, "message.btn_Ok");
     ssr_game_message(game, "PurchaseAnim.Close");
+    // The game menu shows the agent and the trainer.
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "OwnedAgent") == 1 && ssr_tweaks_number(tweaks, "Menu", "OwnedTrainer") == 1);
     // Boots: the first pair, then a question for a second pair.
     ssr_game_message(game, "shop.tab.boots");
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "Boot_10") == 0);
