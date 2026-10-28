@@ -17,7 +17,8 @@ The full career works: the trials, the matches and the chances, the
 league and the cups, the life of the player, the side games, and the
 retirement. The remake adds a world of players and managers, honours and
 records, a custom career, and data packs with real squads and crests.
-See [TODO.md](TODO.md) for the plan to 1.0.
+Version 1.0 has all the content of 4.32 in the new look. See
+[TODO.md](TODO.md) for the plan after 1.0.
 
 ## You need a copy of New Star Soccer
 
