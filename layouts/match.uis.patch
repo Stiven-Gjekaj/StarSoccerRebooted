@@ -9,3 +9,8 @@
 + Text:(TEAM 1,-20,-8,250,72,,,#FFFFFFFF) ref:PreMatchTeamHome
 - Text:(TEAM 2,4,-12,250,72,,,#FFFFFFFF) ref:PreMatchTeamAway
 + Text:(TEAM 2,4,-8,250,72,,,#FFFFFFFF) ref:PreMatchTeamAway
+# The focus button shows in the classic mode only (Match, CanFocus). In the
+# real mode the position of the player gives the mix of the moments.
+- Click(match.btn_Focus,-1)
++ Click(match.btn_Focus,-1)
++ ShowIf(Match,CanFocus,1)

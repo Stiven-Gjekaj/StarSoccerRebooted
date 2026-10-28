@@ -1949,6 +1949,7 @@ static void match_tweaks(SSRGame *game) {
     ssr_tweaks_set_number(t, "Match", "MatchSpeed", m->textSpeed);
     ssr_tweaks_set_number(t, "Match", "WorkRate", m->setup.workRate);
     ssr_tweaks_set_number(t, "Match", "Focus", m->setup.focus);
+    ssr_tweaks_set_number(t, "Match", "CanFocus", game->settings.classicRealism);
     ssr_tweaks_set_number(t, "Match", "Substitute", m->setup.subTime < 0 ? 1 : 0);
     ssr_tweaks_set_number(t, "Player", "Energy", m->energy);
 }
@@ -5073,8 +5074,11 @@ static void match_work_rate(SSRGame *game) {
     match_tweaks(game);
 }
 
+// match.btn_Focus. In the real mode of the remake the position of the
+// player gives the mix of the moments, so the focus stays balanced and its
+// button hides.
 static void match_focus(SSRGame *game) {
-    if (!game->match) return;
+    if (!game->match || !game->settings.classicRealism) return;
     game->match->setup.focus = game->match->setup.focus % 3 + 1;
     match_tweaks(game);
 }

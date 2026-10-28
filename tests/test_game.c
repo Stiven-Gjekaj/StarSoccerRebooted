@@ -703,6 +703,21 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
     }
     ssr_game_message(game, "match.btn_Time");
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchSpeed") == 350);
+    // The focus: its button goes round in the classic mode. In the real
+    // mode the button hides and the focus stays balanced.
+    if (ssr_game_settings(game)->classicRealism) {
+        CHECK(ssr_tweaks_number(tweaks, "Match", "CanFocus") == 1);
+        for (int i = 0; i < 3; i++) ssr_game_message(game, "match.btn_Focus");
+        CHECK(ssr_tweaks_number(tweaks, "Match", "Focus") == 2);
+        ssr_game_message(game, "packs.btn_Realism");
+        ssr_game_message(game, "match.btn_Time");
+        ssr_game_message(game, "match.btn_Time");
+        ssr_game_message(game, "match.btn_Time");
+        CHECK(ssr_tweaks_number(tweaks, "Match", "CanFocus") == 0);
+        ssr_game_message(game, "match.btn_Focus");
+        CHECK(ssr_tweaks_number(tweaks, "Match", "Focus") == 2);
+        ssr_game_message(game, "packs.btn_Realism");
+    }
     ssr_game_message(game, "match.btn_Play");
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MaximiseScreen") == 1);
