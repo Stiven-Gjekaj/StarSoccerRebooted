@@ -1,10 +1,10 @@
 #!/bin/sh
 # Make a release of the version in CMakeLists.txt.
 # Usage: scripts/release.sh
-# It runs the tests, builds the macOS app for arm64 and x86_64 and the
-# Android app, pushes the commits and the tag, and publishes the GitHub
-# release with the notes of CHANGELOG.md, the zip of the macOS app, and the
-# APK.
+# It runs the tests, builds the macOS app for arm64 and x86_64, the
+# Android app, and the iOS app, pushes the commits and the tag, and
+# publishes the GitHub release with the notes of CHANGELOG.md, the zip of
+# the macOS app, the APK, and the IPA.
 set -e
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -39,6 +39,9 @@ rm -f "build/$ZIP"
 (cd android && ./gradlew -q assembleDebug) >build/release-android.log 2>&1 || { tail -30 build/release-android.log >&2; exit 1; }
 cp android/app/build/outputs/apk/debug/app-debug.apk "build/$APK"
 
+# The iOS app, not signed. SideStore or AltStore signs it.
+scripts/ipa.sh >/dev/null
+
 git push -q
 git tag -a "$TAG" -m "Star Soccer Rebooted $VERSION"
 git push -q origin "$TAG"
@@ -53,6 +56,12 @@ an IPA) on the window. The app holds no file of New Star Soccer.
 
 Install on Android: install New Star Soccer from Google Play first, then
 install the APK. The app imports the game from the phone.
+
+Install on iOS: add the source
+https://stiven-gjekaj.github.io/sidestore-source/apps.json to SideStore or
+AltStore, or install StarSoccerRebooted.ipa with them. Put your copy of New
+Star Soccer in the folder of the app in Files.
 NOTES
-gh release create "$TAG" -R "$REPO" -t "Star Soccer Rebooted $VERSION" -F build/notes.md "build/$ZIP" "build/$APK"
+gh release create "$TAG" -R "$REPO" -t "Star Soccer Rebooted $VERSION" -F build/notes.md "build/$ZIP" "build/$APK" \
+    build/StarSoccerRebooted.ipa
 echo "released $TAG"
