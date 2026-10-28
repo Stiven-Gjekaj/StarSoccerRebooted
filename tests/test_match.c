@@ -71,6 +71,19 @@ static void play(SSRMatch *m, SSRRandom *random, SSRChanceResult result, Seen *s
     }
 }
 
+// The difficulty changes only the other team, and stops at 100.
+static void test_sets_the_difficulty(void) {
+    SSRMatchSetup s = {.homeStrength = 50, .awayStrength = 60, .myTeam = 1};
+    ssr_match_set_difficulty(&s, 0.8f);
+    CHECK(s.homeStrength == 50 && fabsf(s.awayStrength - 48) < 1e-4f);
+    s = (SSRMatchSetup){.homeStrength = 90, .awayStrength = 60, .myTeam = 2};
+    ssr_match_set_difficulty(&s, 1.2f);
+    CHECK(s.homeStrength == 100 && s.awayStrength == 60);
+    s.homeStrength = 110;
+    ssr_match_set_difficulty(&s, 1);
+    CHECK(s.homeStrength == 110);
+}
+
 static void test_plays_a_match(void) {
     SSRMatch m;
     SSRRandom random = {SSR_RANDOM_START};
@@ -451,6 +464,7 @@ static void test_the_captain_draws_runs(void) {
 }
 
 int main(void) {
+    test_sets_the_difficulty();
     test_the_captain_draws_runs();
     test_a_dribble_leads_to_an_attack();
     test_keeps_the_furthest_goal_and_pass();

@@ -2741,6 +2741,7 @@ static void start_match(SSRGame *game) {
     s.homeStrength = (float)home.strength;
     s.awayStrength = (float)away.strength;
     s.myTeam = homeIsMine ? 1 : 2;
+    ssr_match_set_difficulty(&s, ssr_career_difficulty_factor(c));
     s.playerName = c->shortName;
     s.focus = ssr_career_focus(c);
     s.position = c->position;

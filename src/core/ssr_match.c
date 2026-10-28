@@ -953,3 +953,9 @@ int ssr_match_take_line(SSRMatch *m, SSRMatchLine *line) {
     m->lineCount--;
     return 1;
 }
+
+void ssr_match_set_difficulty(SSRMatchSetup *s, float factor) {
+    float *other = s->myTeam == 1 ? &s->awayStrength : &s->homeStrength;
+    float scaled = *other * factor;
+    *other = scaled > 100 && *other <= 100 ? 100 : scaled;
+}

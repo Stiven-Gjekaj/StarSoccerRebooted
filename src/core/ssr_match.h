@@ -153,6 +153,11 @@ typedef struct {
     int shootoutNumber;
 } SSRMatch;
 
+// The difficulty of the career changes the strength of the other team, and
+// so its keeper and its defenders in each chance. The strength goes no
+// higher than 100, unless it starts higher. Call it after myTeam is set.
+void ssr_match_set_difficulty(SSRMatchSetup *setup, float factor);
+
 // Makes the match before the kick-off: the minutes of the chances of the
 // player and the wind. It takes random numbers.
 void ssr_match_start(SSRMatch *match, const SSRMatchSetup *setup, const char *(*localise)(void *, const char *),
