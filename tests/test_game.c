@@ -40,9 +40,10 @@ static void test_gives_the_commentary_a_tall_screen(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
     SSRGame *game = ssr_game_create(tweaks);
     ssr_game_set_screen_top(game, -231.0f);
-    CHECK(ssr_tweaks_number(tweaks, "Match", "CommentaryExtra") == 231);
+    CHECK(ssr_tweaks_number(tweaks, "Match", "CommentaryExtra") == 115);
+    CHECK(ssr_tweaks_number(tweaks, "Match", "CommentaryRaise") == -28);
     ssr_game_set_screen_top(game, -1000.0f);
-    CHECK(ssr_tweaks_number(tweaks, "Match", "CommentaryExtra") == 300);
+    CHECK(ssr_tweaks_number(tweaks, "Match", "CommentaryExtra") == 150);
     ssr_game_set_screen_top(game, 0.0f);
     CHECK(ssr_tweaks_number(tweaks, "Match", "CommentaryExtra") == 0);
     ssr_game_set_screen_top(game, 40.0f);

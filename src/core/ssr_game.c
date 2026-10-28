@@ -2387,11 +2387,13 @@ static void match_tweaks(SSRGame *game) {
     ssr_tweaks_set_number(t, "Player", "Energy", m->energy);
 }
 
-// The most height that the commentary of a match gets more on a tall
-// screen. It keeps the commentary clear of the buttons under it.
-#define COMMENTARY_EXTRA_MAX 300
-// The part of the extra height that the window of the match goes up.
-#define COMMENTARY_RAISE_PART 8
+// The commentary of a match gets half the free height of a tall screen,
+// and at most 150 more. The other half stays above and under the window.
+#define COMMENTARY_EXTRA_PART 2
+#define COMMENTARY_EXTRA_MAX 150
+// The window of the match goes down by a quarter of its extra height, so
+// that it stays in the middle between the energy bar and the footer.
+#define COMMENTARY_LOWER_PART 4
 
 // The width of one tab of the layouts (?TAB_WIDTH? of JDButtonMacros.uis).
 #define MATCH_FOOTER_TAB 720
@@ -12370,12 +12372,11 @@ void ssr_game_show_packs(SSRGame *game) {
 
 void ssr_game_set_screen_top(SSRGame *game, float top) {
     if (!game) return;
-    int extra = top < 0 ? (int)-top : 0;
+    int extra = top < 0 ? (int)-top / COMMENTARY_EXTRA_PART : 0;
     game->commentaryExtra = extra > COMMENTARY_EXTRA_MAX ? COMMENTARY_EXTRA_MAX : extra;
     ssr_tweaks_set_number(game->tweaks, "Match", "CommentaryExtra", game->commentaryExtra);
-    // The window of the match goes up by a part of the extra height, so
-    // that it stays in the middle between the energy bar and the footer.
-    ssr_tweaks_set_number(game->tweaks, "Match", "CommentaryRaise", game->commentaryExtra / COMMENTARY_RAISE_PART);
+    // A negative raise moves the window down.
+    ssr_tweaks_set_number(game->tweaks, "Match", "CommentaryRaise", -game->commentaryExtra / COMMENTARY_LOWER_PART);
 }
 
 void ssr_game_set_can_browse(SSRGame *game, int can) {
