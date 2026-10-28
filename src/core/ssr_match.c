@@ -761,7 +761,7 @@ SSRChanceSetup ssr_match_chance_setup(const SSRMatch *m, int technique, int powe
     c.clubId = 1;
     c.careerApps = s->careerApps;
     c.chances = m->chances;
-    c.windSpeed = m->windSpeed;
+    c.windSpeed = m->windSpeed * (s->windFactor > 0 ? s->windFactor : 1);
     c.windDirection = m->windDirection;
     c.weather = m->setup.weather;
     // The captain of a club match is captain 1 or 3, of a nation match 2 or
@@ -958,4 +958,5 @@ void ssr_match_set_difficulty(SSRMatchSetup *s, float factor) {
     float *other = s->myTeam == 1 ? &s->awayStrength : &s->homeStrength;
     float scaled = *other * factor;
     *other = scaled > 100 && *other <= 100 ? 100 : scaled;
+    s->windFactor = factor;
 }

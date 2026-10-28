@@ -80,6 +80,9 @@ typedef struct {
     // when blocks is 1.
     int position;
     int blocks;
+    // The part of the wind that the chances of the player get: the
+    // difficulty of the career. 0 is 1.
+    float windFactor;
 } SSRMatchSetup;
 
 // The big matches of the remake.
@@ -154,8 +157,9 @@ typedef struct {
 } SSRMatch;
 
 // The difficulty of the career changes the strength of the other team, and
-// so its keeper and its defenders in each chance. The strength goes no
-// higher than 100, unless it starts higher. Call it after myTeam is set.
+// so its keeper and its defenders in each chance, and the wind of the
+// chances. The strength goes no higher than 100, unless it starts higher.
+// Call it after myTeam is set.
 void ssr_match_set_difficulty(SSRMatchSetup *setup, float factor);
 
 // Makes the match before the kick-off: the minutes of the chances of the
