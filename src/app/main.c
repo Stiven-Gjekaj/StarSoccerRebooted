@@ -1722,9 +1722,10 @@ static void auto_chance(SSRApp *app) {
         ssr_game_touch(app->game, 1, chance->ball.x, chance->ball.y);
     } else if (chance->state == SSR_CHANCE_TAP) {
         const SSRTapBall *tap = &chance->tap;
-        // The tap waits 1.5 s, so that a frame can show the tap ball.
+        // The tap waits 0.5 s, so that a frame can show the tap ball, and it
+        // follows a moving ball.
         if (!tapStart) tapStart = now;
-        int near = tap->x > 200 && tap->x < 440 && now - tapStart > 1500;
+        int near = tap->x > 40 && tap->x < 600 && now - tapStart > 500;
         ssr_game_touch(app->game, near && (t / 100) % 2 == 0, tap->x, tap->y);
     } else {
         ssr_game_touch(app->game, 0, 0, 0);
