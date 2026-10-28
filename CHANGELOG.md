@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.3 (2026-10-28)
+
+- The ball and the players of a chance move again. A screen holds more
+  copies of the players and of the ball.
+- A quick tap on a phone kicks the ball. The tap counts also when the
+  finger is up again before the next tick.
+- The trail of the ball is a faint copy of the ball, with no black shadows.
+- The button that ends a replay shows, below the status bar of a phone.
+- The difficulty of the career also changes the wind of the chances.
+- The game menu shows the agent and the trainer of the player.
+- The match has no sponsor panel.
+
 ## 1.0.2 (2026-10-28)
 
 - A custom career has a difficulty, from very easy to very hard. Each step
