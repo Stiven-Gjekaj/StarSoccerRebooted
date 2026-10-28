@@ -20,7 +20,17 @@ typedef enum {
     // A dribble chance: swipes push the ball past the defenders.
     SSR_CHANCE_DRIBBLE,
     SSR_CHANCE_OVER,
+    // A moment of the remake in defence: the other team shoots or passes,
+    // and the player runs to the point of each tap.
+    SSR_CHANCE_DEFEND,
 } SSRChanceState;
+
+// The moments of the remake in defence (SSRChanceSetup.type).
+// A save: the player is the keeper, and a player of the other team shoots.
+#define SSR_CHANCE_SAVE 13
+// A block: the player is a defender, and the other team passes to a
+// forward, who shoots.
+#define SSR_CHANCE_BLOCK 14
 
 typedef enum {
     SSR_RESULT_NONE,
@@ -38,6 +48,10 @@ typedef enum {
     SSR_RESULT_LOST,
     // The ball of a dribble crossed the finish line.
     SSR_RESULT_DRIBBLED,
+    // A moment in defence: the player stopped the ball.
+    SSR_RESULT_DEFENDED,
+    // A moment in defence: the other team scored.
+    SSR_RESULT_CONCEDED,
 } SSRChanceResult;
 
 // The facts of the player, the teams, and the match for one chance.
@@ -101,6 +115,12 @@ typedef struct {
     int dribbling, swiping;
     float swipeX, swipeY;
     float dribbleX, dribbleY;
+    // A moment in defence: the player that the taps move, the players of
+    // the other team, the point of the last tap, the time of the start,
+    // and 1 after the pass came to the forward.
+    int controlId, shooterId, receiverId;
+    float targetX, targetY;
+    int defendStart, received;
 } SSRChance;
 
 // The start of the ball for a chance type (c_TBall.m_Reset).

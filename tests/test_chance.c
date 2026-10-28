@@ -311,6 +311,40 @@ static void test_the_captain_draws_a_run(void) {
     CHECK(mate->makeRunDistance == 0);
 }
 
+// Plays a moment in defence. With follow, each frame taps the ball, so the
+// player runs at it. Else the first tap sends the player to the corner of
+// the pitch. Returns the result.
+static SSRChanceResult defend(int type, int follow, int seed) {
+    SSRRandom random = {seed};
+    SSRChance c;
+    SSRChanceSetup s = setup_for(type);
+    s.pace = 50;
+    ssr_chance_start(&c, &s, &random);
+    for (int t = 0; t < 20000 && c.state == SSR_CHANCE_DEFEND; t += 16) {
+        SSRTapTouch touch = {follow ? c.ball.x : 10, follow ? c.ball.y : 900, 1, 1};
+        if (!follow && t > 0) touch.down = 0;
+        ssr_chance_update(&c, t, &touch, &random);
+    }
+    return c.result;
+}
+
+// A save and a block: the player who runs at the ball stops it most of the
+// time, and the player who runs away lets the other team score more.
+static void test_defends_in_a_moment(void) {
+    int types[2] = {SSR_CHANCE_SAVE, SSR_CHANCE_BLOCK};
+    for (int k = 0; k < 2; k++) {
+        int stopped = 0, conceded = 0, over = 0;
+        for (int seed = 1; seed <= 40; seed++) {
+            SSRChanceResult a = defend(types[k], 1, seed), b = defend(types[k], 0, seed);
+            stopped += a == SSR_RESULT_DEFENDED;
+            conceded += b == SSR_RESULT_CONCEDED;
+            over += a != SSR_RESULT_NONE && b != SSR_RESULT_NONE;
+        }
+        // In a block the keeper of the team stops some of the shots.
+        CHECK(over == 40 && stopped >= 30 && conceded >= 10);
+    }
+}
+
 int main(void) {
     test_uses_the_match_ball();
     test_dribbles_past_the_defenders();
@@ -324,5 +358,6 @@ int main(void) {
     test_a_defender_closes_down_the_aim();
     test_a_short_tap_cancels_the_aim();
     test_the_captain_draws_a_run();
+    test_defends_in_a_moment();
     return TEST_RESULT();
 }

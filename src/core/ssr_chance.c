@@ -159,6 +159,8 @@ static void start_dribble(SSRChance *c, SSRRandom *random) {
     c->state = SSR_CHANCE_DRIBBLE;
 }
 
+static void start_defend(SSRChance *c, SSRRandom *random);
+
 void ssr_chance_start_training(SSRChance *c, const SSRChanceSetup *setup, int training, float x, float y,
                                SSRRandom *random) {
     memset(c, 0, sizeof(*c));
@@ -221,6 +223,10 @@ void ssr_chance_start(SSRChance *c, const SSRChanceSetup *setup, SSRRandom *rand
     ssr_players_clear(&c->players);
     if (setup->type == 11) {
         start_dribble(c, random);
+        return;
+    }
+    if (setup->type == SSR_CHANCE_SAVE || setup->type == SSR_CHANCE_BLOCK) {
+        start_defend(c, random);
         return;
     }
     switch (setup->type) {
@@ -613,6 +619,152 @@ static void dribble(SSRChance *c, const SSRTapTouch *touch, SSRRandom *random) {
     }
 }
 
+/* ------------------------------------------------- moments in defence */
+
+// The time before the other team kicks, in ms.
+#define DEFEND_WAIT 900
+// The distance at which the player stops the ball, and the height under
+// which the player reaches it.
+#define DEFEND_REACH 18.0f
+#define DEFEND_HEIGHT 50.0f
+
+static SSRMatchPlayer *place(SSRMatchPlayer *p, float x, float y, int facing) {
+    if (!p) return NULL;
+    p->x = x;
+    p->y = y;
+    p->xVelocity = p->yVelocity = 0;
+    p->inWall = 0;
+    p->facing = facing;
+    p->direction = facing == 3 ? 270 : 90;
+    p->anim = SSR_ANIM_STAND;
+    return p;
+}
+
+// A save: a player of the other team with the ball, and the keeper of the
+// player on the line. A block: a passer, a forward near the goal, the
+// defender of the player between them, and a keeper of the team.
+static void start_defend(SSRChance *c, SSRRandom *random) {
+    float gl = (float)SSR_GOAL_LINE, centre = ssr_goal_centre(c->info.pitchSide);
+    float strength = c->setup.opponentStrength;
+    SSRMatchPlayer *p;
+    if (c->setup.type == SSR_CHANCE_SAVE) {
+        float x = centre + ssr_rand_float(random, -170, 170), y = ssr_rand_float(random, 380, 560);
+        p = place(ssr_players_add_defender(&c->players, &c->info, strength, 0, 0, 0, random), x, y, 3);
+        c->shooterId = p ? p->id : 0;
+        p = place(ssr_players_add_keeper(&c->players, &c->info, c->setup.teamStrength, random), centre, gl + 14, 1);
+        c->controlId = p ? p->id : 0;
+        ssr_ball_place(&c->ball, x, y - 12);
+    } else {
+        float x = centre + ssr_rand_float(random, -200, 200), y = ssr_rand_float(random, 620, 760);
+        p = place(ssr_players_add_defender(&c->players, &c->info, strength, 0, 0, 0, random), x, y, 3);
+        c->shooterId = p ? p->id : 0;
+        float fx = centre + ssr_rand_float(random, -120, 120), fy = ssr_rand_float(random, 260, 340);
+        p = place(ssr_players_add_defender(&c->players, &c->info, strength, 0, 0, 0, random), fx, fy, 3);
+        c->receiverId = p ? p->id : 0;
+        float dx = (x + fx) / 2 + ssr_rand_float(random, -140, 140), dy = (y + fy) / 2 + ssr_rand_float(random, -40, 60);
+        p = place(ssr_players_add_attacker(&c->players, &c->info, c->setup.teamStrength, 0, random), dx, dy, 1);
+        c->controlId = p ? p->id : 0;
+        place(ssr_players_add_keeper(&c->players, &c->info, c->setup.teamStrength, random), centre, gl + 14, 1);
+        ssr_ball_place(&c->ball, x, y - 12);
+    }
+    const SSRMatchPlayer *me = find_player(c, c->controlId);
+    c->targetX = me ? me->x : centre;
+    c->targetY = me ? me->y : gl;
+    c->info.startX = c->ball.x;
+    c->info.startY = c->ball.y;
+    c->actionType = c->setup.type;
+    c->defendStart = -1;
+    c->state = SSR_CHANCE_DEFEND;
+}
+
+// A player of the other team kicks at the goal, a little off the middle.
+static void shoot_at_goal(SSRChance *c, int by, SSRRandom *random) {
+    float centre = ssr_goal_centre(c->info.pitchSide);
+    float target = centre + ssr_rand_float(random, -50, 50);
+    float direction = direction_to(c->ball.x, c->ball.y, target, (float)SSR_GOAL_LINE);
+    float power = ssr_rand_float(random, 70, 86) + c->setup.opponentStrength / 25;
+    kick(c, by, direction, power, 7.5e-4f * ssr_rand_float(random, 0, 40), ssr_rand_float(random, -0.2f, 0.2f), 0, 0);
+}
+
+static void defend(SSRChance *c, const SSRTapTouch *touch, SSRRandom *random) {
+    SSRBall *b = &c->ball;
+    if (c->defendStart < 0) c->defendStart = c->now;
+    SSRMatchPlayer *me = find_player(c, c->controlId);
+    if (!me) {
+        finish(c, SSR_RESULT_CONCEDED);
+        return;
+    }
+    // Each tap moves the target. A keeper stays near the line.
+    if (touch->down) {
+        c->targetX = touch->x;
+        c->targetY = touch->y;
+        if (c->setup.type == SSR_CHANCE_SAVE) {
+            float gl = (float)SSR_GOAL_LINE;
+            c->targetY = c->targetY < gl ? gl : c->targetY > gl + 70 ? gl + 70 : c->targetY;
+        }
+    }
+    float dx = c->targetX - me->x, dy = c->targetY - me->y, d = (float)sqrt((double)(dx * dx + dy * dy));
+    // The speed comes from the pace of the player.
+    float speed = 2.4f + (float)c->setup.pace / 50.0f;
+    if (d > 1) {
+        float step = d < speed ? d : speed;
+        me->x += dx / d * step;
+        me->y += dy / d * step;
+        me->direction = direction_to(0, 0, dx, dy);
+        me->anim = SSR_ANIM_RUN;
+    } else {
+        me->anim = SSR_ANIM_STAND;
+    }
+    // The other team kicks after the wait: a shot, or a pass to the forward.
+    if (!c->kicking) {
+        if (c->now - c->defendStart < DEFEND_WAIT) return;
+        if (c->setup.type == SSR_CHANCE_SAVE) {
+            shoot_at_goal(c, c->shooterId, random);
+        } else {
+            const SSRMatchPlayer *f = find_player(c, c->receiverId);
+            float fx = f ? f->x : 320, fy = f ? f->y : 300;
+            float dist = distance(b->x, b->y, fx, fy);
+            kick(c, c->shooterId, direction_to(b->x, b->y, fx, fy), 30 + dist / 9, 0, 0, 0, 0);
+        }
+        return;
+    }
+    ssr_ball_update(b, &c->goal, random);
+    if (b->outcome == SSR_BALL_GOAL) {
+        finish(c, SSR_RESULT_CONCEDED);
+        return;
+    }
+    // The player stops the ball.
+    if (distance(me->x, me->y, b->x, b->y) < DEFEND_REACH && b->z < DEFEND_HEIGHT) {
+        b->power = 0;
+        c->lastTouchedBy = me->id;
+        finish(c, SSR_RESULT_DEFENDED);
+        return;
+    }
+    if (c->setup.type == SSR_CHANCE_BLOCK) {
+        // The forward takes the pass and shoots. The keeper of the team
+        // stops a shot that comes near.
+        const SSRMatchPlayer *f = find_player(c, c->receiverId);
+        if (!c->received && f && distance(f->x, f->y, b->x, b->y) < 14) {
+            c->received = 1;
+            b->x = f->x;
+            b->y = f->y - 10;
+            shoot_at_goal(c, f->id, random);
+        }
+        for (int i = 0; c->received && i < c->players.count; i++) {
+            const SSRMatchPlayer *k = &c->players.list[i];
+            if (k->type == SSR_PLAYER_KEEPER && distance(k->x, k->y, b->x, b->y) < 22 && b->z < DEFEND_HEIGHT) {
+                b->power = 0;
+                finish(c, SSR_RESULT_MISSED);
+                return;
+            }
+        }
+    }
+    if (b->x < 0 || b->x > 640 || b->y < 0 || b->y > 960 || !b->alive || b->outcome == SSR_BALL_MISSED ||
+        (b->power < 0.3f && c->now - c->kickTime > 500)) {
+        finish(c, SSR_RESULT_MISSED);
+    }
+}
+
 void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRandom *random) {
     c->now = now;
     c->beep = c->kicked = 0;
@@ -673,6 +825,9 @@ void ssr_chance_update(SSRChance *c, int now, const SSRTapTouch *touch, SSRRando
     }
     case SSR_CHANCE_DRIBBLE:
         dribble(c, touch, random);
+        break;
+    case SSR_CHANCE_DEFEND:
+        defend(c, touch, random);
         break;
     case SSR_CHANCE_OVER:
         // The players stop, and the keeper picks up the ball.
