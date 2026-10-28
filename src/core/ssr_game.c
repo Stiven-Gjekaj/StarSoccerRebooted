@@ -1778,6 +1778,149 @@ static void skills_set_pieces(SSRGame *game) {
     skill_choice(game, 3);
 }
 
+// The facts of the player that a drill of the skills screen reads.
+static SSRTrainingPlayer training_player(const SSRCareer *c) {
+    SSRTrainingPlayer player = {.power = ssr_career_skill(c->power),
+                                .technique = ssr_career_skill(c->technique),
+                                .pace = ssr_career_skill(c->pace),
+                                .starLevel = ssr_career_star_level(c),
+                                .hasClub = c->clubId != 0,
+                                .practiceRecord = c->practiceRecord};
+    return player;
+}
+
+// The energy of a practice (fuseparam_practiceenergycost), and the
+// scores of the prizes of the first practice after a match
+// (fuseparam_practice_threshold_1 to 5).
+#define PRACTICE_ENERGY 5
+static const int PRACTICE_SCORES[5] = {10, 15, 20, 25, 30};
+// The part of the price of a can of NRG Classic that each prize of cash
+// gives (fuseparam_practice_NRGpricepercentage). The third prize gives
+// the full price.
+static const float PRACTICE_CASH[5] = {0.1f, 0.2f, 1.0f, 0.4f, 0.5f};
+
+// The level of a practice: its score, and the record (c_MinigameHud
+// SetScore).
+static void practice_level(SSRGame *game, int level, int lives) {
+    SSRCareer *c = &game->career;
+    if (!game->training) game->training = calloc(1, sizeof(SSRTraining));
+    if (!game->training) return;
+    SSRTrainingPlayer player = training_player(c);
+    ssr_training_start(game->training, 7, level, lives, 0, &player, &game->random);
+    game->trainingMessage = NULL;
+    ssr_tweaks_set_number(game->tweaks, "Menu", "Lifecount", lives);
+    ssr_tweaks_set_number(game->tweaks, "Training", "TrainingType", 7);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "Score", level - 1);
+    ssr_tweaks_set_number(game->tweaks, "Menu", "HiScore", c->practiceRecord);
+    if (level == 1 && lives == 3) {
+        char text[64];
+        snprintf(text, sizeof(text), "%s", loc(game, "gamemode_Arcade"));
+        upper(game, text);
+        ssr_tweaks_set(game->tweaks, "Menu", "QuickMessage", text);
+        show_splash(game, "splashmessage", 1500);
+    }
+    set_screen(game, "matchminigame");
+}
+
+// skills.btn_Practice (c_TScreen_Skills.ButtonPractice): a practice costs
+// a little energy.
+static void skills_practice(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    if (c->energy < (float)PRACTICE_ENERGY) {
+        not_enough_energy(game, "Practice", (float)PRACTICE_ENERGY);
+        return;
+    }
+    c->energy -= (float)PRACTICE_ENERGY;
+    c->practiceCount++;
+    save_career(game);
+    practice_level(game, 1, 3);
+}
+
+static int practice_sponsor_offer(SSRGame *game);
+static int nrg_price(const SSRCareer *c, int id);
+static void update_bank(SSRGame *game, int change);
+static void shop_price(char *out, size_t capacity, int price);
+static void update_relation(SSRGame *game, SSRRelation relation, float change);
+
+// A prize of a relation: +amount to the boss, the team, the fans, or the
+// sponsors when the relation is under 90. Gives 0 when the relation is
+// full.
+static int practice_relation(SSRGame *game, int which, int amount, char *text, size_t capacity,
+                             const char **layout) {
+    static const SSRRelation RELATIONS[4] = {SSR_RELATION_BOSS, SSR_RELATION_TEAM, SSR_RELATION_FANS,
+                                             SSR_RELATION_SPONSORS};
+    static const char *const TAGS[4] = {"CTRAINING_PRACTICE_BOSS", "CTRAINING_PRACTICE_TEAM",
+                                        "CTRAINING_PRACTICE_FANS", "CTRAINING_PRACTICE_SPONSORS"};
+    static const char *const LAYOUTS[4] = {"messageboss", "messageteam", "messagefans", "messagesponsor"};
+    const SSRCareer *c = &game->career;
+    if (which < 0 || which > 3) return 0;
+    if (which == 3 && c->relationSponsors <= 0) return 0;
+    if (ssr_career_relation(c, RELATIONS[which]) >= 90.0f) return 0;
+    update_relation(game, RELATIONS[which], (float)amount);
+    snprintf(text, capacity, "%s", loc(game, TAGS[which]));
+    *layout = LAYOUTS[which];
+    return 1;
+}
+
+// c_TMatch.TrainingFailure for the practice: the score, the record, and
+// the prize of the first practice after a match with a good score.
+static void end_practice(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int score = game->training->level - 1;
+    free(game->training);
+    game->training = NULL;
+    char text[512];
+    const char *layout = "message";
+    snprintf(text, sizeof(text), "%s", loc(game, "CTRAINING_PRACTICEFINISH"));
+    if (score > c->practiceRecord) c->practiceRecord = score;
+    int tier = 0;
+    while (tier < 5 && score >= PRACTICE_SCORES[tier]) tier++;
+    if (c->practiceCount == 1 && tier > 0) {
+        int given = 0;
+        if (tier >= 4) {
+            // A cash prize, or the offer of a sponsor.
+            if (ssr_rand(&game->random, 2) == 2 && practice_sponsor_offer(game)) {
+                save_career(game);
+                return;
+            }
+        } else {
+            static const int AMOUNTS[3] = {3, 5, 7};
+            int r = ssr_rand(&game->random, tier == 3 ? 5 : 4);
+            if (r == 5) {
+                if (practice_sponsor_offer(game)) {
+                    save_career(game);
+                    return;
+                }
+            } else {
+                given = practice_relation(game, r - 1, AMOUNTS[tier - 1], text, sizeof(text), &layout);
+            }
+        }
+        if (!given) {
+            int cash = (int)((float)nrg_price(c, 1) * PRACTICE_CASH[tier - 1]);
+            if (cash < 1) cash = 1;
+            char amount[32];
+            shop_price(amount, sizeof(amount), cash);
+            snprintf(text, sizeof(text), "%s", loc(game, "CTRAINING_PRACTICE_CASH"));
+            replace_all(text, sizeof(text), "$cash", amount);
+            update_bank(game, cash);
+            play_sound(game, "CCashIn");
+            layout = "messageboss";
+        }
+    }
+    char number[16];
+    snprintf(number, sizeof(number), "%d", score);
+    replace_all(text, sizeof(text), "$num", number);
+    save_career(game);
+    skills_screen(game);
+    message(game, layout, text, 0, 1, "PracticeReplay");
+}
+
+// PracticeReplay: c_TScreen_Skills.EndPractice.
+static void call_practice_replay(SSRGame *game) {
+    skills_screen(game);
+    save_career(game);
+}
+
 // c_TScreen_SkillChoice.ButtonSkill: the drill of the level, at most three
 // skills and three drills a day, with the energy of the training.
 static void skill_level(SSRGame *game, int level) {
@@ -1808,10 +1951,7 @@ static void skill_level(SSRGame *game, int level) {
     }
     if (!game->training) game->training = calloc(1, sizeof(SSRTraining));
     if (!game->training) return;
-    SSRTrainingPlayer player = {.power = ssr_career_skill(c->power),
-                                .technique = ssr_career_skill(c->technique),
-                                .pace = ssr_career_skill(c->pace),
-                                .starLevel = ssr_career_star_level(c)};
+    SSRTrainingPlayer player = training_player(c);
     ssr_training_start(game->training, game->skillType, level, 3, 0, &player, &game->random);
     game->trainingMessage = NULL;
     ssr_tweaks_set_number(game->tweaks, "Menu", "Lifecount", game->training->lives);
@@ -1826,6 +1966,13 @@ static void skill_level(SSRGame *game, int level) {
 static void end_training(SSRGame *game) {
     SSRTraining *t = game->training;
     SSRCareer *c = &game->career;
+    if (t->training == 7) {
+        // TrainingSuccess goes to the next level with the lives that are
+        // left. TrainingFailure ends the practice.
+        if (t->over == 1) practice_level(game, t->level + 1, t->lives);
+        else end_practice(game);
+        return;
+    }
     int type = game->skillType, level = t->level;
     if (t->over == 1) {
         int *levels = drill_levels(c, type);
@@ -1993,6 +2140,7 @@ static void call_racing_return(SSRGame *game);
 static void call_train_horse(SSRGame *game);
 static void call_sell_horse(SSRGame *game);
 static void call_captain_tutorial(SSRGame *game);
+static void call_practice_replay(SSRGame *game);
 
 
 static void run_call(SSRGame *game, const char *name) {
@@ -2053,6 +2201,7 @@ static void run_call(SSRGame *game, const char *name) {
         {"BootsExpired", call_boots_expired},
         {"DumpGirl", call_dump_partner},
         {"CaptainTutorial", call_captain_tutorial},
+        {"PracticeReplay", call_practice_replay},
     };
     for (size_t i = 0; i < sizeof(CALLS) / sizeof(CALLS[0]); i++) {
         if (strcmp(CALLS[i].name, name) == 0) {
@@ -3373,6 +3522,7 @@ static void stats_continue(SSRGame *game) {
 // c_AScreen_MatchReview: the weekly update after the match.
 static void match_review(SSRGame *game) {
     SSRCareer *c = &game->career;
+    c->practiceCount = 0;
     set_screen(game, "matchreview");
     SSRTweaks *t = game->tweaks;
     ssr_tweaks_set_number(t, "Menu", "HideNRGShopTab", 1);
@@ -7203,6 +7353,29 @@ static int news_sponsorship(SSRGame *game) {
     return 0;
 }
 
+// c_TPlayer.OfferSponsorship_Practice: the first free slot of a sponsor
+// that the star level reaches.
+static int practice_sponsor_offer(SSRGame *game) {
+    SSRCareer *c = &game->career;
+    int level = ssr_career_star_level(c), rating = c->starRating % 100;
+    for (int i = 0; i < 10; i++) {
+        if (!(c->sponsors[i] == 0 && level > i && rating > 50)) continue;
+        char text[512], name[64], cash[32];
+        snprintf(text, sizeof(text), "%s", loc(game, "CTRAINING_PRACTICE_SPONSOROFFER"));
+        snprintf(name, sizeof(name), "%s", sponsor_name(game, i));
+        upper(game, name);
+        replace_all(text, sizeof(text), "$sponsor", name);
+        shop_price(cash, sizeof(cash), i / 2 + 1);
+        replace_all(text, sizeof(text), "$cash", cash);
+        relation_tweaks(game, 1);
+        game->messageData = i;
+        skills_screen(game);
+        message(game, "messagesponsor", text, 1, 1, "SponsorshipOffer");
+        return 1;
+    }
+    return 0;
+}
+
 static void call_sponsorship_offer(SSRGame *game) {
     SSRCareer *c = &game->career;
     if (game->returnState != 1) return;
@@ -10965,6 +11138,7 @@ static const Route ROUTES[] = {
     {"gamemenu.btn_Skills", skills_screen},
     {"skills.btn_Home", game_menu},
     {"skills.btn_NRG", drink_button},
+    {"skills.btn_Practice", skills_practice},
     {"skills.btn_Pace", skills_pace},
     {"skills.btn_Power", skills_power},
     {"skills.btn_Technique", skills_technique},

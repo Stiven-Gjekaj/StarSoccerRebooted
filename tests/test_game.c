@@ -2349,11 +2349,12 @@ static void become_captain(SSRGame *game, SSRTweaks *tweaks, const char *path) {
     news_week(game, path, &before);
 }
 
-// Plays the drill that runs until it ends: each shot aims from the ball by
-// (dx, dy), and each tap hits the middle of the tap ball.
-static void play_a_drill(SSRGame *game, float dx, float dy) {
-    for (int i = 0; i < 200000 && ssr_game_training(game); i++) {
-        const SSRTraining *t = ssr_game_training(game);
+// One step of a drill: a shot aims from the ball by (dx, dy), and a tap
+// hits the middle of the tap ball.
+static void play_a_drill_step(SSRGame *game, float dx, float dy) {
+    const SSRTraining *t = ssr_game_training(game);
+    if (!t) return;
+    {
         const SSRChance *c = &t->chance;
         if (t->instruction) {
             ssr_game_touch(game, 1, 320, 900);
@@ -2372,6 +2373,11 @@ static void play_a_drill(SSRGame *game, float dx, float dy) {
         }
         ssr_game_update(game, 1);
     }
+}
+
+// Plays the drill until it ends.
+static void play_a_drill(SSRGame *game, float dx, float dy) {
+    for (int i = 0; i < 200000 && ssr_game_training(game); i++) play_a_drill_step(game, dx, dy);
 }
 
 // The skills screen trains a skill: the levels of a drill, a failed drill
@@ -2445,6 +2451,34 @@ static void train_a_skill(SSRGame *game, SSRTweaks *tweaks) {
     CHECK(!ssr_game_training(game) && ssr_game_overlay(game)[0] != 0);
     c->energy = 100;
     ssr_game_message(game, "skillchoice.btn_Home");
+    CHECK(strcmp(ssr_game_screen(game), "skills") == 0);
+    // The practice: shots far to the side miss, and three misses end it
+    // with a score of 0 and no prize.
+    c->practiceCount = 0;
+    c->practiceRecord = 0;
+    ssr_game_message(game, "skills.btn_Practice");
+    const SSRTraining *p = ssr_game_training(game);
+    CHECK(strcmp(ssr_game_screen(game), "matchminigame") == 0 && p && p->training == 7 && p->level == 1);
+    CHECK(c->practiceCount == 1 && c->energy == 95 && ssr_tweaks_number(tweaks, "Menu", "Score") == 0);
+    play_a_drill(game, 60, 0);
+    CHECK(!ssr_game_training(game) && strcmp(ssr_game_screen(game), "message") == 0);
+    CHECK(c->practiceRecord == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    CHECK(strcmp(ssr_game_screen(game), "skills") == 0);
+    // Shots up the middle score: each goal is the next level, and the
+    // score becomes the record.
+    int topScore = 0;
+    ssr_game_message(game, "skills.btn_Practice");
+    for (int i = 0; i < 400000 && ssr_game_training(game); i++) {
+        int level = ssr_game_training(game)->level;
+        if (level - 1 > topScore) topScore = level - 1;
+        play_a_drill_step(game, 0, 60);
+    }
+    CHECK(topScore >= 1 && c->practiceRecord == topScore && c->practiceCount == 2);
+    CHECK(strncmp(ssr_game_screen(game), "message", 7) == 0);
+    ssr_game_message(game, "message.btn_Ok");
+    // A prize can be the offer of a sponsor. The test says no.
+    if (strncmp(ssr_game_screen(game), "message", 7) == 0) ssr_game_message(game, "message.btn_Cancel");
     CHECK(strcmp(ssr_game_screen(game), "skills") == 0);
     ssr_game_message(game, "skills.btn_Home");
 }

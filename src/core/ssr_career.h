@@ -97,6 +97,9 @@ typedef struct {
     // The drills of the skills that the player tried since the last match
     // (c_TPlayer.m_trainingattempts).
     int trainingAttempts;
+    // The best practice score, and the practices since the last match
+    // (c_TPlayer.m_practicerecord and m_practicecount).
+    int practiceRecord, practiceCount;
     // The last boss that the club of the player sacked: the name, and the
     // club of the new job of the boss, or 0.
     char exBoss[64];
