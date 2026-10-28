@@ -2286,6 +2286,8 @@ static void player_tweaks(SSRGame *game) {
     ssr_tweaks_set_number(t, "Player", "Lifestyle", ssr_career_lifestyle(c));
     ssr_tweaks_set_number(t, "Player", "Skills", career_skills(c));
     ssr_tweaks_set_number(t, "Player", "EarningsWage", c->wage);
+    // c_TScreen_GameMenu.UpdateMainBoots: the boots that the player wears.
+    ssr_tweaks_set_number(t, "Menu", "OwnedBoot", c->bootId);
     ssr_tweaks_set_number(t, "Player", "EarningsBonusGoals", c->goalBonus);
     ssr_tweaks_set_number(t, "Player", "EarningsBonusAssists", c->assistBonus);
     snprintf(text, sizeof(text), "%d", c->wage);

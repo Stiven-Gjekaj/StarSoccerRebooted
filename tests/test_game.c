@@ -2142,6 +2142,8 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "Boot_10") == 0);
     ssr_game_message(game, "shopoverlay.buy");
     CHECK(now->bootId == 10 && now->bootUses == 15 && now->bank == 110);
+    // The game menu shows the boots that the player wears.
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "OwnedBoot") == 10);
     // The awards of boots, and of boots with control or swerve.
     CHECK(now->awards[26] > 0 && (now->awards[66] > 0) == (ssr_shop_boot(10)->control > 0));
     CHECK(strcmp(ssr_tweaks_get(tweaks, "Menu", "ItemString"), "Boot_10") == 0);
@@ -2151,6 +2153,7 @@ static void hire_and_kit_out(SSRGame *game, SSRTweaks *tweaks, const char *path)
     CHECK(strcmp(ssr_game_screen(game), "message") == 0 && now->bootId == 10);
     ssr_game_message(game, "message.btn_Ok");
     CHECK(now->bootId == 1 && now->bootUses == 5 && now->bank == 107);
+    CHECK(ssr_tweaks_number(tweaks, "Menu", "OwnedBoot") == 1);
     ssr_game_message(game, "PurchaseAnim.Close");
     // Boots with swerve show their tutorial once (CheckPostPurchaseInfo),
     // and Ok goes back to the boots of the shop.
