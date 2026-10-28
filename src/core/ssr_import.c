@@ -18,6 +18,7 @@
 #define SSR_MARKER "import.txt"
 #define SSR_APK_PREFIX "assets/monkey/"
 #define SSR_XAPK_GAME "com.newstargames.newstarsoccer.apk"
+#define SSR_BUNDLE_BASE "base.apk"
 #define SSR_XAPK_TEMP ".import.apk"
 
 static int starts_with(const char *text, const char *prefix) {
@@ -147,8 +148,11 @@ SSRSource ssr_import(const char *archive, const char *dest, int *files) {
 
     if (!prefix) {
         // An XAPK holds the APK of the game and the APKs of the languages.
+        // An APKM of APKMirror and an APKS name the APK of the game
+        // base.apk.
         size_t size = 0;
         unsigned char *apk = ssr_zip_read(zip, SSR_XAPK_GAME, &size);
+        if (!apk) apk = ssr_zip_read(zip, SSR_BUNDLE_BASE, &size);
         ssr_zip_close(zip);
         if (!apk) return SSR_SOURCE_UNKNOWN;
         int ok = write_file(dest, SSR_XAPK_TEMP, apk, size);

@@ -13,7 +13,8 @@ typedef enum {
 
 // Copies each asset in the archive into the directory dest. The tree in
 // dest is the same as the tree under "assets/monkey/" in an APK, or under
-// "Payload/<name>.app/data/" in an IPA. dest
+// "Payload/<name>.app/data/" in an IPA. An XAPK, an APKM, or an APKS
+// holds the APK of the game. dest
 // gets the file "import.txt" last, when all the assets are there.
 // Returns the kind of the archive, or SSR_SOURCE_UNKNOWN when the archive
 // holds no assets or a copy fails. files gets the number of copied files.

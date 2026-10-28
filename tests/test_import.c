@@ -91,6 +91,36 @@ static void test_imports_the_apk_in_an_xapk(void) {
     free(marker);
 }
 
+// An APKM of APKMirror holds the APK of the game as base.apk, with the
+// APKs of the screen sizes and the languages.
+static void test_imports_the_base_apk_of_an_apkm(void) {
+    char archive[1100], dest[1100];
+    make_paths("apkm", archive, dest);
+    char apk[1100];
+    snprintf(apk, sizeof(apk), "%s.inner", archive);
+    SSRZipFile inner[] = {{"assets/monkey/MyData/Content.txt", "beach#\n", 7, 1}};
+    CHECK(ssr_zipwriter_write(apk, inner, 1));
+    FILE *file = fopen(apk, "rb");
+    char apkData[4096];
+    size_t apkSize = fread(apkData, 1, sizeof(apkData), file);
+    fclose(file);
+
+    SSRZipFile outer[] = {
+        {"info.json", "{}", 2, 0},
+        {"split_config.xxhdpi.apk", "screen", 6, 0},
+        {"base.apk", apkData, apkSize, 0},
+    };
+    CHECK(ssr_zipwriter_write(archive, outer, 3));
+
+    int count = -1;
+    CHECK(ssr_import(archive, dest, &count) == SSR_SOURCE_XAPK);
+    CHECK(count == 1);
+    char *text = read_text(dest, "MyData/Content.txt");
+    CHECK(text && strcmp(text, "beach#\n") == 0);
+    free(text);
+    CHECK(!exists(dest, ".import.apk"));
+}
+
 static void test_imports_the_assets_of_an_ipa(void) {
     char archive[1100], dest[1100];
     make_paths("ipa", archive, dest);
@@ -158,6 +188,7 @@ static void test_a_failed_import_removes_the_old_marker(void) {
 int main(void) {
     test_imports_the_assets_of_an_apk();
     test_imports_the_apk_in_an_xapk();
+    test_imports_the_base_apk_of_an_apkm();
     test_imports_the_assets_of_an_ipa();
     test_refuses_an_archive_with_no_assets();
     test_refuses_a_name_that_leaves_the_directory();
