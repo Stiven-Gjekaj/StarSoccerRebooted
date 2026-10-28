@@ -11,7 +11,8 @@
 // "type:text" types the text. Set SSR_WINDOW to "WxH" for the size of the window in points.
 // Set SSR_AUTOCHANCE to "dx,dy" to play each chance of the player with a
 // drag of (dx, dy) from the ball. Set SSR_SHOT_TAP to save the frame of
-// the first tap ball, and SSR_SHOT_DRIBBLE for the first dribble.
+// the first tap ball, SSR_SHOT_DRIBBLE for the first dribble, and
+// SSR_SHOT_DEFEND for the first moment in defence.
 // Set SSR_MESSAGES to messages of the game, for example
 // "mainmenu.btn_Career;saveslot.btn_Slot1", to send them 1.5 seconds apart
 // as the presses go.
@@ -1658,6 +1659,9 @@ static void auto_chance(SSRApp *app) {
         // A swipe up the screen each 600 ms.
         int down = (t % 600) < 100;
         ssr_game_touch(app->game, down, 320, down ? 900 : 720);
+    } else if (chance->state == SSR_CHANCE_DEFEND) {
+        // A moment in defence: the player runs at the ball.
+        ssr_game_touch(app->game, 1, chance->ball.x, chance->ball.y);
     } else if (chance->state == SSR_CHANCE_TAP) {
         const SSRTapBall *tap = &chance->tap;
         // The tap waits 1.5 s, so that a frame can show the tap ball.
@@ -1836,7 +1840,10 @@ SDL_AppResult SDL_AppIterate(void *state) {
     // SSR_SHOT_DRIBBLE 1 s after the first dribble starts, in place of a time.
     static Uint64 stateSeen = 0;
     const SSRChance *shotChance = ssr_game_chance(app->game);
-    int wanted = SDL_getenv("SSR_SHOT_TAP") ? SSR_CHANCE_TAP : SDL_getenv("SSR_SHOT_DRIBBLE") ? SSR_CHANCE_DRIBBLE : -1;
+    int wanted = SDL_getenv("SSR_SHOT_TAP")       ? SSR_CHANCE_TAP
+                 : SDL_getenv("SSR_SHOT_DRIBBLE") ? SSR_CHANCE_DRIBBLE
+                 : SDL_getenv("SSR_SHOT_DEFEND")  ? SSR_CHANCE_DEFEND
+                                                  : -1;
     if (shotChance && (int)shotChance->state == wanted && !stateSeen) stateSeen = SDL_GetTicks();
     int stateReady = stateSeen && SDL_GetTicks() - stateSeen >= 1000;
     if (wanted >= 0) wait = stateReady ? 0 : 1 << 30;
