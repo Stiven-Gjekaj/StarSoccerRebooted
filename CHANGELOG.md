@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0 (2026-10-28)
+
+- Star Soccer Rebooted has all the content of New Star Soccer 4.32 in the
+  new look: the career, the matches, the training of the skills and the
+  practice, the life of the player, the side games, and the retirement.
+- The remake adds a living world: other players and managers with
+  careers, honours and records, news, four positions, real ratings and
+  scores, weather, a custom career, and data packs with real squads and
+  crests.
+- A check of the rules compares the remake with the code of 4.32
+  (`scripts/rules-check.sh`).
+
 ## 0.32.0 (2026-10-28)
 
 - The Practice button of the skills screen starts the practice: shots at
