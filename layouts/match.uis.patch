@@ -86,3 +86,13 @@
 # taller window stays clear of the footer.
 - PushOrigin:(0,-10)
 + PushOrigin:(0,-10-twk(Match,CommentaryRaise))
+# The remake has no match sponsor. The panel "Today's match sponsored by"
+# goes from the kick off and from the tutorial of the commentary.
+- Clip:(-280,50,562,70)
++ Clip:(-280,50,562,70) $HIDE
+- Draw:(NSGamesLogo,240,640,260,)
++ Draw:(NSGamesLogo,240,640,260,) $HIDE
+- TextLoc:(PREMATCH_SPONSOR_1,51,660,,,L)
++ TextLoc:(PREMATCH_SPONSOR_1,51,660,,,L) $HIDE
+- TextLoc:(PREMATCH_SPONSOR_2,51,680,,,L)
++ TextLoc:(PREMATCH_SPONSOR_2,51,680,,,L) $HIDE
