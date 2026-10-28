@@ -167,7 +167,8 @@ int ssr_career_star_level(const SSRCareer *c) {
 }
 
 int ssr_career_focus(const SSRCareer *c) {
-    return c->position == SSR_CAREER_DEFENDER || c->position == SSR_CAREER_GOALKEEPER ? 1 : 2;
+    (void)c;
+    return 2;
 }
 
 int ssr_career_age(const SSRCareer *c) {

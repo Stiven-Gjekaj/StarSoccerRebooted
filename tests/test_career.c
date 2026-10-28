@@ -363,10 +363,10 @@ static void test_keeps_the_records(void) {
     CHECK(back.loanFrom == 915 && back.charityYear == 3 && back.businessStake == 700);
     CHECK(strcmp(back.exBoss, "Ann Lake") == 0 && back.exBossClub == 810);
     back.startAge = 0;
-    // The position gives the focus at the start of a match.
-    CHECK(back.position == SSR_CAREER_GOALKEEPER && ssr_career_focus(&back) == 1);
+    // Each position starts a match with the balanced focus.
+    CHECK(back.position == SSR_CAREER_GOALKEEPER && ssr_career_focus(&back) == 2);
     back.position = SSR_CAREER_DEFENDER;
-    CHECK(ssr_career_focus(&back) == 1);
+    CHECK(ssr_career_focus(&back) == 2);
     back.position = SSR_CAREER_MIDFIELDER;
     CHECK(ssr_career_focus(&back) == 2);
     back.position = SSR_CAREER_FORWARD;

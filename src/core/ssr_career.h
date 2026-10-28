@@ -260,7 +260,9 @@ enum {
 };
 
 // The focus of the player at the start of a match (1 defence, 2 balance,
-// 3 attack): a defender and a goalkeeper defend, the others are balanced.
+// 3 attack): balance for each position. In 4.32 the focus on defence
+// stops the attacks of the team, so the position gives its mix of
+// moments, not the focus.
 int ssr_career_focus(const SSRCareer *career);
 
 // The year and the week of the career, from 1.
