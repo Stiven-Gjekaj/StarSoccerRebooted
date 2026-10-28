@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(StarSoccerRebooted VERSION 1.0.2 LANGUAGES C)
+project(StarSoccerRebooted VERSION 1.0.3 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
