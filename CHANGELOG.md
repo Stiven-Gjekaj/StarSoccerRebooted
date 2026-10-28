@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.2 (2026-10-28)
+
+- A custom career has a difficulty, from very easy to very hard. Each step
+  makes the other teams 10 percent stronger or weaker, with their keepers
+  and defenders. Normal is the game of 4.32.
+- The match plays the sounds of the ball: the kick, the bounce, the post,
+  the save, and the net, with the crowd at a goal and the whistles of the
+  referee.
+- After a chance ends, the ball moves on. A goal goes into the net.
+- The tap ball of the drills and of the practice moves above the first
+  level, as in 4.32.
+- The game menu shows the boots that the player wears.
+- The list of the leagues of a new career fits in its window.
+- The commentary of a match is shorter on a tall screen.
+- The trail of the ball has no black shadows.
+- The match draws each frame about three times faster.
+
 ## 1.0.1 (2026-10-28)
 
 - The app reads an APKM of APKMirror and an APKS, which hold the APK of the
