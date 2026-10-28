@@ -1,7 +1,7 @@
 // The app: imports the copy of the player, then shows the game.
 // Start it with the path of an APK, XAPK, or IPA, or drop the file on the
 // window. A data pack (ssr_pack) installs in the same way.
-// On iOS the app imports the first APK, XAPK, or IPA in its Documents
+// On iOS the app imports the first APK, XAPK, APKM, APKS, or IPA in its Documents
 // folder, where Finder and the Files app can put it. On Android it imports
 // the APK of the installed New Star Soccer.
 // Set SSR_SHOT to a path to save the first frame as a PNG and quit. Set
@@ -1437,7 +1437,7 @@ static void packs_from_documents(SSRApp *app) {
 static int import_from_documents(SSRApp *app) {
     const char *documents = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
     if (!documents) return 0;
-    static const char *patterns[] = {"*.xapk", "*.apk", "*.ipa"};
+    static const char *patterns[] = {"*.xapk", "*.apkm", "*.apks", "*.apk", "*.ipa"};
     for (size_t i = 0; i < SDL_arraysize(patterns); i++) {
         int count = 0;
         char **names = SDL_GlobDirectory(documents, patterns[i], SDL_GLOB_CASEINSENSITIVE, &count);
@@ -1833,7 +1833,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
     }
     if (!app->gfx) {
         draw_centered_text(app, app->height / 2 - 12, "Drop your copy of New Star Soccer here.");
-        draw_centered_text(app, app->height / 2 + 4, "The app reads an APK, an XAPK, or an IPA.");
+        draw_centered_text(app, app->height / 2 + 4, "The app reads an APK, an XAPK, an APKM, or an IPA.");
 #ifdef SDL_PLATFORM_IOS
         draw_centered_text(app, app->height / 2 + 20, "Put the file in Documents with Finder, then restart.");
 #endif
