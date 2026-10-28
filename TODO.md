@@ -212,7 +212,9 @@ look is not in the remake.
 - [ ] All the content of 4.32
 - [x] All the languages of 4.32, with the star glyph and the glyph tables
 - [ ] All the features in this file
-- [ ] A test harness that compares the rules with the original code
+- [x] A test harness that compares the rules with the original code
+      (`scripts/rules-check.sh`): the random numbers, the colours of the
+      roulette, the prices and prizes of the horses, and the star level
 
 ## Gaps in the layout language
 

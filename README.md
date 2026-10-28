@@ -82,6 +82,15 @@ To press a point of the screen 1.5 seconds after the first frame:
 The tests build the archives that they need. They do not read a copy of
 the game.
 
+`scripts/rules-check.sh` compares rules of the remake with the original
+code. It runs the code of 4.32 on an Android device or emulator that has
+the game, and runs the same cases on the remake:
+
+    scripts/rules-check.sh
+
+The cases are in `tools/rules/RulesProbe.java` and
+`tools/rules/rulecheck.c`. A new case goes into both files.
+
 ## Decisions
 
 [docs/decisions.md](docs/decisions.md) holds each decision and its reason.
