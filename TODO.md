@@ -45,10 +45,22 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       welcome texts
 - [x] The texts of the ticker that tell of the career (low energy, the
       next match, relations), and the speed-up when you touch the tape
-- [ ] The other shells: the borders and the overlays
-- [ ] The rest of the layout commands: font shadows (`FontShadow`), the
+- [x] The other shells: the borders and the overlays. The borders
+      (`c_GameBorders`, `CL_StadBG`) are of the classic look only. The
+      shop overlay, the modal overlay, and the quick messages (Overlay1
+      and Overlay2) are in the remake. The tutorial shell is empty in
+      4.32, and the purchase overlay is for real money.
+- [x] The information screens of the tutorials (`TScreen_Information`):
+      the captaincy, and the first boots with control or with swerve
+- [x] The rest of the layout commands: font shadows (`FontShadow`), the
       fade of a screen (`Dissolve:`), global emitters, cached draws
-      (`DrawCached:`), and the 3D models of the match
+      (`DrawCached:`), and the 3D models of the match. No layout of the
+      new look uses `Dissolve:`, a global emitter, or a model, and only
+      the classic `CL_StadBG` uses `DrawCached:`. `Event:` sends its
+      message when the animation reaches its frame. `CAT:`, `Static:`,
+      `Surf:`, and `Expose:` only tell the game how to load and cache, and
+      the atlas already holds the images of `ImgSeq:`, `CelSeq:`, and
+      `Frame:`.
 - [x] The rule of the game for a line that is wider than its box: it
       moves from side to side inside the box
 
