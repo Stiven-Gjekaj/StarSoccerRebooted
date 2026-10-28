@@ -164,6 +164,10 @@ endif()
 add_executable(screendiff tools/screendiff.c tests/ssr_imagewriter.c)
 target_include_directories(screendiff PRIVATE src/third_party)
 target_link_libraries(screendiff PRIVATE ssr_core)
+# The rules of the remake, in the form of tools/rules/RulesProbe.java.
+add_executable(rulecheck tools/rules/rulecheck.c)
+target_link_libraries(rulecheck PRIVATE ssr_core)
+target_compile_options(rulecheck PRIVATE -Wall -Wextra)
 # The modifiers that the scene skips, over all the layouts of an import.
 add_executable(layoutscan tools/layoutscan.c)
 target_link_libraries(layoutscan PRIVATE ssr_core)
