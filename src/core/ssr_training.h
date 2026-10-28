@@ -38,6 +38,9 @@ typedef struct {
     int power, technique, pace;
     int starLevel;
     int controlBoots;
+    // The practice (drill 7): 1 when the player has a club, and the best
+    // practice score (c_TPlayer.m_practicerecord).
+    int hasClub, practiceRecord;
 } SSRTrainingPlayer;
 
 typedef struct {
@@ -64,7 +67,8 @@ typedef struct {
 } SSRTraining;
 
 // SetUpTraining(type, level, lives, trial). Type 5 is the dribble drill 8
-// in 4.32.
+// in 4.32. Type 7 is the practice: a shot at the goal from further away at
+// each level, past a keeper and defenders, or a wall at each fifth level.
 void ssr_training_start(SSRTraining *training, int type, int level, int lives, int trial,
                         const SSRTrainingPlayer *player, SSRRandom *random);
 

@@ -90,6 +90,40 @@ static void place_wall(SSRTraining *t, int bx, int by) {
     }
 }
 
+// c_TMatch.YardsToPixels.
+#define PRACTICE_PIXELS_A_YARD 15.0f
+
+// The players of a practice shot: from more than 20 yards each fifth
+// level is a free kick with a wall, else a keeper (above difficulty 3)
+// and a defender for each 5 of the difficulty. Above 10 the wind blows.
+// [I: the game makes the players before the ball. The ball of the remake
+// clears the players, so they come after it.]
+static void practice_players(SSRTraining *t, int practice, float yards, SSRRandom *random) {
+    SSRChance *c = &t->chance;
+    int L = t->level;
+    if (yards > 20.0f && L % 5 == 0) {
+        ssr_players_add_keeper(&c->players, &c->info, (float)(L * 2), random);
+        int wall = 2 + (practice > 10) + (practice > 15) + (practice > 20);
+        for (int i = 0; i < wall; i++) ssr_players_add_defender(&c->players, &c->info, (float)(L * 2), 1, 0, 0, random);
+        c->info.chanceType = 3;
+        ssr_players_place_wall(&c->players, &c->info, c->ball.x, c->ball.y);
+    } else {
+        if (practice > 3) ssr_players_add_keeper(&c->players, &c->info, (float)(practice * 2), random);
+        int n = clampi(practice / 5, 0, 8);
+        for (int i = 0; i < n; i++) {
+            ssr_players_add_defender(&c->players, &c->info, (float)(practice * 2), 0, 0, 0, random);
+        }
+        c->info.chanceType = 5;
+    }
+    if (practice > 10) {
+        float wind = (float)L / 10.0f;
+        t->windSpeed = wind > 5.0f ? 5.0f : wind;
+        t->windDirection = ssr_rnd3(random, 360.0f);
+        c->ball.windSpeed = t->windSpeed;
+        c->ball.windDirection = t->windDirection;
+    }
+}
+
 // The ball of the drill (c_TBall.m_Reset(5)) at its start.
 static void reset_ball(SSRTraining *t, SSRRandom *random) {
     SSRChanceSetup s = {0};
@@ -133,6 +167,8 @@ void ssr_training_start(SSRTraining *t, int type, int level, int lives, int tria
     }
     cone_look(random);
     int sx = 320, sy = 800;
+    int practice = 0;
+    float practiceYards = 0;
     switch (t->training) {
     case 2: {
         if (L < 5) t->instruction = "CMESSAGE_TRAININGTECHNIQUE";
@@ -227,6 +263,23 @@ void ssr_training_start(SSRTraining *t, int type, int level, int lives, int tria
         }
         break;
     }
+    case 7: {
+        // The practice: the record and the star level make the shot
+        // harder.
+        practice = L;
+        if (player->hasClub) {
+            if (player->practiceRecord > 0) practice++;
+            if (player->starLevel == 2) practice++;
+            else if (player->starLevel != 1) practice += 2;
+        }
+        int r = clampi(practice, 0, 25) * 10;
+        sx = (int)(ssr_rnd2(random, (float)-r, (float)r) + 320.0f);
+        if (practice == 1) sx = 320;
+        practiceYards = (float)(practice + 11);
+        if (practiceYards > 28.0f) practiceYards = (float)ssr_rand2(random, 28, 34);
+        sy = (int)(ssr_goal(1).line + practiceYards * PRACTICE_PIXELS_A_YARD);
+        break;
+    }
     default:
         break;
     }
@@ -238,6 +291,7 @@ void ssr_training_start(SSRTraining *t, int type, int level, int lives, int tria
         // its place between the ball and the goal.
         ssr_players_add_keeper(&t->chance.players, &t->chance.info, (float)player->power, random);
     }
+    if (t->training == 7) practice_players(t, practice, practiceYards, random);
     // c_ATraining.m_SetUp makes the view again: one more random number.
     cone_look(random);
 }
@@ -264,7 +318,7 @@ static void lose_life(SSRTraining *t, int now) {
     if (t->training == 8 && t->lives >= 1) return;
     t->success = 0;
     if (t->chance.ball.alive) kill_ball(t);
-    if (t->training == 3 || t->training == 4) {
+    if (t->training == 3 || t->training == 4 || t->training == 7) {
         // c_MatchChance.m_CheckMessage: a save, a miss over the line, or no
         // banner.
         if (t->chance.result == SSR_RESULT_SAVED) {
@@ -405,7 +459,8 @@ void ssr_training_update(SSRTraining *t, int now, const SSRTapTouch *touch, SSRR
             break;
         case 3:
         case 4:
-            // c_TMatch.m_PlayerScored in training 3 and 4.
+        case 7:
+            // c_TMatch.m_PlayerScored in training 3, 4, and 7.
             if (c->result == SSR_RESULT_GOAL) {
                 t->success = 1;
                 show_message(t, now, "Goal!", 0, 2000);

@@ -109,6 +109,42 @@ static void test_the_power_keeper(void) {
     CHECK(t.chance.players.list[0].y == 143 && t.chance.players.list[0].strength == 10);
 }
 
+// Counts the players of a drill of each type.
+static int count_players(const SSRTraining *t, SSRPlayerType type, int inWall) {
+    int n = 0;
+    for (int i = 0; i < t->chance.players.count; i++) {
+        const SSRMatchPlayer *p = &t->chance.players.list[i];
+        n += p->type == type && (inWall < 0 || p->inWall == inWall);
+    }
+    return n;
+}
+
+// The practice (drill 7): the first shot is in the middle with nobody in
+// the way. The shot of level 5 has a keeper and a defender. The shot of
+// level 10 is a free kick from beyond 20 yards, with a keeper and a wall.
+// A record and a star level of 3 make each level two to three steps
+// harder.
+static void test_the_practice(void) {
+    SSRRandom random = {SSR_RANDOM_START};
+    SSRTraining t;
+    ssr_training_start(&t, 7, 1, 3, 0, &PLAYER, &random);
+    float line = ssr_goal(1).line;
+    CHECK(t.training == 7 && t.chance.ball.x == 320 && t.chance.ball.y == (float)(int)(line + 12 * 15));
+    CHECK(t.chance.players.count == 0 && t.windSpeed == 0);
+    ssr_training_start(&t, 7, 5, 3, 0, &PLAYER, &random);
+    CHECK(count_players(&t, SSR_PLAYER_KEEPER, -1) == 1 && count_players(&t, SSR_PLAYER_DEFENDER, 0) == 1);
+    CHECK(t.chance.info.chanceType == 5);
+    ssr_training_start(&t, 7, 10, 3, 0, &PLAYER, &random);
+    CHECK(count_players(&t, SSR_PLAYER_KEEPER, -1) == 1 && count_players(&t, SSR_PLAYER_DEFENDER, 1) == 2);
+    CHECK(t.chance.info.chanceType == 3 && t.chance.ball.y == (float)(int)(line + 21 * 15));
+    SSRTrainingPlayer star = PLAYER;
+    star.hasClub = 1;
+    star.practiceRecord = 4;
+    star.starLevel = 3;
+    ssr_training_start(&t, 7, 10, 3, 0, &star, &random);
+    CHECK(count_players(&t, SSR_PLAYER_DEFENDER, 1) == 3 && t.windSpeed == 1.0f);
+}
+
 static void test_the_dribble_gate(void) {
     SSRRandom random = {SSR_RANDOM_START};
     SSRTraining t;
@@ -149,6 +185,7 @@ static void test_the_skills(void) {
 
 int main(void) {
     test_the_technique_gate();
+    test_the_practice();
     test_the_vision_dummy();
     test_the_set_piece_wall();
     test_the_power_keeper();
