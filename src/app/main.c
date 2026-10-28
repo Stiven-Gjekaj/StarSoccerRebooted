@@ -129,6 +129,8 @@ typedef struct {
     int alertId;
     int ballCopy, arrowCopy;
     SSRAudio *audio;
+    // The units at the top of the window under the status bar (Menu:SafeTop).
+    float safeTop;
     // The Spine files that the screens use, and when the screen opened.
     struct {
         char name[64];
@@ -1483,6 +1485,15 @@ static void fit_screen(SSRApp *app) {
                                      SDL_LOGICAL_PRESENTATION_STRETCH);
     ssr_gfx_set_offset(app->gfx, -app->left, -app->top);
     ssr_game_set_screen_top(app->game, app->top);
+    // Menu:SafeTop: the units at the top of the window that the status bar
+    // and the notch of a phone cover. A button of the remake at the top goes
+    // down by it.
+    SDL_Rect safe;
+    float units = 0;
+    if (SDL_GetWindowSafeArea(app->window, &safe) && safe.y > 0) {
+        units = safe.y * SDL_GetWindowPixelDensity(app->window) / scale;
+    }
+    app->safeTop = units;
     // The layout of a screen depends on the size, so the screen opens again.
     ssr_scene_free(app->scene);
     app->scene = NULL;
@@ -1788,6 +1799,7 @@ SDL_AppResult SDL_AppIterate(void *state) {
         SSRSceneEnv env = scene_env(app);
         Uint64 now = SDL_GetTicks();
         int ms = 0;
+        ssr_tweaks_set_number(app->tweaks, "Menu", "SafeTop", app->safeTop);
         if (!app->scene) {
             app->scene = ssr_scene_open(app->screen, &env);
             if (app->scene) log_unknown(app->scene, ssr_game_screen(app->game));

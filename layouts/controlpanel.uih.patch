@@ -1,0 +1,5 @@
+# The button that ends the replay is at the top right of the screen. On a
+# phone the status bar and the round corner cover it. It goes down below
+# the status bar (Menu, SafeTop).
+- PushOrigin:(@R-110,@T+5)
++ PushOrigin:(@R-110,@T+5+twk(Menu,SafeTop))
