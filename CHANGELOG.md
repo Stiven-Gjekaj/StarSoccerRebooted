@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 (2026-10-28)
+
+- The app reads an APKM of APKMirror and an APKS, which hold the APK of the
+  game as base.apk. On iOS it looks for them in its Documents folder.
+
 ## 1.0.0 (2026-10-28)
 
 - Star Soccer Rebooted has all the content of New Star Soccer 4.32 in the
