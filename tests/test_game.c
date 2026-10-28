@@ -34,6 +34,23 @@ static void test_goes_between_screens(void) {
     ssr_tweaks_free(tweaks);
 }
 
+// A tall screen gives the commentary of a match its free height, up to a
+// limit. A screen of 640 x 960 or wider gives none.
+static void test_gives_the_commentary_a_tall_screen(void) {
+    SSRTweaks *tweaks = ssr_tweaks_create();
+    SSRGame *game = ssr_game_create(tweaks);
+    ssr_game_set_screen_top(game, -231.0f);
+    CHECK(ssr_tweaks_number(tweaks, "Match", "CommentaryExtra") == 231);
+    ssr_game_set_screen_top(game, -1000.0f);
+    CHECK(ssr_tweaks_number(tweaks, "Match", "CommentaryExtra") == 300);
+    ssr_game_set_screen_top(game, 0.0f);
+    CHECK(ssr_tweaks_number(tweaks, "Match", "CommentaryExtra") == 0);
+    ssr_game_set_screen_top(game, 40.0f);
+    CHECK(ssr_tweaks_number(tweaks, "Match", "CommentaryExtra") == 0);
+    ssr_game_free(game);
+    ssr_tweaks_free(tweaks);
+}
+
 // The options go round and set the tweaks that options.uis shows.
 static void test_changes_and_saves_the_options(void) {
     SSRTweaks *tweaks = ssr_tweaks_create();
@@ -3015,6 +3032,7 @@ static void test_chooses_a_pack(void) {
 int main(void) {
     test_starts_a_new_career();
     test_goes_between_screens();
+    test_gives_the_commentary_a_tall_screen();
     test_changes_and_saves_the_options();
     test_chooses_a_language();
     test_chooses_a_pack();

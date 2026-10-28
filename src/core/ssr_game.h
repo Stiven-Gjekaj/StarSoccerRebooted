@@ -241,6 +241,11 @@ int ssr_game_take_pack_install(SSRGame *game);
 // Opens the packs screen with the list of the installed packs.
 void ssr_game_show_packs(SSRGame *game);
 
+// The top of the screen in the units of the layouts, negative on a screen
+// that is taller than 640 x 960. The commentary of a match gets the height
+// that is free on a tall screen.
+void ssr_game_set_screen_top(SSRGame *game, float top);
+
 // The pack browser: the app tells the game that it can download (not in
 // the store builds). The browser screen asks for the index once
 // (ssr_game_take_browse), and the app gives its text, or NULL when the

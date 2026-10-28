@@ -1244,6 +1244,7 @@ static void load_game(SSRApp *app) {
 #else
     ssr_game_set_packs_directory(app->game, app->packsDirectory, 1);
 #endif
+    ssr_game_set_screen_top(app->game, app->top);
 #ifdef SSR_PACK_BROWSER
     ssr_game_set_can_browse(app->game, 1);
 #endif
@@ -1422,6 +1423,7 @@ static void fit_screen(SSRApp *app) {
     SDL_SetRenderLogicalPresentation(app->renderer, (int)(app->width + 0.5f), (int)(app->height + 0.5f),
                                      SDL_LOGICAL_PRESENTATION_STRETCH);
     ssr_gfx_set_offset(app->gfx, -app->left, -app->top);
+    ssr_game_set_screen_top(app->game, app->top);
     // The layout of a screen depends on the size, so the screen opens again.
     ssr_scene_free(app->scene);
     app->scene = NULL;

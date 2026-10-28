@@ -75,6 +75,9 @@ struct SSRGame {
     // the row of the download that the game asks for, and the row of the
     // download that the app makes (each from 1).
     int canBrowse, browseAsked, downloadAsked, downloading;
+    // The height that the commentary of a match gets more on a tall screen
+    // (Match.CommentaryExtra).
+    int commentaryExtra;
     SSRPackEntry browse[64];
     int browseCount;
     // 1 after the player chose another pack: the app loads the world again.
@@ -1954,6 +1957,12 @@ static void match_tweaks(SSRGame *game) {
     ssr_tweaks_set_number(t, "Player", "Energy", m->energy);
 }
 
+// The most height that the commentary of a match gets more on a tall
+// screen. It keeps the commentary clear of the buttons under it.
+#define COMMENTARY_EXTRA_MAX 300
+// The part of the extra height that the window of the match goes up.
+#define COMMENTARY_RAISE_PART 8
+
 // The width of one tab of the layouts (?TAB_WIDTH? of JDButtonMacros.uis).
 #define MATCH_FOOTER_TAB 720
 
@@ -1977,7 +1986,7 @@ static void match_state(SSRGame *game) {
 // ScrollToBottom: the last row of the commentary shows. The list shows 400
 // units of its rows of 72.
 static void scroll_commentary(SSRGame *game) {
-    float lowest = 400.0f - 72.0f * (float)game->commentaryCount;
+    float lowest = 400.0f + (float)game->commentaryExtra - 72.0f * (float)game->commentaryCount;
     ssr_tweaks_set_number(game->tweaks, "Menu", "CommentaryWindowScroll", lowest < 0 ? lowest : 0);
     ssr_tweaks_set_number(game->tweaks, "Menu", "CommentaryWindowScrollVel", 0);
 }
@@ -11740,6 +11749,16 @@ int ssr_game_take_pack_install(SSRGame *game) {
 
 void ssr_game_show_packs(SSRGame *game) {
     if (game) packs_screen(game);
+}
+
+void ssr_game_set_screen_top(SSRGame *game, float top) {
+    if (!game) return;
+    int extra = top < 0 ? (int)-top : 0;
+    game->commentaryExtra = extra > COMMENTARY_EXTRA_MAX ? COMMENTARY_EXTRA_MAX : extra;
+    ssr_tweaks_set_number(game->tweaks, "Match", "CommentaryExtra", game->commentaryExtra);
+    // The window of the match goes up by a part of the extra height, so
+    // that it stays in the middle between the energy bar and the footer.
+    ssr_tweaks_set_number(game->tweaks, "Match", "CommentaryRaise", game->commentaryExtra / COMMENTARY_RAISE_PART);
 }
 
 void ssr_game_set_can_browse(SSRGame *game, int can) {

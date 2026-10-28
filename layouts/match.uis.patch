@@ -14,3 +14,75 @@
 - Click(match.btn_Focus,-1)
 + Click(match.btn_Focus,-1)
 + ShowIf(Match,CanFocus,1)
+# The commentary of a match gets the height that is free on a tall screen
+# (Match, CommentaryExtra). The game sets it from the top of the screen.
+# The macro calls become their lines, because a macro argument cannot hold
+# the comma of twk().
+- M_ResizeWithScreen:(614,514,614,627)
++ DoIf(Match,MaximiseScreen,0)
++ <
++     ConvergeSizeTo(614,514+twk(Match,CommentaryExtra))
++ >
++ DoIf(Match,MaximiseScreen,1)
++ <
++     ConvergeSizeTo(614,627+twk(Match,CommentaryExtra))
++ >
+- M_ResizeWithScreen:(596,498,596,608)
++ DoIf(Match,MaximiseScreen,0)
++ <
++     ConvergeSizeTo(596,498+twk(Match,CommentaryExtra))
++ >
++ DoIf(Match,MaximiseScreen,1)
++ <
++     ConvergeSizeTo(596,608+twk(Match,CommentaryExtra))
++ >
+- M_ResizeWithComments:(572,80,572,515)
++ DoIf(Menu,MaximiseCommentary,0)
++ <
++     ConvergeSizeTo(572,80)
++ >
++ DoIf(Menu,MaximiseCommentary,1)
++ <
++     ConvergeSizeTo(572,515+twk(Match,CommentaryExtra))
++ >
+- M_ResizeWithComments:(572,80,572,370)
++ DoIf(Menu,MaximiseCommentary,0)
++ <
++     ConvergeSizeTo(572,80)
++ >
++ DoIf(Menu,MaximiseCommentary,1)
++ <
++     ConvergeSizeTo(572,370+twk(Match,CommentaryExtra))
++ >
+- M_ResizeWithComments:(564,72,564,505)
++ DoIf(Menu,MaximiseCommentary,0)
++ <
++     ConvergeSizeTo(564,72)
++ >
++ DoIf(Menu,MaximiseCommentary,1)
++ <
++     ConvergeSizeTo(564,505+twk(Match,CommentaryExtra))
++ >
+- M_ResizeWithComments:(564,72,564,360)
++ DoIf(Menu,MaximiseCommentary,0)
++ <
++     ConvergeSizeTo(564,72)
++ >
++ DoIf(Menu,MaximiseCommentary,1)
++ <
++     ConvergeSizeTo(564,360+twk(Match,CommentaryExtra))
++ >
+- Draw:(GreyRecess,551,3,20,505)
++ Draw:(GreyRecess,551,3,20,505+twk(Match,CommentaryExtra))
+- Draw:(SliderButton,553,3,18,505,,#858585FF)
++ Draw:(SliderButton,553,3,18,505+twk(Match,CommentaryExtra),,#858585FF)
+- Draw:(GreyRecess,551,3,20,398)
++ Draw:(GreyRecess,551,3,20,398+twk(Match,CommentaryExtra))
+- Draw:(SliderButton,553,3,18,398,,#858585FF)
++ Draw:(SliderButton,553,3,18,398+twk(Match,CommentaryExtra),,#858585FF)
+- ScrollingList(Menu,CommentaryWindowScroll,400,Menu,CommentaryWindowScrollVel)
++ ScrollingList(Menu,CommentaryWindowScroll,400+twk(Match,CommentaryExtra),Menu,CommentaryWindowScrollVel) ref:ScrollingList
+# The window of the match goes up by Match.CommentaryRaise, so that the
+# taller window stays clear of the footer.
+- PushOrigin:(0,-10)
++ PushOrigin:(0,-10-twk(Match,CommentaryRaise))
