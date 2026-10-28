@@ -2287,8 +2287,12 @@ static void gambling_news(SSRGame *game, SSRTweaks *tweaks, const char *path) {
         const char *body = ssr_tweaks_get(tweaks, "Menu", "MessageBody");
         asked = strcmp(ssr_game_screen(game), "messageteam") == 0 && strcmp(body, "CMESSAGE_TEAMMATESCASINO") == 0;
         if (asked) break;
-        // No to the shopping costs 5 team.
-        if (strcmp(ssr_game_screen(game), "messageteam") == 0) {
+        // No to the shopping costs 5 team. A request of the team mates can
+        // also come in a week.
+        if (strcmp(ssr_game_screen(game), "messageteam") == 0 && strncmp(body, "CMESSAGE_TEAMREQUEST", 20) == 0) {
+            ssr_game_message(game, "message.btn_Cancel");
+            if (strcmp(ssr_game_screen(game), "relationships") == 0) ssr_game_message(game, "relationships.btn_Home");
+        } else if (strcmp(ssr_game_screen(game), "messageteam") == 0) {
             CHECK(strcmp(body, "CMESSAGE_TEAMMATESSHOPPING") == 0);
             ssr_game_message(game, "message.btn_Cancel");
             CHECK(strcmp(ssr_game_screen(game), "relationships") == 0 && fabsf(now->relationTeam - 45) < 1e-4f);

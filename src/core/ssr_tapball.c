@@ -146,8 +146,26 @@ void ssr_tapball_reset(SSRTapBall *b, const SSRTapSetup *s, SSRRandom *random) {
                 set_up_dead(b);
             }
         }
-    } else {
+    } else if (s->training != 7) {
+        // c_TBall2.Reset: above level 1 the ball of the drills of technique,
+        // power, and vision rolls or bounces.
         set_up_dead(b);
+        if (s->level > 1 && (s->training == 2 || s->training == 4 || s->training == 6)) {
+            if (ssr_rand(random, 2) == 1) set_up_rolling(b, v, random);
+            else set_up_bouncing(b, v, random);
+        }
+    } else if (s->chanceType == 3) {
+        // The practice: a free kick is a dead ball.
+        set_up_dead(b);
+    } else if (s->level <= 1) {
+        set_up_dead(b);
+    } else if (s->level == 2) {
+        set_up_rolling(b, v, random);
+    } else if (s->level == 3) {
+        if (ssr_rand(random, 2) == 1) set_up_rolling(b, v, random);
+        else set_up_bouncing(b, v, random);
+    } else {
+        set_up_bouncing(b, v, random);
     }
     b->y = 810 - b->z;
     b->limit = ssr_tapball_limit(s->training, s->level, s->opponentStrength);

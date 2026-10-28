@@ -177,7 +177,7 @@ void ssr_chance_start_training(SSRChance *c, const SSRChanceSetup *setup, int tr
     c->info.startY = y;
     c->actionType = 5;
     // c_TBall.m_Reset(5) resets the tap ball, with its random numbers.
-    SSRTapSetup tap = {.training = training, .level = setup->level};
+    SSRTapSetup tap = {.training = training, .chanceType = setup->type, .level = setup->level};
     ssr_tapball_reset(&c->tap, &tap, random);
     ssr_players_clear(&c->players);
     if (training == 8) {

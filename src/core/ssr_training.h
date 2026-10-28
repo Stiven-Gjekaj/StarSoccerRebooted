@@ -64,6 +64,8 @@ typedef struct {
     // 1 after the drill ends with a success, -1 with a failure.
     int over;
     float windSpeed, windDirection;
+    // The practice: its difficulty, and 1 for a free kick with a wall.
+    int practice, practiceWall;
 } SSRTraining;
 
 // SetUpTraining(type, level, lives, trial). Type 5 is the dribble drill 8

@@ -55,6 +55,44 @@ static void test_chooses_the_ball(void) {
     CHECK(types[SSR_TAPBALL_ROLLING] > 0 && types[SSR_TAPBALL_BOUNCING] > 0 && types[SSR_TAPBALL_DEAD] == 0);
 }
 
+// The ball of a drill and of the practice: still at the first level, then
+// it moves.
+static void test_moves_the_ball_of_the_training(void) {
+    SSRTapBall ball;
+    SSRRandom random = {SSR_RANDOM_START};
+    int types[4] = {0};
+    // The drills of technique, power, and vision: still at level 1.
+    for (int training = 2; training <= 6; training += 2) {
+        SSRTapSetup setup = {.training = training, .level = 1};
+        ssr_tapball_reset(&ball, &setup, &random);
+        CHECK(ball.type == SSR_TAPBALL_DEAD);
+        for (int i = 0; i < 20; i++) {
+            setup.level = 2 + i % 5;
+            ssr_tapball_reset(&ball, &setup, &random);
+            types[ball.type]++;
+        }
+    }
+    CHECK(types[SSR_TAPBALL_ROLLING] > 0 && types[SSR_TAPBALL_BOUNCING] > 0 && types[SSR_TAPBALL_DEAD] == 0);
+    // The other drills keep a still ball.
+    SSRTapSetup setup = {.training = 3, .level = 9};
+    ssr_tapball_reset(&ball, &setup, &random);
+    CHECK(ball.type == SSR_TAPBALL_DEAD);
+    // The practice: still at difficulty 1 and for a free kick, rolling at
+    // 2, and bouncing from 4.
+    setup = (SSRTapSetup){.training = 7, .level = 1};
+    ssr_tapball_reset(&ball, &setup, &random);
+    CHECK(ball.type == SSR_TAPBALL_DEAD);
+    setup.level = 2;
+    ssr_tapball_reset(&ball, &setup, &random);
+    CHECK(ball.type == SSR_TAPBALL_ROLLING);
+    setup.level = 8;
+    ssr_tapball_reset(&ball, &setup, &random);
+    CHECK(ball.type == SSR_TAPBALL_BOUNCING);
+    setup.chanceType = 3;
+    ssr_tapball_reset(&ball, &setup, &random);
+    CHECK(ball.type == SSR_TAPBALL_DEAD);
+}
+
 static void test_rolls_and_runs_out(void) {
     SSRTapBall ball;
     SSRRandom random = {SSR_RANDOM_START};
@@ -153,6 +191,7 @@ static void test_control_boots_push_the_ball(void) {
 int main(void) {
     test_gives_the_time_and_the_speed();
     test_chooses_the_ball();
+    test_moves_the_ball_of_the_training();
     test_rolls_and_runs_out();
     test_counts_down_and_beeps();
     test_kicks_on_the_35th_tick_after_a_tap();

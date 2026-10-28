@@ -98,10 +98,10 @@ static void place_wall(SSRTraining *t, int bx, int by) {
 // and a defender for each 5 of the difficulty. Above 10 the wind blows.
 // [I: the game makes the players before the ball. The ball of the remake
 // clears the players, so they come after it.]
-static void practice_players(SSRTraining *t, int practice, float yards, SSRRandom *random) {
+static void practice_players(SSRTraining *t, int practice, SSRRandom *random) {
     SSRChance *c = &t->chance;
     int L = t->level;
-    if (yards > 20.0f && L % 5 == 0) {
+    if (t->practiceWall) {
         ssr_players_add_keeper(&c->players, &c->info, (float)(L * 2), random);
         int wall = 2 + (practice > 10) + (practice > 15) + (practice > 20);
         for (int i = 0; i < wall; i++) ssr_players_add_defender(&c->players, &c->info, (float)(L * 2), 1, 0, 0, random);
@@ -130,7 +130,10 @@ static void reset_ball(SSRTraining *t, SSRRandom *random) {
     s.power = t->player.power;
     s.technique = t->player.technique;
     s.pace = t->player.pace;
-    s.level = t->level;
+    // The tap ball of the practice moves with its difficulty, and stays
+    // still for a free kick.
+    s.level = t->training == 7 ? t->practice : t->level;
+    s.type = t->training == 7 && t->practiceWall ? 3 : 0;
     s.starLevel = t->player.starLevel;
     s.controlBoots = t->player.controlBoots;
     s.windSpeed = t->windSpeed;
@@ -285,13 +288,15 @@ void ssr_training_start(SSRTraining *t, int type, int level, int lives, int tria
     }
     t->chance.info.startX = (float)sx;
     t->chance.info.startY = (float)sy;
+    t->practice = practice;
+    t->practiceWall = t->training == 7 && practiceYards > 20.0f && L % 5 == 0;
     reset_ball(t, random);
     if (t->training == 4) {
         // CreateKeeper with the power of the player, then the keeper goes to
         // its place between the ball and the goal.
         ssr_players_add_keeper(&t->chance.players, &t->chance.info, (float)player->power, random);
     }
-    if (t->training == 7) practice_players(t, practice, practiceYards, random);
+    if (t->training == 7) practice_players(t, practice, random);
     // c_ATraining.m_SetUp makes the view again: one more random number.
     cone_look(random);
 }
