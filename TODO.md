@@ -413,9 +413,14 @@ living world starts in 0.6, with the season. Version 1.0 has all of it.
 
 ## More features
 
-- [x] Choose the position of the player, and change it later (the list
-      of the rivals). The position gives the focus at the kick-off.
-- [ ] More kinds of match moments: set pieces, defence, saves
+- [x] Choose the position of the player (goalkeeper, defender,
+      midfielder, or forward), and change it later (the list of the
+      rivals). The position gives the focus at the kick-off.
+- [x] More kinds of match moments: set pieces, defence, saves. The four
+      positions (goalkeeper, defender, midfielder, forward) each have their
+      mix: a goalkeeper has only saves, a defender mostly blocks, a
+      midfielder mostly moments in the middle, and a forward the moments of
+      4.32 with a few blocks.
 - Replays of whole matches are not in the plan. The owner chose this on
   2026-10-28. The replays of goals stay.
 
