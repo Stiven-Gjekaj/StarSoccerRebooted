@@ -594,6 +594,34 @@ static void player_anim(const SSRMatchPlayer *p, char *out, size_t capacity) {
     SDL_snprintf(out, capacity, "%s%s", kind, heading);
 }
 
+// The least distance of the night shadows of the ball from the ball, and
+// the distance of the night shadows of the tap ball below the place of the
+// layout. With the values of the game, the ball hides its shadows on the
+// ground.
+#define BALL_SHADOW_REST 5.0f
+#define TAP_SHADOW_DROP 14.0f
+
+// The sides of the four night shadows of the ball, in the order of the
+// layouts: up left, up right, down right, down left.
+static const float NIGHT_SHADOW_SIDES[4][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+
+// c_TapballShadowNighttime.Update: the four night shadows of the tap ball
+// follow the ball from side to side on the ground. They grow and fade as
+// the ball comes near, and they go out from the ball as it rises.
+static void update_tap_shadows(SSRApp *app, const SSRTapBall *tap) {
+    float near = tap->y > 0 ? SDL_clamp(400.0f / tap->y, 0.0f, 1.0f) : 1.0f;
+    ssr_scene_spawn_set(app->tapScene, 0, "TapBallNightShadow", SSR_GEL_X, tap->x);
+    for (int i = 0; i < 4; i++) {
+        char element[32];
+        SDL_snprintf(element, sizeof(element), "TapBallNightShadow#%d", i + 1);
+        ssr_scene_spawn_set(app->tapScene, 0, element, SSR_GEL_SCALE, near);
+        ssr_scene_spawn_set(app->tapScene, 0, element, SSR_GEL_ALPHA, (1 - near) / 3);
+        ssr_scene_spawn_set(app->tapScene, 0, element, SSR_GEL_X, NIGHT_SHADOW_SIDES[i][0] * tap->z);
+        ssr_scene_spawn_set(app->tapScene, 0, element, SSR_GEL_Y,
+                            TAP_SHADOW_DROP + NIGHT_SHADOW_SIDES[i][1] * tap->z * 0.1f);
+    }
+}
+
 // The ball of a chance (c_ABall): the ball rises with z and grows, and it
 // rolls in one of 8 headings at a speed by its power.
 static void update_ball_view(SSRApp *app, const SSRChance *chance) {
@@ -603,6 +631,18 @@ static void update_ball_view(SSRApp *app, const SSRChance *chance) {
     ssr_scene_spawn_place(app->scene, id, "BallHook", 0, -b->z);
     ssr_scene_spawn_set(app->scene, id, "BallHook", SSR_GEL_SCALE,
                         (1 + b->z / 100) * (chance->info.chanceType == 11 || chance->info.training == 8 ? 1.5f : 1));
+    // c_BallShadowNighttime.Update: the four shadows of the floodlights
+    // (the elements 2 to 5 of the ball) go out from the ball as it rises,
+    // and fade. The game starts them at 1 unit, under the ball. The remake
+    // starts them further out, so that the shadows show on the ground.
+    float rise = SDL_max(BALL_SHADOW_REST, b->z);
+    for (int i = 0; i < 4; i++) {
+        char element[16];
+        SDL_snprintf(element, sizeof(element), "Ball#%d", i + 2);
+        ssr_scene_spawn_set(app->scene, id, element, SSR_GEL_X, NIGHT_SHADOW_SIDES[i][0] * 0.75f * rise);
+        ssr_scene_spawn_set(app->scene, id, element, SSR_GEL_Y, NIGHT_SHADOW_SIDES[i][1] * rise);
+        ssr_scene_spawn_set(app->scene, id, element, SSR_GEL_ALPHA, 10 / (rise + 10) / 2);
+    }
     // GetVelDir: a heading near an axis, or a diagonal.
     float c = SDL_cosf(b->direction * SDL_PI_F / 180), s = SDL_sinf(b->direction * SDL_PI_F / 180);
     const char *roll;
@@ -970,11 +1010,7 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     if (app->tapScene) {
         const SSRTapBall *tap = &chance->tap;
         ssr_scene_place(app->tapScene, "TapBall", tap->x, tap->y, tap->depth);
-        // The shadow stays on the ground under the ball (y 810 at rest) and
-        // gets smaller as the ball goes up.
-        float lift = tap->z > 0 ? tap->z : 0;
-        float shadowScale = tap->depth * SDL_max(0.4f, 1 - lift / 800);
-        ssr_scene_place(app->tapScene, "TapBallShadows", tap->x, 810 + 125 * tap->depth, shadowScale);
+        update_tap_shadows(app, tap);
         ssr_scene_update(app->tapScene, env, ms);
         ssr_scene_update(app->stadiumStaticScene, env, ms);
         ssr_scene_update(app->stadiumScene, env, ms);
