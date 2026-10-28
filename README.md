@@ -124,7 +124,7 @@ The app accepts these files:
 
 - an APK, for example from `adb pull` on your Android phone. On Android
   the app imports the game that is installed on the phone.
-- an XAPK, which holds the APK
+- an XAPK, an APKM of APKMirror, or an APKS, which holds the APK
 - an IPA that you decrypted from your own install
 
 The reference version is the Android release 4.32.
@@ -140,7 +140,7 @@ or AltStore, or install `StarSoccerRebooted.ipa` with them. Start the app
 one time. Then put your copy in the folder of the app: in Files, open On My
 iPhone and then Star Soccer. In LiveContainer, use the Documents folder of
 the container of the app. Close the app fully and start it again. It
-imports the first APK, XAPK, or IPA of the folder.
+imports the first XAPK, APKM, APKS, APK, or IPA of the folder.
 
 **Android.** Install New Star Soccer from Google Play first. Then install
 the APK of the release. The app imports the game from the phone.
