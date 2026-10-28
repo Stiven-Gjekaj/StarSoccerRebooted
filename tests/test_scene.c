@@ -1303,6 +1303,14 @@ static void test_moves_copies_and_sorts_by_y(void) {
     int low = ssr_scene_spawn(scene, "Pitch", "Player", 0, NULL, 0);
     int high = ssr_scene_spawn(scene, "Pitch", "Player", 0, NULL, 0);
     CHECK(low && high && low != high);
+    // A chance needs more than 64 copies: each gets its own id.
+    int more[120], fresh = 1;
+    for (int i = 0; i < 120; i++) {
+        more[i] = ssr_scene_spawn(scene, "Pitch", "Player", 0, NULL, 0);
+        fresh &= more[i] > high + i;
+    }
+    CHECK(fresh);
+    for (int i = 0; i < 120; i++) ssr_scene_spawn_show(scene, more[i], NULL, 0);
     ssr_scene_spawn_place(scene, low, NULL, 100, 500);
     ssr_scene_spawn_place(scene, high, NULL, 200, 300);
     ssr_scene_spawn_anim(scene, high, "PlayerAnim", "RunB");

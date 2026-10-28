@@ -11,6 +11,9 @@
 #include "ssr_expr.h"
 #include "ssr_random.h"
 
+// The most copies of templates that a screen holds at one time. A chance
+// has two for each player, 40 for the trail of the ball, and the ball.
+#define SPAWNS_MAX 256
 #define MAX_ORIGINS 64
 #define MAX_LAYERS 64
 #define PI_F 3.14159265f
@@ -321,7 +324,7 @@ struct SSRScene {
     } embeds[32];
     int embedCount;
     // The copies of templates that the code made, by id - 1.
-    Gel *spawned[64];
+    Gel *spawned[SPAWNS_MAX];
     // The random numbers of the emitters. The crowds have their own.
     SSRRandom random;
 
@@ -4124,7 +4127,7 @@ int ssr_scene_spawn(SSRScene *scene, const char *parent, const char *template_, 
     Gel *model = scene && template_ ? find_ref_first(scene, template_) : NULL;
     if (!holder || !model) return 0;
     int id = 0;
-    for (int i = 0; i < 64 && !id; i++) {
+    for (int i = 0; i < SPAWNS_MAX && !id; i++) {
         if (!scene->spawned[i]) id = i + 1;
     }
     if (!id) return 0;
@@ -4148,11 +4151,11 @@ int ssr_scene_spawn(SSRScene *scene, const char *parent, const char *template_, 
 }
 
 float ssr_scene_spawn_x(const SSRScene *scene, int id) {
-    return scene && id > 0 && id <= 64 && scene->spawned[id - 1] ? scene->spawned[id - 1]->x : 0;
+    return scene && id > 0 && id <= SPAWNS_MAX && scene->spawned[id - 1] ? scene->spawned[id - 1]->x : 0;
 }
 
 void ssr_scene_spawn_remove(SSRScene *scene, int id) {
-    if (!scene || id < 1 || id > 64 || !scene->spawned[id - 1]) return;
+    if (!scene || id < 1 || id > SPAWNS_MAX || !scene->spawned[id - 1]) return;
     Gel *g = scene->spawned[id - 1];
     scene->spawned[id - 1] = NULL;
     Gel *p = g->parent;
@@ -4179,7 +4182,7 @@ static Gel *find_below(Gel *g, const char *ref) {
 }
 
 static Gel *spawned(const SSRScene *scene, int id) {
-    return scene && id > 0 && id <= 64 ? scene->spawned[id - 1] : NULL;
+    return scene && id > 0 && id <= SPAWNS_MAX ? scene->spawned[id - 1] : NULL;
 }
 
 void ssr_scene_spawn_place(SSRScene *scene, int id, const char *ref, float x, float y) {
