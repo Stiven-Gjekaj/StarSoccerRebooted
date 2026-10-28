@@ -143,7 +143,10 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
       captaincy, and the sponsors
 - [x] The gambling news, with the casino of 0.8
 - [x] The skill bar in the message of a dilemma accident
-- [ ] Check the colour of the interview buttons against the original
+- [x] Check the colour of the interview buttons against the original.
+      EnableAllButtons sets each button white at the setup, a fault sets
+      the button red, and the outlines show the right buttons, as in the
+      remake.
 - [x] Money, the lifestyle shop, and boots (`ShopLifestyle`, `BootShop`,
       `BuyItem`)
 - [x] Match balls (`MatchBalls`): six free balls, one for each match
@@ -179,10 +182,12 @@ in the code of the original (`c_TMatch`, `TScreen_Casino`).
 - [x] The coin shower and the ticker tape of a win (`Spawn`). Each win
       shows a new ticker tape. A tie of blackjack gives the bet back with
       no sound.
-- [ ] The camera of the race moves all horses; check it against the
-      original
-- [ ] The size of the roulette wheel: the remake takes 545 for the width
-      of the "Wheel" gadget. Check it against the original.
+- [x] The camera of the race moves all horses; check it against the
+      original. TRacing.Update moves each horse back by the distance of
+      the leader past x 350, and down by 0.2 of it, as the remake does.
+- [x] The size of the roulette wheel: the remake takes 545 for the width
+      of the "Wheel" gadget. The original reads the width of the hot zone
+      of the gadget, the Draw of 545 in roulette.uis.
 - The casino games take their numbers from the clock, as the original
   does. The remake keeps the numbers of the career apart, so a visit to
   the casino does not change them.
