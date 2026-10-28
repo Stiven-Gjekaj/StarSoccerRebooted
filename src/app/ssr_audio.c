@@ -67,10 +67,20 @@ void ssr_audio_set_volume(SSRAudio *audio, float volume) {
 }
 
 void ssr_audio_play(SSRAudio *audio, const char *name) {
-    if (!audio || !name || audio->volume <= 0) return;
+    ssr_audio_play_at(audio, name, 1);
+}
+
+void ssr_audio_play_at(SSRAudio *audio, const char *name, float volume) {
+    if (!audio || !name || audio->volume <= 0 || volume <= 0) return;
     int count = ssr_sounds_count(audio->sounds, name);
-    if (count == 0) return;
-    const char *file = ssr_sounds_file(audio->sounds, name, (int)SDL_rand(count));
+    char own[256];
+    const char *file = NULL;
+    if (count > 0) {
+        file = ssr_sounds_file(audio->sounds, name, (int)SDL_rand(count));
+    } else if (SDL_strncmp(name, "Sounds/", 7) == 0) {
+        SDL_snprintf(own, sizeof(own), "%s.ogg", name);
+        file = own;
+    }
     const SSRPcm *pcm = file ? pcm_for(audio, file) : NULL;
     if (!pcm) return;
 
@@ -85,6 +95,6 @@ void ssr_audio_play(SSRAudio *audio, const char *name) {
         audio->voices[index] = SDL_CreateAudioStream(&spec, NULL);
         if (!audio->voices[index] || !SDL_BindAudioStream(audio->device, audio->voices[index])) return;
     }
-    SDL_SetAudioStreamGain(audio->voices[index], audio->volume);
+    SDL_SetAudioStreamGain(audio->voices[index], audio->volume * (volume > 1 ? 1 : volume));
     SDL_PutAudioStreamData(audio->voices[index], pcm->samples, pcm->frames * pcm->channels * (int)sizeof(int16_t));
 }
