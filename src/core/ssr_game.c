@@ -258,6 +258,10 @@ struct SSRGame {
     int bannerEnd;
     SSRTapTouch touch;
     int touchWasDown;
+    // A press that the next tick has not seen, and its point. A quick tap
+    // can go down and up between two ticks.
+    int touchPressed;
+    float pressX, pressY;
     // The rows of the commentary. The screen shows them again when it
     // comes back after a chance (m_commentaryCache).
     SSRMatchLine commentary[256];
@@ -429,6 +433,8 @@ static void show_splash(SSRGame *game, const char *layout, int ms) {
 // changes for the old screen go away.
 static void set_screen(SSRGame *game, const char *name) {
     snprintf(game->screen, sizeof(game->screen), "%s", name);
+    // A press on the old screen is not a tap of the new one.
+    game->touchPressed = 0;
     game->version++;
     game->opCount = 0;
     ssr_tweaks_set(game->tweaks, "Menu", "CurrentScreen", name);
@@ -1590,12 +1596,24 @@ static void end_trial(SSRGame *game) {
     message(game, "messagedefault", loc(game, key), 0, 1, call);
 }
 
+// The touch of a tick. A press counts once, also when the finger is up
+// again before the tick.
+static SSRTapTouch take_touch(SSRGame *game) {
+    SSRTapTouch touch = game->touch;
+    touch.hit = (touch.down && !game->touchWasDown) || game->touchPressed;
+    if (game->touchPressed) {
+        touch.x = game->pressX;
+        touch.y = game->pressY;
+    }
+    game->touchPressed = 0;
+    game->touchWasDown = touch.down;
+    return touch;
+}
+
 // One tick of a trial: the drill, its hint, its lives, and its banners.
 static void trial_tick(SSRGame *game) {
     SSRTraining *t = game->training;
-    SSRTapTouch touch = game->touch;
-    touch.hit = touch.down && !game->touchWasDown;
-    game->touchWasDown = touch.down;
+    SSRTapTouch touch = take_touch(game);
     ssr_training_update(t, game->now, &touch, &game->random);
     chance_sounds(game, &t->chance);
     // c_TrialHud.m_Update: the hint goes after the first aim.
@@ -5777,9 +5795,7 @@ static void match_tick(SSRGame *game) {
             if (game->offerEnd && game->now >= game->offerEnd) skip_replay(game);
             return;
         }
-        SSRTapTouch touch = game->touch;
-        touch.hit = touch.down && !game->touchWasDown;
-        game->touchWasDown = touch.down;
+        SSRTapTouch touch = take_touch(game);
         ssr_chance_update(game->chance, game->now, &touch, &game->random);
         chance_sounds(game, game->chance);
         record_replay(game);
@@ -12509,6 +12525,11 @@ int ssr_game_replaying(const SSRGame *game) {
 
 void ssr_game_touch(SSRGame *game, int down, float x, float y) {
     if (!game) return;
+    if (down && !game->touch.down) {
+        game->touchPressed = 1;
+        game->pressX = x;
+        game->pressY = y;
+    }
     game->touch.down = down;
     game->touch.x = x;
     game->touch.y = y;

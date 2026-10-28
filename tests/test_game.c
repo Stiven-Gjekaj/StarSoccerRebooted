@@ -820,15 +820,19 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
             ssr_game_touch(game, 0, aimX, aimY);
             ssr_game_update(game, 1);
             CHECK(chance->state == SSR_CHANCE_TAP);
-            // Wait for the tap ball to come near, then tap it.
+            // Wait for the tap ball to come near, then tap it as a phone
+            // does: the finger goes down and up before the next tick.
+            int tapped = 0;
             for (int i = 0; i < 600 && chance->state == SSR_CHANCE_TAP; i++) {
-                ssr_game_touch(game, 0, 0, 0);
                 ssr_game_update(game, 1);
-                if (chance->tap.x > 100 && chance->tap.x < 540) {
+                if (!tapped && chance->tap.x > 100 && chance->tap.x < 540) {
                     ssr_game_touch(game, 1, chance->tap.x, chance->tap.y);
-                    ssr_game_update(game, 1);
+                    ssr_game_touch(game, 0, chance->tap.x, chance->tap.y);
+                    tapped = 1;
                 }
             }
+            // The tap kicks the ball.
+            CHECK(!tapped || chance->tap.powScale > -1);
             ssr_game_touch(game, 0, 0, 0);
             // The chance ends with a banner of its result.
             for (int i = 0; i < 2000 && ssr_game_chance(game) && chance->state != SSR_CHANCE_OVER; i++) {
