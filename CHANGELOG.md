@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.31.0 (2026-10-28)
+
+- The Skills button of the game menu opens the skills. Each skill has a
+  drill with 20 levels. A drill that the player passes gives its level
+  the stars of the lives that are left, and trains the skill that day.
+  The player can do three drills a day, and each drill costs energy.
+- The information screens of 4.32: the captaincy, the first boots with
+  control or with swerve, and the offside rule when the vision reaches
+  60.
+- The animation of a purchase closes by itself, as in the original.
+- The shadows of the ball move out and fade as the ball rises, as in the
+  original, and show on the ground.
+- A new check compares rules of the remake with the code of 4.32 on an
+  Android device (`scripts/rules-check.sh`).
+
 ## 0.30.0 (2026-10-28)
 
 - The match stats show the saves of a goalkeeper and the blocks of a
