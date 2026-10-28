@@ -1,0 +1,7 @@
+# The import has no BallShadow image, so the tap ball had no shadow. The
+# four night shadows use the shadow of the remake (SSRBallShadow), each
+# faint, and the app puts the group under the ball (TapBallShadows).
+- Rect:(-1000,925) ref:TapBallNightShadow
++ Rect:(-1000,925) ref:TapBallShadows
+- Draw:(BallShadow,0,0,200,50) ref:TapBallNightShadow
++ Draw:(SSRBallShadow,0,0,260,60,,#FFFFFF70) ref:TapBallNightShadow

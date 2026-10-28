@@ -736,10 +736,13 @@ static void play_a_match(SSRGame *game, SSRTweaks *tweaks) {
         CHECK(ssr_tweaks_number(tweaks, "Match", "Focus") == 2);
         ssr_game_message(game, "packs.btn_Realism");
     }
+    ssr_tweaks_set_number(tweaks, "Match", "Daytime", 1);
     ssr_game_message(game, "match.btn_Play");
     CHECK(ssr_tweaks_number(tweaks, "Match", "MatchState") == 0);
     // The footer moves one tab of 720 units, so that the buttons show.
     CHECK(ssr_tweaks_number(tweaks, "Menu", "MatchScreenFooter") == -720);
+    // The matches are at night, so the ball has the night shadows.
+    CHECK(ssr_tweaks_number(tweaks, "Match", "Daytime") == 0);
     CHECK(ssr_tweaks_number(tweaks, "Match", "MaximiseScreen") == 1);
     int kick = take_ops(game, ops, 64);
     CHECK(has_op(ops, kick, SSR_OP_ANIM, "NameBar", "1"));

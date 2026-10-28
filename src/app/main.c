@@ -970,6 +970,11 @@ static void update_chance_view(SSRApp *app, SSRSceneEnv *env, int ms) {
     if (app->tapScene) {
         const SSRTapBall *tap = &chance->tap;
         ssr_scene_place(app->tapScene, "TapBall", tap->x, tap->y, tap->depth);
+        // The shadow stays on the ground under the ball (y 810 at rest) and
+        // gets smaller as the ball goes up.
+        float lift = tap->z > 0 ? tap->z : 0;
+        float shadowScale = tap->depth * SDL_max(0.4f, 1 - lift / 800);
+        ssr_scene_place(app->tapScene, "TapBallShadows", tap->x, 810 + 125 * tap->depth, shadowScale);
         ssr_scene_update(app->tapScene, env, ms);
         ssr_scene_update(app->stadiumStaticScene, env, ms);
         ssr_scene_update(app->stadiumScene, env, ms);

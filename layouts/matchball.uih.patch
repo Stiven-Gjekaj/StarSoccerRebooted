@@ -1,0 +1,28 @@
+# The import has no BallShadow image, so the ball had no shadow. The
+# matches are at night (the game never sets Match.Daytime), so the ball
+# gets a soft shadow of the remake (SSRBallShadow) from each of the four
+# floodlights. The shadows go out from the ball, so that the ball does not
+# hide them on the ground. One group draws the four shadows, in place of
+# the four calls of M_BallShadow.
+- Draw:(BallShadow,0,0,14,18) ref:Ball
++ Rect:(0,0) ref:BallShadows
++ {
++     Draw:(SSRBallShadow,-9,-5,22,15,,#FFFFFF90)
++         Layer(Minigame)
++         YDepth(-10)
++         Handle(0.5,0.5)
++     Draw:(SSRBallShadow,9,-5,22,15,,#FFFFFF90)
++         Layer(Minigame)
++         YDepth(-10)
++         Handle(0.5,0.5)
++     Draw:(SSRBallShadow,-9,7,22,15,,#FFFFFF90)
++         Layer(Minigame)
++         YDepth(-10)
++         Handle(0.5,0.5)
++     Draw:(SSRBallShadow,9,7,22,15,,#FFFFFF90)
++         Layer(Minigame)
++         YDepth(-10)
++         Handle(0.5,0.5)
++ }
+- M_BallShadow:(0.5,0.5)
+- ShowIf(Match,Daytime,1)

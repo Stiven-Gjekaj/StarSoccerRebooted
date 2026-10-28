@@ -1980,6 +1980,9 @@ static void match_state(SSRGame *game) {
     // While the clock runs, the commentary fills the screen
     // (c_AScreen_Match.m_ButtonPlay and m_DoHalfEnd).
     ssr_tweaks_set_number(game->tweaks, "Match", "MaximiseScreen", state == 0);
+    // The matches are at night, as the stadium of the tap ball: the night
+    // shadows of the ball show (matchball.uih, tapball.uis).
+    ssr_tweaks_set_number(game->tweaks, "Match", "Daytime", 0);
     ssr_tweaks_set_number(game->tweaks, "Menu", "MaximiseCommentary", state == 0);
 }
 
